@@ -33,6 +33,7 @@ import org.opensearch.ml.action.stats.MLStatsNodesAction;
 import org.opensearch.ml.action.stats.MLStatsNodesTransportAction;
 import org.opensearch.ml.action.training.TransportTrainingTaskAction;
 import org.opensearch.ml.action.trainpredict.TransportTrainAndPredictionTaskAction;
+import org.opensearch.ml.common.parameter.AnomalyDetectionLibSVMParams;
 import org.opensearch.ml.common.parameter.FunctionName;
 import org.opensearch.ml.common.parameter.KMeansParams;
 import org.opensearch.ml.common.parameter.LinearRegressionParams;
@@ -235,6 +236,7 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin {
             .of(
                 KMeansParams.XCONTENT_REGISTRY,
                 LinearRegressionParams.XCONTENT_REGISTRY,
+                AnomalyDetectionLibSVMParams.XCONTENT_REGISTRY,
                 SampleAlgoParams.XCONTENT_REGISTRY,
                 LocalSampleCalculatorInput.XCONTENT_REGISTRY,
                 AnomalyLocalizationInput.XCONTENT_REGISTRY_ENTRY

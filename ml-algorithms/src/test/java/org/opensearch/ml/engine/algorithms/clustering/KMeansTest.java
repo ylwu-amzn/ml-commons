@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package org.opensearch.ml.engine.clustering;
+package org.opensearch.ml.engine.algorithms.clustering;
 
 import org.junit.Assert;
 import org.junit.Before;
@@ -13,7 +13,6 @@ import org.opensearch.ml.common.parameter.KMeansParams;
 import org.opensearch.ml.common.parameter.FunctionName;
 import org.opensearch.ml.common.parameter.MLPredictionOutput;
 import org.opensearch.ml.engine.Model;
-import org.opensearch.ml.engine.algorithms.clustering.KMeans;
 
 import static org.opensearch.ml.engine.helper.KMeansHelper.constructKMeansDataFrame;
 

@@ -15,6 +15,7 @@ import org.tribuo.Example;
 import org.tribuo.MutableDataset;
 import org.tribuo.Output;
 import org.tribuo.OutputFactory;
+import org.tribuo.anomaly.Event;
 import org.tribuo.clustering.ClusterID;
 import org.tribuo.datasource.ListDataSource;
 import org.tribuo.impl.ArrayExample;
@@ -64,6 +65,9 @@ public class TribuoUtil {
                 case REGRESSOR:
                     //Create single dimension tribuo regressor with name DIM-0 and value double NaN.
                     example = new ArrayExample<T>((T) new Regressor("DIM-0", Double.NaN), featureNamesValues.v1(), featureNamesValues.v2()[i]);
+                    break;
+                case ANOMALY_DETECTION_LIBSVM:
+                    example = new ArrayExample<T>((T) new Event(Event.EventType.EXPECTED), featureNamesValues.v1(), featureNamesValues.v2()[i]);
                     break;
                 default:
                     throw new IllegalArgumentException("unknown type:" + outputType);
