@@ -28,13 +28,13 @@ import org.opensearch.index.query.MatchAllQueryBuilder;
 import org.opensearch.ml.common.dataframe.ColumnType;
 import org.opensearch.ml.common.dataframe.DataFrame;
 import org.opensearch.ml.common.dataframe.DataFrameBuilder;
-import org.opensearch.ml.common.dataset.DataFrameInputDataset;
-import org.opensearch.ml.common.dataset.MLInputDataType;
-import org.opensearch.ml.common.dataset.MLInputDataset;
-import org.opensearch.ml.common.dataset.SearchQueryInputDataset;
+import org.opensearch.ml.common.input.dataset.DataFrameInputDataset;
+import org.opensearch.ml.common.input.dataset.MLInputDataType;
+import org.opensearch.ml.common.input.dataset.MLInputDataset;
+import org.opensearch.ml.common.input.dataset.SearchQueryInputDataset;
 import org.opensearch.ml.common.parameter.KMeansParams;
 import org.opensearch.ml.common.parameter.FunctionName;
-import org.opensearch.ml.common.parameter.MLInput;
+import org.opensearch.ml.common.input.MLInput;
 import org.opensearch.search.builder.SearchSourceBuilder;
 
 import static org.junit.Assert.assertEquals;

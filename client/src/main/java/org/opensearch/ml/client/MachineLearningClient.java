@@ -15,10 +15,10 @@ package org.opensearch.ml.client;
 import org.opensearch.action.ActionFuture;
 import org.opensearch.action.ActionListener;
 import org.opensearch.action.support.PlainActionFuture;
-import org.opensearch.ml.common.parameter.Input;
-import org.opensearch.ml.common.parameter.MLInput;
-import org.opensearch.ml.common.parameter.MLOutput;
-import org.opensearch.ml.common.parameter.Output;
+import org.opensearch.ml.common.input.Input;
+import org.opensearch.ml.common.input.MLInput;
+import org.opensearch.ml.common.output.MLOutput;
+import org.opensearch.ml.common.output.Output;
 
 /**
  * A client to provide interfaces for machine learning jobs. This will be used by other plugins.

@@ -12,7 +12,7 @@
 
 package org.opensearch.ml.common.annotation;
 
-import org.opensearch.ml.common.dataset.MLInputDataType;
+import org.opensearch.ml.common.input.dataset.MLInputDataType;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;

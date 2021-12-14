@@ -15,9 +15,9 @@ import org.junit.Test;
 import org.opensearch.client.Client;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.ml.common.parameter.FunctionName;
-import org.opensearch.ml.common.parameter.Input;
-import org.opensearch.ml.common.parameter.LocalSampleCalculatorInput;
-import org.opensearch.ml.common.parameter.SampleAlgoOutput;
+import org.opensearch.ml.common.input.Input;
+import org.opensearch.ml.common.input.LocalSampleCalculatorInput;
+import org.opensearch.ml.common.output.SampleAlgoOutput;
 import org.opensearch.ml.engine.algorithms.sample.LocalSampleCalculator;
 
 import java.util.ArrayList;

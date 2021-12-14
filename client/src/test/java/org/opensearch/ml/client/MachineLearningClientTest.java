@@ -21,14 +21,14 @@ import org.opensearch.action.ActionListener;
 import org.opensearch.common.io.stream.StreamOutput;
 import org.opensearch.common.xcontent.XContentBuilder;
 import org.opensearch.ml.common.dataframe.DataFrame;
-import org.opensearch.ml.common.dataset.DataFrameInputDataset;
-import org.opensearch.ml.common.parameter.Input;
+import org.opensearch.ml.common.input.dataset.DataFrameInputDataset;
+import org.opensearch.ml.common.input.Input;
 import org.opensearch.ml.common.parameter.FunctionName;
 import org.opensearch.ml.common.parameter.MLAlgoParams;
-import org.opensearch.ml.common.parameter.MLInput;
-import org.opensearch.ml.common.parameter.MLOutput;
-import org.opensearch.ml.common.parameter.MLTrainingOutput;
-import org.opensearch.ml.common.parameter.Output;
+import org.opensearch.ml.common.input.MLInput;
+import org.opensearch.ml.common.output.MLOutput;
+import org.opensearch.ml.common.output.MLTrainingOutput;
+import org.opensearch.ml.common.output.Output;
 
 import java.io.IOException;
 
