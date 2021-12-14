@@ -17,8 +17,7 @@ import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.opensearch.common.io.stream.BytesStreamOutput;
 import org.opensearch.common.io.stream.StreamInput;
-import org.opensearch.ml.common.parameter.FunctionName;
-import org.opensearch.ml.common.parameter.MLAlgoParams;
+import org.opensearch.ml.common.parameter.Parameters;
 import org.opensearch.ml.common.parameter.SampleAlgoParams;
 
 import java.io.IOException;
@@ -52,7 +51,7 @@ public class MLCommonsClassLoaderTests {
 
     @Test
     public void testClassLoader_Return_MLAlgoParams() {
-        MLAlgoParams mlAlgoParams = MLCommonsClassLoader.initInstance(FunctionName.SAMPLE_ALGO, streamInput, StreamInput.class);
+        Parameters mlAlgoParams = MLCommonsClassLoader.initInstance(FunctionName.SAMPLE_ALGO, streamInput, StreamInput.class);
         assertTrue(mlAlgoParams instanceof SampleAlgoParams);
         assertEquals(params.getSampleParam(), ((SampleAlgoParams)mlAlgoParams).getSampleParam());
     }

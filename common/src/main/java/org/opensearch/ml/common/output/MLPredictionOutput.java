@@ -9,7 +9,7 @@
  *  GitHub history for details.
  */
 
-package org.opensearch.ml.common.parameter;
+package org.opensearch.ml.common.output;
 
 import lombok.Builder;
 import lombok.Data;
@@ -28,7 +28,7 @@ import java.io.IOException;
 @Data
 @EqualsAndHashCode(callSuper=false)
 @MLAlgoOutput(MLOutputType.PREDICTION)
-public class MLPredictionOutput extends MLOutput{
+public class MLPredictionOutput extends MLOutput {
 
     private static final MLOutputType OUTPUT_TYPE = MLOutputType.PREDICTION;
     public static final String TASK_ID_FIELD = "task_id";

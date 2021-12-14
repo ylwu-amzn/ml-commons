@@ -9,7 +9,7 @@
  *  GitHub history for details.
  */
 
-package org.opensearch.ml.common.parameter;
+package org.opensearch.ml.common;
 
 public enum FunctionName {
     LINEAR_REGRESSION,

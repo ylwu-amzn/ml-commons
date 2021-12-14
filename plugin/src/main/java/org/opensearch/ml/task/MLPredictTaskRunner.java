@@ -38,13 +38,13 @@ import org.opensearch.index.query.QueryBuilder;
 import org.opensearch.index.query.QueryBuilders;
 import org.opensearch.ml.action.prediction.MLPredictionTaskExecutionAction;
 import org.opensearch.ml.common.dataframe.DataFrame;
-import org.opensearch.ml.common.dataset.DataFrameInputDataset;
-import org.opensearch.ml.common.dataset.MLInputDataType;
-import org.opensearch.ml.common.parameter.Input;
-import org.opensearch.ml.common.parameter.MLInput;
-import org.opensearch.ml.common.parameter.MLOutput;
-import org.opensearch.ml.common.parameter.MLPredictionOutput;
-import org.opensearch.ml.common.parameter.Output;
+import org.opensearch.ml.common.input.dataset.DataFrameInputDataset;
+import org.opensearch.ml.common.input.dataset.MLInputDataType;
+import org.opensearch.ml.common.input.Input;
+import org.opensearch.ml.common.input.MLInput;
+import org.opensearch.ml.common.output.MLOutput;
+import org.opensearch.ml.common.output.MLPredictionOutput;
+import org.opensearch.ml.common.output.Output;
 import org.opensearch.ml.common.transport.execute.MLExecuteTaskRequest;
 import org.opensearch.ml.common.transport.execute.MLExecuteTaskResponse;
 import org.opensearch.ml.common.transport.prediction.MLPredictionTaskRequest;
@@ -133,7 +133,8 @@ public class MLPredictTaskRunner extends MLTaskRunner<MLPredictionTaskRequest, M
             .createTime(Instant.now())
             .state(MLTaskState.CREATED)
             .build();
-        MLInput mlInput = request.getMlInput();
+//        MLInput mlInput = (MLInput)request.getInput();
+        Input mlInput = request.getInput();
         if (mlInput.getInputDataset().getInputDataType().equals(MLInputDataType.SEARCH_QUERY)) {
             ActionListener<DataFrame> dataFrameActionListener = ActionListener
                 .wrap(dataFrame -> { predict(mlTask, dataFrame, request, listener); }, e -> {
@@ -164,7 +165,7 @@ public class MLPredictTaskRunner extends MLTaskRunner<MLPredictionTaskRequest, M
         mlStats.getStat(ML_EXECUTING_TASK_COUNT.getName()).increment();
         mlTaskManager.add(mlTask);
 
-        MLInput mlInput = request.getMlInput();
+        MLInput mlInput = request.getInput();
         // search model by model id.
         Model model = new Model();
         if (request.getModelId() != null) {

@@ -15,10 +15,10 @@ package org.opensearch.ml.engine.algorithms.clustering;
 import org.opensearch.ml.common.dataframe.DataFrame;
 import org.opensearch.ml.common.dataframe.DataFrameBuilder;
 import org.opensearch.ml.common.parameter.KMeansParams;
-import org.opensearch.ml.common.parameter.FunctionName;
-import org.opensearch.ml.common.parameter.MLAlgoParams;
-import org.opensearch.ml.common.parameter.MLOutput;
-import org.opensearch.ml.common.parameter.MLPredictionOutput;
+import org.opensearch.ml.common.FunctionName;
+import org.opensearch.ml.common.parameter.Parameters;
+import org.opensearch.ml.common.output.MLOutput;
+import org.opensearch.ml.common.output.MLPredictionOutput;
 import org.opensearch.ml.engine.Model;
 import org.opensearch.ml.engine.Predictable;
 import org.opensearch.ml.engine.Trainable;
@@ -62,7 +62,7 @@ public class KMeans implements Trainable, Predictable {
 
     public KMeans() {}
 
-    public KMeans(MLAlgoParams parameters) {
+    public KMeans(Parameters parameters) {
         this.parameters = parameters == null ? KMeansParams.builder().build() : (KMeansParams)parameters;
         validateParameters();
         createDistance();

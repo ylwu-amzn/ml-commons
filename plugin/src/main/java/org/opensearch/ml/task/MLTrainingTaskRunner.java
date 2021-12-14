@@ -33,10 +33,10 @@ import org.opensearch.client.Client;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.ml.action.training.MLTrainingTaskExecutionAction;
 import org.opensearch.ml.common.dataframe.DataFrame;
-import org.opensearch.ml.common.dataset.DataFrameInputDataset;
-import org.opensearch.ml.common.dataset.MLInputDataType;
-import org.opensearch.ml.common.parameter.MLInput;
-import org.opensearch.ml.common.parameter.MLTrainingOutput;
+import org.opensearch.ml.common.input.dataset.DataFrameInputDataset;
+import org.opensearch.ml.common.input.dataset.MLInputDataType;
+import org.opensearch.ml.common.input.MLInput;
+import org.opensearch.ml.common.output.MLTrainingOutput;
 import org.opensearch.ml.common.transport.training.MLTrainingTaskRequest;
 import org.opensearch.ml.common.transport.training.MLTrainingTaskResponse;
 import org.opensearch.ml.engine.MLEngine;
@@ -117,7 +117,7 @@ public class MLTrainingTaskRunner extends MLTaskRunner<MLTrainingTaskRequest, ML
         // 1). search data failure, 2) train model failure, 3) persist model failure.
         MLTrainingOutput output = MLTrainingOutput.builder().modelId(mlTask.getTaskId()).status(MLTaskState.CREATED.name()).build();
         listener.onResponse(MLTrainingTaskResponse.builder().output(output).build());
-        MLInput mlInput = request.getMlInput();
+        MLInput mlInput = request.getInput();
         if (mlInput.getInputDataset().getInputDataType().equals(MLInputDataType.SEARCH_QUERY)) {
             ActionListener<DataFrame> dataFrameActionListener = ActionListener
                 .wrap(

@@ -9,21 +9,23 @@
  *  GitHub history for details.
  */
 
-package org.opensearch.ml.common.parameter;
+package org.opensearch.ml.common.input;
 
 import lombok.Builder;
-import lombok.Data;
 import org.opensearch.common.io.stream.StreamInput;
 import org.opensearch.common.io.stream.StreamOutput;
 import org.opensearch.common.xcontent.XContentBuilder;
 import org.opensearch.common.xcontent.XContentParser;
 import org.opensearch.ml.common.MLCommonsClassLoader;
+import org.opensearch.ml.common.annotation.FunctionInput;
 import org.opensearch.ml.common.dataframe.DataFrame;
 import org.opensearch.ml.common.dataframe.DefaultDataFrame;
-import org.opensearch.ml.common.dataset.DataFrameInputDataset;
-import org.opensearch.ml.common.dataset.MLInputDataType;
-import org.opensearch.ml.common.dataset.MLInputDataset;
-import org.opensearch.ml.common.dataset.SearchQueryInputDataset;
+import org.opensearch.ml.common.input.dataset.DataFrameInputDataset;
+import org.opensearch.ml.common.input.dataset.MLInputDataType;
+import org.opensearch.ml.common.input.dataset.MLInputDataset;
+import org.opensearch.ml.common.input.dataset.SearchQueryInputDataset;
+import org.opensearch.ml.common.FunctionName;
+import org.opensearch.ml.common.parameter.Parameters;
 import org.opensearch.search.builder.SearchSourceBuilder;
 
 import java.io.IOException;
@@ -36,7 +38,9 @@ import static org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedT
 /**
  * ML input data: algirithm name, parameters and input data set.
  */
-@Data
+@FunctionInput(functions={FunctionName.KMEANS,
+        FunctionName.LINEAR_REGRESSION,
+        FunctionName.SAMPLE_ALGO})
 public class MLInput implements Input {
 
     public static final String ALGORITHM_FIELD = "algorithm";
@@ -48,39 +52,32 @@ public class MLInput implements Input {
     // Algorithm name
     private FunctionName algorithm;
     // ML algorithm parameters
-    private MLAlgoParams parameters;
+    private Parameters parameters;
     // Input data to train model, run trained model to predict or run ML algorithms(no-model-based) directly.
     private MLInputDataset inputDataset;
 
     private int version = 1;
 
     @Builder(toBuilder = true)
-    public MLInput(FunctionName algorithm, MLAlgoParams parameters, MLInputDataset inputDataset) {
-        validate(algorithm);
+    public MLInput(FunctionName algorithm, Parameters parameters, MLInputDataset inputDataset) {
+        validate(algorithm, inputDataset);
         this.algorithm = algorithm;
         this.parameters = parameters;
         this.inputDataset = inputDataset;
     }
 
-    public MLInput(FunctionName algorithm, MLAlgoParams parameters, SearchSourceBuilder searchSourceBuilder, List<String> sourceIndices, DataFrame dataFrame, MLInputDataset inputDataset) {
-        validate(algorithm);
-        this.algorithm = algorithm;
-        this.parameters = parameters;
-        if (inputDataset != null) {
-            this.inputDataset = inputDataset;
-        } else {
-            this.inputDataset = createInputDataSet(searchSourceBuilder, sourceIndices, dataFrame);
-        }
-    }
-
-    private void validate(FunctionName algorithm) {
+    private void validate(FunctionName algorithm, MLInputDataset inputDataset) {
         if (algorithm == null) {
             throw new IllegalArgumentException("algorithm can't be null");
         }
+        if (inputDataset == null) {
+            throw new IllegalArgumentException("inputDataset can't be null");
+        }
     }
 
-    public MLInput(StreamInput in) throws IOException {
-        this.algorithm = in.readEnum(FunctionName.class);
+    public MLInput(FunctionName functionName, StreamInput in) throws IOException {
+        //this.algorithm = in.readEnum(FunctionName.class);
+        setFunctionName(functionName);
         if (in.readBoolean()) {
             this.parameters = MLCommonsClassLoader.initInstance(algorithm, in, StreamInput.class);
         }
@@ -93,7 +90,8 @@ public class MLInput implements Input {
 
     @Override
     public void writeTo(StreamOutput out) throws IOException {
-        out.writeEnum(algorithm);
+        Input.super.writeTo(out);
+        //out.writeEnum(algorithm);
         if (parameters != null) {
             out.writeBoolean(true);
             parameters.writeTo(out);
@@ -139,7 +137,7 @@ public class MLInput implements Input {
     public static MLInput parse(XContentParser parser, String inputAlgoName) throws IOException {
         String algorithmName = inputAlgoName.toUpperCase(Locale.ROOT);
         FunctionName algorithm = FunctionName.valueOf(algorithmName);
-        MLAlgoParams mlParameters = null;
+        Parameters mlParameters = null;
         SearchSourceBuilder searchSourceBuilder = null;
         List<String> sourceIndices = new ArrayList<>();
         DataFrame dataFrame = null;
@@ -151,7 +149,7 @@ public class MLInput implements Input {
 
             switch (fieldName) {
                 case ML_PARAMETERS_FIELD:
-                    mlParameters = parser.namedObject(MLAlgoParams.class, algorithmName, null);
+                    mlParameters = parser.namedObject(Parameters.class, algorithmName, null);
                     break;
                 case INPUT_INDEX_FIELD:
                     ensureExpectedToken(XContentParser.Token.START_ARRAY, parser.currentToken(), parser);
@@ -170,10 +168,11 @@ public class MLInput implements Input {
                     break;
             }
         }
-        return new MLInput(algorithm, mlParameters, searchSourceBuilder, sourceIndices, dataFrame, null);
+        MLInputDataset inputDataset = createInputDataSet(searchSourceBuilder, sourceIndices, dataFrame);
+        return new MLInput(algorithm, mlParameters, inputDataset);
     }
 
-    private MLInputDataset createInputDataSet(SearchSourceBuilder searchSourceBuilder, List<String> sourceIndices, DataFrame dataFrame) {
+    private static MLInputDataset createInputDataSet(SearchSourceBuilder searchSourceBuilder, List<String> sourceIndices, DataFrame dataFrame) {
         if (dataFrame != null) {
             return new DataFrameInputDataset(dataFrame);
         }
@@ -186,6 +185,11 @@ public class MLInput implements Input {
     @Override
     public FunctionName getFunctionName() {
         return this.algorithm;
+    }
+
+    @Override
+    public void setFunctionName(FunctionName functionName) {
+        this.algorithm = functionName;
     }
 
     public DataFrame getDataFrame() {

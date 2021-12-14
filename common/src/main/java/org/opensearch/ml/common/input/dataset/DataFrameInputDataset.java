@@ -9,7 +9,7 @@
  *  GitHub history for details.
  */
 
-package org.opensearch.ml.common.dataset;
+package org.opensearch.ml.common.input.dataset;
 
 import java.io.IOException;
 
@@ -31,7 +31,7 @@ import org.opensearch.ml.common.dataframe.DefaultDataFrame;
  */
 @Getter
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-@InputDataSet(MLInputDataType.DATA_FRAME)
+@InputDataSet(org.opensearch.ml.common.input.dataset.MLInputDataType.DATA_FRAME)
 public class DataFrameInputDataset extends MLInputDataset {
     DataFrame dataFrame;
 

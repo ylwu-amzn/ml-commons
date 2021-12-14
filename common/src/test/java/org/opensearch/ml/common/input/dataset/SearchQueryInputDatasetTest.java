@@ -9,7 +9,7 @@
  *  GitHub history for details.
  */
 
-package org.opensearch.ml.common.dataset;
+package org.opensearch.ml.common.input.dataset;
 
 import java.io.IOException;
 import java.util.ArrayList;

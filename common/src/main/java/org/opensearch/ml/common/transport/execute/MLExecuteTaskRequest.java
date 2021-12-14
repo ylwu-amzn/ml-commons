@@ -23,13 +23,16 @@ import org.opensearch.common.io.stream.InputStreamStreamInput;
 import org.opensearch.common.io.stream.OutputStreamStreamOutput;
 import org.opensearch.common.io.stream.StreamInput;
 import org.opensearch.common.io.stream.StreamOutput;
-import org.opensearch.ml.common.parameter.Input;
-import org.opensearch.ml.common.parameter.MLInput;
+import org.opensearch.ml.common.MLCommonsClassLoader;
+import org.opensearch.ml.common.FunctionName;
+import org.opensearch.ml.common.input.Input;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.opensearch.action.ValidateActions.addValidationError;
 
@@ -47,7 +50,11 @@ public class MLExecuteTaskRequest extends ActionRequest {
 
     public MLExecuteTaskRequest(StreamInput in) throws IOException {
         super(in);
-        this.input = new MLInput(in);
+        FunctionName functionName = in.readEnum(FunctionName.class);
+        List<Object> params = new ArrayList<>();
+        params.add(functionName);
+        params.add(in);
+        this.input = MLCommonsClassLoader.initFunctionInput(functionName, params, null);
     }
 
     @Override

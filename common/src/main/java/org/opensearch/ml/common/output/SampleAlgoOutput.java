@@ -9,7 +9,7 @@
  *  GitHub history for details.
  */
 
-package org.opensearch.ml.common.parameter;
+package org.opensearch.ml.common.output;
 
 import lombok.Builder;
 import lombok.Data;
@@ -18,13 +18,15 @@ import org.opensearch.common.io.stream.StreamInput;
 import org.opensearch.common.io.stream.StreamOutput;
 import org.opensearch.common.xcontent.XContentBuilder;
 import org.opensearch.ml.common.annotation.MLAlgoOutput;
+import org.opensearch.ml.common.output.MLOutput;
+import org.opensearch.ml.common.output.MLOutputType;
 
 import java.io.IOException;
 
 @Data
 @EqualsAndHashCode(callSuper=false)
 @MLAlgoOutput(MLOutputType.SAMPLE_ALGO)
-public class SampleAlgoOutput extends MLOutput{
+public class SampleAlgoOutput extends MLOutput {
 
     private static final MLOutputType OUTPUT_TYPE = MLOutputType.SAMPLE_ALGO;
     public static final String SAMPLE_RESULT_FIELD = "sample_result";

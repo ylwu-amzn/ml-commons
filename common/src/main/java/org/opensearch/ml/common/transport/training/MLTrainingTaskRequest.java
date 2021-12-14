@@ -23,13 +23,16 @@ import org.opensearch.common.io.stream.InputStreamStreamInput;
 import org.opensearch.common.io.stream.OutputStreamStreamOutput;
 import org.opensearch.common.io.stream.StreamInput;
 import org.opensearch.common.io.stream.StreamOutput;
-import org.opensearch.ml.common.parameter.MLInput;
+import org.opensearch.ml.common.MLCommonsClassLoader;
+import org.opensearch.ml.common.FunctionName;
+import org.opensearch.ml.common.input.Input;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.util.Objects;
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.opensearch.action.ValidateActions.addValidationError;
 
@@ -39,27 +42,31 @@ import static org.opensearch.action.ValidateActions.addValidationError;
 public class MLTrainingTaskRequest extends ActionRequest {
 
     /**
-     * the name of algorithm
+     * the input of training task
      */
-    MLInput mlInput;
+    Input input;
 
     @Builder
-    public MLTrainingTaskRequest(MLInput mlInput) {
-        this.mlInput = mlInput;
+    public MLTrainingTaskRequest(Input input) {
+        this.input = input;
     }
 
     public MLTrainingTaskRequest(StreamInput in) throws IOException {
         super(in);
-        this.mlInput = new MLInput(in);
+        FunctionName functionName = in.readEnum(FunctionName.class);
+        List<Object> params = new ArrayList<>();
+        params.add(functionName);
+        params.add(in);
+        this.input = MLCommonsClassLoader.initFunctionInput(functionName, params, null);
     }
 
     @Override
     public ActionRequestValidationException validate() {
         ActionRequestValidationException exception = null;
-        if (mlInput == null) {
+        if (input == null) {
             exception = addValidationError("MLInput can't be null", exception);
-        } else if (Objects.isNull(mlInput.getInputDataset())) {
-            exception = addValidationError("input data can't be null", exception);
+        } else if (input.getFunctionName() == null) {
+            exception = addValidationError("ML function name can't be null", exception);
         }
 
         return exception;
@@ -68,7 +75,7 @@ public class MLTrainingTaskRequest extends ActionRequest {
     @Override
     public void writeTo(StreamOutput out) throws IOException {
         super.writeTo(out);
-        this.mlInput.writeTo(out);
+        this.input.writeTo(out);
     }
 
     public static MLTrainingTaskRequest fromActionRequest(ActionRequest actionRequest) {

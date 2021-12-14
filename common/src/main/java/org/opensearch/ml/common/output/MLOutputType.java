@@ -10,7 +10,7 @@
  *
  */
 
-package org.opensearch.ml.common.parameter;
+package org.opensearch.ml.common.output;
 
 public enum MLOutputType {
     TRAINING,

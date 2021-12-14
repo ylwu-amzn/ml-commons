@@ -6,7 +6,7 @@ This doc explains how to add new function to `ml-commons` with two examples.
 This sample algorithm will train a dummy model first. Then user can call predict API to calculate total sum of a data frame or selected data from indices.
 
 ### Step 1: name the function
-Add new function name in `org.opensearch.ml.common.parameter.FunctionName`
+Add new function name in `org.opensearch.ml.common.FunctionName`
 ```
 public enum FunctionName {
     ...
@@ -49,7 +49,7 @@ Register `SampleAlgoParams.XCONTENT_REGISTRY` in `MachineLearningPlugin.getNamed
 ```
 
 ### Step 3: add output class
-Add new enum in `org.opensearch.ml.common.parameter.MLOutputType`:
+Add new enum in `org.opensearch.ml.common.output.MLOutputType`:
 ```    
     public enum MLOutputType {
         ...
@@ -57,7 +57,7 @@ Add new enum in `org.opensearch.ml.common.parameter.MLOutputType`:
         ...
     }
 ```
-Create new class `org.opensearch.ml.common.parameter.SampleAlgoOutput` in `common` package by extending abstract class `MLOutput`.
+Create new class `org.opensearch.ml.common.output.SampleAlgoOutput` in `common` package by extending abstract class `MLOutput`.
 
 Must add `@MLAlgoOutput` annotation with new output type.
 
@@ -155,7 +155,7 @@ In this example, we will add a new sample calculator which runs on local node (d
 The sample calculator supports calculating `sum`/`max`/`min` value from a double list.
 
 ### Step 1: name the function
-Add new function name in  `org.opensearch.ml.common.parameter.FunctionName`
+Add new function name in  `org.opensearch.ml.common.FunctionName`
 ```
 public enum FunctionName {
     ...
@@ -165,7 +165,7 @@ public enum FunctionName {
 ```
 
 ### Step 2: add input class
-Add new class `org.opensearch.ml.common.parameter.LocalSampleCalculatorInput` by implementing `Input`.
+Add new class `org.opensearch.ml.common.input.LocalSampleCalculatorInput` by implementing `Input`.
 Must define `NamedXContentRegistry.Entry` in `LocalSampleCalculatorInput`.
 ```
 public class LocalSampleCalculatorInput implements Input {
@@ -193,7 +193,7 @@ Register `SampleAlgoParams.XCONTENT_REGISTRY` in `MachineLearningPlugin.getNamed
 ```
 
 ### Step 3: add output class
-Add output class `org.opensearch.ml.common.parameter.LocalSampleCalculatorOutput` by implementing `Output`.
+Add output class `org.opensearch.ml.common.output.LocalSampleCalculatorOutput` by implementing `Output`.
 ```
 public class LocalSampleCalculatorOutput implements Output{
     private Double result;

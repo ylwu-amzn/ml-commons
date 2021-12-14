@@ -19,6 +19,7 @@ import org.opensearch.common.io.stream.StreamOutput;
 import org.opensearch.common.xcontent.NamedXContentRegistry;
 import org.opensearch.common.xcontent.XContentBuilder;
 import org.opensearch.common.xcontent.XContentParser;
+import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.common.annotation.MLAlgoParameter;
 
 import java.io.IOException;
@@ -28,11 +29,11 @@ import static org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedT
 
 @Data
 @MLAlgoParameter(algorithms={FunctionName.LINEAR_REGRESSION})
-public class LinearRegressionParams implements MLAlgoParams {
+public class LinearRegressionParams implements Parameters {
 
     public static final String PARSE_FIELD_NAME = FunctionName.LINEAR_REGRESSION.name();
     public static final NamedXContentRegistry.Entry XCONTENT_REGISTRY = new NamedXContentRegistry.Entry(
-            MLAlgoParams.class,
+            Parameters.class,
             new ParseField(PARSE_FIELD_NAME),
             it -> parse(it)
     );
@@ -104,7 +105,7 @@ public class LinearRegressionParams implements MLAlgoParams {
         this.target = in.readOptionalString();
     }
 
-    public static MLAlgoParams parse(XContentParser parser) throws IOException {
+    public static Parameters parse(XContentParser parser) throws IOException {
         ObjectiveType objective = null;
         OptimizerType optimizerType = null;
         Double learningRate = null;

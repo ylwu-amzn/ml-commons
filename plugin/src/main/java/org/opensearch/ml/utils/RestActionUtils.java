@@ -10,7 +10,7 @@ import java.util.function.IntConsumer;
 import org.opensearch.action.search.SearchRequest;
 import org.opensearch.client.node.NodeClient;
 import org.opensearch.common.Strings;
-import org.opensearch.ml.common.dataset.SearchQueryInputDataset;
+import org.opensearch.ml.common.input.dataset.SearchQueryInputDataset;
 import org.opensearch.rest.RestRequest;
 
 public class RestActionUtils {

@@ -22,7 +22,7 @@ import org.opensearch.common.xcontent.XContentBuilder;
 import org.opensearch.common.xcontent.XContentFactory;
 import org.opensearch.common.xcontent.XContentType;
 import org.opensearch.ml.common.dataframe.DataFrameBuilder;
-import org.opensearch.ml.common.parameter.MLPredictionOutput;
+import org.opensearch.ml.common.output.MLPredictionOutput;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;

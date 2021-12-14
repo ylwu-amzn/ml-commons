@@ -9,11 +9,9 @@
  *  GitHub history for details.
  */
 
-package org.opensearch.ml.common.parameter;
+package org.opensearch.ml.common.input.dataset;
 
-import org.opensearch.common.io.stream.Writeable;
-import org.opensearch.common.xcontent.ToXContentObject;
-
-public interface Output extends ToXContentObject, Writeable {
-
+public enum MLInputDataType {
+    SEARCH_QUERY,
+    DATA_FRAME
 }

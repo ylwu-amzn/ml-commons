@@ -28,13 +28,13 @@ import org.opensearch.index.query.MatchAllQueryBuilder;
 import org.opensearch.ml.common.dataframe.ColumnType;
 import org.opensearch.ml.common.dataframe.DataFrame;
 import org.opensearch.ml.common.dataframe.DataFrameBuilder;
-import org.opensearch.ml.common.dataset.DataFrameInputDataset;
-import org.opensearch.ml.common.dataset.MLInputDataType;
-import org.opensearch.ml.common.dataset.MLInputDataset;
-import org.opensearch.ml.common.dataset.SearchQueryInputDataset;
+import org.opensearch.ml.common.input.dataset.DataFrameInputDataset;
+import org.opensearch.ml.common.input.dataset.MLInputDataType;
+import org.opensearch.ml.common.input.dataset.MLInputDataset;
+import org.opensearch.ml.common.input.dataset.SearchQueryInputDataset;
 import org.opensearch.ml.common.parameter.KMeansParams;
-import org.opensearch.ml.common.parameter.FunctionName;
-import org.opensearch.ml.common.parameter.MLInput;
+import org.opensearch.ml.common.FunctionName;
+import org.opensearch.ml.common.input.MLInput;
 import org.opensearch.search.builder.SearchSourceBuilder;
 
 import static org.junit.Assert.assertEquals;
@@ -62,15 +62,16 @@ public class MLPredictionTaskRequestTest {
     public void writeTo_Success() throws IOException {
 
         MLPredictionTaskRequest request = MLPredictionTaskRequest.builder()
-            .mlInput(mlInput)
+            .input(mlInput)
             .build();
         BytesStreamOutput bytesStreamOutput = new BytesStreamOutput();
         request.writeTo(bytesStreamOutput);
         request = new MLPredictionTaskRequest(bytesStreamOutput.bytes().streamInput());
-        assertEquals(FunctionName.KMEANS, request.getMlInput().getAlgorithm());
-        KMeansParams params = (KMeansParams)request.getMlInput().getParameters();
+        MLInput input = (MLInput) request.getInput();
+        assertEquals(FunctionName.KMEANS, input.getAlgorithm());
+        KMeansParams params = (KMeansParams)input.getParameters();
         assertEquals(1, params.getCentroids().intValue());
-        MLInputDataset inputDataset = request.getMlInput().getInputDataset();
+        MLInputDataset inputDataset = input.getInputDataset();
         assertEquals(MLInputDataType.DATA_FRAME, inputDataset.getInputDataType());
         DataFrame dataFrame = ((DataFrameInputDataset) inputDataset).getDataFrame();
         assertEquals(1, dataFrame.size());
@@ -86,7 +87,7 @@ public class MLPredictionTaskRequestTest {
     @Test
     public void validate_Success() {
         MLPredictionTaskRequest request = MLPredictionTaskRequest.builder()
-            .mlInput(mlInput)
+            .input(mlInput)
             .build();
 
         assertNull(request.validate());
@@ -106,7 +107,7 @@ public class MLPredictionTaskRequestTest {
     public void validate_Exception_NullInputDataset() {
         mlInput.setInputDataset(null);
         MLPredictionTaskRequest request = MLPredictionTaskRequest.builder()
-                .mlInput(mlInput)
+                .input(mlInput)
                 .build();
 
         ActionRequestValidationException exception = request.validate();
@@ -118,7 +119,7 @@ public class MLPredictionTaskRequestTest {
     @Test
     public void fromActionRequest_Success_WithMLPredictionTaskRequest() {
         MLPredictionTaskRequest request = MLPredictionTaskRequest.builder()
-                .mlInput(mlInput)
+                .input(mlInput)
                 .build();
         assertSame(MLPredictionTaskRequest.fromActionRequest(request), request);
     }
@@ -141,7 +142,7 @@ public class MLPredictionTaskRequestTest {
 
     private void fromActionRequest_Success_WithNonMLPredictionTaskRequest(MLInput mlInput) {
         MLPredictionTaskRequest request = MLPredictionTaskRequest.builder()
-                .mlInput(mlInput)
+                .input(mlInput)
                 .build();
         ActionRequest actionRequest = new ActionRequest() {
             @Override
@@ -155,9 +156,10 @@ public class MLPredictionTaskRequestTest {
             }
         };
         MLPredictionTaskRequest result = MLPredictionTaskRequest.fromActionRequest(actionRequest);
+        MLInput input = (MLInput) request.getInput();
         assertNotSame(result, request);
-        assertEquals(request.getMlInput().getAlgorithm(), result.getMlInput().getAlgorithm());
-        assertEquals(request.getMlInput().getInputDataset().getInputDataType(), result.getMlInput().getInputDataset().getInputDataType());
+        assertEquals(input.getAlgorithm(), input.getAlgorithm());
+        assertEquals(input.getInputDataset().getInputDataType(), input.getInputDataset().getInputDataType());
     }
 
     @Test(expected = UncheckedIOException.class)

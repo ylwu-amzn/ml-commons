@@ -13,11 +13,11 @@
 package org.opensearch.ml.engine;
 
 import org.opensearch.ml.common.dataframe.DataFrame;
-import org.opensearch.ml.common.parameter.Input;
-import org.opensearch.ml.common.parameter.MLAlgoParams;
-import org.opensearch.ml.common.parameter.MLInput;
-import org.opensearch.ml.common.parameter.MLOutput;
-import org.opensearch.ml.common.parameter.Output;
+import org.opensearch.ml.common.input.Input;
+import org.opensearch.ml.common.parameter.Parameters;
+import org.opensearch.ml.common.input.MLInput;
+import org.opensearch.ml.common.output.MLOutput;
+import org.opensearch.ml.common.output.Output;
 
 /**
  * This is the interface to all ml algorithms.
@@ -26,8 +26,8 @@ public class MLEngine {
 
     public static Model train(Input input) {
         validateMLInput(input);
-        MLInput mlInput = (MLInput) input;
-        Trainable trainable = MLEngineClassLoader.initInstance(mlInput.getAlgorithm(), mlInput.getParameters(), MLAlgoParams.class);
+//        MLInput mlInput = (MLInput) input;
+        Trainable trainable = MLEngineClassLoader.initInstance(input.getFunctionName(), input.getParameters(), Parameters.class);
         if (trainable == null) {
             throw new IllegalArgumentException("Unsupported algorithm: " + mlInput.getAlgorithm());
         }
@@ -37,7 +37,7 @@ public class MLEngine {
     public static MLOutput predict(Input input, Model model) {
         validateMLInput(input);
         MLInput mlInput = (MLInput) input;
-        Predictable predictable = MLEngineClassLoader.initInstance(mlInput.getAlgorithm(), mlInput.getParameters(), MLAlgoParams.class);
+        Predictable predictable = MLEngineClassLoader.initInstance(mlInput.getAlgorithm(), mlInput.getParameters(), Parameters.class);
         if (predictable == null) {
             throw new IllegalArgumentException("Unsupported algorithm: " + mlInput.getAlgorithm());
         }

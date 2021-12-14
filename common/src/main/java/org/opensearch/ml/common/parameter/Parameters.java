@@ -19,7 +19,7 @@ import org.opensearch.common.xcontent.ToXContentObject;
  * Machine learning algorithms parameter interface.
  * Implement this interface when add a new algorith.
  */
-public interface MLAlgoParams extends ToXContentObject, NamedWriteable {
+public interface Parameters extends ToXContentObject, NamedWriteable {
 
     int getVersion();
 

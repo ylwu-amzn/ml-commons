@@ -10,7 +10,7 @@
  *
  */
 
-package org.opensearch.ml.engine.annotation;
+package org.opensearch.ml.common.annotation;
 
 import org.opensearch.ml.common.FunctionName;
 
@@ -21,6 +21,7 @@ import java.lang.annotation.Target;
 
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.TYPE)
-public @interface Function {
-    FunctionName value();
+public @interface FunctionInput {
+    // supported algorithms. One type of parameter may support multiple algorithms.
+    FunctionName[] functions();
 }

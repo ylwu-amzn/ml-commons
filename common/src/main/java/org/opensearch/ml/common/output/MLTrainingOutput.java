@@ -10,7 +10,7 @@
  *
  */
 
-package org.opensearch.ml.common.parameter;
+package org.opensearch.ml.common.output;
 
 import lombok.Builder;
 import lombok.Getter;
@@ -23,7 +23,7 @@ import java.io.IOException;
 
 @Getter
 @MLAlgoOutput(MLOutputType.TRAINING)
-public class MLTrainingOutput extends MLOutput{
+public class MLTrainingOutput extends MLOutput {
 
     private static final MLOutputType OUTPUT_TYPE = MLOutputType.TRAINING;
     public static final String MODEL_ID_FIELD = "model_id";

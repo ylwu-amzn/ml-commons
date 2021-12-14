@@ -20,11 +20,11 @@ import org.opensearch.common.io.stream.BytesStreamOutput;
 import org.opensearch.common.io.stream.StreamOutput;
 import org.opensearch.ml.common.dataframe.DataFrame;
 import org.opensearch.ml.common.dataframe.DataFrameBuilder;
-import org.opensearch.ml.common.dataset.DataFrameInputDataset;
-import org.opensearch.ml.common.dataset.MLInputDataType;
+import org.opensearch.ml.common.input.dataset.DataFrameInputDataset;
+import org.opensearch.ml.common.input.dataset.MLInputDataType;
 import org.opensearch.ml.common.parameter.KMeansParams;
-import org.opensearch.ml.common.parameter.FunctionName;
-import org.opensearch.ml.common.parameter.MLInput;
+import org.opensearch.ml.common.FunctionName;
+import org.opensearch.ml.common.input.MLInput;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -55,7 +55,7 @@ public class MLTrainingTaskRequestTest {
     @Test
     public void validate_Success() {
         MLTrainingTaskRequest request = MLTrainingTaskRequest.builder()
-                .mlInput(mlInput)
+                .input(mlInput)
                 .build();
         assertNull(request.validate());
     }
@@ -63,20 +63,21 @@ public class MLTrainingTaskRequestTest {
     @Test
     public void writeTo() throws IOException {
         MLTrainingTaskRequest request = MLTrainingTaskRequest.builder()
-            .mlInput(mlInput)
+            .input(mlInput)
             .build();
         BytesStreamOutput bytesStreamOutput = new BytesStreamOutput();
         request.writeTo(bytesStreamOutput);
         request = new MLTrainingTaskRequest(bytesStreamOutput.bytes().streamInput());
-        assertEquals(FunctionName.KMEANS, request.getMlInput().getAlgorithm());
-        assertEquals(1, ((KMeansParams) request.getMlInput().getParameters()).getCentroids().intValue());
-        assertEquals(MLInputDataType.DATA_FRAME, request.getMlInput().getInputDataset().getInputDataType());
+        MLInput input = (MLInput)request.getInput();
+        assertEquals(FunctionName.KMEANS, input.getFunctionName());
+        assertEquals(1, ((KMeansParams) input.getParameters()).getCentroids().intValue());
+        assertEquals(MLInputDataType.DATA_FRAME, input.getInputDataset().getInputDataType());
     }
 
     @Test
     public void fromActionRequest_WithMLTrainingTaskRequest() {
         MLTrainingTaskRequest request = MLTrainingTaskRequest.builder()
-            .mlInput(mlInput)
+            .input(mlInput)
             .build();
         assertSame(request, MLTrainingTaskRequest.fromActionRequest(request));
     }
@@ -84,7 +85,7 @@ public class MLTrainingTaskRequestTest {
     @Test
     public void fromActionRequest_WithNonMLTrainingTaskRequest() {
         MLTrainingTaskRequest request = MLTrainingTaskRequest.builder()
-                .mlInput(mlInput)
+                .input(mlInput)
                 .build();
         ActionRequest actionRequest = new ActionRequest() {
             @Override
@@ -98,10 +99,11 @@ public class MLTrainingTaskRequestTest {
             }
         };
         MLTrainingTaskRequest result = MLTrainingTaskRequest.fromActionRequest(actionRequest);
+        MLInput input = (MLInput)request.getInput();
         assertNotSame(request, result);
-        assertEquals(request.getMlInput().getAlgorithm(), result.getMlInput().getAlgorithm());
-        assertEquals(request.getMlInput().getParameters(), result.getMlInput().getParameters());
-        assertEquals(request.getMlInput().getInputDataset().getInputDataType(), result.getMlInput().getInputDataset().getInputDataType());
+        assertEquals(input.getAlgorithm(), input.getAlgorithm());
+        assertEquals(input.getParameters(), input.getParameters());
+        assertEquals(input.getInputDataset().getInputDataType(), input.getInputDataset().getInputDataType());
     }
 
     @Test(expected = UncheckedIOException.class)

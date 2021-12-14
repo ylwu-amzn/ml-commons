@@ -9,7 +9,7 @@
  *  GitHub history for details.
  */
 
-package org.opensearch.ml.common.parameter;
+package org.opensearch.ml.common.output;
 
 import lombok.Builder;
 import lombok.Data;
@@ -20,7 +20,7 @@ import org.opensearch.common.xcontent.XContentBuilder;
 import java.io.IOException;
 
 @Data
-public class LocalSampleCalculatorOutput implements Output{
+public class LocalSampleCalculatorOutput implements Output {
 
     private Double result;
 

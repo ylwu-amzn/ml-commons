@@ -12,10 +12,10 @@
 package org.opensearch.ml.engine.algorithms.sample;
 
 import org.opensearch.ml.common.dataframe.DataFrame;
-import org.opensearch.ml.common.parameter.FunctionName;
-import org.opensearch.ml.common.parameter.MLAlgoParams;
-import org.opensearch.ml.common.parameter.MLOutput;
-import org.opensearch.ml.common.parameter.SampleAlgoOutput;
+import org.opensearch.ml.common.FunctionName;
+import org.opensearch.ml.common.parameter.Parameters;
+import org.opensearch.ml.common.output.MLOutput;
+import org.opensearch.ml.common.output.SampleAlgoOutput;
 import org.opensearch.ml.common.parameter.SampleAlgoParams;
 import org.opensearch.ml.engine.Model;
 import org.opensearch.ml.engine.Predictable;
@@ -33,7 +33,7 @@ public class SampleAlgo implements Trainable, Predictable {
 
     public SampleAlgo(){}
 
-    public SampleAlgo(MLAlgoParams parameters) {
+    public SampleAlgo(Parameters parameters) {
         this.sampleParam = Optional.ofNullable(((SampleAlgoParams)parameters).getSampleParam()).orElse(DEFAULT_SAMPLE_PARAM);
     }
 

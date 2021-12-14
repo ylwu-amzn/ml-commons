@@ -9,7 +9,7 @@
  *  GitHub history for details.
  */
 
-package org.opensearch.ml.common.dataset;
+package org.opensearch.ml.common.input.dataset;
 
 import java.io.IOException;
 
@@ -29,6 +29,7 @@ public abstract class MLInputDataset implements Writeable {
 
     @Override
     public void writeTo(StreamOutput streamOutput) throws IOException {
-        streamOutput.writeEnum(this.inputDataType);
+        //streamOutput.writeEnum(this.inputDataType);
+        //this.inputDataType;
     }
 }

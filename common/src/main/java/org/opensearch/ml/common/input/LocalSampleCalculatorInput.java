@@ -9,7 +9,7 @@
  *  GitHub history for details.
  */
 
-package org.opensearch.ml.common.parameter;
+package org.opensearch.ml.common.input;
 
 import lombok.Builder;
 import lombok.Data;
@@ -19,6 +19,8 @@ import org.opensearch.common.io.stream.StreamOutput;
 import org.opensearch.common.xcontent.NamedXContentRegistry;
 import org.opensearch.common.xcontent.XContentBuilder;
 import org.opensearch.common.xcontent.XContentParser;
+import org.opensearch.ml.common.annotation.FunctionInput;
+import org.opensearch.ml.common.FunctionName;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -27,6 +29,7 @@ import java.util.List;
 import static org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken;
 
 @Data
+@FunctionInput(functions={FunctionName.LOCAL_SAMPLE_CALCULATOR})
 public class LocalSampleCalculatorInput implements Input {
     public static final String PARSE_FIELD_NAME = FunctionName.LOCAL_SAMPLE_CALCULATOR.name();
     public static final NamedXContentRegistry.Entry XCONTENT_REGISTRY = new NamedXContentRegistry.Entry(
@@ -65,6 +68,7 @@ public class LocalSampleCalculatorInput implements Input {
         return new LocalSampleCalculatorInput(operation, inputData);
     }
 
+    FunctionName functionName;
     String operation;
     List<Double> inputData;
 
@@ -76,16 +80,29 @@ public class LocalSampleCalculatorInput implements Input {
         if (inputData == null || inputData.size() == 0) {
             throw new IllegalArgumentException("empty input data");
         }
+        functionName = FunctionName.LOCAL_SAMPLE_CALCULATOR;
         this.operation = operation;
         this.inputData = inputData;
     }
 
     @Override
     public FunctionName getFunctionName() {
-        return FunctionName.LOCAL_SAMPLE_CALCULATOR;
+        return functionName;
+    }
+
+    public LocalSampleCalculatorInput(FunctionName functionName, StreamInput in) throws IOException {
+        setFunctionName(functionName);
+        //this.functionName = in.readEnum(FunctionName.class);
+        this.operation = in.readString();
+        int size = in.readInt();
+        this.inputData = new ArrayList<>();
+        for (int i = 0; i<size; i++) {
+            inputData.add(in.readDouble());
+        }
     }
 
     public LocalSampleCalculatorInput(StreamInput in) throws IOException {
+        this.functionName = in.readEnum(FunctionName.class);
         this.operation = in.readString();
         int size = in.readInt();
         this.inputData = new ArrayList<>();
@@ -96,6 +113,7 @@ public class LocalSampleCalculatorInput implements Input {
 
     @Override
     public void writeTo(StreamOutput out) throws IOException {
+        Input.super.writeTo(out);
         out.writeString(operation);
         out.writeInt(inputData.size());
         for (Double d : inputData) {

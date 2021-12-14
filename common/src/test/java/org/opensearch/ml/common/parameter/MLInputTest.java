@@ -17,6 +17,7 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.opensearch.common.xcontent.XContentParser;
+import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.common.dataframe.ColumnMeta;
 import org.opensearch.ml.common.dataframe.ColumnType;
 import org.opensearch.ml.common.dataframe.ColumnValue;
@@ -24,7 +25,8 @@ import org.opensearch.ml.common.dataframe.DataFrame;
 import org.opensearch.ml.common.dataframe.DefaultDataFrame;
 import org.opensearch.ml.common.dataframe.DoubleValue;
 import org.opensearch.ml.common.dataframe.Row;
-import org.opensearch.ml.common.dataset.DataFrameInputDataset;
+import org.opensearch.ml.common.input.dataset.DataFrameInputDataset;
+import org.opensearch.ml.common.input.MLInput;
 
 import java.io.IOException;
 import java.util.ArrayList;

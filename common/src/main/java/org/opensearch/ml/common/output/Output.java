@@ -9,12 +9,11 @@
  *  GitHub history for details.
  */
 
-package org.opensearch.ml.common.parameter;
+package org.opensearch.ml.common.output;
 
 import org.opensearch.common.io.stream.Writeable;
 import org.opensearch.common.xcontent.ToXContentObject;
 
-public interface Input extends ToXContentObject, Writeable {
+public interface Output extends ToXContentObject, Writeable {
 
-    FunctionName getFunctionName();
 }

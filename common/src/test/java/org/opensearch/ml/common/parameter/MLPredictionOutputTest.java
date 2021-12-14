@@ -28,6 +28,8 @@ import org.opensearch.ml.common.dataframe.DataFrame;
 import org.opensearch.ml.common.dataframe.DefaultDataFrame;
 import org.opensearch.ml.common.dataframe.IntValue;
 import org.opensearch.ml.common.dataframe.Row;
+import org.opensearch.ml.common.output.MLOutputType;
+import org.opensearch.ml.common.output.MLPredictionOutput;
 
 import java.io.IOException;
 import java.util.ArrayList;
