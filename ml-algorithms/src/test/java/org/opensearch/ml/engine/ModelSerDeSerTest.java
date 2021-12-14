@@ -15,7 +15,7 @@ package org.opensearch.ml.engine;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
-import org.opensearch.ml.common.parameter.KMeansParams;
+import org.opensearch.ml.common.input.parameter.KMeansParams;
 import org.opensearch.ml.engine.algorithms.clustering.KMeans;
 import org.opensearch.ml.engine.exceptions.ModelSerDeSerException;
 import org.opensearch.ml.engine.utils.ModelSerDeSer;

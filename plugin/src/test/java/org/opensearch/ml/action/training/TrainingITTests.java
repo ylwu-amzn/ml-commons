@@ -40,7 +40,7 @@ import org.opensearch.ml.common.input.MLInput;
 import org.opensearch.ml.common.input.dataset.MLInputDataset;
 import org.opensearch.ml.common.input.dataset.SearchQueryInputDataset;
 import org.opensearch.ml.common.output.MLTrainingOutput;
-import org.opensearch.ml.common.parameter.FunctionName;
+import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.common.transport.training.MLTrainingTaskAction;
 import org.opensearch.ml.common.transport.training.MLTrainingTaskRequest;
 import org.opensearch.ml.common.transport.training.MLTrainingTaskResponse;

@@ -16,8 +16,6 @@ import org.opensearch.action.ActionFuture;
 import org.opensearch.action.ActionListener;
 import org.opensearch.action.support.PlainActionFuture;
 import org.opensearch.ml.common.input.Input;
-import org.opensearch.ml.common.input.MLInput;
-import org.opensearch.ml.common.output.MLOutput;
 import org.opensearch.ml.common.output.Output;
 
 /**
@@ -28,41 +26,41 @@ public interface MachineLearningClient {
     /**
      * Do prediction machine learning job
      * @param modelId the trained model id
-     * @param mlInput ML input
+     * @param Input ML input
      * @return
      */
-    default ActionFuture<MLOutput> predict(String modelId, MLInput mlInput) {
-        PlainActionFuture<MLOutput> actionFuture = PlainActionFuture.newFuture();
-        predict(modelId, mlInput, actionFuture);
+    default ActionFuture<Output> predict(String modelId, Input Input) {
+        PlainActionFuture<Output> actionFuture = PlainActionFuture.newFuture();
+        predict(modelId, Input, actionFuture);
         return actionFuture;
     }
 
     /**
      * Do prediction machine learning job
      * @param modelId the trained model id
-     * @param mlInput ML input
+     * @param Input ML input
      * @param listener a listener to be notified of the result
      */
-    void predict(String modelId, MLInput mlInput, ActionListener<MLOutput> listener);
+    void predict(String modelId, Input Input, ActionListener<Output> listener);
 
     /**
      *  Do the training machine learning job. The training job will be always async process. The job id will be returned in this method.
-     * @param mlInput ML input
+     * @param Input ML input
      * @return the result future
      */
-    default ActionFuture<MLOutput> train(MLInput mlInput) {
-        PlainActionFuture<MLOutput> actionFuture = PlainActionFuture.newFuture();
-        train(mlInput, actionFuture);
+    default ActionFuture<Output> train(Input Input) {
+        PlainActionFuture<Output> actionFuture = PlainActionFuture.newFuture();
+        train(Input, actionFuture);
         return actionFuture;
     }
 
 
     /**
      * Do the training machine learning job. The training job will be always async process. The job id will be returned in this method.
-     * @param mlInput ML input
+     * @param Input ML input
      * @param listener a listener to be notified of the result
      */
-    void train(MLInput mlInput, ActionListener<MLOutput> listener);
+    void train(Input Input, ActionListener<Output> listener);
 
     /**
      * Execute function and return ActionFuture.

@@ -23,8 +23,8 @@ import org.opensearch.common.xcontent.XContentBuilder;
 import org.opensearch.ml.common.dataframe.DataFrame;
 import org.opensearch.ml.common.input.dataset.DataFrameInputDataset;
 import org.opensearch.ml.common.input.Input;
-import org.opensearch.ml.common.parameter.FunctionName;
-import org.opensearch.ml.common.parameter.MLAlgoParams;
+import org.opensearch.ml.common.FunctionName;
+import org.opensearch.ml.common.input.parameter.MLAlgoParams;
 import org.opensearch.ml.common.input.MLInput;
 import org.opensearch.ml.common.output.MLOutput;
 import org.opensearch.ml.common.output.MLTrainingOutput;
@@ -50,7 +50,7 @@ public class MachineLearningClientTest {
     MLAlgoParams mlParameters;
 
     @Mock
-    ActionListener<MLOutput> dataFrameActionListener;
+    ActionListener<Output> dataFrameActionListener;
 
     private String modekId = "test_model_id";
     @Before
@@ -60,13 +60,13 @@ public class MachineLearningClientTest {
         machineLearningClient = new MachineLearningClient() {
             @Override
             public void predict(String modelId,
-                                MLInput mlInput,
-                                ActionListener<MLOutput> listener) {
+                                Input input,
+                                ActionListener<Output> listener) {
                 listener.onResponse(output);
             }
 
             @Override
-            public void train(MLInput mlInput, ActionListener<MLOutput> listener) {
+            public void train(Input input, ActionListener<Output> listener) {
                 listener.onResponse(MLTrainingOutput.builder().modelId(modekId).build());
             }
 

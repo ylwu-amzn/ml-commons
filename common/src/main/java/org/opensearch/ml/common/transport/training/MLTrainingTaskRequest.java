@@ -23,6 +23,7 @@ import org.opensearch.common.io.stream.InputStreamStreamInput;
 import org.opensearch.common.io.stream.OutputStreamStreamOutput;
 import org.opensearch.common.io.stream.StreamInput;
 import org.opensearch.common.io.stream.StreamOutput;
+import org.opensearch.ml.common.input.Input;
 import org.opensearch.ml.common.input.MLInput;
 
 import java.io.ByteArrayInputStream;
@@ -41,24 +42,24 @@ public class MLTrainingTaskRequest extends ActionRequest {
     /**
      * the name of algorithm
      */
-    MLInput mlInput;
+    Input input;
 
     @Builder
-    public MLTrainingTaskRequest(MLInput mlInput) {
-        this.mlInput = mlInput;
+    public MLTrainingTaskRequest(Input input) {
+        this.input = input;
     }
 
     public MLTrainingTaskRequest(StreamInput in) throws IOException {
         super(in);
-        this.mlInput = new MLInput(in);
+        this.input = new MLInput(in);
     }
 
     @Override
     public ActionRequestValidationException validate() {
         ActionRequestValidationException exception = null;
-        if (mlInput == null) {
+        if (input == null) {
             exception = addValidationError("MLInput can't be null", exception);
-        } else if (Objects.isNull(mlInput.getInputDataset())) {
+        } else if (Objects.isNull(input.getInputDataset())) {
             exception = addValidationError("input data can't be null", exception);
         }
 
@@ -68,7 +69,7 @@ public class MLTrainingTaskRequest extends ActionRequest {
     @Override
     public void writeTo(StreamOutput out) throws IOException {
         super.writeTo(out);
-        this.mlInput.writeTo(out);
+        this.input.writeTo(out);
     }
 
     public static MLTrainingTaskRequest fromActionRequest(ActionRequest actionRequest) {

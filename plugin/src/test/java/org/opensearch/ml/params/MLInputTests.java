@@ -21,7 +21,7 @@ import org.opensearch.ml.common.dataframe.DataFrame;
 import org.opensearch.ml.common.input.MLInput;
 import org.opensearch.ml.common.input.dataset.DataFrameInputDataset;
 import org.opensearch.ml.common.input.dataset.SearchQueryInputDataset;
-import org.opensearch.ml.common.parameter.FunctionName;
+import org.opensearch.ml.common.FunctionName;
 import org.opensearch.test.OpenSearchTestCase;
 
 public class MLInputTests extends OpenSearchTestCase {

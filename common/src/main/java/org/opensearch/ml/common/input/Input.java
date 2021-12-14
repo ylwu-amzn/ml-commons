@@ -11,11 +11,30 @@
 
 package org.opensearch.ml.common.input;
 
+import org.opensearch.common.io.stream.StreamOutput;
 import org.opensearch.common.io.stream.Writeable;
 import org.opensearch.common.xcontent.ToXContentObject;
-import org.opensearch.ml.common.parameter.FunctionName;
+import org.opensearch.ml.common.FunctionName;
+import org.opensearch.ml.common.input.dataset.MLInputDataset;
+import org.opensearch.ml.common.input.parameter.MLAlgoParams;
+
+import java.io.IOException;
 
 public interface Input extends ToXContentObject, Writeable {
 
     FunctionName getFunctionName();
+    void setFunctionName(FunctionName functionName);
+
+    @Override
+    default void writeTo(StreamOutput out) throws IOException {
+        out.writeEnum(getFunctionName());
+    }
+
+    default MLInputDataset getInputDataset() {
+        throw new IllegalArgumentException("Don't support get input data set");
+    }
+
+    default MLAlgoParams getParameters() {
+        throw new IllegalArgumentException("Don't support get input data set");
+    };
 }

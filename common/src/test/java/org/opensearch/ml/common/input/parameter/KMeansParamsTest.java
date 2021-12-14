@@ -10,7 +10,7 @@
  *
  */
 
-package org.opensearch.ml.common.parameter;
+package org.opensearch.ml.common.input.parameter;
 
 import org.junit.Before;
 import org.junit.Test;

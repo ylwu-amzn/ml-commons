@@ -10,7 +10,7 @@
  *
  */
 
-package org.opensearch.ml.common.parameter;
+package org.opensearch.ml.common.input.parameter;
 
 import lombok.Builder;
 import lombok.Data;
@@ -21,6 +21,7 @@ import org.opensearch.common.xcontent.NamedXContentRegistry;
 import org.opensearch.common.xcontent.XContentBuilder;
 import org.opensearch.common.xcontent.XContentParser;
 import org.opensearch.ml.common.annotation.Parameter;
+import org.opensearch.ml.common.FunctionName;
 
 import java.io.IOException;
 

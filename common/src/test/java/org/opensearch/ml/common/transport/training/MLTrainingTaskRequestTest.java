@@ -22,8 +22,8 @@ import org.opensearch.ml.common.dataframe.DataFrame;
 import org.opensearch.ml.common.dataframe.DataFrameBuilder;
 import org.opensearch.ml.common.input.dataset.DataFrameInputDataset;
 import org.opensearch.ml.common.input.dataset.MLInputDataType;
-import org.opensearch.ml.common.parameter.KMeansParams;
-import org.opensearch.ml.common.parameter.FunctionName;
+import org.opensearch.ml.common.input.parameter.KMeansParams;
+import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.common.input.MLInput;
 
 import java.io.IOException;
@@ -68,9 +68,9 @@ public class MLTrainingTaskRequestTest {
         BytesStreamOutput bytesStreamOutput = new BytesStreamOutput();
         request.writeTo(bytesStreamOutput);
         request = new MLTrainingTaskRequest(bytesStreamOutput.bytes().streamInput());
-        assertEquals(FunctionName.KMEANS, request.getMlInput().getAlgorithm());
-        assertEquals(1, ((KMeansParams) request.getMlInput().getParameters()).getCentroids().intValue());
-        assertEquals(MLInputDataType.DATA_FRAME, request.getMlInput().getInputDataset().getInputDataType());
+        assertEquals(FunctionName.KMEANS, request.getInput().getAlgorithm());
+        assertEquals(1, ((KMeansParams) request.getInput().getParameters()).getCentroids().intValue());
+        assertEquals(MLInputDataType.DATA_FRAME, request.getInput().getInputDataset().getInputDataType());
     }
 
     @Test
@@ -99,9 +99,9 @@ public class MLTrainingTaskRequestTest {
         };
         MLTrainingTaskRequest result = MLTrainingTaskRequest.fromActionRequest(actionRequest);
         assertNotSame(request, result);
-        assertEquals(request.getMlInput().getAlgorithm(), result.getMlInput().getAlgorithm());
-        assertEquals(request.getMlInput().getParameters(), result.getMlInput().getParameters());
-        assertEquals(request.getMlInput().getInputDataset().getInputDataType(), result.getMlInput().getInputDataset().getInputDataType());
+        assertEquals(request.getInput().getAlgorithm(), result.getInput().getAlgorithm());
+        assertEquals(request.getInput().getParameters(), result.getInput().getParameters());
+        assertEquals(request.getInput().getInputDataset().getInputDataType(), result.getInput().getInputDataset().getInputDataType());
     }
 
     @Test(expected = UncheckedIOException.class)

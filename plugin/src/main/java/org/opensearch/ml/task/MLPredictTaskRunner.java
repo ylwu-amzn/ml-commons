@@ -133,7 +133,7 @@ public class MLPredictTaskRunner extends MLTaskRunner<MLPredictionTaskRequest, M
             .createTime(Instant.now())
             .state(MLTaskState.CREATED)
             .build();
-        MLInput mlInput = request.getMlInput();
+        MLInput mlInput = request.getInput();
         if (mlInput.getInputDataset().getInputDataType().equals(MLInputDataType.SEARCH_QUERY)) {
             ActionListener<DataFrame> dataFrameActionListener = ActionListener
                 .wrap(dataFrame -> { predict(mlTask, dataFrame, request, listener); }, e -> {
@@ -164,7 +164,7 @@ public class MLPredictTaskRunner extends MLTaskRunner<MLPredictionTaskRequest, M
         mlStats.getStat(ML_EXECUTING_TASK_COUNT.getName()).increment();
         mlTaskManager.add(mlTask);
 
-        MLInput mlInput = request.getMlInput();
+        MLInput mlInput = request.getInput();
         // search model by model id.
         Model model = new Model();
         if (request.getModelId() != null) {

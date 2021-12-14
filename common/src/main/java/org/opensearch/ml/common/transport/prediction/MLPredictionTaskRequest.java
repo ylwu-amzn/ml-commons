@@ -23,6 +23,7 @@ import org.opensearch.common.io.stream.InputStreamStreamInput;
 import org.opensearch.common.io.stream.OutputStreamStreamOutput;
 import org.opensearch.common.io.stream.StreamInput;
 import org.opensearch.common.io.stream.StreamOutput;
+import org.opensearch.ml.common.input.Input;
 import org.opensearch.ml.common.input.MLInput;
 
 import lombok.AccessLevel;
@@ -39,33 +40,33 @@ import static org.opensearch.action.ValidateActions.addValidationError;
 public class MLPredictionTaskRequest extends ActionRequest {
 
     String modelId;
-    MLInput mlInput;
+    Input input;
 
     @Builder
-    public MLPredictionTaskRequest(String modelId, MLInput mlInput) {
-        this.mlInput = mlInput;
+    public MLPredictionTaskRequest(String modelId, Input input) {
+        this.input = input;
         this.modelId = modelId;
     }
 
     public MLPredictionTaskRequest(StreamInput in) throws IOException {
         super(in);
         this.modelId = in.readOptionalString();
-        this.mlInput = new MLInput(in);
+        this.input = new MLInput(in);
     }
 
     @Override
     public void writeTo(StreamOutput out) throws IOException {
         super.writeTo(out);
         out.writeOptionalString(this.modelId);
-        this.mlInput.writeTo(out);
+        this.input.writeTo(out);
     }
 
     @Override
     public ActionRequestValidationException validate() {
         ActionRequestValidationException exception = null;
-        if (this.mlInput == null) {
+        if (this.input == null) {
             exception = addValidationError("ML input can't be null", exception);
-        } else if (this.mlInput.getInputDataset() == null) {
+        } else if (this.input.getInputDataset() == null) {
             exception = addValidationError("input data can't be null", exception);
         }
 

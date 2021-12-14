@@ -10,7 +10,7 @@
  *
  */
 
-package org.opensearch.ml.common.parameter;
+package org.opensearch.ml.common.input.parameter;
 
 import org.opensearch.common.io.stream.NamedWriteable;
 import org.opensearch.common.xcontent.ToXContentObject;

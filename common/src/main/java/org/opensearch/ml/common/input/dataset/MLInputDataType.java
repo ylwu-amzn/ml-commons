@@ -13,5 +13,6 @@ package org.opensearch.ml.common.input.dataset;
 
 public enum MLInputDataType {
     SEARCH_QUERY,
-    DATA_FRAME
+    DATA_FRAME,
+    SAMPLE_DATA
 }

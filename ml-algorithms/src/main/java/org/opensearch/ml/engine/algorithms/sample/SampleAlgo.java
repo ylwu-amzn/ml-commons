@@ -12,11 +12,11 @@
 package org.opensearch.ml.engine.algorithms.sample;
 
 import org.opensearch.ml.common.dataframe.DataFrame;
-import org.opensearch.ml.common.parameter.FunctionName;
-import org.opensearch.ml.common.parameter.MLAlgoParams;
+import org.opensearch.ml.common.FunctionName;
+import org.opensearch.ml.common.input.parameter.MLAlgoParams;
 import org.opensearch.ml.common.output.MLOutput;
 import org.opensearch.ml.common.output.SampleAlgoOutput;
-import org.opensearch.ml.common.parameter.SampleAlgoParams;
+import org.opensearch.ml.common.input.parameter.SampleAlgoParams;
 import org.opensearch.ml.engine.Model;
 import org.opensearch.ml.engine.Predictable;
 import org.opensearch.ml.engine.Trainable;

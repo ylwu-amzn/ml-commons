@@ -20,7 +20,6 @@ import org.opensearch.ml.common.annotation.Parameter;
 import org.opensearch.ml.common.input.MLInput;
 import org.opensearch.ml.common.input.dataset.MLInputDataType;
 import org.opensearch.ml.common.output.MLOutput;
-import org.opensearch.ml.common.parameter.FunctionName;
 import org.opensearch.ml.common.output.OutputType;
 import org.reflections.Reflections;
 

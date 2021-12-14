@@ -17,6 +17,7 @@ import org.opensearch.common.io.stream.StreamInput;
 import org.opensearch.common.io.stream.StreamOutput;
 import org.opensearch.common.xcontent.XContentBuilder;
 import org.opensearch.common.xcontent.XContentParser;
+import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.common.MLCommonsClassLoader;
 import org.opensearch.ml.common.dataframe.DataFrame;
 import org.opensearch.ml.common.dataframe.DefaultDataFrame;
@@ -24,8 +25,7 @@ import org.opensearch.ml.common.input.dataset.DataFrameInputDataset;
 import org.opensearch.ml.common.input.dataset.MLInputDataType;
 import org.opensearch.ml.common.input.dataset.MLInputDataset;
 import org.opensearch.ml.common.input.dataset.SearchQueryInputDataset;
-import org.opensearch.ml.common.parameter.FunctionName;
-import org.opensearch.ml.common.parameter.MLAlgoParams;
+import org.opensearch.ml.common.input.parameter.MLAlgoParams;
 import org.opensearch.search.builder.SearchSourceBuilder;
 
 import java.io.IOException;
@@ -38,7 +38,6 @@ import static org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedT
 /**
  * ML input data: algirithm name, parameters and input data set.
  */
-@Data
 public class MLInput implements Input {
 
     public static final String ALGORITHM_FIELD = "algorithm";
@@ -109,6 +108,16 @@ public class MLInput implements Input {
             out.writeBoolean(false);
         }
         out.writeInt(version);
+    }
+
+    @Override
+    public MLInputDataset getInputDataset() {
+        return inputDataset;
+    }
+
+    @Override
+    public MLAlgoParams getParameters() {
+        return parameters;
     }
 
     @Override
@@ -188,6 +197,11 @@ public class MLInput implements Input {
     @Override
     public FunctionName getFunctionName() {
         return this.algorithm;
+    }
+
+    @Override
+    public void setFunctionName(FunctionName functionName) {
+        this.algorithm = functionName;
     }
 
     public DataFrame getDataFrame() {

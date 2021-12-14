@@ -117,7 +117,7 @@ public class MLTrainingTaskRunner extends MLTaskRunner<MLTrainingTaskRequest, ML
         // 1). search data failure, 2) train model failure, 3) persist model failure.
         MLTrainingOutput output = MLTrainingOutput.builder().modelId(mlTask.getTaskId()).status(MLTaskState.CREATED.name()).build();
         listener.onResponse(MLTrainingTaskResponse.builder().output(output).build());
-        MLInput mlInput = request.getMlInput();
+        MLInput mlInput = request.getInput();
         if (mlInput.getInputDataset().getInputDataType().equals(MLInputDataType.SEARCH_QUERY)) {
             ActionListener<DataFrame> dataFrameActionListener = ActionListener
                 .wrap(

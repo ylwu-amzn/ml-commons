@@ -19,7 +19,9 @@ import org.opensearch.common.io.stream.StreamOutput;
 import org.opensearch.common.xcontent.NamedXContentRegistry;
 import org.opensearch.common.xcontent.XContentBuilder;
 import org.opensearch.common.xcontent.XContentParser;
-import org.opensearch.ml.common.parameter.FunctionName;
+import org.opensearch.ml.common.FunctionName;
+import org.opensearch.ml.common.input.dataset.MLInputDataset;
+import org.opensearch.ml.common.input.parameter.MLAlgoParams;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -27,7 +29,6 @@ import java.util.List;
 
 import static org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken;
 
-@Data
 public class LocalSampleCalculatorInput implements Input {
     public static final String PARSE_FIELD_NAME = FunctionName.LOCAL_SAMPLE_CALCULATOR.name();
     public static final NamedXContentRegistry.Entry XCONTENT_REGISTRY = new NamedXContentRegistry.Entry(
@@ -38,6 +39,7 @@ public class LocalSampleCalculatorInput implements Input {
 
     public static final String OPERATION_FIELD = "operation";
     public static final String INPUT_DATA_FIELD = "input_data";
+    private FunctionName functionName;
 
     public static LocalSampleCalculatorInput parse(XContentParser parser) throws IOException {
         String operation = null;
@@ -79,11 +81,17 @@ public class LocalSampleCalculatorInput implements Input {
         }
         this.operation = operation;
         this.inputData = inputData;
+        this.functionName = FunctionName.LOCAL_SAMPLE_CALCULATOR;
     }
 
     @Override
     public FunctionName getFunctionName() {
-        return FunctionName.LOCAL_SAMPLE_CALCULATOR;
+        return this.functionName;
+    }
+
+    @Override
+    public void setFunctionName(FunctionName functionName) {
+        this.functionName = functionName;
     }
 
     public LocalSampleCalculatorInput(StreamInput in) throws IOException {
@@ -102,6 +110,16 @@ public class LocalSampleCalculatorInput implements Input {
         for (Double d : inputData) {
             out.writeDouble(d.doubleValue());
         }
+    }
+
+    @Override
+    public MLInputDataset getInputDataset() {
+        return Input.super.getInputDataset();
+    }
+
+    @Override
+    public MLAlgoParams getParameters() {
+        return Input.super.getParameters();
     }
 
     @Override

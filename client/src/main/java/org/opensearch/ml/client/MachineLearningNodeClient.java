@@ -17,8 +17,6 @@ import lombok.experimental.FieldDefaults;
 import org.opensearch.action.ActionListener;
 import org.opensearch.client.node.NodeClient;
 import org.opensearch.ml.common.input.Input;
-import org.opensearch.ml.common.input.MLInput;
-import org.opensearch.ml.common.output.MLOutput;
 import org.opensearch.ml.common.output.Output;
 import org.opensearch.ml.common.transport.execute.MLExecuteTaskAction;
 import org.opensearch.ml.common.transport.execute.MLExecuteTaskRequest;
@@ -37,12 +35,12 @@ public class MachineLearningNodeClient implements MachineLearningClient {
     NodeClient client;
 
     @Override
-    public void predict(String modelId, MLInput mlInput,
-                        ActionListener<MLOutput> listener) {
-        validateMLInput(mlInput, true);
+    public void predict(String modelId, Input input,
+                        ActionListener<Output> listener) {
+        validateMLInput(input, true);
 
         MLPredictionTaskRequest predictionRequest = MLPredictionTaskRequest.builder()
-            .mlInput(mlInput)
+            .input(input)
             .build();
 
         client.execute(MLPredictionTaskAction.INSTANCE, predictionRequest, ActionListener.wrap(response -> {
@@ -55,10 +53,10 @@ public class MachineLearningNodeClient implements MachineLearningClient {
     }
 
     @Override
-    public void train(MLInput mlInput, ActionListener<MLOutput> listener) {
-        validateMLInput(mlInput, true);
+    public void train(Input Input, ActionListener<Output> listener) {
+        validateMLInput(Input, true);
         MLTrainingTaskRequest trainingTaskRequest = MLTrainingTaskRequest.builder()
-                .mlInput(mlInput)
+                .input(Input)
                 .build();
 
         client.execute(MLTrainingTaskAction.INSTANCE, trainingTaskRequest, ActionListener.wrap(response -> {
@@ -77,11 +75,11 @@ public class MachineLearningNodeClient implements MachineLearningClient {
         }, listener::onFailure));
     }
 
-    private void validateMLInput(MLInput mlInput, boolean requireInput) {
-        if (mlInput == null) {
+    private void validateMLInput(Input Input, boolean requireInput) {
+        if (Input == null) {
             throw new IllegalArgumentException("ML Input can't be null");
         }
-        if(requireInput && mlInput.getInputDataset() == null) {
+        if(requireInput && Input.getInputDataset() == null) {
             throw new IllegalArgumentException("input data set can't be null");
         }
     }

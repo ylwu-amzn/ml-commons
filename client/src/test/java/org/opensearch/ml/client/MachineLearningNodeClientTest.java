@@ -23,11 +23,12 @@ import org.opensearch.action.ActionListener;
 import org.opensearch.client.node.NodeClient;
 import org.opensearch.ml.common.dataframe.DataFrame;
 import org.opensearch.ml.common.input.dataset.MLInputDataset;
-import org.opensearch.ml.common.parameter.FunctionName;
+import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.common.input.MLInput;
 import org.opensearch.ml.common.output.MLOutput;
 import org.opensearch.ml.common.output.MLPredictionOutput;
 import org.opensearch.ml.common.output.MLTrainingOutput;
+import org.opensearch.ml.common.output.Output;
 import org.opensearch.ml.common.transport.prediction.MLPredictionTaskAction;
 import org.opensearch.ml.common.transport.prediction.MLPredictionTaskRequest;
 import org.opensearch.ml.common.transport.prediction.MLPredictionTaskResponse;
@@ -55,10 +56,10 @@ public class MachineLearningNodeClientTest {
     DataFrame output;
 
     @Mock
-    ActionListener<MLOutput> dataFrameActionListener;
+    ActionListener<Output> dataFrameActionListener;
 
     @Mock
-    ActionListener<MLOutput> trainingActionListener;
+    ActionListener<Output> trainingActionListener;
 
     @InjectMocks
     MachineLearningNodeClient machineLearningNodeClient;
