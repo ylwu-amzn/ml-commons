@@ -81,6 +81,29 @@ public class MLTrainingTaskRunner extends MLTaskRunner<MLTrainingTaskRequest, ML
 
     @Override
     public void run(MLTrainingTaskRequest request, TransportService transportService, ActionListener<MLTrainingTaskResponse> listener) {
+        if (!request.isAsync()) {
+            // Train model in sync way
+            // trainModelInSyncWay(request, listener);
+            MLInput mlInput = request.getMlInput();
+            if (mlInput.getInputDataset().getInputDataType().equals(MLInputDataType.SEARCH_QUERY)) {
+                ActionListener<DataFrame> dataFrameActionListener = ActionListener.wrap(dataFrame -> {
+                    // train(mlTask, mlInput.toBuilder().inputDataset(new DataFrameInputDataset(dataFrame)).build(), listener);
+                    MLInput input = mlInput.toBuilder().inputDataset(new DataFrameInputDataset(dataFrame)).build();
+                    trainModelInSyncWay(input, listener);
+                }, e -> {
+                    log.error("Failed to generate DataFrame from search query", e);
+                    listener.onFailure(e);
+                });
+                mlInputDatasetHandler
+                    .parseSearchQueryInput(
+                        mlInput.getInputDataset(),
+                        new ThreadedActionListener<>(log, threadPool, TASK_THREAD_POOL, dataFrameActionListener, false)
+                    );
+            } else {
+                threadPool.executor(TASK_THREAD_POOL).execute(() -> { trainModelInSyncWay(mlInput, listener); });
+            }
+            return;
+        }
         mlTaskDispatcher.dispatchTask(ActionListener.wrap(node -> {
             if (clusterService.localNode().getId().equals(node.getId())) {
                 // Execute training task locally
@@ -98,6 +121,27 @@ public class MLTrainingTaskRunner extends MLTaskRunner<MLTrainingTaskRequest, ML
                     );
             }
         }, e -> listener.onFailure(e)));
+    }
+
+    private void trainModelInSyncWay(MLInput input, ActionListener<MLTrainingTaskResponse> listener) {
+        try {
+            Model model = MLEngine.train(input);
+            MLModel mlModel = new MLModel(input.getAlgorithm(), model);
+            IndexRequest indexRequest = new IndexRequest(ML_MODEL_INDEX)
+                .source(mlModel.toXContent(XContentBuilder.builder(XContentType.JSON.xContent()), ToXContent.EMPTY_PARAMS))
+                .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE);
+            client.index(indexRequest, ActionListener.wrap(r -> {
+                log.info("Train model successfully, model id: {}", r.getId());
+                MLTrainingOutput output = MLTrainingOutput.builder().modelId(r.getId()).status(MLTaskState.CREATED.name()).build();
+                listener.onResponse(MLTrainingTaskResponse.builder().output(output).build());
+            }, e -> {
+                log.error("Failed to index model", e);
+                listener.onFailure(e);
+            }));
+        } catch (Exception e) {
+            log.error("Failed to train model", e);
+            listener.onFailure(e);
+        }
     }
 
     public void createMLTaskAndTrain(MLTrainingTaskRequest request, ActionListener<MLTrainingTaskResponse> listener) {

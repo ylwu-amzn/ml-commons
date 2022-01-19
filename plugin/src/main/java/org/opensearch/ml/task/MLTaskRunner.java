@@ -59,5 +59,14 @@ public abstract class MLTaskRunner<Request, Response> {
         mlTaskManager.updateTaskState(mlTask.getTaskId(), MLTaskState.COMPLETED);
     }
 
+    protected void handleMLTaskComplete(MLTask mlTask, boolean updateTaskInIndex) {
+        // decrease ML_EXECUTING_TASK_COUNT
+        // update task state to MLTaskState.COMPLETED
+        mlStats.getStat(ML_EXECUTING_TASK_COUNT.getName()).decrement();
+        if (updateTaskInIndex) {
+            mlTaskManager.updateTaskState(mlTask.getTaskId(), MLTaskState.COMPLETED);
+        }
+    }
+
     public abstract void run(Request request, TransportService transportService, ActionListener<Response> listener);
 }

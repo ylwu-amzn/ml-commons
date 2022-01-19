@@ -103,6 +103,16 @@ public class MLTaskManager {
         updateMLTask(taskId, ImmutableMap.of(MLTask.STATE_FIELD, state));
     }
 
+    public synchronized void updateTaskState(String taskId, MLTaskState state, boolean updateTaskInIndex) {
+        if (!contains(taskId)) {
+            throw new IllegalArgumentException("Task not found");
+        }
+        taskCaches.get(taskId).setState(state);
+        if (updateTaskInIndex) {
+            updateMLTask(taskId, ImmutableMap.of(MLTask.STATE_FIELD, state));
+        }
+    }
+
     /**
      * Update task error
      * @param taskId task id

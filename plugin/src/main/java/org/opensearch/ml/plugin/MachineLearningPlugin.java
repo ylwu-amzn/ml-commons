@@ -167,7 +167,8 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin {
             mlTaskManager,
             mlStats,
             mlInputDatasetHandler,
-            mlTaskDispatcher
+            mlTaskDispatcher,
+            xContentRegistry
         );
         mlExecuteTaskRunner = new MLExecuteTaskRunner(
             threadPool,

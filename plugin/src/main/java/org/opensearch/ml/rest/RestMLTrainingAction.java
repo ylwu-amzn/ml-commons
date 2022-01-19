@@ -70,7 +70,7 @@ public class RestMLTrainingAction extends BaseRestHandler {
         XContentParser parser = request.contentParser();
         ensureExpectedToken(XContentParser.Token.START_OBJECT, parser.nextToken(), parser);
         MLInput mlInput = MLInput.parse(parser, algorithm);
-
-        return new MLTrainingTaskRequest(mlInput);
+        boolean async = request.paramAsBoolean("async", false);
+        return new MLTrainingTaskRequest(mlInput, async);
     }
 }
