@@ -12,6 +12,7 @@
 
 package org.opensearch.ml.engine.algorithms.clustering;
 
+import com.oracle.labs.mlrg.olcut.util.Pair;
 import org.opensearch.ml.common.dataframe.DataFrame;
 import org.opensearch.ml.common.dataframe.DataFrameBuilder;
 import org.opensearch.ml.common.parameter.KMeansParams;
@@ -21,17 +22,21 @@ import org.opensearch.ml.common.parameter.MLOutput;
 import org.opensearch.ml.common.parameter.MLPredictionOutput;
 import org.opensearch.ml.engine.Model;
 import org.opensearch.ml.engine.Predictable;
+import org.opensearch.ml.engine.TrainAndPredictable;
 import org.opensearch.ml.engine.Trainable;
 import org.opensearch.ml.engine.annotation.Function;
 import org.opensearch.ml.engine.utils.ModelSerDeSer;
 import org.opensearch.ml.engine.contants.TribuoOutputType;
 import org.opensearch.ml.engine.utils.TribuoUtil;
+import org.tribuo.Feature;
+import org.tribuo.ImmutableOutputInfo;
 import org.tribuo.MutableDataset;
 import org.tribuo.Prediction;
 import org.tribuo.clustering.ClusterID;
 import org.tribuo.clustering.ClusteringFactory;
 import org.tribuo.clustering.kmeans.KMeansModel;
 import org.tribuo.clustering.kmeans.KMeansTrainer;
+import org.tribuo.math.la.DenseVector;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -47,7 +52,7 @@ import java.util.Optional;
  * https://github.com/oracle/tribuo/issues/158
  */
 @Function(FunctionName.KMEANS)
-public class KMeans implements Trainable, Predictable {
+public class KMeans implements TrainAndPredictable {
     private static final KMeansParams.DistanceType DEFAULT_DISTANCE_TYPE = KMeansParams.DistanceType.EUCLIDEAN;
     private static int DEFAULT_CENTROIDS = 2;
     private static int DEFAULT_ITERATIONS = 10;
@@ -128,4 +133,63 @@ public class KMeans implements Trainable, Predictable {
 
         return model;
     }
+
+    @Override
+    public MLOutput trainAndPredict(DataFrame dataFrame) {
+        MutableDataset<ClusterID> trainDataset = TribuoUtil.generateDataset(dataFrame, new ClusteringFactory(),
+                "KMeans training and predicting data from opensearch", TribuoOutputType.CLUSTERID);
+        Integer centroids = Optional.ofNullable(parameters.getCentroids()).orElse(DEFAULT_CENTROIDS);
+        Integer iterations = Optional.ofNullable(parameters.getIterations()).orElse(DEFAULT_ITERATIONS);
+        KMeansTrainer trainer = new KMeansTrainer(centroids, iterations, distance, numThreads, seed);
+        KMeansModel kMeansModel = trainer.train(trainDataset);
+//        Model model = new Model();
+//        model.setName(FunctionName.KMEANS.name());
+//        model.setVersion(1);
+//        model.setContent(ModelSerDeSer.serialize(kMeansModel));
+
+//        DenseVector[] centroidVectors = kMeansModel.getCentroidVectors();
+//        for (DenseVector centroid : centroidVectors) {
+//            System.out.println(centroid);
+//        }
+//        ImmutableOutputInfo<ClusterID> outputIDInfo = kMeansModel.getOutputIDInfo();
+//        List<List<Feature>> centroids1 = kMeansModel.getCentroids();
+//        Map<String, List<Pair<String, Double>>> topFeatures = kMeansModel.getTopFeatures(10);
+
+        List<Prediction<ClusterID>> predictions = kMeansModel.predict(trainDataset);
+        List<Map<String, Object>> listClusterID = new ArrayList<>();
+        predictions.forEach(e -> listClusterID.add(Collections.singletonMap("Cluster ID", e.getOutput().getID())));
+
+        return MLPredictionOutput.builder().predictionResult(DataFrameBuilder.load(listClusterID)).build();
+    }
+
+    //@Override
+    public MLOutput predict1(DataFrame dataFrame, Model model1) {
+        MutableDataset<ClusterID> trainDataset = TribuoUtil.generateDataset(dataFrame, new ClusteringFactory(),
+                "KMeans training data from opensearch", TribuoOutputType.CLUSTERID);
+        Integer centroids = Optional.ofNullable(parameters.getCentroids()).orElse(DEFAULT_CENTROIDS);
+        Integer iterations = Optional.ofNullable(parameters.getIterations()).orElse(DEFAULT_ITERATIONS);
+        KMeansTrainer trainer = new KMeansTrainer(centroids, iterations, distance, numThreads, seed);
+        KMeansModel kMeansModel = trainer.train(trainDataset);
+        Model model = new Model();
+        model.setName(FunctionName.KMEANS.name());
+        model.setVersion(1);
+        model.setContent(ModelSerDeSer.serialize(kMeansModel));
+
+        DenseVector[] centroidVectors = kMeansModel.getCentroidVectors();
+        for (DenseVector centroid : centroidVectors) {
+            System.out.println(centroid);
+        }
+
+        ImmutableOutputInfo<ClusterID> outputIDInfo = kMeansModel.getOutputIDInfo();
+        List<List<Feature>> centroids1 = kMeansModel.getCentroids();
+        Map<String, List<Pair<String, Double>>> topFeatures = kMeansModel.getTopFeatures(10);
+
+        List<Prediction<ClusterID>> predictions = kMeansModel.predict(trainDataset);
+        List<Map<String, Object>> listClusterID = new ArrayList<>();
+        predictions.forEach(e -> listClusterID.add(Collections.singletonMap("Cluster ID", e.getOutput().getID())));
+
+        return MLPredictionOutput.builder().predictionResult(DataFrameBuilder.load(listClusterID)).build();
+    }
+
+
 }

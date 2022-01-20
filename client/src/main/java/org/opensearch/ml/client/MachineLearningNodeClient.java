@@ -29,6 +29,7 @@ import org.opensearch.ml.common.transport.prediction.MLPredictionTaskResponse;
 import org.opensearch.ml.common.transport.training.MLTrainingTaskAction;
 import org.opensearch.ml.common.transport.training.MLTrainingTaskRequest;
 import org.opensearch.ml.common.transport.training.MLTrainingTaskResponse;
+import org.opensearch.ml.common.transport.trainpredict.MLTrainAndPredictionTaskAction;
 
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @RequiredArgsConstructor
@@ -46,6 +47,23 @@ public class MachineLearningNodeClient implements MachineLearningClient {
             .build();
 
         client.execute(MLPredictionTaskAction.INSTANCE, predictionRequest, ActionListener.wrap(response -> {
+            MLPredictionTaskResponse predictionResponse =
+                    MLPredictionTaskResponse
+                            .fromActionResponse(response);
+            listener.onResponse(predictionResponse.getOutput());
+        }, listener::onFailure));
+
+    }
+
+    @Override
+    public void trainAndPredict(MLInput mlInput, ActionListener<MLOutput> listener) {
+        validateMLInput(mlInput, true);
+
+        MLTrainingTaskRequest request = MLTrainingTaskRequest.builder()
+                .mlInput(mlInput)
+                .build();
+
+        client.execute(MLTrainAndPredictionTaskAction.INSTANCE, request, ActionListener.wrap(response -> {
             MLPredictionTaskResponse predictionResponse =
                     MLPredictionTaskResponse
                             .fromActionResponse(response);
