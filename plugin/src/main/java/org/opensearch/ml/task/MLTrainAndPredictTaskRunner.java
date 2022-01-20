@@ -12,16 +12,19 @@
 
 package org.opensearch.ml.task;
 
+import static org.opensearch.ml.plugin.MachineLearningPlugin.TASK_THREAD_POOL;
+import static org.opensearch.ml.stats.StatNames.ML_EXECUTING_TASK_COUNT;
+
+import java.time.Instant;
+import java.util.UUID;
+
 import lombok.extern.log4j.Log4j2;
-import org.opensearch.OpenSearchException;
-import org.opensearch.ResourceNotFoundException;
+
 import org.opensearch.action.ActionListener;
 import org.opensearch.action.ActionListenerResponseHandler;
-import org.opensearch.action.get.GetRequest;
 import org.opensearch.action.support.ThreadedActionListener;
 import org.opensearch.client.Client;
 import org.opensearch.cluster.service.ClusterService;
-import org.opensearch.commons.authuser.User;
 import org.opensearch.ml.action.trainpredict.MLTrainAndPredictionTaskExecutionAction;
 import org.opensearch.ml.common.dataframe.DataFrame;
 import org.opensearch.ml.common.dataset.DataFrameInputDataset;
@@ -32,26 +35,13 @@ import org.opensearch.ml.common.parameter.MLPredictionOutput;
 import org.opensearch.ml.common.transport.prediction.MLPredictionTaskResponse;
 import org.opensearch.ml.common.transport.training.MLTrainingTaskRequest;
 import org.opensearch.ml.engine.MLEngine;
-import org.opensearch.ml.engine.Model;
 import org.opensearch.ml.indices.MLInputDatasetHandler;
-import org.opensearch.ml.model.MLModel;
 import org.opensearch.ml.model.MLTask;
 import org.opensearch.ml.model.MLTaskState;
 import org.opensearch.ml.model.MLTaskType;
 import org.opensearch.ml.stats.MLStats;
 import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.transport.TransportService;
-
-import java.time.Instant;
-import java.util.Base64;
-import java.util.Map;
-import java.util.UUID;
-
-import static org.opensearch.ml.indices.MLIndicesHandler.ML_MODEL_INDEX;
-import static org.opensearch.ml.permission.AccessController.checkUserPermissions;
-import static org.opensearch.ml.permission.AccessController.getUserContext;
-import static org.opensearch.ml.plugin.MachineLearningPlugin.TASK_THREAD_POOL;
-import static org.opensearch.ml.stats.StatNames.ML_EXECUTING_TASK_COUNT;
 
 /**
  * MLPredictTaskRunner is responsible for running predict tasks.

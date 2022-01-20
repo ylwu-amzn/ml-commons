@@ -22,7 +22,8 @@ import org.opensearch.ml.task.MLTrainAndPredictTaskRunner;
 import org.opensearch.tasks.Task;
 import org.opensearch.transport.TransportService;
 
-public class MLTrainAndPredictionTaskExecutionTransportAction extends HandledTransportAction<MLTrainingTaskRequest, MLPredictionTaskResponse> {
+public class MLTrainAndPredictionTaskExecutionTransportAction extends
+    HandledTransportAction<MLTrainingTaskRequest, MLPredictionTaskResponse> {
     private final MLTrainAndPredictTaskRunner mlTrainAndPredictTaskRunner;
     private final TransportService transportService;
 

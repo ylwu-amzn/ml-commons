@@ -11,26 +11,27 @@
 
 package org.opensearch.ml.rest;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.ImmutableList;
-import org.opensearch.client.node.NodeClient;
-import org.opensearch.common.xcontent.XContentParser;
-import org.opensearch.ml.common.parameter.MLInput;
-import org.opensearch.ml.common.transport.trainpredict.MLTrainAndPredictionTaskAction;
-import org.opensearch.ml.common.transport.training.MLTrainingTaskRequest;
-import org.opensearch.rest.BaseRestHandler;
-import org.opensearch.rest.RestRequest;
-import org.opensearch.rest.action.RestToXContentListener;
-
-import java.io.IOException;
-import java.util.List;
-import java.util.Locale;
-
 import static org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken;
 import static org.opensearch.ml.plugin.MachineLearningPlugin.ML_BASE_URI;
 import static org.opensearch.ml.utils.RestActionUtils.PARAMETER_ALGORITHM;
 import static org.opensearch.ml.utils.RestActionUtils.getAlgorithm;
 import static org.opensearch.ml.utils.RestActionUtils.isAsync;
+
+import java.io.IOException;
+import java.util.List;
+import java.util.Locale;
+
+import org.opensearch.client.node.NodeClient;
+import org.opensearch.common.xcontent.XContentParser;
+import org.opensearch.ml.common.parameter.MLInput;
+import org.opensearch.ml.common.transport.training.MLTrainingTaskRequest;
+import org.opensearch.ml.common.transport.trainpredict.MLTrainAndPredictionTaskAction;
+import org.opensearch.rest.BaseRestHandler;
+import org.opensearch.rest.RestRequest;
+import org.opensearch.rest.action.RestToXContentListener;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableList;
 
 public class RestMLTrainAndPredictAction extends BaseRestHandler {
     private static final String ML_TRAIN_AND_PREDICT_ACTION = "ml_train_and_predict_action";
@@ -54,7 +55,8 @@ public class RestMLTrainAndPredictAction extends BaseRestHandler {
     @Override
     public RestChannelConsumer prepareRequest(RestRequest request, NodeClient client) throws IOException {
         MLTrainingTaskRequest mlTrainingTaskRequest = getRequest(request);
-        return channel -> client.execute(MLTrainAndPredictionTaskAction.INSTANCE, mlTrainingTaskRequest, new RestToXContentListener<>(channel));
+        return channel -> client
+            .execute(MLTrainAndPredictionTaskAction.INSTANCE, mlTrainingTaskRequest, new RestToXContentListener<>(channel));
     }
 
     /**
