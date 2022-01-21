@@ -12,7 +12,9 @@
 
 package org.opensearch.ml.action.trainpredict;
 
+import lombok.extern.log4j.Log4j2;
 import org.opensearch.action.ActionListener;
+import org.opensearch.action.ActionRequest;
 import org.opensearch.action.support.ActionFilters;
 import org.opensearch.action.support.HandledTransportAction;
 import org.opensearch.common.inject.Inject;
@@ -22,8 +24,9 @@ import org.opensearch.ml.task.MLTrainAndPredictTaskRunner;
 import org.opensearch.tasks.Task;
 import org.opensearch.transport.TransportService;
 
+@Log4j2
 public class MLTrainAndPredictionTaskExecutionTransportAction extends
-    HandledTransportAction<MLTrainingTaskRequest, MLPredictionTaskResponse> {
+    HandledTransportAction<ActionRequest, MLPredictionTaskResponse> {
     private final MLTrainAndPredictTaskRunner mlTrainAndPredictTaskRunner;
     private final TransportService transportService;
 
@@ -39,7 +42,9 @@ public class MLTrainAndPredictionTaskExecutionTransportAction extends
     }
 
     @Override
-    protected void doExecute(Task task, MLTrainingTaskRequest request, ActionListener<MLPredictionTaskResponse> listener) {
-        mlTrainAndPredictTaskRunner.startTrainAndPredictionTask(request, listener);
+    protected void doExecute(Task task, ActionRequest request, ActionListener<MLPredictionTaskResponse> listener) {
+        log.info("Received train and predict request " + request);
+        MLTrainingTaskRequest mlTrainingTaskRequest = MLTrainingTaskRequest.fromActionRequest(request);
+        mlTrainAndPredictTaskRunner.startTrainAndPredictionTask(mlTrainingTaskRequest, listener);
     }
 }
