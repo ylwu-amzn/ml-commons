@@ -43,12 +43,11 @@ import org.opensearch.ml.common.parameter.FunctionName;
 import org.opensearch.ml.common.parameter.MLInput;
 import org.opensearch.ml.common.parameter.MLPredictionOutput;
 import org.opensearch.ml.common.parameter.MLTrainingOutput;
+import org.opensearch.ml.common.transport.MLTaskResponse;
 import org.opensearch.ml.common.transport.prediction.MLPredictionTaskAction;
 import org.opensearch.ml.common.transport.prediction.MLPredictionTaskRequest;
-import org.opensearch.ml.common.transport.prediction.MLPredictionTaskResponse;
 import org.opensearch.ml.common.transport.training.MLTrainingTaskAction;
 import org.opensearch.ml.common.transport.training.MLTrainingTaskRequest;
-import org.opensearch.ml.common.transport.training.MLTrainingTaskResponse;
 import org.opensearch.rest.RestStatus;
 import org.opensearch.search.SearchHit;
 import org.opensearch.search.SearchHits;
@@ -123,8 +122,8 @@ public class IntegTestUtils extends OpenSearchIntegTestCase {
     public static String trainModel(MLInputDataset inputDataset) throws ExecutionException, InterruptedException {
         MLInput mlInput = MLInput.builder().algorithm(FunctionName.KMEANS).inputDataset(inputDataset).build();
         MLTrainingTaskRequest trainingRequest = new MLTrainingTaskRequest(mlInput, true); // TODO: support train test in sync way
-        ActionFuture<MLTrainingTaskResponse> trainingFuture = client().execute(MLTrainingTaskAction.INSTANCE, trainingRequest);
-        MLTrainingTaskResponse trainingResponse = trainingFuture.actionGet();
+        ActionFuture<MLTaskResponse> trainingFuture = client().execute(MLTrainingTaskAction.INSTANCE, trainingRequest);
+        MLTaskResponse trainingResponse = trainingFuture.actionGet();
         assertNotNull(trainingResponse);
         MLTrainingOutput modelTrainingOutput = (MLTrainingOutput) trainingResponse.getOutput();
         String modelId = modelTrainingOutput.getModelId();
@@ -163,8 +162,8 @@ public class IntegTestUtils extends OpenSearchIntegTestCase {
     public static void predictAndVerifyResult(String taskId, MLInputDataset inputDataset) throws IOException {
         MLInput mlInput = MLInput.builder().algorithm(FunctionName.KMEANS).inputDataset(inputDataset).build();
         MLPredictionTaskRequest predictionRequest = new MLPredictionTaskRequest(taskId, mlInput);
-        ActionFuture<MLPredictionTaskResponse> predictionFuture = client().execute(MLPredictionTaskAction.INSTANCE, predictionRequest);
-        MLPredictionTaskResponse predictionResponse = predictionFuture.actionGet();
+        ActionFuture<MLTaskResponse> predictionFuture = client().execute(MLPredictionTaskAction.INSTANCE, predictionRequest);
+        MLTaskResponse predictionResponse = predictionFuture.actionGet();
         XContentBuilder builder = XContentFactory.contentBuilder(XContentType.JSON);
         builder.startObject();
         MLPredictionOutput mlPredictionOutput = (MLPredictionOutput) predictionResponse.getOutput();

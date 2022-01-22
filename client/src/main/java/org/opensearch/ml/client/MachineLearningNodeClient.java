@@ -15,24 +15,20 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.opensearch.action.ActionListener;
-import org.opensearch.action.ActionResponse;
 import org.opensearch.client.node.NodeClient;
 import org.opensearch.ml.common.parameter.Input;
 import org.opensearch.ml.common.parameter.MLInput;
 import org.opensearch.ml.common.parameter.MLOutput;
 import org.opensearch.ml.common.parameter.Output;
+import org.opensearch.ml.common.transport.MLTaskResponse;
 import org.opensearch.ml.common.transport.execute.MLExecuteTaskAction;
 import org.opensearch.ml.common.transport.execute.MLExecuteTaskRequest;
 import org.opensearch.ml.common.transport.execute.MLExecuteTaskResponse;
 import org.opensearch.ml.common.transport.prediction.MLPredictionTaskAction;
 import org.opensearch.ml.common.transport.prediction.MLPredictionTaskRequest;
-import org.opensearch.ml.common.transport.prediction.MLPredictionTaskResponse;
 import org.opensearch.ml.common.transport.training.MLTrainingTaskAction;
 import org.opensearch.ml.common.transport.training.MLTrainingTaskRequest;
-import org.opensearch.ml.common.transport.training.MLTrainingTaskResponse;
 import org.opensearch.ml.common.transport.trainpredict.MLTrainAndPredictionTaskAction;
-
-import java.util.function.Function;
 
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @RequiredArgsConstructor
@@ -41,21 +37,14 @@ public class MachineLearningNodeClient implements MachineLearningClient {
     NodeClient client;
 
     @Override
-    public void predict(String modelId, MLInput mlInput,
-                        ActionListener<MLOutput> listener) {
+    public void predict(String modelId, MLInput mlInput, ActionListener<MLOutput> listener) {
         validateMLInput(mlInput, true);
 
         MLPredictionTaskRequest predictionRequest = MLPredictionTaskRequest.builder()
             .mlInput(mlInput)
             .build();
 
-        client.execute(MLPredictionTaskAction.INSTANCE, predictionRequest, ActionListener.wrap(response -> {
-            MLPredictionTaskResponse predictionResponse =
-                    MLPredictionTaskResponse
-                            .fromActionResponse(response);
-            listener.onResponse(predictionResponse.getOutput());
-        }, listener::onFailure));
-
+        client.execute(MLPredictionTaskAction.INSTANCE, predictionRequest, getMlPredictionTaskResponseActionListener(listener));
     }
 
     @Override
@@ -69,28 +58,6 @@ public class MachineLearningNodeClient implements MachineLearningClient {
         client.execute(MLTrainAndPredictionTaskAction.INSTANCE, request, getMlPredictionTaskResponseActionListener(listener));
     }
 
-    //TODO: use this method in predict method.
-    private ActionListener<MLPredictionTaskResponse> getMlPredictionTaskResponseActionListener(ActionListener<MLOutput> listener) {
-        ActionListener<MLPredictionTaskResponse> internalListener = ActionListener.wrap(predictionResponse -> {
-            listener.onResponse(predictionResponse.getOutput());
-        }, listener::onFailure);
-        ActionListener<MLPredictionTaskResponse> actionListener = wrapActionListener(internalListener, res -> {
-            MLPredictionTaskResponse predictionResponse = MLPredictionTaskResponse.fromActionResponse(res);
-            listener.onResponse(predictionResponse.getOutput());
-            return predictionResponse;
-        });
-        return actionListener;
-    }
-
-    private final <T extends ActionResponse> ActionListener<T> wrapActionListener(final ActionListener<T> listener, final Function<ActionResponse, T> recreate) {
-        ActionListener<T> actionListener = ActionListener.wrap(r-> {
-            listener.onResponse(recreate.apply(r));;
-        }, e->{
-            listener.onFailure(e);
-        });
-        return actionListener;
-    }
-
     @Override
     public void train(MLInput mlInput, ActionListener<MLOutput> listener) {
         validateMLInput(mlInput, true);
@@ -98,9 +65,7 @@ public class MachineLearningNodeClient implements MachineLearningClient {
                 .mlInput(mlInput)
                 .build();
 
-        client.execute(MLTrainingTaskAction.INSTANCE, trainingTaskRequest, ActionListener.wrap(response -> {
-            listener.onResponse(MLTrainingTaskResponse.fromActionResponse(response).getOutput());
-        }, listener::onFailure));
+        client.execute(MLTrainingTaskAction.INSTANCE, trainingTaskRequest, getMlPredictionTaskResponseActionListener(listener));
     }
 
     @Override
@@ -113,6 +78,38 @@ public class MachineLearningNodeClient implements MachineLearningClient {
             listener.onResponse(MLExecuteTaskResponse.fromActionResponse(response).getOutput());
         }, listener::onFailure));
     }
+
+    private ActionListener<MLTaskResponse> getMlPredictionTaskResponseActionListener(ActionListener<MLOutput> listener) {
+        ActionListener<MLTaskResponse> actionListener = ActionListener.wrap(r -> {
+            MLTaskResponse mlTaskResponse = MLTaskResponse.fromActionResponse(r);
+            listener.onResponse(mlTaskResponse.getOutput());
+        }, e -> {
+            listener.onFailure(e);
+        });
+        return actionListener;
+    }
+
+//    private ActionListener<MLTaskResponse> getMlPredictionTaskResponseActionListener(ActionListener<MLOutput> listener) {
+//        ActionListener<MLTaskResponse> internalListener = ActionListener.wrap(predictionResponse -> {
+//            listener.onResponse(predictionResponse.getOutput());
+//        }, listener::onFailure);
+//        ActionListener<MLTaskResponse> actionListener = wrapActionListener(internalListener, res -> {
+//            MLTaskResponse predictionResponse = MLTaskResponse.fromActionResponse(res);
+//            //listener.onResponse(predictionResponse.getOutput());
+//            internalListener.onResponse(predictionResponse);
+//            return predictionResponse;
+//        });
+//        return actionListener;
+//    }
+//
+//    private <T extends ActionResponse> ActionListener<T> wrapActionListener(final ActionListener<T> listener, final Function<ActionResponse, T> recreate) {
+//        ActionListener<T> actionListener = ActionListener.wrap(r-> {
+//            listener.onResponse(recreate.apply(r));;
+//        }, e->{
+//            listener.onFailure(e);
+//        });
+//        return actionListener;
+//    }
 
     private void validateMLInput(MLInput mlInput, boolean requireInput) {
         if (mlInput == null) {
