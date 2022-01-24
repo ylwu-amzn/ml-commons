@@ -84,16 +84,6 @@ public class MachineLearningNodeClient implements MachineLearningClient {
         }, listener::onFailure));
     }
 
-//    private ActionListener<MLTaskResponse> getMlPredictionTaskResponseActionListener(ActionListener<MLOutput> listener) {
-//        ActionListener<MLTaskResponse> actionListener = ActionListener.wrap(r -> {
-//            MLTaskResponse mlTaskResponse = MLTaskResponse.fromActionResponse(r);
-//            listener.onResponse(mlTaskResponse.getOutput());
-//        }, e -> {
-//            listener.onFailure(e);
-//        });
-//        return actionListener;
-//    }
-
     private ActionListener<MLTaskResponse> getMlPredictionTaskResponseActionListener(ActionListener<MLOutput> listener) {
         ActionListener<MLTaskResponse> internalListener = ActionListener.wrap(predictionResponse -> {
             listener.onResponse(predictionResponse.getOutput());

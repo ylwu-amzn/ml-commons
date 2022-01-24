@@ -15,10 +15,7 @@ package org.opensearch.ml.task;
 import static org.mockito.Mockito.*;
 
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 
 import org.junit.Assert;
@@ -30,20 +27,10 @@ import org.mockito.ArgumentCaptor;
 import org.opensearch.action.ActionListener;
 import org.opensearch.action.update.UpdateResponse;
 import org.opensearch.client.Client;
-import org.opensearch.ml.common.dataframe.ColumnMeta;
-import org.opensearch.ml.common.dataframe.ColumnType;
-import org.opensearch.ml.common.dataframe.ColumnValue;
-import org.opensearch.ml.common.dataframe.DataFrame;
-import org.opensearch.ml.common.dataframe.DefaultDataFrame;
-import org.opensearch.ml.common.dataframe.DoubleValue;
-import org.opensearch.ml.common.dataframe.Row;
-import org.opensearch.ml.common.parameter.MLPredictionOutput;
 import org.opensearch.ml.indices.MLIndicesHandler;
 import org.opensearch.ml.model.MLTask;
 import org.opensearch.ml.model.MLTaskState;
 import org.opensearch.ml.model.MLTaskType;
-
-import com.google.common.collect.ImmutableMap;
 
 public class MLTaskManagerTests {
     MLTaskManager mlTaskManager;
@@ -197,97 +184,5 @@ public class MLTaskManagerTests {
         ActionListener listener = mock(ActionListener.class);
         mlTaskManager.createMLTask(mlTask, listener);
         verify(listener).onFailure(any());
-    }
-
-    @Test
-    public void testA() {
-        ColumnMeta[] columnMetas = new ColumnMeta[] { new ColumnMeta("a", ColumnType.DOUBLE) };
-        List<Row> rows = new ArrayList<>();
-        rows.add(new Row(new ColumnValue[] { new DoubleValue(1.0) }));
-        rows.add(new Row(new ColumnValue[] { new DoubleValue(10.0) }));
-        DataFrame dataFrame = new DefaultDataFrame(columnMetas, rows);
-        MLPredictionOutput predictionResult = new MLPredictionOutput("taskId", "status", dataFrame);
-        System.out.println("++++++++++++++++++++++++++++++++++++++++");
-        System.out.println(predictionResult.getPredictionResult());
-        System.out.println("++++++++++++++++++++++++++++++++++++++++");
-    }
-
-    @Test
-    public void testBb() {
-        ColumnMeta[] columnMetas = new ColumnMeta[] { new ColumnMeta("a", ColumnType.DOUBLE) };
-        List<Row> rows = new ArrayList<>();
-        rows.add(new Row(new ColumnValue[] { new DoubleValue(1.0) }));
-        rows.add(new Row(new ColumnValue[] { new DoubleValue(10.0) }));
-        DataFrame inputDataFrame = new DefaultDataFrame(columnMetas, rows);
-
-        ColumnMeta[] columnMetas2 = new ColumnMeta[] { new ColumnMeta("b", ColumnType.DOUBLE) };
-        List<Row> rows2 = new ArrayList<>();
-        rows2.add(new Row(new ColumnValue[] { new DoubleValue(2.0) }));
-        rows2.add(new Row(new ColumnValue[] { new DoubleValue(20.0) }));
-        DataFrame inputDataFrame2 = new DefaultDataFrame(columnMetas2, rows2);
-
-        // inputDataFrame.appendColumn(new ColumnMeta("testt", ColumnType.DOUBLE), new Object[]{2.0, 4.0});
-        System.out.println("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");
-        System.out.println(inputDataFrame);
-        System.out.println("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");
-        System.out.println("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");
-        System.out.println(inputDataFrame2);
-        System.out.println("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");
-
-        Iterator<Row> iterator1 = inputDataFrame.iterator();
-        Iterator<Row> iterator2 = inputDataFrame2.iterator();
-        Iterator<String> iterator = new Iterator<String>() {
-            @Override
-            public boolean hasNext() {
-                return iterator1.hasNext();
-            }
-
-            @Override
-            public String next() {
-                StringBuilder sb = new StringBuilder();
-                sb.append(convertRowIntoExprValue(inputDataFrame.columnMetas(), iterator1.next()));
-                sb.append(convertRowIntoExprValue(inputDataFrame2.columnMetas(), iterator2.next()));
-                return sb.toString();
-            }
-        };
-
-        while (iterator.hasNext()) {
-            String next = iterator.next();
-            System.out.println(next);
-        }
-    }
-
-    private java.lang.String convertRowIntoExprValue(ColumnMeta[] columnMetas, Row row) {
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < columnMetas.length; i++) {
-            ColumnValue columnValue = row.getValue(i);
-            String name = columnMetas[i].getName();
-            sb.append(name).append(":");
-            switch (columnValue.columnType()) {
-                case INTEGER:
-                    sb.append(columnValue.intValue()).append("; ");
-                    break;
-                case DOUBLE:
-                    sb.append(columnValue.doubleValue()).append("; ");
-                    break;
-                case STRING:
-                    sb.append(columnValue.stringValue()).append("; ");
-                    break;
-                default:
-                    break;
-            }
-        }
-        return sb.toString();
-    }
-
-    @Test
-    public void testCc() {
-        ImmutableMap.Builder<String, String> builder = new ImmutableMap.Builder<>();
-        builder.putAll(ImmutableMap.of("a", "1", "b", "2"));
-        builder.putAll(ImmutableMap.of("c", "100"));
-        ImmutableMap<String, String> build = builder.build();
-        System.out.println("----------------------------------------");
-        System.out.println(build);
-        System.out.println("----------------------------------------");
     }
 }
