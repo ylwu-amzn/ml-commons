@@ -191,7 +191,7 @@ public class MLTrainingTaskRunner extends MLTaskRunner<MLTrainingTaskRequest, ML
                     .source(mlModel.toXContent(XContentBuilder.builder(XContentType.JSON.xContent()), ToXContent.EMPTY_PARAMS))
                     .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE);
                 client.index(indexRequest, ActionListener.wrap(r -> {
-                    log.info("mode data indexing done, result:{}", r.getResult());
+                    log.info("mode data indexing done, result:{}, model id: {}", r.getResult(), r.getId());
                     handleMLTaskComplete(mlTask);
                     MLTrainingOutput output = new MLTrainingOutput(r.getId(), mlTask.getTaskId(), MLTaskState.COMPLETED.name());
                     listener.onResponse(MLTaskResponse.builder().output(output).build());

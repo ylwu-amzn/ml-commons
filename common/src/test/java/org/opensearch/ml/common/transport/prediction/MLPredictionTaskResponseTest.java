@@ -120,7 +120,7 @@ public class MLPredictionTaskResponseTest {
                 .taskId("b5009b99-268f-476d-a676-379a30f82457")
                 .status("Success")
                 .predictionResult(DataFrameBuilder.load(Collections.singletonList(new HashMap<String, Object>() {{
-                    put("Cluster ID", 0);
+                    put("ClusterID", 0);
                 }})))
                 .build();
         MLTaskResponse response = MLTaskResponse.builder()
@@ -134,7 +134,7 @@ public class MLPredictionTaskResponseTest {
         assertEquals("{\"task_id\":\"b5009b99-268f-476d-a676-379a30f82457\"," +
              "\"status\":\"Success\"," +
              "\"prediction_result\":{" +
-             "\"column_metas\":[{\"name\":\"Cluster ID\",\"column_type\":\"INTEGER\"}]," +
+             "\"column_metas\":[{\"name\":\"ClusterID\",\"column_type\":\"INTEGER\"}]," +
              "\"rows\":[{\"values\":[{\"column_type\":\"INTEGER\",\"value\":0}]}]}}", jsonStr);
     }
 }

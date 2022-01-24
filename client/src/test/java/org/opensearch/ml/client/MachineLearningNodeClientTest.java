@@ -139,7 +139,7 @@ public class MachineLearningNodeClientTest {
                 .algorithm(FunctionName.KMEANS)
                 .inputDataset(input)
                 .build();
-        machineLearningNodeClient.train(mlInput, trainingActionListener);
+        machineLearningNodeClient.train(mlInput, false, trainingActionListener);
 
         verify(client).execute(eq(MLTrainingTaskAction.INSTANCE), isA(MLTrainingTaskRequest.class),
                 any(ActionListener.class));
@@ -155,13 +155,13 @@ public class MachineLearningNodeClientTest {
         MLInput mlInput = MLInput.builder()
                 .algorithm(FunctionName.KMEANS)
                 .build();
-        machineLearningNodeClient.train(mlInput, trainingActionListener);
+        machineLearningNodeClient.train(mlInput, false, trainingActionListener);
     }
 
     @Test
     public void train_Exception_WithNullInput() {
         exceptionRule.expect(IllegalArgumentException.class);
         exceptionRule.expectMessage("ML Input can't be null");
-        machineLearningNodeClient.train(null, trainingActionListener);
+        machineLearningNodeClient.train(null, false, trainingActionListener);
     }
 }

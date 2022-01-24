@@ -170,9 +170,9 @@ public class IntegTestUtils extends OpenSearchIntegTestCase {
         mlPredictionOutput.getPredictionResult().toXContent(builder, ToXContent.EMPTY_PARAMS);
         builder.endObject();
         String jsonStr = Strings.toString(builder);
-        String expectedStr1 = "{\"column_metas\":[{\"name\":\"Cluster ID\",\"column_type\":\"INTEGER\"}],"
+        String expectedStr1 = "{\"column_metas\":[{\"name\":\"ClusterID\",\"column_type\":\"INTEGER\"}],"
             + "\"rows\":[{\"values\":[{\"column_type\":\"INTEGER\",\"value\":0}]}]}";
-        String expectedStr2 = "{\"column_metas\":[{\"name\":\"Cluster ID\",\"column_type\":\"INTEGER\"}],"
+        String expectedStr2 = "{\"column_metas\":[{\"name\":\"ClusterID\",\"column_type\":\"INTEGER\"}],"
             + "\"rows\":[{\"values\":[{\"column_type\":\"INTEGER\",\"value\":1}]}]}";
         // The prediction result would not be a fixed value.
         assertTrue(expectedStr1.equals(jsonStr) || expectedStr2.equals(jsonStr));
