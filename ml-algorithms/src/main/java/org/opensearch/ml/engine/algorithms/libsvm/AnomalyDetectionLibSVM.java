@@ -19,9 +19,9 @@ import org.opensearch.ml.common.parameter.AnomalyDetectionLibSVMParams;
 import org.opensearch.ml.common.parameter.MLAlgoParams;
 import org.opensearch.ml.common.parameter.MLOutput;
 import org.opensearch.ml.common.parameter.MLPredictionOutput;
-import org.opensearch.ml.engine.MLAlgo;
-import org.opensearch.ml.engine.MLAlgoMetaData;
 import org.opensearch.ml.engine.Model;
+import org.opensearch.ml.engine.Predictable;
+import org.opensearch.ml.engine.Trainable;
 import org.opensearch.ml.engine.annotation.Function;
 import org.opensearch.ml.engine.contants.TribuoOutputType;
 import org.opensearch.ml.engine.utils.ModelSerDeSer;
@@ -49,7 +49,7 @@ import java.util.Map;
  *
  */
 @Function(FunctionName.ANOMALY_DETECTION_LIBSVM)
-public class AnomalyDetectionLibSVM implements MLAlgo {
+public class AnomalyDetectionLibSVM implements Trainable, Predictable {
     private static double DEFAULT_GAMMA = 1.0;
     private static double DEFAULT_NU = 0.1;
 
@@ -120,14 +120,4 @@ public class AnomalyDetectionLibSVM implements MLAlgo {
         return model;
     }
 
-    @Override
-    public MLAlgoMetaData getMetaData() {
-        return MLAlgoMetaData.builder().name(FunctionName.ANOMALY_DETECTION_LIBSVM.name())
-                .description("Anomaly detection based on one-class SVM.")
-                .version("1.0")
-                .predictable(true)
-                .trainable(true)
-                .executable(false)
-                .build();
-    }
 }
