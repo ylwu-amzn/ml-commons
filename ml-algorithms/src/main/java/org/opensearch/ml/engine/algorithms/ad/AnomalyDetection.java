@@ -26,8 +26,6 @@ import org.opensearch.ml.engine.annotation.Function;
 import org.opensearch.ml.engine.contants.TribuoOutputType;
 import org.opensearch.ml.engine.utils.ModelSerDeSer;
 import org.opensearch.ml.engine.utils.TribuoUtil;
-import org.tribuo.Example;
-import org.tribuo.Feature;
 import org.tribuo.MutableDataset;
 import org.tribuo.Prediction;
 import org.tribuo.anomaly.AnomalyFactory;
@@ -92,11 +90,6 @@ public class AnomalyDetection implements Trainable, Predictable {
         predictions.forEach(e -> {
             Map<String, Object> result = new HashMap<>();
             result.put("anomaly_type", e.getOutput().getType().name());
-//            result.put("score", e.getOutput().getScore());
-//            Example<Event> example = e.getExample();
-//            for (Feature feature : example) {
-//                result.put(feature.getName(), feature.getValue());
-//            }
             adResults.add(result);
         });
 

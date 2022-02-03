@@ -27,7 +27,6 @@ import org.opensearch.ml.common.dataframe.DoubleValue;
 import org.opensearch.ml.common.dataframe.Row;
 import org.opensearch.ml.common.parameter.AnomalyDetectionParams;
 import org.opensearch.ml.common.parameter.FunctionName;
-import org.opensearch.ml.common.parameter.MLOutput;
 import org.opensearch.ml.common.parameter.MLPredictionOutput;
 import org.opensearch.ml.engine.Model;
 import org.tribuo.Dataset;
@@ -43,7 +42,6 @@ import org.tribuo.common.libsvm.KernelType;
 import org.tribuo.common.libsvm.LibSVMModel;
 import org.tribuo.common.libsvm.SVMParameters;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -144,7 +142,7 @@ public class AnomalyDetectionTest {
         int falsePositive = 0;
         int totalPositive = 0;
         for (Row row : predictions) {
-            String type = row.getValue(1).stringValue();
+            String type = row.getValue(0).stringValue();
             if (predictionLabels.get(i) == Event.EventType.ANOMALOUS) {
                 totalPositive++;
                 if ("ANOMALOUS".equals(type)) {
@@ -161,30 +159,4 @@ public class AnomalyDetectionTest {
         Assert.assertEquals(1.0, recall, 0.01);
     }
 
-    @Test
-    public void tribuoAD() {
-        Pair<Dataset<Event>, Dataset<Event>> pair = AnomalyDataGenerator.gaussianAnomaly(1000, 0.3);
-        Dataset<Event> data = pair.getA();
-        Dataset<Event> test = pair.getB();
-        Iterator<Example<Event>> iterator = test.iterator();
-        while (iterator.hasNext()) {
-            Example<Event> example = iterator.next();
-            Event.EventType type = example.getOutput().getType();
-            if (type == Event.EventType.UNKNOWN) {
-                throw new IllegalArgumentException("test");
-            }
-        }
-        SVMParameters params = new SVMParameters<>(new SVMAnomalyType(SVMAnomalyType.SVMMode.ONE_CLASS), KernelType.RBF);
-        params.setGamma(1.0);
-        params.setNu(0.1);
-
-        LibSVMAnomalyTrainer trainer = new LibSVMAnomalyTrainer(params);
-        LibSVMModel model = trainer.train(data);
-        ((LibSVMAnomalyModel) model).getNumberOfSupportVectors();
-
-        List<Prediction<Event>> predictions = model.predict(test);
-        assertEquals(1000, predictions.size());
-        Optional<Prediction<Event>> anomaly = predictions.stream().filter(p -> p.getOutput().getType() == Event.EventType.ANOMALOUS).findAny();
-        assertTrue(anomaly.isPresent());
-    }
 }
