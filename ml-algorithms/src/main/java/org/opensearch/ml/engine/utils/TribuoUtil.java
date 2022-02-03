@@ -32,7 +32,6 @@ import java.util.stream.StreamSupport;
 @UtilityClass
 public class TribuoUtil {
     public static Tuple transformDataFrame(DataFrame dataFrame) {
-        //TODO: remove this line, don't need to do this for everytime
         String[] featureNames = Arrays.stream(dataFrame.columnMetas()).map(e -> e.getName()).toArray(String[]::new);
         double[][] featureValues = new double[dataFrame.size()][];
         Iterator<Row> itr = dataFrame.iterator();
@@ -68,24 +67,12 @@ public class TribuoUtil {
                     example = new ArrayExample<T>((T) new Regressor("DIM-0", Double.NaN), featureNamesValues.v1(), featureNamesValues.v2()[i]);
                     break;
                 case ANOMALY_DETECTION_LIBSVM:
-                    Event.EventType eventType = Event.EventType.UNKNOWN;
-                    String[] columns = featureNamesValues.v1();
-                    if ("anomaly_type".equals(columns[columns.length - 1])) {
-                        double v = featureNamesValues.v2()[i][columns.length - 1];
-                        int anomalyType = Double.valueOf(v).intValue();
-                        switch (anomalyType) {
-                            case 1:
-                                eventType = Event.EventType.ANOMALOUS;
-                                break;
-                            case 0:
-                                eventType = Event.EventType.EXPECTED;
-                                break;
-                            default:
-                                break;
-                        }
-                    }
-
-                    example = new ArrayExample<T>((T) new Event(eventType), featureNamesValues.v1(), featureNamesValues.v2()[i]);
+                    // Why we set default event type as EXPECTED(non-anomalous)
+                    // 1. For training data, Tribuo LibSVMAnomalyTrainer only supports EXPECTED events at training time.
+                    // 2. For prediction data, we treat the data as non-anomalous by default as Tribuo lib don't accept UNKNOWN type.
+                    Event.EventType defaultEventType = Event.EventType.EXPECTED;
+                    // TODO: support anomaly labels to evaluate prediction result
+                    example = new ArrayExample<T>((T) new Event(defaultEventType), featureNamesValues.v1(), featureNamesValues.v2()[i]);
                     break;
                 default:
                     throw new IllegalArgumentException("unknown type:" + outputType);
