@@ -12,6 +12,7 @@
 
 package org.opensearch.ml.engine.algorithms.ad;
 
+import lombok.extern.log4j.Log4j2;
 import org.opensearch.ml.common.dataframe.DataFrame;
 import org.opensearch.ml.common.dataframe.DataFrameBuilder;
 import org.opensearch.ml.common.parameter.FunctionName;
@@ -26,6 +27,8 @@ import org.opensearch.ml.engine.annotation.Function;
 import org.opensearch.ml.engine.contants.TribuoOutputType;
 import org.opensearch.ml.engine.utils.ModelSerDeSer;
 import org.opensearch.ml.engine.utils.TribuoUtil;
+import org.tribuo.Example;
+import org.tribuo.Feature;
 import org.tribuo.MutableDataset;
 import org.tribuo.Prediction;
 import org.tribuo.anomaly.AnomalyFactory;
@@ -47,11 +50,13 @@ import java.util.Optional;
  * Wrap Tribuo's anomaly detection based on one-class SVM (libSVM).
  *
  */
+@Log4j2
 @Function(FunctionName.ANOMALY_DETECTION)
 public class AnomalyDetection implements Trainable, Predictable {
     public static final int VERSION = 1;
-    private static double DEFAULT_GAMMA = 1.0;
-    private static double DEFAULT_NU = 0.1;
+//    private static double DEFAULT_GAMMA = 1.0;
+//    private static double DEFAULT_NU = 0.1;
+    private static KernelType DEFAULT_KERNEL_TYPE = KernelType.RBF;
 
     private AnomalyDetectionParams parameters;
 
@@ -90,19 +95,44 @@ public class AnomalyDetection implements Trainable, Predictable {
         predictions.forEach(e -> {
             Map<String, Object> result = new HashMap<>();
             result.put("anomaly_type", e.getOutput().getType().name());
+            result.put("score", e.getOutput().getScore());
+            Example<Event> example = e.getExample();
+            for (Feature feature : example) {
+                result.put(feature.getName(), feature.getValue());
+            }
             adResults.add(result);
         });
-
         return MLPredictionOutput.builder().predictionResult(DataFrameBuilder.load(adResults)).build();
     }
 
     @Override
     public Model train(DataFrame dataFrame) {
-        SVMParameters params = new SVMParameters<>(new SVMAnomalyType(SVMAnomalyType.SVMMode.ONE_CLASS), KernelType.RBF);
-        Double gamma = Optional.ofNullable(parameters.getGamma()).orElse(DEFAULT_GAMMA);
-        Double nu = Optional.ofNullable(parameters.getNu()).orElse(DEFAULT_NU);
-        params.setGamma(gamma);
-        params.setNu(nu);
+        KernelType kernelType = parseKernelType();
+        log.info("---------------- kernel type " + kernelType);
+        SVMParameters params = new SVMParameters<>(new SVMAnomalyType(SVMAnomalyType.SVMMode.ONE_CLASS), kernelType);
+//        Double gamma = Optional.ofNullable(parameters.getGamma()).orElse(DEFAULT_GAMMA);
+//        Double nu = Optional.ofNullable(parameters.getNu()).orElse(DEFAULT_NU);
+        if (parameters.getGamma() != null) {
+            params.setGamma(parameters.getGamma());
+        }
+        if (parameters.getNu() != null) {
+            params.setNu(parameters.getNu());
+        }
+        if (parameters.getCost() != null) {
+            params.setCost(parameters.getCost());
+        }
+        if (parameters.getCoeff() != null) {
+            params.setCoeff(parameters.getCoeff());
+        }
+        if (parameters.getEpsilon() != null) {
+            params.setEpsilon(parameters.getEpsilon());
+        }
+
+        if (parameters.getDegree() != null) {
+            params.setDegree(parameters.getDegree());
+        }
+//        params.setCacheSize();
+        //params.setProbability();
         MutableDataset<Event> data = TribuoUtil.generateDataset(dataFrame, new AnomalyFactory(),
                 "Anomaly detection LibSVM training data from OpenSearch", TribuoOutputType.ANOMALY_DETECTION_LIBSVM);
 
@@ -117,4 +147,27 @@ public class AnomalyDetection implements Trainable, Predictable {
         return model;
     }
 
+    private KernelType parseKernelType() {
+        KernelType kernelType = DEFAULT_KERNEL_TYPE;
+        if (parameters.getKernelType() == null) {
+            return kernelType;
+        }
+        switch (parameters.getKernelType()){
+            case LINEAR:
+                kernelType = KernelType.LINEAR;
+                break;
+            case POLY:
+                kernelType = KernelType.POLY;
+                break;
+            case RBF:
+                kernelType = KernelType.RBF;
+                break;
+            case SIGMOID:
+                kernelType = KernelType.SIGMOID;
+                break;
+            default:
+                break;
+        }
+        return kernelType;
+    }
 }
