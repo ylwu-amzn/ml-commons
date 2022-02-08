@@ -6,11 +6,16 @@
 package org.opensearch.ml.engine;
 
 import com.amazon.randomcutforest.RandomCutForest;
+import com.amazon.randomcutforest.config.Precision;
+import com.amazon.randomcutforest.parkservices.AnomalyDescriptor;
+import com.amazon.randomcutforest.parkservices.ThresholdedRandomCutForest;
+import com.google.common.collect.ImmutableList;
+import com.smelter.base.DataFrame;
+import gnu.trove.list.array.TIntArrayList;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
-import org.opensearch.ml.common.dataframe.DataFrame;
 import org.opensearch.ml.common.dataset.DataFrameInputDataset;
 import org.opensearch.ml.common.dataset.MLInputDataset;
 import org.opensearch.ml.common.parameter.FunctionName;
@@ -20,9 +25,19 @@ import org.opensearch.ml.common.parameter.LinearRegressionParams;
 import org.opensearch.ml.common.parameter.MLInput;
 import org.opensearch.ml.common.parameter.Model;
 
+import java.io.IOException;
+import java.text.DateFormat;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.TimeZone;
 
+import static com.smelter.utils.DateUtil.YEAR_MONTH_DAY_HOUR_MIN_SECOND_FORMAT;
 import static org.opensearch.ml.engine.helper.KMeansHelper.constructKMeansDataFrame;
 import static org.opensearch.ml.engine.helper.LinearRegressionHelper.constructLinearRegressionTrainDataFrame;
 
@@ -181,6 +196,87 @@ public class RCFTest {
         }
     }
 
+//    @Test
+//    public void testThresholdedRCF_TrainWihExpectedAndAnomalyData() {
+//        trainingDataSize = 200;
+//        int expectedTrainingDataSize = 200;
+//        int anomalyTrainingDataSize = 0;
+//        ThresholdedRandomCutForest forest = ThresholdedRandomCutForest.builder()
+//                .dimensions(2)
+//                .numberOfTrees(10)
+//                .sampleSize(trainingDataSize)
+//                .outputAfter(trainingDataSize)
+//                .parallelExecutionEnabled(false)
+//                .compact(true)
+//                .precision(Precision.FLOAT_32)
+//                .boundingBoxCacheFraction(1)
+//                .shingleSize(1)
+//                .anomalyRate((855.0 - 550.0)/855.0)
+//                .build();
+//
+//        double max = Double.MIN_VALUE;
+//        double min = Double.MAX_VALUE;
+//        // train with normal data
+//        for (int i = 0; i < expectedTrainingDataSize; i++) {
+//            double[] point = fourclassExpectedData.get(i);
+//            double score = forest.getForest().getAnomalyScore(point);
+//            if (score < min) {
+//                min = score;
+//            }
+//            if (score > max) {
+//                max = score;
+//            }
+//            forest.getForest().update(point);
+//        }
+//
+//        // train with anomaly data
+//        for (int i = 0; i < anomalyTrainingDataSize; i++) {
+//            double[] point = fourclassAnomalyData.get(i);
+//            double score = forest.getForest().getAnomalyScore(point);
+//            if (score < min) {
+//                min = score;
+//            }
+//            if (score > max) {
+//                max = score;
+//            }
+//            forest.getForest().update(point);
+//        }
+//
+//        max = Double.MIN_VALUE;
+//        min = Double.MAX_VALUE;
+//        int j;
+//        // Predict anomaly data
+//        for (j = anomalyTrainingDataSize; j < fourclassAnomalyData.size(); j++) {
+//            double[] point = fourclassAnomalyData.get(j);
+//            double score = forest.getForest().getAnomalyScore(point);
+//            if (score < min) {
+//                min = score;
+//            }
+//            if (score > max) {
+//                max = score;
+//            }
+//            forest.process(point, )
+//            System.out.println(String.format("{ \"index\" : { \"_index\" : \"%s\", \"_id\" : \"%s\" } }",
+//                    index_name, j));
+//            System.out.println(String.format("{\"A\":%s,\"B\":%s,\"score\":%s,\"anomaly_type\":\"%s\"}",
+//                    point[0], point[1], score, score > 1 ? "ANOMALOUS" : "EXPECTED"));
+//        }
+//        // Predict normal data
+//        for (int m = expectedTrainingDataSize; m < fourclassExpectedData.size(); m++) {
+//            double[] point = fourclassExpectedData.get(m);
+//            double score = forest.getForest().getAnomalyScore(point);
+//            if (score < min) {
+//                min = score;
+//            }
+//            if (score > max) {
+//                max = score;
+//            }
+//            System.out.println(String.format("{ \"index\" : { \"_index\" : \"%s\", \"_id\" : \"%s\" } }",
+//                    index_name, j + m));
+//            System.out.println(String.format("{\"A\":%s,\"B\":%s,\"score\":%s,\"anomaly_type\":\"%s\"}",
+//                    point[0], point[1], score, score > 1 ? "ANOMALOUS" : "EXPECTED"));
+//        }
+//    }
 
     public List<double[]> createExpectedData() {
         List<double[]> fourclassExpectedData = new ArrayList<>();
@@ -1047,4 +1143,305 @@ public class RCFTest {
         return fourclassAnomalyData;
     }
 
+
+    public List<double[]> createTrainingDataForMachineFailure() throws ParseException {
+        List<double[]> data = new ArrayList<>();
+        DataFrame df = new DataFrame("/Users/ylwu/code/ml/NAB/data/realKnownCause/machine_temperature_system_failure.csv");
+        df.asType("timestamp", Date.class);
+        df.asType("value", Double.class);
+//        System.out.println(df.first(20));
+        DataFrame loc = df.loc(df.where("timestamp>=\"2013-12-18 01:00:00\" and timestamp<=\"2013-12-31 01:00:00\""));
+//        System.out.println(loc.first(20));
+//        System.out.println(loc.getSize());
+        List<Double> value = loc.getColumnData("value");
+//        System.out.println(Arrays.toString(value.toArray()));
+        for (Double v : value) {
+            data.add(new double[]{v});
+        }
+        return data;
+    }
+
+    public DataFrame createTrainingDataForMachineFailure2() throws ParseException {
+        List<double[]> data = new ArrayList<>();
+        DataFrame df = new DataFrame("/Users/ylwu/code/ml/NAB/data/realKnownCause/machine_temperature_system_failure.csv");
+        df.asType("timestamp", Date.class);
+        df.asType("value", Double.class);
+//        System.out.println(df.first(20));
+        DataFrame loc = df.loc(df.where("timestamp>=\"2013-12-18 01:00:00\" and timestamp<=\"2013-12-31 01:00:00\""));
+//        System.out.println(loc.first(20));
+//        System.out.println(loc.getSize());
+        List<Double> value = loc.getColumnData("value");
+//        System.out.println(Arrays.toString(value.toArray()));
+        for (Double v : value) {
+            data.add(new double[]{v});
+        }
+        return loc;
+    }
+
+    public DataFrame createAllDataForMachineFailure() throws ParseException {
+        List<double[]> data = new ArrayList<>();
+        DataFrame df = new DataFrame("/Users/ylwu/code/ml/NAB/data/realKnownCause/machine_temperature_system_failure.csv");
+        df.asType("timestamp", Date.class);
+        df.asType("value", Double.class);
+        List<Double> value = df.getColumnData("value");
+//        System.out.println(Arrays.toString(value.toArray()));
+        for (Double v : value) {
+            data.add(new double[]{v});
+        }
+        return df;
+    }
+
+    @Test
+    public void testMachineFailure() throws ParseException, IOException {
+        List<double[]> trainingData = createTrainingDataForMachineFailure();
+        trainingDataSize = trainingData.size();
+        int expectedTrainingDataSize = trainingDataSize;
+        int anomalyTrainingDataSize = 0;
+        RandomCutForest forest = RandomCutForest.builder()
+                .numberOfTrees(10)
+                .sampleSize(trainingDataSize)
+                .outputAfter(trainingDataSize)
+                .dimensions(1) // still required! shingle can increase the dimension
+                .randomSeed(123)
+                .storeSequenceIndexesEnabled(true)
+                .centerOfMassEnabled(true)
+                .build();
+        // train with expected data
+        for (int i = 0; i < expectedTrainingDataSize; i++) {
+            double[] point = trainingData.get(i);
+//            double score = forest.getAnomalyScore(point);
+            forest.update(point);
+        }
+        // train with anomaly data
+        for (int i = 0; i < anomalyTrainingDataSize; i++) {
+            double[] point = fourclassAnomalyData.get(i);
+//            double score = forest.getAnomalyScore(point);
+            forest.update(point);
+        }
+
+        DateFormat simpleDateFormat = new SimpleDateFormat(YEAR_MONTH_DAY_HOUR_MIN_SECOND_FORMAT);
+        simpleDateFormat.setTimeZone(TimeZone.getTimeZone("America/New_York"));
+
+        DataFrame df = createAllDataForMachineFailure();
+        String index_name = "machine_temperature_system_failure_results";
+        DataFrame bulkResult = new DataFrame();
+        bulkResult.addColumn("bulk_request");
+        for (int m = 0; m < df.getSize(); m++) {
+            double[] point = new double[]{(Double)df.getRowData(m)[1]};
+            double score = forest.getAnomalyScore(point);
+//            System.out.println(String.format("{ \"index\" : { \"_index\" : \"%s\", \"_id\" : \"%s\" } }",
+//                    index_name, m));
+//            System.out.println(String.format("{\"timestamp\":\"%s\",\"value\":%s,\"score\":%s,\"anomaly_type\":\"%s\"}",
+//                    simpleDateFormat.format(df.getRowData(m)[0]), point[0], score, score > 1 ? "ANOMALOUS" : "EXPECTED"));
+            bulkResult.addRow(ImmutableList.of(String.format("{ \"index\" : { \"_index\" : \"%s\", \"_id\" : \"%s\" } }",
+                    index_name, m)));
+            bulkResult.addRow(ImmutableList.of(String.format("{\"timestamp\":\"%s\",\"value\":%s,\"score\":%s,\"anomaly_type\":\"%s\"}",
+                    simpleDateFormat.format(df.getRowData(m)[0]), point[0], score, score > 1 ? "ANOMALOUS" : "EXPECTED")));
+//            if (m == 10) {
+//                break;
+//            }
+        }
+        System.out.println("+++++++++++++++++++++++++++++");
+        System.out.println(bulkResult.getSize());
+        bulkResult.toCsv("/Users/ylwu/code/ylwu/MLPyGround/data/ad/nab/machine_temperature_system_failure_results_bulk");
+    }
+
+    @Test
+    public void testMachineFailure2() throws ParseException, IOException {
+        DataFrame trainingData = createTrainingDataForMachineFailure2();
+        trainingDataSize = trainingData.getSize();
+        int expectedTrainingDataSize = trainingDataSize;
+        int anomalyTrainingDataSize = 0;
+        ThresholdedRandomCutForest.Builder<?> rcfBuilder = ThresholdedRandomCutForest
+                .builder()
+                .dimensions(1)
+                .sampleSize(trainingDataSize)
+                .numberOfTrees(10)
+                .timeDecay(0.0001)
+                .outputAfter(trainingDataSize)
+//                .initialAcceptFraction(initialAcceptFraction)
+                .parallelExecutionEnabled(false)
+                .compact(true)
+                .precision(Precision.FLOAT_32)
+                .boundingBoxCacheFraction(0)
+                // same with dimension for opportunistic memory saving
+                // Usually, we use it as shingleSize(dimension). When a new point comes in, we will
+                // look at the point store if there is any overlapping. Say the previously-stored
+                // vector is x1, x2, x3, x4, now we add x3, x4, x5, x6. RCF will recognize
+                // overlapping x3, x4, and only store x5, x6.
+                .shingleSize(8)
+                .internalShinglingEnabled(true)
+                .anomalyRate(1 - 0.995)
+                .randomSeed(123);
+
+        ThresholdedRandomCutForest trcf = new ThresholdedRandomCutForest(rcfBuilder);
+
+        // train with expected data
+        for (int i = 0; i < expectedTrainingDataSize; i++) {
+            Object[] rowData = trainingData.getRowData(i);
+            double[] point = new double[]{(Double) rowData[1]};
+//            double score = forest.getAnomalyScore(point);
+            trcf.process(point, ((Date)rowData[0]).getTime());
+        }
+
+        DateFormat simpleDateFormat = new SimpleDateFormat(YEAR_MONTH_DAY_HOUR_MIN_SECOND_FORMAT);
+        simpleDateFormat.setTimeZone(TimeZone.getTimeZone("America/New_York"));
+
+        DataFrame df = createAllDataForMachineFailure();
+        String index_name = "machine_temperature_system_failure_results2";
+        DataFrame bulkResult = new DataFrame();
+        bulkResult.addColumn("bulk_request");
+        for (int m = 0; m < df.getSize(); m++) {
+            Object[] rowData = df.getRowData(m);
+            double[] point = new double[]{(Double) rowData[1]};
+            AnomalyDescriptor resultDescriptor = trcf.process(point, ((Date) rowData[0]).getTime());
+//            System.out.println(String.format("{ \"index\" : { \"_index\" : \"%s\", \"_id\" : \"%s\" } }",
+//                    index_name, m));
+//            System.out.println(String.format("{\"timestamp\":\"%s\",\"value\":%s,\"score\":%s,\"anomaly_type\":\"%s\"}",
+//                    simpleDateFormat.format(df.getRowData(m)[0]), point[0], score, score > 1 ? "ANOMALOUS" : "EXPECTED"));
+            bulkResult.addRow(ImmutableList.of(String.format("{ \"index\" : { \"_index\" : \"%s\", \"_id\" : \"%s\" } }",
+                    index_name, m)));
+            double anomalyGrade = resultDescriptor.getAnomalyGrade();
+            double score = resultDescriptor.getRCFScore();
+            bulkResult.addRow(ImmutableList.of(String.format("{\"timestamp\":\"%s\",\"value\":%s,\"score\":%s,\"grade\":%s,\"anomaly_type\":\"%s\"}",
+                    simpleDateFormat.format(rowData[0]), point[0], score, anomalyGrade, anomalyGrade > 0.01 ? "ANOMALOUS" : "EXPECTED")));
+//            if (m == 10) {
+//                break;
+//            }
+        }
+        System.out.println("+++++++++++++++++++++++++++++");
+        System.out.println(bulkResult.getSize());
+        bulkResult.toCsv("/Users/ylwu/code/ylwu/MLPyGround/data/ad/nab/machine_temperature_system_failure_results_bulk2");
+    }
+
+    public List<double[]> createTrainingDataForNycTaxi(int shingleSize, int trainingDataSize) throws ParseException {
+        List<double[]> data = new ArrayList<>();
+        DataFrame df = new DataFrame("/Users/ylwu/code/ml/NAB/data/realKnownCause/nyc_taxi.csv");
+        df.asType("timestamp", Date.class);
+        df.asType("value", Double.class);
+        List<Double> shingle = new ArrayList<>();
+        for (int i=0; i< trainingDataSize; i++) {
+            for (int j=i; j<i+shingleSize; j++) {
+                shingle.add((Double)df.getRowData(j)[1]);
+            }
+            data.add(shingle.stream().mapToDouble(d -> d).toArray());
+            shingle.clear();
+        }
+        return data;
+    }
+
+    public DataFrame createAllDataForNycTaxi() throws ParseException {
+        List<double[]> data = new ArrayList<>();
+        DataFrame df = new DataFrame("/Users/ylwu/code/ml/NAB/data/realKnownCause/nyc_taxi.csv");
+        df.asType("timestamp", Date.class);
+        df.asType("value", Double.class);
+        List<Double> value = df.getColumnData("value");
+//        System.out.println(Arrays.toString(value.toArray()));
+        for (Double v : value) {
+            data.add(new double[]{v});
+        }
+        return df;
+    }
+
+    @Test
+    public void testNycTaxi() throws ParseException, IOException {
+        int shingleSize = 10;
+        Map<Integer, Float> shingleScoreThreshold = new HashMap<>();
+        shingleScoreThreshold.put(1, 2.0f);
+        shingleScoreThreshold.put(10, 1.7f);
+        shingleScoreThreshold.put(48, 1.5f);
+        trainingDataSize = 512;
+        List<double[]> trainingData = createTrainingDataForNycTaxi(shingleSize, 512);
+        int expectedTrainingDataSize = trainingDataSize;
+        int anomalyTrainingDataSize = 0;
+        RandomCutForest forest = RandomCutForest.builder()
+                .numberOfTrees(200)
+                .sampleSize(trainingDataSize)
+                .outputAfter(trainingDataSize)
+                .dimensions(shingleSize) // still required! shingle can increase the dimension
+                .randomSeed(123)
+                .build();
+        // train with first 1000 shingles
+        for (int i = 0; i < trainingDataSize ; i++) {
+            double[] point = trainingData.get(i);
+            forest.update(point);
+        }
+
+
+        DateFormat simpleDateFormat = new SimpleDateFormat(YEAR_MONTH_DAY_HOUR_MIN_SECOND_FORMAT);
+        simpleDateFormat.setTimeZone(TimeZone.getTimeZone("America/New_York"));
+
+        DataFrame df = createAllDataForNycTaxi();
+        String index_name = "nyc_taxi_shingle"+shingleSize;
+        DataFrame bulkResult = new DataFrame();
+        bulkResult.addColumn("bulk_request");
+        List<Double> shingle = new ArrayList<>();
+        for (int m = trainingDataSize  + shingleSize; m < df.getSize()-shingleSize; m++) {
+            for (int j = m; j<m + shingleSize; j++) {
+                shingle.add((Double)df.getRowData(j)[1]);
+            }
+
+            double[] point = shingle.stream().mapToDouble(d -> d).toArray();
+            shingle.clear();
+            double score = forest.getAnomalyScore(point);
+            bulkResult.addRow(ImmutableList.of(String.format("{ \"index\" : { \"_index\" : \"%s\", \"_id\" : \"%s\" } }",
+                    index_name, m)));
+            bulkResult.addRow(ImmutableList.of(String.format("{\"timestamp\":\"%s\",\"value\":%s,\"score\":%s,\"anomaly_type\":\"%s\"}",
+                    simpleDateFormat.format(df.getRowData(m)[0]), point[0], score, score > shingleScoreThreshold.get(shingleSize) ? "ANOMALOUS" : "EXPECTED")));
+        }
+        System.out.println("+++++++++++++++++++++++++++++ " + bulkResult.getSize());
+        bulkResult.toCsv("/Users/ylwu/code/ylwu/MLPyGround/data/ad/nab/nyc_taxi_results_shingle_size"+shingleSize);
+    }
+
+
+    @Test
+    public void testNycTaxi_RefreshTreeWithPredictionData() throws ParseException, IOException {
+        int shingleSize = 48;
+        Map<Integer, Float> shingleScoreThreshold = new HashMap<>();
+        shingleScoreThreshold.put(1, 2.0f);
+        shingleScoreThreshold.put(10, 1.7f);
+        shingleScoreThreshold.put(48, 1.2f);
+        trainingDataSize = 512;
+        List<double[]> trainingData = createTrainingDataForNycTaxi(shingleSize, 512);
+        int expectedTrainingDataSize = trainingDataSize;
+        int anomalyTrainingDataSize = 0;
+        RandomCutForest forest = RandomCutForest.builder()
+                .numberOfTrees(200)
+                .sampleSize(trainingDataSize)
+                .outputAfter(trainingDataSize)
+                .dimensions(shingleSize) // still required! shingle can increase the dimension
+                .randomSeed(123)
+                .build();
+        // train with first 1000 shingles
+        for (int i = 0; i < trainingDataSize ; i++) {
+            double[] point = trainingData.get(i);
+            forest.update(point);
+        }
+
+
+        DateFormat simpleDateFormat = new SimpleDateFormat(YEAR_MONTH_DAY_HOUR_MIN_SECOND_FORMAT);
+        simpleDateFormat.setTimeZone(TimeZone.getTimeZone("America/New_York"));
+
+        DataFrame df = createAllDataForNycTaxi();
+        String index_name = "nyc_taxi_update_with_prediction_data_shingle"+shingleSize;
+        DataFrame bulkResult = new DataFrame();
+        bulkResult.addColumn("bulk_request");
+        List<Double> shingle = new ArrayList<>();
+        for (int m = trainingDataSize  + shingleSize; m < df.getSize()-shingleSize; m++) {
+            for (int j = m; j<m + shingleSize; j++) {
+                shingle.add((Double)df.getRowData(j)[1]);
+            }
+
+            double[] point = shingle.stream().mapToDouble(d -> d).toArray();
+            shingle.clear();
+            double score = forest.getAnomalyScore(point);
+            forest.update(point); // Update RCF with prediction data
+            bulkResult.addRow(ImmutableList.of(String.format("{ \"index\" : { \"_index\" : \"%s\", \"_id\" : \"%s\" } }",
+                    index_name, m)));
+            bulkResult.addRow(ImmutableList.of(String.format("{\"timestamp\":\"%s\",\"value\":%s,\"score\":%s,\"anomaly_type\":\"%s\"}",
+                    simpleDateFormat.format(df.getRowData(m)[0]), point[0], score, score > shingleScoreThreshold.get(shingleSize) ? "ANOMALOUS" : "EXPECTED")));
+        }
+        System.out.println("+++++++++++++++++++++++++++++ " + bulkResult.getSize());
+        bulkResult.toCsv("/Users/ylwu/code/ylwu/MLPyGround/data/ad/nab/nyc_taxi_results_update_with_predict_data_shingle_size"+shingleSize);
+    }
 }
