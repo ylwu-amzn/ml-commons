@@ -256,7 +256,7 @@ public class MLTaskManager {
         updatedContent.put(LAST_UPDATE_TIME_FIELD, Instant.now().toEpochMilli());
         updateRequest.doc(updatedContent);
         updateRequest.setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE);
-        ActionListener actionListener = semaphore == null ? listener : ActionListener.runAfter(listener, () -> semaphore.release());
+        ActionListener<UpdateResponse> actionListener = semaphore == null ? listener : ActionListener.runAfter(listener, () -> semaphore.release());
         client.update(updateRequest, actionListener);
     }
 }
