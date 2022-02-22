@@ -193,6 +193,7 @@ public class MLTaskManager {
             IndexRequest request = new IndexRequest(ML_TASK_INDEX);
             try (XContentBuilder builder = XContentFactory.jsonBuilder()) {
                 request.source(mlTask.toXContent(builder, ToXContent.EMPTY_PARAMS)).setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE);
+                log.info("-------------------- Create new task");
                 client.index(request, listener);
             } catch (Exception e) {
                 log.error("Failed to create AD task for " + mlTask.getFunctionName() + ", " + mlTask.getTaskType(), e);
@@ -256,7 +257,7 @@ public class MLTaskManager {
         updatedContent.put(LAST_UPDATE_TIME_FIELD, Instant.now().toEpochMilli());
         updateRequest.doc(updatedContent);
         updateRequest.setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE);
-        ActionListener actionListener = semaphore == null ? listener : ActionListener.runAfter(listener, () -> semaphore.release());
+        ActionListener<UpdateResponse> actionListener = semaphore == null ? listener : ActionListener.runAfter(listener, () -> semaphore.release());
         client.update(updateRequest, actionListener);
     }
 }
