@@ -88,29 +88,29 @@ public class MLIndicesHandler {
 
     public void initMLIndexIfAbsent(String indexName, String mapping, ActionListener<Boolean> listener) {
         log.info("Start to init ML index " + indexName);
-        try (ThreadContext.StoredContext context = client.threadPool().getThreadContext().stashContext()) {
-            if (!clusterService.state().metadata().hasIndex(indexName)) {
-                CreateIndexRequest request = new CreateIndexRequest(indexName).mapping("_doc", mapping, XContentType.JSON);
+//        try (ThreadContext.StoredContext context = client.threadPool().getThreadContext().stashContext()) {
+        if (!clusterService.state().metadata().hasIndex(indexName)) {
+            CreateIndexRequest request = new CreateIndexRequest(indexName).mapping("_doc", mapping, XContentType.JSON);
 
-                client.admin().indices().create(request, ActionListener.wrap(r -> {
-                    if (r.isAcknowledged()) {
-                        log.info("Created index:{}", indexName);
-                        listener.onResponse(true);
-                    } else {
-                        listener.onResponse(false);
-                    }
-                }, e -> {
-                    log.error("Failed to create index " + indexName, e);
-                    listener.onFailure(e);
-                }));
-            } else {
-                log.info("index:{} is already created", indexName);
-                listener.onResponse(true);
-            }
-        } catch (Exception e) {
-            log.error("Failed to init ML index " + indexName, e);
-            listener.onFailure(e);
+            client.admin().indices().create(request, ActionListener.wrap(r -> {
+                if (r.isAcknowledged()) {
+                    log.info("Created index:{}", indexName);
+                    listener.onResponse(true);
+                } else {
+                    listener.onResponse(false);
+                }
+            }, e -> {
+                log.error("Failed to create index " + indexName, e);
+                listener.onFailure(e);
+            }));
+        } else {
+            log.info("index:{} is already created", indexName);
+            listener.onResponse(true);
         }
+//        } catch (Exception e) {
+//            log.error("Failed to init ML index " + indexName, e);
+//            listener.onFailure(e);
+//        }
     }
 
 }
