@@ -58,7 +58,7 @@ public class MLStats {
      * @param supplier supplier to create MLStat
      * @return existing MLStat or new MLStat
      */
-    public synchronized MLStat<?> createStatIfAbsent(String key, Supplier<MLStat> supplier) {
+    public synchronized MLStat<?> createStatIfAbsent(String key, Supplier<MLStat<?>> supplier) {
         return stats.computeIfAbsent(key, k -> supplier.get());
     }
 
