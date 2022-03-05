@@ -59,7 +59,7 @@ public class TrainingITTests extends OpenSearchIntegTestCase {
 
     @Ignore("This test case is flaky, something is off with waitModelAvailable(taskId) method."
         + " This issue will be tracked in an issue and will be fixed later")
-    public void testTrainingWithSearchInput() throws ExecutionException, InterruptedException, IOException {
+    public void testTrainingWithSearchInput() throws ExecutionException, InterruptedException {
         SearchSourceBuilder searchSourceBuilder = generateSearchSourceBuilder();
         MLInputDataset inputDataset = new SearchQueryInputDataset(Collections.singletonList(TESTING_INDEX_NAME), searchSourceBuilder);
 
@@ -70,7 +70,7 @@ public class TrainingITTests extends OpenSearchIntegTestCase {
 
     @Ignore("This test case is flaky, something is off with waitModelAvailable(taskId) method."
         + " This issue will be tracked in an issue and will be fixed later")
-    public void testTrainingWithDataInput() throws ExecutionException, InterruptedException, IOException {
+    public void testTrainingWithDataInput() throws ExecutionException, InterruptedException {
         String taskId = trainModel(DATA_FRAME_INPUT_DATASET);
 
         waitModelAvailable(taskId);
@@ -87,7 +87,7 @@ public class TrainingITTests extends OpenSearchIntegTestCase {
     }
 
     // Train a model with empty dataset.
-    public void testTrainingWithEmptyDataset() throws InterruptedException {
+    public void testTrainingWithEmptyDataset() {
         SearchSourceBuilder searchSourceBuilder = generateSearchSourceBuilder();
         searchSourceBuilder.query(QueryBuilders.matchQuery("noSuchName", ""));
         MLInputDataset inputDataset = new SearchQueryInputDataset(Collections.singletonList(TESTING_INDEX_NAME), searchSourceBuilder);
