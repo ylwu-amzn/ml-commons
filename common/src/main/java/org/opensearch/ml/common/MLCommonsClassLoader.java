@@ -90,6 +90,18 @@ public class MLCommonsClassLoader {
         }
     }
 
+    private static void loadExecuteInputDataSetClassMapping() {
+        Reflections reflections = new Reflections("org.opensearch.ml.common.parameter");
+        Set<Class<?>> classes = reflections.getTypesAnnotatedWith(InputDataSet.class);
+        for (Class<?> clazz : classes) {
+            InputDataSet inputDataSet = clazz.getAnnotation(InputDataSet.class);
+            MLInputDataType value = inputDataSet.value();
+            if (value != null) {
+                parameterClassMap.put(value, clazz);
+            }
+        }
+    }
+
     @SuppressWarnings("unchecked")
     public static <T extends Enum<T>, S, I extends Object> S initInstance(T type, I in, Class<?> constructorParamClass) {
         Class<?> clazz = parameterClassMap.get(type);
