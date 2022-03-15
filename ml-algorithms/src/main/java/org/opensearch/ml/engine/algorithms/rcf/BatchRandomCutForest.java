@@ -101,10 +101,12 @@ public class BatchRandomCutForest implements TrainAndPredictable {
         List<Map<String, Object>> predictResult = new ArrayList<>();
 
         for (int rowNum = 0; rowNum< dataFrame.size(); rowNum++) {
+            Map<String, Object> result = new HashMap<>();
             for (int i = 0; i < columnMetas.length; i++) {
                 Row row = dataFrame.getRow(rowNum);
                 ColumnValue value = row.getValue(i);
                 pointList.add(value.doubleValue());
+                result.put(dataFrame.columnMetas()[i].getName(), value.doubleValue());
             }
             double[] point = pointList.stream().mapToDouble(d -> d).toArray();
             pointList.clear();
@@ -112,7 +114,6 @@ public class BatchRandomCutForest implements TrainAndPredictable {
             if (actualTrainingDataSize == null || rowNum < actualTrainingDataSize) {
                 forest.update(point);
             }
-            Map<String, Object> result = new HashMap<>();
             result.put("score", anomalyScore);
             result.put("anomalous", anomalyScore > anomalyScoreThreshold);
             predictResult.add(result);

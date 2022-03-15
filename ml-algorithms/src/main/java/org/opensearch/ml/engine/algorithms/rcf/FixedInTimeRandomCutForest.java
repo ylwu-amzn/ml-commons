@@ -131,6 +131,7 @@ public class FixedInTimeRandomCutForest implements TrainAndPredictable {
         for (int rowNum = 0; rowNum< dataFrame.size(); rowNum++) {
             Row row = dataFrame.getRow(rowNum);
             long timestamp = -1;
+            Map<String, Object> result = new HashMap<>();
             for (int i = 0; i < columnMetas.length; i++) {
                 ColumnMeta columnMeta = columnMetas[i];
                 ColumnValue value = row.getValue(i);
@@ -152,11 +153,11 @@ public class FixedInTimeRandomCutForest implements TrainAndPredictable {
                     }
                 } else {
                     pointList.add(value.doubleValue());
+                    result.put(columnMeta.getName(), value.doubleValue());
                 }
             }
             double[] point = pointList.stream().mapToDouble(d -> d).toArray();
             pointList.clear();
-            Map<String, Object> result = new HashMap<>();
 
             AnomalyDescriptor process = forest.process(point, timestamp);
             result.put(timeField, timestamp);
