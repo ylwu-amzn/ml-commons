@@ -8,6 +8,7 @@ package org.opensearch.ml.common.transport.execute;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
+import lombok.NonNull;
 import lombok.ToString;
 import lombok.experimental.FieldDefaults;
 import org.opensearch.action.ActionRequest;
@@ -16,7 +17,9 @@ import org.opensearch.common.io.stream.InputStreamStreamInput;
 import org.opensearch.common.io.stream.OutputStreamStreamOutput;
 import org.opensearch.common.io.stream.StreamInput;
 import org.opensearch.common.io.stream.StreamOutput;
-import org.opensearch.ml.common.parameter.MLInput;
+import org.opensearch.ml.common.MLCommonsClassLoader;
+import org.opensearch.ml.common.parameter.FunctionName;
+import org.opensearch.ml.common.parameter.Input;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -30,28 +33,32 @@ import static org.opensearch.action.ValidateActions.addValidationError;
 @ToString
 public class MLExecuteTaskRequest extends ActionRequest {
 
-    MLInput mlInput;
+    FunctionName functionName;
+    Input input;
 
     @Builder
-    public MLExecuteTaskRequest(MLInput input) {
-        this.mlInput = input;
+    public MLExecuteTaskRequest(@NonNull FunctionName functionName, @NonNull Input input) {
+        this.functionName = functionName;
+        this.input = input;
     }
 
     public MLExecuteTaskRequest(StreamInput in) throws IOException {
         super(in);
-        this.mlInput = new MLInput(in);
+        this.functionName = in.readEnum(FunctionName.class);
+        this.input = MLCommonsClassLoader.initExecuteInputInstance(functionName, in, StreamInput.class);
     }
 
     @Override
     public void writeTo(StreamOutput out) throws IOException {
         super.writeTo(out);
-        this.mlInput.writeTo(out);
+        out.writeEnum(functionName);
+        this.input.writeTo(out);
     }
 
     @Override
     public ActionRequestValidationException validate() {
         ActionRequestValidationException exception = null;
-        if (this.mlInput == null) {
+        if(this.input == null) {
             exception = addValidationError("ML input can't be null", exception);
         }
 

@@ -1,22 +1,24 @@
+/*
+ * Copyright OpenSearch Contributors
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 package org.opensearch.ml.action.execute;
 
-import com.google.common.collect.ImmutableList;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.rules.ExpectedException;
-import org.opensearch.action.ActionRequest;
 import org.opensearch.ml.action.MLCommonsIntegTestCase;
+import org.opensearch.ml.common.parameter.FunctionName;
 import org.opensearch.ml.common.parameter.Input;
 import org.opensearch.ml.common.parameter.LocalSampleCalculatorInput;
-import org.opensearch.ml.common.parameter.MLInput;
-import org.opensearch.ml.common.parameter.MLModel;
-import org.opensearch.ml.common.parameter.Output;
+import org.opensearch.ml.common.parameter.LocalSampleCalculatorOutput;
 import org.opensearch.ml.common.transport.execute.MLExecuteTaskAction;
 import org.opensearch.ml.common.transport.execute.MLExecuteTaskRequest;
 import org.opensearch.ml.common.transport.execute.MLExecuteTaskResponse;
-import org.opensearch.ml.common.transport.task.MLTaskGetAction;
-import org.opensearch.ml.common.transport.task.MLTaskGetResponse;
 import org.opensearch.test.OpenSearchIntegTestCase;
+
+import com.google.common.collect.ImmutableList;
 
 @OpenSearchIntegTestCase.ClusterScope(scope = OpenSearchIntegTestCase.Scope.SUITE, numDataNodes = 3)
 public class ExecuteITTests extends MLCommonsIntegTestCase {
@@ -30,9 +32,10 @@ public class ExecuteITTests extends MLCommonsIntegTestCase {
     }
 
     public void testExecuteLocalSampleCalculator() {
-        MLInput input = new LocalSampleCalculatorInput("sum", ImmutableList.of(1.0, 2.0, 3.0));
-        MLExecuteTaskRequest request = new MLExecuteTaskRequest(input);
+        Input input = new LocalSampleCalculatorInput("sum", ImmutableList.of(1.0, 2.0, 3.0));
+        MLExecuteTaskRequest request = new MLExecuteTaskRequest(FunctionName.LOCAL_SAMPLE_CALCULATOR, input);
         MLExecuteTaskResponse executeTaskResponse = client().execute(MLExecuteTaskAction.INSTANCE, request).actionGet(5000);
-        Output output = executeTaskResponse.getOutput();
+        LocalSampleCalculatorOutput output = (LocalSampleCalculatorOutput) executeTaskResponse.getOutput();
+        assertEquals(6.0, output.getResult(), 1e-5);
     }
 }

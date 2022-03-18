@@ -178,7 +178,6 @@ public class AnomalyLocalizationOutput implements Output {
     @Override
     @SneakyThrows
     public XContentBuilder toXContent(XContentBuilder builder, ToXContent.Params params) {
-        builder.startObject();
         builder.startArray(FIELD_RESULTS);
         for (Map.Entry<String, Result> entry : this.results.entrySet()) {
             builder.startObject();
@@ -187,7 +186,6 @@ public class AnomalyLocalizationOutput implements Output {
             builder.endObject();
         }
         builder.endArray();
-        builder.endObject();
         return builder;
     }
 
