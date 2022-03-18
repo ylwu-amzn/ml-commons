@@ -64,7 +64,7 @@ public class MLExecuteTaskRunner extends MLTaskRunner<MLExecuteTaskRequest, MLEx
         ActionListener<MLExecuteTaskResponse> listener
     ) {
         threadPool.executor(TASK_THREAD_POOL).execute(() -> {
-            Input input = request.getInput();
+            Input input = request.getMlInput();
             Output output = MLEngine.execute(input);
             MLExecuteTaskResponse response = MLExecuteTaskResponse.builder().output(output).build();
             listener.onResponse(response);

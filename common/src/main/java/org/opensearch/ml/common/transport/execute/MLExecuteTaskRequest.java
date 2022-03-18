@@ -16,7 +16,6 @@ import org.opensearch.common.io.stream.InputStreamStreamInput;
 import org.opensearch.common.io.stream.OutputStreamStreamOutput;
 import org.opensearch.common.io.stream.StreamInput;
 import org.opensearch.common.io.stream.StreamOutput;
-import org.opensearch.ml.common.parameter.Input;
 import org.opensearch.ml.common.parameter.MLInput;
 
 import java.io.ByteArrayInputStream;
@@ -31,32 +30,29 @@ import static org.opensearch.action.ValidateActions.addValidationError;
 @ToString
 public class MLExecuteTaskRequest extends ActionRequest {
 
-    Input input;
+    MLInput mlInput;
 
     @Builder
-    public MLExecuteTaskRequest(Input input) {
-        this.input = input;
+    public MLExecuteTaskRequest(MLInput input) {
+        this.mlInput = input;
     }
 
     public MLExecuteTaskRequest(StreamInput in) throws IOException {
         super(in);
-        this.input = new MLInput(in);
+        this.mlInput = new MLInput(in);
     }
 
     @Override
     public void writeTo(StreamOutput out) throws IOException {
         super.writeTo(out);
-        this.input.writeTo(out);
+        this.mlInput.writeTo(out);
     }
 
     @Override
     public ActionRequestValidationException validate() {
         ActionRequestValidationException exception = null;
-        if(this.input == null) {
+        if (this.mlInput == null) {
             exception = addValidationError("ML input can't be null", exception);
-        }
-        if(this.input.getFunctionName() == null) {
-            exception = addValidationError("function name can't be null or empty", exception);
         }
 
         return exception;

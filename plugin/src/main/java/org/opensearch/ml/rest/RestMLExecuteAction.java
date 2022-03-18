@@ -17,6 +17,7 @@ import java.util.Locale;
 import org.opensearch.client.node.NodeClient;
 import org.opensearch.common.xcontent.XContentParser;
 import org.opensearch.ml.common.parameter.Input;
+import org.opensearch.ml.common.parameter.MLInput;
 import org.opensearch.ml.common.transport.execute.MLExecuteTaskAction;
 import org.opensearch.ml.common.transport.execute.MLExecuteTaskRequest;
 import org.opensearch.rest.BaseRestHandler;
@@ -63,8 +64,8 @@ public class RestMLExecuteAction extends BaseRestHandler {
 
         XContentParser parser = request.contentParser();
         ensureExpectedToken(XContentParser.Token.START_OBJECT, parser.nextToken(), parser);
-        Input input = parser.namedObject(Input.class, algorithm, null);
+        MLInput mlInput = MLInput.parse(parser, algorithm);
 
-        return new MLExecuteTaskRequest(input);
+        return new MLExecuteTaskRequest(mlInput);
     }
 }
