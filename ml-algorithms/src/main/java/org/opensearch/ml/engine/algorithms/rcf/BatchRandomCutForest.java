@@ -52,9 +52,6 @@ public class BatchRandomCutForest implements TrainAndPredictable {
     private Integer trainingDataSize;
 
     private static final RandomCutForestMapper rcfMapper = new RandomCutForestMapper();
-    public static final Schema<RandomCutForestState> schema =
-            AccessController.doPrivileged((PrivilegedAction<Schema<RandomCutForestState>>) () ->
-                    RuntimeSchema.getSchema(RandomCutForestState.class));
 
     public BatchRandomCutForest(){}
 
@@ -75,7 +72,7 @@ public class BatchRandomCutForest implements TrainAndPredictable {
         if (model == null) {
             throw new IllegalArgumentException("No model found for batch RCF prediction.");
         }
-        RandomCutForestState state = ModelSerDeSer.deserialize(model.getContent(), schema);
+        RandomCutForestState state = RCFModelSerDeSer.deserializeRCF(model.getContent());
         RandomCutForest forest = rcfMapper.toModel(state);
         List<Map<String, Object>> predictResult = process(dataFrame, forest, 0);
         return MLPredictionOutput.builder().predictionResult(DataFrameBuilder.load(predictResult)).build();
@@ -90,7 +87,7 @@ public class BatchRandomCutForest implements TrainAndPredictable {
         model.setName(FunctionName.BATCH_RCF.name());
         model.setVersion(1);
         RandomCutForestState state = rcfMapper.toState(forest);
-        model.setContent(ModelSerDeSer.serialize(state, schema));
+        model.setContent(RCFModelSerDeSer.serializeRCF(state));
         return model;
     }
 

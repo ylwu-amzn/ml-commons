@@ -5,8 +5,6 @@
 
 package org.opensearch.ml.engine.algorithms.clustering;
 
-import io.protostuff.Schema;
-import io.protostuff.runtime.RuntimeSchema;
 import org.opensearch.ml.common.dataframe.DataFrame;
 import org.opensearch.ml.common.dataframe.DataFrameBuilder;
 import org.opensearch.ml.common.input.parameter.clustering.KMeansParams;
@@ -27,8 +25,6 @@ import org.tribuo.clustering.ClusteringFactory;
 import org.tribuo.clustering.kmeans.KMeansModel;
 import org.tribuo.clustering.kmeans.KMeansTrainer;
 
-import java.security.AccessController;
-import java.security.PrivilegedAction;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -55,9 +51,6 @@ public class KMeans implements TrainAndPredictable {
     //The random seed.
     private long seed = System.currentTimeMillis();
     private KMeansTrainer.Distance distance;
-    public static final Schema<KMeansModel> schema =
-            AccessController.doPrivileged((PrivilegedAction<Schema<KMeansModel>>) () ->
-                    RuntimeSchema.getSchema(KMeansModel.class));
 
     public KMeans() {}
 
@@ -103,7 +96,7 @@ public class KMeans implements TrainAndPredictable {
         List<Prediction<ClusterID>> predictions;
         MutableDataset<ClusterID> predictionDataset = TribuoUtil.generateDataset(dataFrame, new ClusteringFactory(),
                 "KMeans prediction data from opensearch", TribuoOutputType.CLUSTERID);
-        KMeansModel kMeansModel = ModelSerDeSer.deserialize(model.getContent(), schema);
+        KMeansModel kMeansModel = (KMeansModel) ModelSerDeSer.deserialize(model.getContent());
         predictions = kMeansModel.predict(predictionDataset);
 
         List<Map<String, Object>> listClusterID = new ArrayList<>();
@@ -123,7 +116,7 @@ public class KMeans implements TrainAndPredictable {
         Model model = new Model();
         model.setName(FunctionName.KMEANS.name());
         model.setVersion(1);
-        model.setContent(ModelSerDeSer.serialize(kMeansModel, schema));
+        model.setContent(ModelSerDeSer.serialize(kMeansModel));
 
         return model;
     }

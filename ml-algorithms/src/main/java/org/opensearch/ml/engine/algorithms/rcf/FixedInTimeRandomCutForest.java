@@ -71,9 +71,6 @@ public class FixedInTimeRandomCutForest implements TrainAndPredictable {
 
     private DateFormat simpleDateFormat;
     private static final ThresholdedRandomCutForestMapper trcfMapper = new ThresholdedRandomCutForestMapper();
-    public static final Schema<ThresholdedRandomCutForestState> schema =
-            AccessController.doPrivileged((PrivilegedAction<Schema<ThresholdedRandomCutForestState>>) () ->
-                    RuntimeSchema.getSchema(ThresholdedRandomCutForestState.class));
 
     public FixedInTimeRandomCutForest(){}
 
@@ -106,7 +103,7 @@ public class FixedInTimeRandomCutForest implements TrainAndPredictable {
         if (model == null) {
             throw new IllegalArgumentException("No model found for FIT RCF prediction.");
         }
-        ThresholdedRandomCutForestState state = ModelSerDeSer.deserialize(model.getContent(), schema);
+        ThresholdedRandomCutForestState state = RCFModelSerDeSer.deserializeTRCF(model.getContent());
         ThresholdedRandomCutForest forest = trcfMapper.toModel(state);
         List<Map<String, Object>> predictResult = process(dataFrame, forest);
         return MLPredictionOutput.builder().predictionResult(DataFrameBuilder.load(predictResult)).build();
@@ -120,7 +117,7 @@ public class FixedInTimeRandomCutForest implements TrainAndPredictable {
         model.setName(FunctionName.FIT_RCF.name());
         model.setVersion(1);
         ThresholdedRandomCutForestState state = trcfMapper.toState(forest);
-        model.setContent(ModelSerDeSer.serialize(state, schema));
+        model.setContent(RCFModelSerDeSer.serializeTRCF(state));
         return model;
     }
 
