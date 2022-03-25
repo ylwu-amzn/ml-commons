@@ -5,6 +5,8 @@
 
 package org.opensearch.ml.engine.algorithms.sample;
 
+import io.protostuff.Schema;
+import io.protostuff.runtime.RuntimeSchema;
 import org.opensearch.ml.common.dataframe.DataFrame;
 import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.common.input.parameter.MLAlgoParams;
@@ -17,6 +19,8 @@ import org.opensearch.ml.engine.Trainable;
 import org.opensearch.ml.engine.annotation.Function;
 import org.opensearch.ml.engine.utils.ModelSerDeSer;
 
+import java.security.AccessController;
+import java.security.PrivilegedAction;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -24,7 +28,9 @@ import java.util.concurrent.atomic.AtomicReference;
 public class SampleAlgo implements Trainable, Predictable {
     private static final int DEFAULT_SAMPLE_PARAM = -1;
     private int sampleParam;
-
+    private static final Schema<String> schema =
+            AccessController.doPrivileged((PrivilegedAction<Schema<String>>) () ->
+                    RuntimeSchema.getSchema(String.class));
     public SampleAlgo(){}
 
     public SampleAlgo(MLAlgoParams parameters) {
@@ -48,7 +54,7 @@ public class SampleAlgo implements Trainable, Predictable {
         Model model = new Model();
         model.setName(FunctionName.SAMPLE_ALGO.name());
         model.setVersion(1);
-        model.setContent(ModelSerDeSer.serialize("This is a sample testing model with parameter: " + sampleParam));
+        model.setContent(ModelSerDeSer.serialize("This is a sample testing model with parameter: " + sampleParam, schema));
         return model;
     }
 }

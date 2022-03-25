@@ -5,6 +5,8 @@
 
 package org.opensearch.ml.engine.algorithms.regression;
 
+import io.protostuff.Schema;
+import io.protostuff.runtime.RuntimeSchema;
 import org.opensearch.ml.common.dataframe.DataFrame;
 import org.opensearch.ml.common.dataframe.DataFrameBuilder;
 import org.opensearch.ml.common.input.parameter.regression.LinearRegressionParams;
@@ -30,11 +32,14 @@ import org.tribuo.math.optimisers.SGD;
 import org.tribuo.regression.RegressionFactory;
 import org.tribuo.regression.Regressor;
 import org.tribuo.regression.sgd.RegressionObjective;
+import org.tribuo.regression.sgd.linear.LinearSGDModel;
 import org.tribuo.regression.sgd.linear.LinearSGDTrainer;
 import org.tribuo.regression.sgd.objectives.AbsoluteLoss;
 import org.tribuo.regression.sgd.objectives.Huber;
 import org.tribuo.regression.sgd.objectives.SquaredLoss;
 
+import java.security.AccessController;
+import java.security.PrivilegedAction;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -67,6 +72,10 @@ public class LinearRegression implements Trainable, Predictable {
     private RegressionObjective objective;
 
     private long seed = System.currentTimeMillis();
+
+    public static final Schema<LinearSGDModel> schema =
+            AccessController.doPrivileged((PrivilegedAction<Schema<LinearSGDModel>>) () ->
+                    RuntimeSchema.getSchema(LinearSGDModel.class));
 
     public LinearRegression() {}
 
@@ -185,7 +194,7 @@ public class LinearRegression implements Trainable, Predictable {
             throw new IllegalArgumentException("No model found for linear regression prediction.");
         }
 
-        org.tribuo.Model<Regressor> regressionModel = (org.tribuo.Model<Regressor>) ModelSerDeSer.deserialize(model.getContent());
+        LinearSGDModel regressionModel = ModelSerDeSer.deserialize(model.getContent(), schema);
         MutableDataset<Regressor> predictionDataset = TribuoUtil.generateDataset(dataFrame, new RegressionFactory(),
                 "Linear regression prediction data from opensearch", TribuoOutputType.REGRESSOR);
         List<Prediction<Regressor>> predictions = regressionModel.predict(predictionDataset);
@@ -201,11 +210,11 @@ public class LinearRegression implements Trainable, Predictable {
                 "Linear regression training data from opensearch", TribuoOutputType.REGRESSOR, parameters.getTarget());
         Integer epochs = Optional.ofNullable(parameters.getEpochs()).orElse(DEFAULT_EPOCHS);
         LinearSGDTrainer linearSGDTrainer = new LinearSGDTrainer(objective, optimiser, epochs, DEFAULT_INTERVAL, DEFAULT_BATCH_SIZE, seed);
-        org.tribuo.Model<Regressor> regressionModel = linearSGDTrainer.train(trainDataset);
+        LinearSGDModel regressionModel = linearSGDTrainer.train(trainDataset);
         Model model = new Model();
         model.setName(FunctionName.LINEAR_REGRESSION.name());
         model.setVersion(1);
-        model.setContent(ModelSerDeSer.serialize(regressionModel));
+        model.setContent(ModelSerDeSer.serialize(regressionModel, schema));
 
         return model;
     }

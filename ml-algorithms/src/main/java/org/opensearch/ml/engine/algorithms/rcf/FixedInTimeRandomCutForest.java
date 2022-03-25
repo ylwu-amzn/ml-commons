@@ -11,6 +11,8 @@ import com.amazon.randomcutforest.parkservices.AnomalyDescriptor;
 import com.amazon.randomcutforest.parkservices.ThresholdedRandomCutForest;
 import com.amazon.randomcutforest.parkservices.state.ThresholdedRandomCutForestMapper;
 import com.amazon.randomcutforest.parkservices.state.ThresholdedRandomCutForestState;
+import io.protostuff.Schema;
+import io.protostuff.runtime.RuntimeSchema;
 import lombok.extern.log4j.Log4j2;
 import org.opensearch.ml.common.dataframe.ColumnMeta;
 import org.opensearch.ml.common.dataframe.ColumnType;
@@ -29,6 +31,8 @@ import org.opensearch.ml.engine.TrainAndPredictable;
 import org.opensearch.ml.engine.annotation.Function;
 import org.opensearch.ml.engine.utils.ModelSerDeSer;
 
+import java.security.AccessController;
+import java.security.PrivilegedAction;
 import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -67,6 +71,9 @@ public class FixedInTimeRandomCutForest implements TrainAndPredictable {
 
     private DateFormat simpleDateFormat;
     private static final ThresholdedRandomCutForestMapper trcfMapper = new ThresholdedRandomCutForestMapper();
+    public static final Schema<ThresholdedRandomCutForestState> schema =
+            AccessController.doPrivileged((PrivilegedAction<Schema<ThresholdedRandomCutForestState>>) () ->
+                    RuntimeSchema.getSchema(ThresholdedRandomCutForestState.class));
 
     public FixedInTimeRandomCutForest(){}
 
@@ -99,7 +106,7 @@ public class FixedInTimeRandomCutForest implements TrainAndPredictable {
         if (model == null) {
             throw new IllegalArgumentException("No model found for FIT RCF prediction.");
         }
-        ThresholdedRandomCutForestState state = (ThresholdedRandomCutForestState) ModelSerDeSer.deserialize(model.getContent());
+        ThresholdedRandomCutForestState state = ModelSerDeSer.deserialize(model.getContent(), schema);
         ThresholdedRandomCutForest forest = trcfMapper.toModel(state);
         List<Map<String, Object>> predictResult = process(dataFrame, forest);
         return MLPredictionOutput.builder().predictionResult(DataFrameBuilder.load(predictResult)).build();
@@ -113,7 +120,7 @@ public class FixedInTimeRandomCutForest implements TrainAndPredictable {
         model.setName(FunctionName.FIT_RCF.name());
         model.setVersion(1);
         ThresholdedRandomCutForestState state = trcfMapper.toState(forest);
-         model.setContent(ModelSerDeSer.serialize(state));
+        model.setContent(ModelSerDeSer.serialize(state, schema));
         return model;
     }
 

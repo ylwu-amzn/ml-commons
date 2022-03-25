@@ -18,15 +18,17 @@ import org.opensearch.ml.common.input.parameter.ad.BatchRCFParams;
 import org.opensearch.ml.common.input.parameter.ad.FitRCFParams;
 import org.opensearch.ml.common.input.parameter.clustering.KMeansParams;
 import org.opensearch.ml.common.Model;
+import org.opensearch.ml.common.input.parameter.regression.LinearRegressionParams;
 import org.opensearch.ml.engine.algorithms.clustering.KMeans;
 import org.opensearch.ml.engine.algorithms.rcf.BatchRandomCutForest;
 import org.opensearch.ml.engine.algorithms.rcf.FixedInTimeRandomCutForest;
-import org.opensearch.ml.engine.exceptions.ModelSerDeSerException;
+import org.opensearch.ml.engine.algorithms.regression.LinearRegression;
 import org.opensearch.ml.engine.utils.ModelSerDeSer;
 import org.tribuo.clustering.kmeans.KMeansModel;
+import org.tribuo.regression.sgd.linear.LinearSGDModel;
 
 import java.util.Arrays;
-import static org.junit.Assert.assertFalse;
+
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.opensearch.ml.engine.helper.MLTestHelper.TIME_FIELD;
@@ -36,17 +38,8 @@ public class ModelSerDeSerTest {
     @Rule
     public ExpectedException thrown = ExpectedException.none();
 
-    private final Object dummyModel = new Object();
     private final RandomCutForestMapper rcfMapper = new RandomCutForestMapper();
     private final ThresholdedRandomCutForestMapper trcfMapper = new ThresholdedRandomCutForestMapper();
-
-    @Test
-    public void testModelSerDeSerBlocklModel() {
-        thrown.expect(ModelSerDeSerException.class);
-        byte[] modelBin = ModelSerDeSer.serialize(dummyModel);
-        Object model = ModelSerDeSer.deserialize(modelBin);
-        assertTrue(model.equals(dummyModel));
-    }
 
     @Test
     public void testModelSerDeSerKMeans() {
@@ -54,9 +47,19 @@ public class ModelSerDeSerTest {
         KMeans kMeans = new KMeans(params);
         Model model = kMeans.train(constructTestDataFrame(100));
 
-        KMeansModel kMeansModel = (KMeansModel) ModelSerDeSer.deserialize(model.getContent());
-        byte[] serializedModel = ModelSerDeSer.serialize(kMeansModel);
-        assertFalse(Arrays.equals(serializedModel, model.getContent()));
+        KMeansModel deserializedModel = ModelSerDeSer.deserialize(model.getContent(), KMeans.schema);
+        byte[] serializedModel = ModelSerDeSer.serialize(deserializedModel, KMeans.schema);
+        assertTrue(Arrays.equals(serializedModel, model.getContent()));
+    }
+
+    @Test
+    public void testModelSerDeSerLinearRegression() {
+        LinearRegressionParams params = LinearRegressionParams.builder().target("f2").build();
+        LinearRegression linearRegression = new LinearRegression(params);
+        Model model = linearRegression.train(constructTestDataFrame(100));
+
+        LinearSGDModel deserializedModel = ModelSerDeSer.deserialize(model.getContent(), LinearRegression.schema);
+        assertNotNull(deserializedModel);
     }
 
     @Test
@@ -65,11 +68,11 @@ public class ModelSerDeSerTest {
         BatchRandomCutForest batchRCF = new BatchRandomCutForest(params);
         Model model = batchRCF.train(constructTestDataFrame(500));
 
-        RandomCutForestState state = (RandomCutForestState) ModelSerDeSer.deserialize(model.getContent());
-        RandomCutForest forest = rcfMapper.toModel(state);
+        RandomCutForestState deserializedState = ModelSerDeSer.deserialize(model.getContent(), BatchRandomCutForest.schema);
+        RandomCutForest forest = rcfMapper.toModel(deserializedState);
         assertNotNull(forest);
-        byte[] serializedModel = ModelSerDeSer.serialize(ModelSerDeSer.serialize(state));
-        assertFalse(Arrays.equals(serializedModel, model.getContent()));
+        byte[] serializedModel = ModelSerDeSer.serialize(deserializedState, BatchRandomCutForest.schema);
+        assertTrue(Arrays.equals(serializedModel, model.getContent()));
     }
 
     @Test
@@ -78,11 +81,11 @@ public class ModelSerDeSerTest {
         FixedInTimeRandomCutForest fitRCF = new FixedInTimeRandomCutForest(params);
         Model model = fitRCF.train(constructTestDataFrame(500, true));
 
-        ThresholdedRandomCutForestState state = (ThresholdedRandomCutForestState) ModelSerDeSer.deserialize(model.getContent());
-        ThresholdedRandomCutForest forest = trcfMapper.toModel(state);
+        ThresholdedRandomCutForestState deserializedState = ModelSerDeSer.deserialize(model.getContent(), FixedInTimeRandomCutForest.schema);
+        ThresholdedRandomCutForest forest = trcfMapper.toModel(deserializedState);
         assertNotNull(forest);
-        byte[] serializedModel = ModelSerDeSer.serialize(ModelSerDeSer.serialize(state));
-        assertFalse(Arrays.equals(serializedModel, model.getContent()));
+        byte[] serializedModel = ModelSerDeSer.serialize(deserializedState, FixedInTimeRandomCutForest.schema);
+        assertTrue(Arrays.equals(serializedModel, model.getContent()));
     }
 
 }

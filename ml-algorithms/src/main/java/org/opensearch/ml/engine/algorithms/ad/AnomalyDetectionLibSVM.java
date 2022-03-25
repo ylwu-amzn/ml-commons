@@ -5,6 +5,8 @@
 
 package org.opensearch.ml.engine.algorithms.ad;
 
+import io.protostuff.Schema;
+import io.protostuff.runtime.RuntimeSchema;
 import org.opensearch.ml.common.dataframe.DataFrame;
 import org.opensearch.ml.common.dataframe.DataFrameBuilder;
 import org.opensearch.ml.common.FunctionName;
@@ -30,6 +32,8 @@ import org.tribuo.common.libsvm.KernelType;
 import org.tribuo.common.libsvm.LibSVMModel;
 import org.tribuo.common.libsvm.SVMParameters;
 
+import java.security.AccessController;
+import java.security.PrivilegedAction;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -48,6 +52,9 @@ public class AnomalyDetectionLibSVM implements Trainable, Predictable {
     private static KernelType DEFAULT_KERNEL_TYPE = KernelType.RBF;
 
     private AnomalyDetectionLibSVMParams parameters;
+    public static final Schema<LibSVMModel> schema =
+            AccessController.doPrivileged((PrivilegedAction<Schema<LibSVMModel>>) () ->
+                    RuntimeSchema.getSchema(LibSVMModel.class));
 
     public AnomalyDetectionLibSVM() {}
 
@@ -77,7 +84,7 @@ public class AnomalyDetectionLibSVM implements Trainable, Predictable {
         List<Prediction<Event>> predictions;
         MutableDataset<Event> predictionDataset = TribuoUtil.generateDataset(dataFrame, new AnomalyFactory(),
                 "Anomaly detection LibSVM prediction data from OpenSearch", TribuoOutputType.ANOMALY_DETECTION_LIBSVM);
-        LibSVMModel libSVMAnomalyModel = (LibSVMModel) ModelSerDeSer.deserialize(model.getContent());
+        LibSVMModel libSVMAnomalyModel = ModelSerDeSer.deserialize(model.getContent(), schema);
         predictions = libSVMAnomalyModel.predict(predictionDataset);
 
         List<Map<String, Object>> adResults = new ArrayList<>();
@@ -121,7 +128,7 @@ public class AnomalyDetectionLibSVM implements Trainable, Predictable {
         Model model = new Model();
         model.setName(FunctionName.AD_LIBSVM.name());
         model.setVersion(VERSION);
-        model.setContent(ModelSerDeSer.serialize(libSVMModel));
+        model.setContent(ModelSerDeSer.serialize(libSVMModel, schema));
         return model;
     }
 
