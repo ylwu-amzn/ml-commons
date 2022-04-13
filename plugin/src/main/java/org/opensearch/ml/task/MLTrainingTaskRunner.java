@@ -52,7 +52,7 @@ import org.opensearch.ml.indices.MLInputDatasetHandler;
 import org.opensearch.ml.stats.ActionName;
 import org.opensearch.ml.stats.MLStats;
 import org.opensearch.threadpool.ThreadPool;
-import org.opensearch.transport.TransportService;
+import org.opensearch.transport.TransportResponseHandler;
 
 /**
  * MLTrainingTaskRunner is responsible for running training tasks.
@@ -76,7 +76,7 @@ public class MLTrainingTaskRunner extends MLTaskRunner<MLTrainingTaskRequest, ML
         MLTaskDispatcher mlTaskDispatcher,
         MLCircuitBreakerService mlCircuitBreakerService
     ) {
-        super(mlTaskManager, mlStats, mlTaskDispatcher, mlCircuitBreakerService);
+        super(mlTaskManager, mlStats, mlTaskDispatcher, mlCircuitBreakerService, clusterService);
         this.threadPool = threadPool;
         this.clusterService = clusterService;
         this.client = client;
@@ -85,27 +85,17 @@ public class MLTrainingTaskRunner extends MLTaskRunner<MLTrainingTaskRequest, ML
     }
 
     @Override
-    public void executeTask(MLTrainingTaskRequest request, TransportService transportService, ActionListener<MLTaskResponse> listener) {
-        mlTaskDispatcher.dispatchTask(ActionListener.wrap(node -> {
-            if (clusterService.localNode().getId().equals(node.getId())) {
-                // Execute training task locally
-                log.info("execute ML training request {} locally on node {}", request.toString(), node.getId());
-                createMLTaskAndTrain(request, listener);
-            } else {
-                // Execute batch task remotely
-                log.info("execute ML training request {} remotely on node {}", request.toString(), node.getId());
-                transportService
-                    .sendRequest(
-                        node,
-                        MLTrainingTaskAction.NAME,
-                        request,
-                        new ActionListenerResponseHandler<>(listener, MLTaskResponse::new)
-                    );
-            }
-        }, e -> listener.onFailure(e)));
+    public String getTransportActionName() {
+        return MLTrainingTaskAction.NAME;
     }
 
-    public void createMLTaskAndTrain(MLTrainingTaskRequest request, ActionListener<MLTaskResponse> listener) {
+    @Override
+    public TransportResponseHandler<MLTaskResponse> getResonseHandler(ActionListener<MLTaskResponse> listener) {
+        return new ActionListenerResponseHandler<>(listener, MLTaskResponse::new);
+    }
+
+    @Override
+    public void executeTask(MLTrainingTaskRequest request, ActionListener<MLTaskResponse> listener) {
         MLInputDataType inputDataType = request.getMlInput().getInputDataset().getInputDataType();
         Instant now = Instant.now();
         MLTask mlTask = MLTask

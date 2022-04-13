@@ -114,7 +114,7 @@ public class IntegTestUtils extends OpenSearchIntegTestCase {
     // Train a model.
     public static String trainModel(MLInputDataset inputDataset) throws ExecutionException, InterruptedException {
         MLInput mlInput = MLInput.builder().algorithm(FunctionName.KMEANS).inputDataset(inputDataset).build();
-        MLTrainingTaskRequest trainingRequest = new MLTrainingTaskRequest(mlInput, true); // TODO: support train test in sync way
+        MLTrainingTaskRequest trainingRequest = new MLTrainingTaskRequest(mlInput, true, true); // TODO: support train test in sync way
         ActionFuture<MLTaskResponse> trainingFuture = client().execute(MLTrainingTaskAction.INSTANCE, trainingRequest);
         MLTaskResponse trainingResponse = trainingFuture.actionGet();
         assertNotNull(trainingResponse);
@@ -154,7 +154,7 @@ public class IntegTestUtils extends OpenSearchIntegTestCase {
     // Predict with the model generated, and verify the prediction result.
     public static void predictAndVerifyResult(String taskId, MLInputDataset inputDataset) throws IOException {
         MLInput mlInput = MLInput.builder().algorithm(FunctionName.KMEANS).inputDataset(inputDataset).build();
-        MLPredictionTaskRequest predictionRequest = new MLPredictionTaskRequest(taskId, mlInput);
+        MLPredictionTaskRequest predictionRequest = new MLPredictionTaskRequest(taskId, mlInput, true);
         ActionFuture<MLTaskResponse> predictionFuture = client().execute(MLPredictionTaskAction.INSTANCE, predictionRequest);
         MLTaskResponse predictionResponse = predictionFuture.actionGet();
         XContentBuilder builder = XContentFactory.contentBuilder(XContentType.JSON);
