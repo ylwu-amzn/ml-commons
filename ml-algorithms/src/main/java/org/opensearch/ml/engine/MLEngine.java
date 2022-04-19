@@ -5,6 +5,7 @@
 
 package org.opensearch.ml.engine;
 
+import lombok.extern.log4j.Log4j2;
 import org.opensearch.ml.common.dataframe.DataFrame;
 import org.opensearch.ml.common.input.Input;
 import org.opensearch.ml.common.input.parameter.MLAlgoParams;
@@ -16,6 +17,7 @@ import org.opensearch.ml.common.output.Output;
 /**
  * This is the interface to all ml algorithms.
  */
+@Log4j2
 public class MLEngine {
 
     public static Model train(Input input) {
@@ -41,6 +43,7 @@ public class MLEngine {
     public static MLOutput trainAndPredict(Input input) {
         validateMLInput(input);
         MLInput mlInput = (MLInput) input;
+        log.info("ylwudebugg: ----- trainAndPredict with algorithm: {}", mlInput.getAlgorithm());
         TrainAndPredictable trainAndPredictable = MLEngineClassLoader.initInstance(mlInput.getAlgorithm(), mlInput.getParameters(), MLAlgoParams.class);
         if (trainAndPredictable == null) {
             throw new IllegalArgumentException("Unsupported algorithm: " + mlInput.getAlgorithm());

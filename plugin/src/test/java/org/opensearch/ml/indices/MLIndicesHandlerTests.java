@@ -29,14 +29,6 @@ public class MLIndicesHandlerTests extends OpenSearchIntegTestCase {
         mlIndicesHandler = new MLIndicesHandler(clusterService, client);
     }
 
-    public void testInitModelIndex() {
-        Assert.assertFalse(mlIndicesHandler.doesModelIndexExist());
-        mlIndicesHandler.initModelIndexIfAbsent();
-        Assert.assertTrue(mlIndicesHandler.doesModelIndexExist());
-        mlIndicesHandler.initModelIndexIfAbsent();
-        Assert.assertTrue(mlIndicesHandler.doesModelIndexExist());
-    }
-
     public void testInitMLTaskIndex() {
         ActionListener<Boolean> listener = ActionListener.wrap(r -> { assertTrue(r); }, e -> { throw new RuntimeException(e); });
         mlIndicesHandler.initMLTaskIndex(listener);

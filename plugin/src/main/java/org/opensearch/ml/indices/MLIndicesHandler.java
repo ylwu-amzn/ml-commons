@@ -61,23 +61,6 @@ public class MLIndicesHandler {
     ClusterService clusterService;
     Client client;
 
-    public void initModelIndexIfAbsent() {
-        initMLIndexIfAbsent(ML_MODEL_INDEX, ML_MODEL_INDEX_MAPPING);
-    }
-
-    public boolean doesModelIndexExist() {
-        return clusterService.state().metadata().hasIndex(ML_MODEL_INDEX);
-    }
-
-    private void initMLIndexIfAbsent(String indexName, String mapping) {
-        if (!clusterService.state().metadata().hasIndex(indexName)) {
-            client.admin().indices().prepareCreate(indexName).get();
-            log.info("create index:{}", indexName);
-        } else {
-            log.info("index:{} is already created", indexName);
-        }
-    }
-
     public void initModelIndexIfAbsent(ActionListener<Boolean> listener) {
         initMLIndexIfAbsent(ML_MODEL_INDEX, ML_MODEL_INDEX_MAPPING, listener);
     }
