@@ -41,6 +41,7 @@ import org.apache.http.impl.client.BasicCredentialsProvider;
 import org.apache.http.message.BasicHeader;
 import org.apache.http.ssl.SSLContextBuilder;
 import org.apache.http.util.EntityUtils;
+import org.apache.logging.log4j.util.Strings;
 import org.junit.After;
 import org.opensearch.client.Request;
 import org.opensearch.client.Response;
@@ -517,6 +518,14 @@ public abstract class MLCommonsRestTestCase extends OpenSearchRestTestCase {
         MLInput kmeansInput = MLInput.builder().algorithm(functionName).parameters(params).inputDataset(inputData).build();
         String endpoint = "/_plugins/_ml/_predict/" + functionName.name().toLowerCase(Locale.ROOT) + "/" + modelId;
         Response response = TestHelper.makeRequest(client, "POST", endpoint, ImmutableMap.of(), TestHelper.toHttpEntity(kmeansInput), null);
+        verifyResponse(function, response);
+    }
+
+    public void getStats(RestClient client, String nodeId, String statName, Consumer<Map<String, Object>> function) throws IOException {
+        nodeId = Strings.isBlank(nodeId) ? "" : "/" + nodeId;
+        statName = Strings.isBlank(statName) ? "" : "/" + statName;
+        String endpoint = String.format(Locale.ROOT, "/_plugins/_ml%s/stats%s", nodeId, statName);
+        Response response = TestHelper.makeRequest(client, "GET", endpoint, null, "", null);
         verifyResponse(function, response);
     }
 

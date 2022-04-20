@@ -210,7 +210,7 @@ public class SecureMLRestIT extends MLCommonsRestTestCase {
         }, true);
     }
 
-    public void testReadOnlyUser_CanGetModel_CanNotDeleteModel() throws IOException {
+    public void testReadOnlyUser_CanGetModel_CanGetStats_CanNotDeleteModel() throws IOException {
         KMeansParams kMeansParams = KMeansParams.builder().build();
         // train model with full access client
         train(mlFullAccessClient, FunctionName.KMEANS, irisIndex, kMeansParams, searchSourceBuilder, trainResult -> {
@@ -236,6 +236,50 @@ public class SecureMLRestIT extends MLCommonsRestTestCase {
                 assertTrue(Throwables.getStackTraceAsString(e).contains("no permissions for [cluster:admin/opensearch/ml/models/delete]"));
             }
         }, false);
+    }
+
+    public void testFullAccessUser_CanGetStats() {
+        testGetStats(mlFullAccessClient);
+    }
+
+    @AwaitsFix(bugUrl = "https://github.com/opensearch-project/ml-commons/issues/287")
+    public void testReadOnlyUser_CanGetStats() {
+        testGetStats(mlReadOnlyClient);
+    }
+
+    private void testGetStats(RestClient restClient) {
+        try {
+            // Get all stats: GET /_plugins/_ml/stats
+            getStats(restClient, null, null, statsMap -> {
+                assertNotNull(statsMap);
+                assertTrue(statsMap.size() > 0);
+                Map.Entry<String, Object> entry = statsMap.entrySet().iterator().next();
+                String nodeId = entry.getKey();
+                Map<String, Object> value = (Map<String, Object>) entry.getValue();
+                String statName = value.entrySet().iterator().next().getKey();
+                try {
+                    // Get node's stats: GET /_plugins/_ml/<nodeId>/stats/
+                    getStats(restClient, nodeId, null, nodeStatsMap -> {
+                        assertNotNull(statsMap);
+                        assertTrue(statsMap.size() > 0);
+                    });
+                    // Get node's specific stat: GET /_plugins/_ml/<nodeId>/stats/<stat>
+                    getStats(restClient, nodeId, statName, nodeStatsMap -> {
+                        assertNotNull(statsMap);
+                        assertTrue(statsMap.size() > 0);
+                    });
+                    // Get specific stat: GET /_plugins/_ml/stats/<stat>
+                    getStats(restClient, nodeId, statName, nodeStatsMap -> {
+                        assertNotNull(statsMap);
+                        assertTrue(statsMap.size() > 0);
+                    });
+                } catch (IOException e) {
+                    assertNull(e);
+                }
+            });
+        } catch (IOException e) {
+            assertNull(e);
+        }
     }
 
     public void testReadOnlyUser_CanGetTask_CanNotDeleteTask() throws IOException {

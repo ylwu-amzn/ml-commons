@@ -9,7 +9,6 @@ import static org.opensearch.ml.indices.MLIndicesHandler.ML_TASK_INDEX;
 
 import java.util.concurrent.ExecutionException;
 
-import org.junit.Assert;
 import org.junit.Before;
 import org.opensearch.action.ActionListener;
 import org.opensearch.action.admin.indices.create.CreateIndexRequest;
