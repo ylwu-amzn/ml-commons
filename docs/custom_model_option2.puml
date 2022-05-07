@@ -1,0 +1,47 @@
+@startuml
+'https://plantuml.com/sequence-diagram
+
+autonumber
+== Upload custom model ==
+User -> User: encode model with base64
+User -> User: split model into chunks(chunk size<100mb)
+User -> OS_Node: upload model chunks
+note over User: model meta data, total chunk count, current chunk number
+OS_Node --> OS_Node: save model chunk to index
+note over OS_Node: generate unified model id for all chunks
+OS_Node -> User: unified model id
+
+'== Deploy model ==
+'User -> OS_Node: deploy(model_id)
+'OS_Node --> OS_ML_Node: dispatch task
+'OS_ML_Node --> OS_ML_Node: get model chunks
+'OS_ML_Node --> OS_ML_Node: concat model chunks
+'OS_ML_Node --> OS_ML_Node: load model into memory
+
+== Inference ==
+User -> OS_Node: predict(model_id, data)
+OS_Node --> OS_ML_Node: dispatch task
+
+alt model not in memory:
+   OS_ML_Node --> OS_ML_Node: get model chunks
+   OS_ML_Node --> OS_ML_Node: concat model chunks
+   OS_ML_Node --> OS_ML_Node: load model into memory
+   OS_ML_Node --> OS_ML_Node: run model
+   OS_ML_Node --> OS_ML_Node: store result to index
+else model exists in memory:
+    OS_ML_Node --> OS_ML_Node: run model
+    OS_ML_Node --> OS_ML_Node: store result to index
+end group
+
+'OS_ML_Node --> OS_ML_Node: run model
+'OS_ML_Node --> OS_ML_Node: store result to index
+'alt async task/set result index:
+'
+'else sync task:
+'    OS_ML_Node -> OS_N
+'end group
+== Stop model in cron job ==
+OS_ML_Node --> OS_ML_Node: start cron job when node starts
+OS_ML_Node --> OS_ML_Node: remove model from memory if no request after TTL
+
+@enduml

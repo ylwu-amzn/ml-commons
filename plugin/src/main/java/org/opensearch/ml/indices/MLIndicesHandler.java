@@ -27,9 +27,9 @@ public class MLIndicesHandler {
         + "    \"properties\": {\n"
         + "      \"task_id\": { \"type\": \"keyword\" },\n"
         + "      \"algorithm\": {\"type\": \"keyword\"},\n"
-        + "      \"model_name\" : { \"type\": \"keyword\"},\n"
-        + "      \"model_version\" : { \"type\": \"keyword\"},\n"
-        + "      \"model_content\" : { \"type\": \"binary\"}\n"
+        + "      \"name\" : { \"type\": \"keyword\"},\n"
+        + "      \"version\" : { \"type\": \"keyword\"},\n"
+        + "      \"content\" : { \"type\": \"binary\"}\n"
         + "    }\n"
         + "}";
 
