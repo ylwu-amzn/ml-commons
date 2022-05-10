@@ -18,6 +18,7 @@ import java.io.IOException;
 import java.util.Base64;
 
 import static org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken;
+import static org.opensearch.ml.common.CommonName.USER;
 
 @Getter
 public class MLModel implements ToXContentObject {
@@ -25,7 +26,6 @@ public class MLModel implements ToXContentObject {
     public static final String MODEL_NAME = "name";
     public static final String MODEL_VERSION = "version";
     public static final String MODEL_CONTENT = "content";
-    public static final String USER = "user";
 
     private String name;
     private FunctionName algorithm;

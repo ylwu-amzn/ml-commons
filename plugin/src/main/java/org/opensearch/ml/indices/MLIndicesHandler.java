@@ -5,6 +5,10 @@
 
 package org.opensearch.ml.indices;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
+
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -16,6 +20,9 @@ import org.opensearch.action.admin.indices.create.CreateIndexResponse;
 import org.opensearch.client.Client;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.util.concurrent.ThreadContext;
+import org.opensearch.ml.common.CommonName;
+import org.opensearch.ml.common.MLModel;
+import org.opensearch.ml.common.MLTask;
 
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @RequiredArgsConstructor
@@ -23,30 +30,11 @@ import org.opensearch.common.util.concurrent.ThreadContext;
 public class MLIndicesHandler {
     public static final String ML_MODEL_INDEX = ".plugins-ml-model";
     public static final String ML_TASK_INDEX = ".plugins-ml-task";
-    private static final String ML_MODEL_INDEX_MAPPING = "{\n"
-        + "    \"properties\": {\n"
-        + "      \"task_id\": { \"type\": \"keyword\" },\n"
-        + "      \"algorithm\": {\"type\": \"keyword\"},\n"
-        + "      \"model_name\" : { \"type\": \"keyword\"},\n"
-        + "      \"model_version\" : { \"type\": \"keyword\"},\n"
-        + "      \"model_content\" : { \"type\": \"binary\"}\n"
-        + "    }\n"
-        + "}";
-
-    private static final String ML_TASK_INDEX_MAPPING = "{\n"
-        + "    \"properties\": {\n"
-        + "      \"model_id\": {\"type\": \"keyword\"},\n"
-        + "      \"task_type\": {\"type\": \"keyword\"},\n"
-        + "      \"function_name\": {\"type\": \"keyword\"},\n"
-        + "      \"state\": {\"type\": \"keyword\"},\n"
-        + "      \"input_type\": {\"type\": \"keyword\"},\n"
-        + "      \"progress\": {\"type\": \"float\"},\n"
-        + "      \"output_index\": {\"type\": \"keyword\"},\n"
-        + "      \"worker_node\": {\"type\": \"keyword\"},\n"
-        + "      \"create_time\": {\"type\": \"date\", \"format\": \"strict_date_time||epoch_millis\"},\n"
-        + "      \"last_update_time\": {\"type\": \"date\", \"format\": \"strict_date_time||epoch_millis\"},\n"
-        + "      \"error\": {\"type\": \"text\"},\n"
-        + "      \"user\": {\n"
+    public static final Integer ML_MODEL_INDEX_SCHEMA_VERSION = 1;
+    public static final Integer ML_TASK_INDEX_SCHEMA_VERSION = 1;
+    public static final String USER_FIELD_MAPPING = "      \""
+        + CommonName.USER
+        + "\": {\n"
         + "        \"type\": \"nested\",\n"
         + "        \"properties\": {\n"
         + "          \"name\": {\"type\":\"text\", \"fields\":{\"keyword\":{\"type\":\"keyword\", \"ignore_above\":256}}},\n"
@@ -54,29 +42,77 @@ public class MLIndicesHandler {
         + "          \"roles\": {\"type\":\"text\", \"fields\":{\"keyword\":{\"type\":\"keyword\"}}},\n"
         + "          \"custom_attribute_names\": {\"type\":\"text\", \"fields\":{\"keyword\":{\"type\":\"keyword\"}}}\n"
         + "        }\n"
-        + "      }\n"
+        + "      }\n";
+    public static final String ML_MODEL_INDEX_MAPPING = "{\n"
+        + "    \"_meta\": {\"schema_version\": "
+        + ML_MODEL_INDEX_SCHEMA_VERSION
+        + "},\n"
+        + "    \"properties\": {\n"
+        + "      \""
+        + MLModel.ALGORITHM
+        + "\": {\"type\": \"keyword\"},\n"
+        + "      \""
+        + MLModel.MODEL_NAME
+        + "\" : {\"type\": \"keyword\"},\n"
+        + "      \""
+        + MLModel.MODEL_VERSION
+        + "\" : {\"type\": \"keyword\"},\n"
+        + "      \""
+        + MLModel.MODEL_CONTENT
+        + "\" : {\"type\": \"binary\"},\n"
+        + USER_FIELD_MAPPING
+        + "    }\n"
+        + "}";
+
+    public static final String ML_TASK_INDEX_MAPPING = "{\n"
+        + "    \"_meta\": {\"schema_version\": "
+        + ML_TASK_INDEX_SCHEMA_VERSION
+        + "},\n"
+        + "    \"properties\": {\n"
+        + "      \""
+        + MLTask.MODEL_ID_FIELD
+        + "\": {\"type\": \"keyword\"},\n"
+        + "      \""
+        + MLTask.TASK_TYPE_FIELD
+        + "\": {\"type\": \"keyword\"},\n"
+        + "      \""
+        + MLTask.FUNCTION_NAME_FIELD
+        + "\": {\"type\": \"keyword\"},\n"
+        + "      \""
+        + MLTask.STATE_FIELD
+        + "\": {\"type\": \"keyword\"},\n"
+        + "      \""
+        + MLTask.INPUT_TYPE_FIELD
+        + "\": {\"type\": \"keyword\"},\n"
+        + "      \""
+        + MLTask.PROGRESS_FIELD
+        + "\": {\"type\": \"float\"},\n"
+        + "      \""
+        + MLTask.OUTPUT_INDEX_FIELD
+        + "\": {\"type\": \"keyword\"},\n"
+        + "      \""
+        + MLTask.WORKER_NODE_FIELD
+        + "\": {\"type\": \"keyword\"},\n"
+        + "      \""
+        + MLTask.CREATE_TIME_FIELD
+        + "\": {\"type\": \"date\", \"format\": \"strict_date_time||epoch_millis\"},\n"
+        + "      \""
+        + MLTask.LAST_UPDATE_TIME_FIELD
+        + "\": {\"type\": \"date\", \"format\": \"strict_date_time||epoch_millis\"},\n"
+        + "      \""
+        + MLTask.ERROR_FIELD
+        + "\": {\"type\": \"text\"},\n"
+        + "      \""
+        + MLTask.IS_ASYNC_TASK_FIELD
+        + "\" : {\"type\" : \"boolean\"}, \n"
+        + USER_FIELD_MAPPING
         + "    }\n"
         + "}";
 
     ClusterService clusterService;
     Client client;
 
-    public void initModelIndexIfAbsent() {
-        initMLIndexIfAbsent(ML_MODEL_INDEX, ML_MODEL_INDEX_MAPPING);
-    }
-
-    public boolean doesModelIndexExist() {
-        return clusterService.state().metadata().hasIndex(ML_MODEL_INDEX);
-    }
-
-    private void initMLIndexIfAbsent(String indexName, String mapping) {
-        if (!clusterService.state().metadata().hasIndex(indexName)) {
-            client.admin().indices().prepareCreate(indexName).get();
-            log.info("create index:{}", indexName);
-        } else {
-            log.info("index:{} is already created", indexName);
-        }
-    }
+    private static final Map<String, AtomicBoolean> indexMappingUpdated = new HashMap<>();
 
     public void initModelIndexIfAbsent(ActionListener<Boolean> listener) {
         initMLIndexIfAbsent(ML_MODEL_INDEX, ML_MODEL_INDEX_MAPPING, listener);
@@ -108,6 +144,9 @@ public class MLIndicesHandler {
             }
         } else {
             log.info("index:{} is already created", indexName);
+            // if (indexMappingUpdated) {
+            //
+            // }
             listener.onResponse(true);
         }
     }
