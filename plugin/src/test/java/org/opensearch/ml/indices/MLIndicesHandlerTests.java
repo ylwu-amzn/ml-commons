@@ -5,7 +5,8 @@
 
 package org.opensearch.ml.indices;
 
-import static org.opensearch.ml.indices.MLIndicesHandler.ML_TASK_INDEX;
+import static org.opensearch.ml.common.CommonValue.ML_TASK_INDEX;
+import static org.opensearch.ml.common.CommonValue.ML_TASK_INDEX_MAPPING;
 
 import java.util.concurrent.ExecutionException;
 
@@ -34,7 +35,7 @@ public class MLIndicesHandlerTests extends OpenSearchIntegTestCase {
     }
 
     public void testInitMLTaskIndexWithExistingIndex() throws ExecutionException, InterruptedException {
-        CreateIndexRequest request = new CreateIndexRequest(ML_TASK_INDEX);
+        CreateIndexRequest request = new CreateIndexRequest(ML_TASK_INDEX).mapping(ML_TASK_INDEX_MAPPING);
         client.admin().indices().create(request).get();
         testInitMLTaskIndex();
     }

@@ -22,7 +22,7 @@ import java.io.IOException;
 import java.time.Instant;
 
 import static org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken;
-import static org.opensearch.ml.common.CommonName.USER;
+import static org.opensearch.ml.common.CommonValue.USER;
 
 @Getter
 @EqualsAndHashCode

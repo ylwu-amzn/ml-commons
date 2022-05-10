@@ -5,7 +5,7 @@
 
 package org.opensearch.ml.task;
 
-import static org.opensearch.ml.indices.MLIndicesHandler.ML_MODEL_INDEX;
+import static org.opensearch.ml.common.CommonValue.ML_MODEL_INDEX;
 import static org.opensearch.ml.plugin.MachineLearningPlugin.TASK_THREAD_POOL;
 import static org.opensearch.ml.stats.StatNames.ML_EXECUTING_TASK_COUNT;
 import static org.opensearch.ml.stats.StatNames.ML_TOTAL_FAILURE_COUNT;
