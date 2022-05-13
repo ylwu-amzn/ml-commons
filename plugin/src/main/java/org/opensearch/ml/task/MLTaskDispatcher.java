@@ -9,6 +9,7 @@ import static org.opensearch.ml.stats.InternalStatNames.JVM_HEAP_USAGE;
 import static org.opensearch.ml.stats.StatNames.ML_EXECUTING_TASK_COUNT;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -27,6 +28,7 @@ import org.opensearch.ml.action.stats.MLStatsNodesAction;
 import org.opensearch.ml.action.stats.MLStatsNodesRequest;
 
 import com.google.common.collect.ImmutableSet;
+import org.opensearch.ml.utils.MLNodeUtils;
 
 /**
  * MLTaskDispatcher is responsible for dispatching the ml tasks.
@@ -53,7 +55,7 @@ public class MLTaskDispatcher {
     public void dispatchTask(ActionListener<DiscoveryNode> listener) {
         // todo: add ML node type setting check
         // DiscoveryNode[] mlNodes = getEligibleMLNodes();
-        DiscoveryNode[] mlNodes = getEligibleDataNodes();
+        DiscoveryNode[] mlNodes = getEligibleNodes();
         MLStatsNodesRequest MLStatsNodesRequest = new MLStatsNodesRequest(mlNodes);
         MLStatsNodesRequest.addAll(ImmutableSet.of(ML_EXECUTING_TASK_COUNT, JVM_HEAP_USAGE.getName()));
 
@@ -108,14 +110,26 @@ public class MLTaskDispatcher {
         }));
     }
 
-    private DiscoveryNode[] getEligibleDataNodes() {
+    private DiscoveryNode[] getEligibleNodes() {
         ClusterState state = this.clusterService.state();
+        final List<DiscoveryNode> eligibleMLNodes = new ArrayList<>();
         final List<DiscoveryNode> eligibleDataNodes = new ArrayList<>();
         for (DiscoveryNode node : state.nodes()) {
+            if (MLNodeUtils.isMLNode(node)) {
+                eligibleMLNodes.add(node);
+            }
             if (node.isDataNode()) {
                 eligibleDataNodes.add(node);
             }
         }
-        return eligibleDataNodes.toArray(new DiscoveryNode[0]);
+        if (eligibleMLNodes.size() > 0) {
+            DiscoveryNode[] mlNodes = eligibleMLNodes.toArray(new DiscoveryNode[0]);
+            log.info("We have {} dedicated ML nodes: {}", eligibleMLNodes.size(), Arrays.toString(mlNodes));
+            return mlNodes;
+        } else {
+            DiscoveryNode[] dataNodes = eligibleDataNodes.toArray(new DiscoveryNode[0]);
+            log.info("We have no dedicated ML nodes. But have {} data nodes: {}", eligibleDataNodes.size(), Arrays.toString(dataNodes));
+            return dataNodes;
+        }
     }
 }
