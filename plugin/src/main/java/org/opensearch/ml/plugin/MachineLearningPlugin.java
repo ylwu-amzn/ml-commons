@@ -5,6 +5,9 @@
 
 package org.opensearch.ml.plugin;
 
+import static org.opensearch.ml.indices.MLIndicesHandler.ML_MODEL_INDEX;
+import static org.opensearch.ml.indices.MLIndicesHandler.ML_TASK_INDEX;
+
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -34,6 +37,8 @@ import org.opensearch.ml.action.models.DeleteModelTransportAction;
 import org.opensearch.ml.action.models.GetModelTransportAction;
 import org.opensearch.ml.action.models.SearchModelTransportAction;
 import org.opensearch.ml.action.prediction.TransportPredictionTaskAction;
+import org.opensearch.ml.action.stats.MLClusterLevelStat;
+import org.opensearch.ml.action.stats.MLNodeLevelStat;
 import org.opensearch.ml.action.stats.MLStatsNodesAction;
 import org.opensearch.ml.action.stats.MLStatsNodesTransportAction;
 import org.opensearch.ml.action.tasks.DeleteTaskTransportAction;
@@ -69,10 +74,8 @@ import org.opensearch.ml.indices.MLInputDatasetHandler;
 import org.opensearch.ml.rest.*;
 import org.opensearch.ml.stats.MLStat;
 import org.opensearch.ml.stats.MLStats;
-import org.opensearch.ml.stats.StatNames;
 import org.opensearch.ml.stats.suppliers.CounterSupplier;
 import org.opensearch.ml.stats.suppliers.IndexStatusSupplier;
-import org.opensearch.ml.stats.suppliers.SettableSupplier;
 import org.opensearch.ml.task.MLExecuteTaskRunner;
 import org.opensearch.ml.task.MLPredictTaskRunner;
 import org.opensearch.ml.task.MLTaskDispatcher;
@@ -93,9 +96,6 @@ import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.watcher.ResourceWatcherService;
 
 import com.google.common.collect.ImmutableList;
-
-import static org.opensearch.ml.indices.MLIndicesHandler.ML_MODEL_INDEX;
-import static org.opensearch.ml.indices.MLIndicesHandler.ML_TASK_INDEX;
 
 public class MachineLearningPlugin extends Plugin implements ActionPlugin {
     public static final String TASK_THREAD_POOL = "OPENSEARCH_ML_TASK_THREAD_POOL";
@@ -165,17 +165,17 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin {
         JvmService jvmService = new JvmService(environment.settings());
         MLCircuitBreakerService mlCircuitBreakerService = new MLCircuitBreakerService(jvmService).init();
 
-        Map<String, MLStat<?>> stats = new ConcurrentHashMap<>();
-        stats.put(StatNames.ML_MODEL_INDEX_STATUS, new MLStat<>(true, new IndexStatusSupplier(indexUtils, ML_MODEL_INDEX)));
-        stats.put(StatNames.ML_TASK_INDEX_STATUS, new MLStat<>(true, new IndexStatusSupplier(indexUtils, ML_TASK_INDEX)));
-        stats.put(StatNames.ML_MODEL_COUNT, new MLStat<>(true, new CounterSupplier()));
-        stats.put(StatNames.ML_NODE_EXECUTING_TASK_COUNT, new MLStat<>(false, new CounterSupplier()));
-        stats.put(StatNames.ML_NODE_TOTAL_REQUEST_COUNT, new MLStat<>(false, new CounterSupplier()));
-        stats.put(StatNames.ML_NODE_TOTAL_FAILURE_COUNT, new MLStat<>(false, new CounterSupplier()));
-        stats.put(StatNames.ML_NODE_TOTAL_MODEL_COUNT, new MLStat<>(false, new CounterSupplier()));
-        stats.put(StatNames.ML_NODE_TOTAL_CIRCUIT_BREAKER_TRIGGER_COUNT, new MLStat<>(false, new CounterSupplier()));
-        stats.put(StatNames.ML_MODEL_COUNT, new MLStat<>(true, new CounterSupplier()));
-        stats.put(StatNames.ML_MODEL_COUNT, new MLStat<>(true, new SettableSupplier()));
+        Map<Enum, MLStat<?>> stats = new ConcurrentHashMap<>();
+        // cluster level stats
+        stats.put(MLClusterLevelStat.ML_MODEL_INDEX_STATUS, new MLStat<>(true, new IndexStatusSupplier(indexUtils, ML_MODEL_INDEX)));
+        stats.put(MLClusterLevelStat.ML_TASK_INDEX_STATUS, new MLStat<>(true, new IndexStatusSupplier(indexUtils, ML_TASK_INDEX)));
+        stats.put(MLClusterLevelStat.ML_MODEL_COUNT, new MLStat<>(true, new CounterSupplier()));
+        // node level stats
+        stats.put(MLNodeLevelStat.ML_NODE_EXECUTING_TASK_COUNT, new MLStat<>(false, new CounterSupplier()));
+        stats.put(MLNodeLevelStat.ML_NODE_TOTAL_REQUEST_COUNT, new MLStat<>(false, new CounterSupplier()));
+        stats.put(MLNodeLevelStat.ML_NODE_TOTAL_FAILURE_COUNT, new MLStat<>(false, new CounterSupplier()));
+        stats.put(MLNodeLevelStat.ML_NODE_TOTAL_MODEL_COUNT, new MLStat<>(false, new CounterSupplier()));
+        stats.put(MLNodeLevelStat.ML_NODE_TOTAL_CIRCUIT_BREAKER_TRIGGER_COUNT, new MLStat<>(false, new CounterSupplier()));
         this.mlStats = new MLStats(stats);
 
         mlIndicesHandler = new MLIndicesHandler(clusterService, client);

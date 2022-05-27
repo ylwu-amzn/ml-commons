@@ -8,10 +8,6 @@ package org.opensearch.ml.task;
 import static org.opensearch.ml.indices.MLIndicesHandler.ML_MODEL_INDEX;
 import static org.opensearch.ml.plugin.MachineLearningPlugin.TASK_THREAD_POOL;
 import static org.opensearch.ml.stats.StatNames.FAILURE_COUNT;
-import static org.opensearch.ml.stats.StatNames.ML_NODE_EXECUTING_TASK_COUNT;
-import static org.opensearch.ml.stats.StatNames.ML_NODE_TOTAL_FAILURE_COUNT;
-import static org.opensearch.ml.stats.StatNames.ML_NODE_TOTAL_MODEL_COUNT;
-import static org.opensearch.ml.stats.StatNames.ML_NODE_TOTAL_REQUEST_COUNT;
 import static org.opensearch.ml.stats.StatNames.REQUEST_COUNT;
 
 import java.time.Instant;
@@ -31,6 +27,7 @@ import org.opensearch.common.util.concurrent.ThreadContext;
 import org.opensearch.common.xcontent.ToXContent;
 import org.opensearch.common.xcontent.XContentBuilder;
 import org.opensearch.common.xcontent.XContentType;
+import org.opensearch.ml.action.stats.MLNodeLevelStat;
 import org.opensearch.ml.common.MLModel;
 import org.opensearch.ml.common.MLTask;
 import org.opensearch.ml.common.MLTaskState;
@@ -143,8 +140,8 @@ public class MLTrainingTaskRunner extends MLTaskRunner<MLTrainingTaskRequest, ML
     private void startTrainingTask(MLTask mlTask, MLInput mlInput, ActionListener<MLTaskResponse> listener) {
         ActionListener<MLTaskResponse> internalListener = wrappedCleanupListener(listener, mlTask.getTaskId());
         // track ML task count and add ML task into cache
-        mlStats.getStat(ML_NODE_EXECUTING_TASK_COUNT).increment();
-        mlStats.getStat(ML_NODE_TOTAL_REQUEST_COUNT).increment();
+        mlStats.getStat(MLNodeLevelStat.ML_NODE_EXECUTING_TASK_COUNT).increment();
+        mlStats.getStat(MLNodeLevelStat.ML_NODE_TOTAL_REQUEST_COUNT).increment();
         mlStats.createCounterStatIfAbsent(mlTask.getFunctionName(), ActionName.TRAIN, REQUEST_COUNT).increment();
         mlTaskManager.add(mlTask);
         try {
@@ -176,7 +173,7 @@ public class MLTrainingTaskRunner extends MLTaskRunner<MLTrainingTaskRequest, ML
     private void train(MLTask mlTask, MLInput mlInput, ActionListener<MLTaskResponse> actionListener) {
         ActionListener<MLTaskResponse> listener = ActionListener.wrap(r -> actionListener.onResponse(r), e -> {
             mlStats.createCounterStatIfAbsent(mlTask.getFunctionName(), ActionName.TRAIN, FAILURE_COUNT).increment();
-            mlStats.getStat(ML_NODE_TOTAL_FAILURE_COUNT).increment();
+            mlStats.getStat(MLNodeLevelStat.ML_NODE_TOTAL_FAILURE_COUNT).increment();
             actionListener.onFailure(e);
         });
         try {
@@ -193,7 +190,7 @@ public class MLTrainingTaskRunner extends MLTaskRunner<MLTrainingTaskRequest, ML
                 try (ThreadContext.StoredContext context = client.threadPool().getThreadContext().stashContext()) {
                     ActionListener<IndexResponse> indexResponseListener = ActionListener.wrap(r -> {
                         log.info("Model data indexing done, result:{}, model id: {}", r.getResult(), r.getId());
-                        mlStats.getStat(ML_NODE_TOTAL_MODEL_COUNT).increment();
+                        mlStats.getStat(MLNodeLevelStat.ML_NODE_TOTAL_MODEL_COUNT).increment();
                         // mlStats.createCounterStatIfAbsent(modelCountStat(mlTask.getFunctionName())).increment();
                         String returnedTaskId = mlTask.isAsync() ? mlTask.getTaskId() : null;
                         MLTrainingOutput output = new MLTrainingOutput(r.getId(), returnedTaskId, MLTaskState.COMPLETED.name());

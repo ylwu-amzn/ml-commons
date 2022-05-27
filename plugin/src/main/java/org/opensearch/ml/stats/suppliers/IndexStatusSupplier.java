@@ -7,9 +7,9 @@
 
 package org.opensearch.ml.stats.suppliers;
 
-import org.opensearch.ml.utils.IndexUtils;
-
 import java.util.function.Supplier;
+
+import org.opensearch.ml.utils.IndexUtils;
 
 /**
  * IndexStatusSupplier provides the status of an index as the value

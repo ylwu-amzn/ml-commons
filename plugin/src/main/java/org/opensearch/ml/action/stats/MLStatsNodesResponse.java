@@ -61,7 +61,7 @@ public class MLStatsNodesResponse extends BaseNodesResponse<MLStatsNodeResponse>
         String nodeId;
         DiscoveryNode node;
         builder.startObject("nodes");
-//        builder.startObject();
+        // builder.startObject();
         for (MLStatsNodeResponse mlStats : getNodes()) {
             node = mlStats.getNode();
             nodeId = node.getId();

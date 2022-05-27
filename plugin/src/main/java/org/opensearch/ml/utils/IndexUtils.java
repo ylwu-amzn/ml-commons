@@ -11,6 +11,11 @@
 
 package org.opensearch.ml.utils;
 
+import static org.opensearch.ml.indices.MLIndicesHandler.ML_MODEL_INDEX;
+
+import java.util.List;
+import java.util.Locale;
+
 import org.opensearch.action.ActionListener;
 import org.opensearch.action.admin.indices.stats.IndicesStatsRequest;
 import org.opensearch.client.Client;
@@ -19,11 +24,6 @@ import org.opensearch.cluster.metadata.IndexMetadata;
 import org.opensearch.cluster.metadata.IndexNameExpressionResolver;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.inject.Inject;
-
-import java.util.List;
-import java.util.Locale;
-
-import static org.opensearch.ml.indices.MLIndicesHandler.ML_MODEL_INDEX;
 
 public class IndexUtils {
     /**
@@ -48,11 +48,7 @@ public class IndexUtils {
      * @param indexNameExpressionResolver index name resolver
      */
     @Inject
-    public IndexUtils(
-        Client client,
-        ClusterService clusterService,
-        IndexNameExpressionResolver indexNameExpressionResolver
-    ) {
+    public IndexUtils(Client client, ClusterService clusterService, IndexNameExpressionResolver indexNameExpressionResolver) {
         this.client = client;
         this.clusterService = clusterService;
         this.indexNameExpressionResolver = indexNameExpressionResolver;
@@ -106,9 +102,7 @@ public class IndexUtils {
             client.admin().indices().stats(indicesStatsRequest, ActionListener.wrap(r -> {
                 long count = r.getIndex(ML_MODEL_INDEX).getPrimaries().docs.getCount();
                 listener.onResponse(count);
-            }, e-> {
-                listener.onFailure(e);
-            }));
+            }, e -> { listener.onFailure(e); }));
         } else {
             listener.onResponse(0L);
         }

@@ -207,7 +207,19 @@ jacocoTestReport {
 List<String> jacocoExclusions = [
         // TODO: add more unit test to meet the minimal test coverage.
         'org.opensearch.ml.constant.CommonValue',
-        'org.opensearch.ml.plugin.MachineLearningPlugin*'
+        'org.opensearch.ml.plugin.MachineLearningPlugin*',
+        'org.opensearch.ml.utils.IndexUtils',
+        'org.opensearch.ml.rest.RestStatsMLAction',
+        'org.opensearch.ml.stats.suppliers.IndexStatusSupplier',
+        'org.opensearch.ml.action.stats.MLClusterLevelStat',
+        'org.opensearch.ml.action.stats.MLAlgoActionStats',
+        'org.opensearch.ml.action.stats.MLAlgoStats',
+        'org.opensearch.ml.action.stats.MLStatsInput',
+        'org.opensearch.ml.action.stats.MLStatsNodesTransportAction',
+        'org.opensearch.ml.action.stats.MLStatLevel',
+        'org.opensearch.ml.action.stats.MLStatsNodeResponse',
+        'org.opensearch.ml.stats.MLStats',
+        'org.opensearch.ml.stats.StatNames'
 ]
 
 jacocoTestCoverageVerification {

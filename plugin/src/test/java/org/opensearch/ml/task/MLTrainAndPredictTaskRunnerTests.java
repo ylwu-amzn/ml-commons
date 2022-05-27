@@ -30,6 +30,7 @@ import org.opensearch.client.Client;
 import org.opensearch.cluster.node.DiscoveryNode;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.index.query.MatchAllQueryBuilder;
+import org.opensearch.ml.action.stats.MLNodeLevelStat;
 import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.common.MLTask;
 import org.opensearch.ml.common.MLTaskState;
@@ -46,7 +47,6 @@ import org.opensearch.ml.common.transport.trainpredict.MLTrainAndPredictionTaskA
 import org.opensearch.ml.indices.MLInputDatasetHandler;
 import org.opensearch.ml.stats.MLStat;
 import org.opensearch.ml.stats.MLStats;
-import org.opensearch.ml.stats.StatNames;
 import org.opensearch.ml.stats.suppliers.CounterSupplier;
 import org.opensearch.ml.utils.TestData;
 import org.opensearch.search.builder.SearchSourceBuilder;
@@ -102,11 +102,11 @@ public class MLTrainAndPredictTaskRunnerTests extends OpenSearchTestCase {
             return null;
         }).when(executorService).execute(any(Runnable.class));
 
-        Map<String, MLStat<?>> stats = new ConcurrentHashMap<>();
-        stats.put(StatNames.ML_NODE_EXECUTING_TASK_COUNT, new MLStat<>(false, new CounterSupplier()));
-        stats.put(StatNames.ML_NODE_TOTAL_REQUEST_COUNT, new MLStat<>(false, new CounterSupplier()));
-        stats.put(StatNames.ML_NODE_TOTAL_FAILURE_COUNT, new MLStat<>(false, new CounterSupplier()));
-        stats.put(StatNames.ML_NODE_TOTAL_MODEL_COUNT, new MLStat<>(false, new CounterSupplier()));
+        Map<Enum, MLStat<?>> stats = new ConcurrentHashMap<>();
+        stats.put(MLNodeLevelStat.ML_NODE_EXECUTING_TASK_COUNT, new MLStat<>(false, new CounterSupplier()));
+        stats.put(MLNodeLevelStat.ML_NODE_TOTAL_REQUEST_COUNT, new MLStat<>(false, new CounterSupplier()));
+        stats.put(MLNodeLevelStat.ML_NODE_TOTAL_FAILURE_COUNT, new MLStat<>(false, new CounterSupplier()));
+        stats.put(MLNodeLevelStat.ML_NODE_TOTAL_MODEL_COUNT, new MLStat<>(false, new CounterSupplier()));
         this.mlStats = new MLStats(stats);
 
         mlInputDatasetHandler = spy(new MLInputDatasetHandler(client));

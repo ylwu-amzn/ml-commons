@@ -7,9 +7,6 @@ package org.opensearch.ml.task;
 
 import static org.opensearch.ml.plugin.MachineLearningPlugin.TASK_THREAD_POOL;
 import static org.opensearch.ml.stats.StatNames.FAILURE_COUNT;
-import static org.opensearch.ml.stats.StatNames.ML_NODE_EXECUTING_TASK_COUNT;
-import static org.opensearch.ml.stats.StatNames.ML_NODE_TOTAL_FAILURE_COUNT;
-import static org.opensearch.ml.stats.StatNames.ML_NODE_TOTAL_REQUEST_COUNT;
 import static org.opensearch.ml.stats.StatNames.REQUEST_COUNT;
 
 import java.time.Instant;
@@ -22,6 +19,7 @@ import org.opensearch.action.ActionListenerResponseHandler;
 import org.opensearch.action.support.ThreadedActionListener;
 import org.opensearch.client.Client;
 import org.opensearch.cluster.service.ClusterService;
+import org.opensearch.ml.action.stats.MLNodeLevelStat;
 import org.opensearch.ml.common.MLTask;
 import org.opensearch.ml.common.MLTaskState;
 import org.opensearch.ml.common.MLTaskType;
@@ -127,8 +125,8 @@ public class MLTrainAndPredictTaskRunner extends MLTaskRunner<MLTrainingTaskRequ
     ) {
         ActionListener<MLTaskResponse> internalListener = wrappedCleanupListener(listener, mlTask.getTaskId());
         // track ML task count and add ML task into cache
-        mlStats.getStat(ML_NODE_EXECUTING_TASK_COUNT).increment();
-        mlStats.getStat(ML_NODE_TOTAL_REQUEST_COUNT).increment();
+        mlStats.getStat(MLNodeLevelStat.ML_NODE_EXECUTING_TASK_COUNT).increment();
+        mlStats.getStat(MLNodeLevelStat.ML_NODE_TOTAL_REQUEST_COUNT).increment();
         mlStats.createCounterStatIfAbsent(mlTask.getFunctionName(), ActionName.TRAIN_PREDICT, REQUEST_COUNT).increment();
         mlTaskManager.add(mlTask);
         MLInput mlInput = request.getMlInput();
@@ -156,7 +154,7 @@ public class MLTrainAndPredictTaskRunner extends MLTaskRunner<MLTrainingTaskRequ
     private void handlePredictFailure(MLTask mlTask, ActionListener<MLTaskResponse> listener, Exception e, boolean trackFailure) {
         if (trackFailure) {
             mlStats.createCounterStatIfAbsent(mlTask.getFunctionName(), ActionName.TRAIN_PREDICT, FAILURE_COUNT).increment();
-            mlStats.getStat(ML_NODE_TOTAL_FAILURE_COUNT).increment();
+            mlStats.getStat(MLNodeLevelStat.ML_NODE_TOTAL_FAILURE_COUNT).increment();
         }
         handleAsyncMLTaskFailure(mlTask, e);
         listener.onFailure(e);

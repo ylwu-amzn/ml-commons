@@ -21,7 +21,7 @@ import org.opensearch.ml.stats.suppliers.CounterSupplier;
  */
 public class MLStats {
     @Getter
-    private Map<String, MLStat<?>> stats;
+    private Map<Enum, MLStat<?>> stats;
     private Map<FunctionName, Map<ActionName, Map<String, MLStat>>> algoStats;// {"kmeans":{"train":{"request_count":10}}}
 
     /**
@@ -29,7 +29,7 @@ public class MLStats {
      *
      * @param stats Map of the stats that are to be kept
      */
-    public MLStats(Map<String, MLStat<?>> stats) {
+    public MLStats(Map<Enum, MLStat<?>> stats) {
         this.stats = stats;
         this.algoStats = new ConcurrentHashMap<>();
     }
@@ -41,7 +41,7 @@ public class MLStats {
      * @return ADStat
      * @throws IllegalArgumentException thrown on illegal statName
      */
-    public MLStat<?> getStat(String key) throws IllegalArgumentException {
+    public MLStat<?> getStat(Enum key) throws IllegalArgumentException {
         if (!stats.keySet().contains(key)) {
             throw new IllegalArgumentException("Stat \"" + key + "\" does not exist");
         }
@@ -53,7 +53,7 @@ public class MLStats {
      * @param key stat key
      * @return existing MLStat or new MLStat
      */
-    public MLStat<?> createCounterStatIfAbsent(String key) {
+    public MLStat<?> createCounterStatIfAbsent(Enum key) {
         return createStatIfAbsent(key, () -> new MLStat<>(false, new CounterSupplier()));
     }
 
@@ -73,7 +73,7 @@ public class MLStats {
      * @param supplier supplier to create MLStat
      * @return existing MLStat or new MLStat
      */
-    public synchronized MLStat<?> createStatIfAbsent(String key, Supplier<MLStat> supplier) {
+    public synchronized MLStat<?> createStatIfAbsent(Enum key, Supplier<MLStat> supplier) {
         return stats.computeIfAbsent(key, k -> supplier.get());
     }
 
@@ -82,7 +82,7 @@ public class MLStats {
      *
      * @return Map of stats kept at the node level
      */
-    public Map<String, MLStat<?>> getNodeStats() {
+    public Map<Enum, MLStat<?>> getNodeStats() {
         return getClusterOrNodeStats(false);
     }
 
@@ -91,14 +91,14 @@ public class MLStats {
      *
      * @return Map of stats kept at the cluster level
      */
-    public Map<String, MLStat<?>> getClusterStats() {
+    public Map<Enum, MLStat<?>> getClusterStats() {
         return getClusterOrNodeStats(true);
     }
 
-    private Map<String, MLStat<?>> getClusterOrNodeStats(Boolean getClusterStats) {
-        Map<String, MLStat<?>> statsMap = new HashMap<>();
+    private Map<Enum, MLStat<?>> getClusterOrNodeStats(Boolean getClusterStats) {
+        Map<Enum, MLStat<?>> statsMap = new HashMap<>();
 
-        for (Map.Entry<String, MLStat<?>> entry : stats.entrySet()) {
+        for (Map.Entry<Enum, MLStat<?>> entry : stats.entrySet()) {
             if (entry.getValue().isClusterLevel() == getClusterStats) {
                 statsMap.put(entry.getKey(), entry.getValue());
             }
@@ -133,18 +133,18 @@ public class MLStats {
     // return algoActionStats;
     // }
 
-    public Map<String, MLAlgoStats> getAlgorithmStats(FunctionName algoName) {
+    public Map<ActionName, MLAlgoStats> getAlgorithmStats(FunctionName algoName) {
         if (!algoStats.containsKey(algoName)) {
             return null;
         }
-        Map<String, MLAlgoStats> algoActionStats = new HashMap<>();
+        Map<ActionName, MLAlgoStats> algoActionStats = new HashMap<>();
 
         for (Map.Entry<ActionName, Map<String, MLStat>> entry : algoStats.get(algoName).entrySet()) {
             Map<String, Object> statsMap = new HashMap<>();
             for (Map.Entry<String, MLStat> state : entry.getValue().entrySet()) {
                 statsMap.put(state.getKey(), state.getValue().getValue());
             }
-            algoActionStats.put(entry.getKey().name(), new MLAlgoStats(statsMap));
+            algoActionStats.put(entry.getKey(), new MLAlgoStats(statsMap));
         }
         return algoActionStats;
     }

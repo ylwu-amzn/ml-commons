@@ -7,8 +7,6 @@ package org.opensearch.ml.task;
 
 import static org.mockito.Mockito.*;
 import static org.opensearch.ml.common.breaker.MemoryCircuitBreaker.DEFAULT_JVM_HEAP_USAGE_THRESHOLD;
-import static org.opensearch.ml.stats.InternalStatNames.JVM_HEAP_USAGE;
-import static org.opensearch.ml.stats.StatNames.ML_NODE_EXECUTING_TASK_COUNT;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -30,6 +28,7 @@ import org.opensearch.cluster.node.DiscoveryNode;
 import org.opensearch.cluster.node.DiscoveryNodeRole;
 import org.opensearch.cluster.node.DiscoveryNodes;
 import org.opensearch.cluster.service.ClusterService;
+import org.opensearch.ml.action.stats.MLNodeLevelStat;
 import org.opensearch.ml.action.stats.MLStatsNodeResponse;
 import org.opensearch.ml.action.stats.MLStatsNodesAction;
 import org.opensearch.ml.action.stats.MLStatsNodesRequest;
@@ -113,11 +112,11 @@ public class MLTaskDispatcherTests extends OpenSearchTestCase {
     }
 
     private MLStatsNodesResponse getMlStatsNodesResponse() {
-        Map<String, Object> stateMap = new HashMap<>();
-        stateMap.put(JVM_HEAP_USAGE.getName(), 50l);
-        stateMap.put(ML_NODE_EXECUTING_TASK_COUNT, 5l);
-        MLStatsNodeResponse mlStatsNodeResponse1 = new MLStatsNodeResponse(node1, stateMap);
-        MLStatsNodeResponse mlStatsNodeResponse2 = new MLStatsNodeResponse(node1, stateMap);
+        Map<MLNodeLevelStat, Object> nodeStats = new HashMap<>();
+        nodeStats.put(MLNodeLevelStat.ML_NODE_JVM_HEAP_USAGE, 50l);
+        nodeStats.put(MLNodeLevelStat.ML_NODE_EXECUTING_TASK_COUNT, 5l);
+        MLStatsNodeResponse mlStatsNodeResponse1 = new MLStatsNodeResponse(node1, nodeStats);
+        MLStatsNodeResponse mlStatsNodeResponse2 = new MLStatsNodeResponse(node1, nodeStats);
         return new MLStatsNodesResponse(
             new ClusterName(clusterName),
             Arrays.asList(mlStatsNodeResponse1, mlStatsNodeResponse2),
@@ -126,10 +125,10 @@ public class MLTaskDispatcherTests extends OpenSearchTestCase {
     }
 
     private MLStatsNodesResponse getNodesResponse_NoTaskCounts() {
-        Map<String, Object> stateMap = new HashMap<>();
-        stateMap.put(JVM_HEAP_USAGE.getName(), 50l);
-        MLStatsNodeResponse mlStatsNodeResponse1 = new MLStatsNodeResponse(node1, stateMap);
-        MLStatsNodeResponse mlStatsNodeResponse2 = new MLStatsNodeResponse(node1, stateMap);
+        Map<MLNodeLevelStat, Object> nodeStats = new HashMap<>();
+        nodeStats.put(MLNodeLevelStat.ML_NODE_JVM_HEAP_USAGE, 50l);
+        MLStatsNodeResponse mlStatsNodeResponse1 = new MLStatsNodeResponse(node1, nodeStats);
+        MLStatsNodeResponse mlStatsNodeResponse2 = new MLStatsNodeResponse(node1, nodeStats);
         return new MLStatsNodesResponse(
             new ClusterName(clusterName),
             Arrays.asList(mlStatsNodeResponse1, mlStatsNodeResponse2),
@@ -138,11 +137,11 @@ public class MLTaskDispatcherTests extends OpenSearchTestCase {
     }
 
     private MLStatsNodesResponse getNodesResponse_MemoryExceedLimits() {
-        Map<String, Object> stateMap = new HashMap<>();
-        stateMap.put(JVM_HEAP_USAGE.getName(), 90l);
-        stateMap.put(ML_NODE_EXECUTING_TASK_COUNT, 5l);
-        MLStatsNodeResponse mlStatsNodeResponse1 = new MLStatsNodeResponse(node1, stateMap);
-        MLStatsNodeResponse mlStatsNodeResponse2 = new MLStatsNodeResponse(node1, stateMap);
+        Map<MLNodeLevelStat, Object> nodeStats = new HashMap<>();
+        nodeStats.put(MLNodeLevelStat.ML_NODE_JVM_HEAP_USAGE, 90l);
+        nodeStats.put(MLNodeLevelStat.ML_NODE_EXECUTING_TASK_COUNT, 5l);
+        MLStatsNodeResponse mlStatsNodeResponse1 = new MLStatsNodeResponse(node1, nodeStats);
+        MLStatsNodeResponse mlStatsNodeResponse2 = new MLStatsNodeResponse(node1, nodeStats);
         return new MLStatsNodesResponse(
             new ClusterName(clusterName),
             Arrays.asList(mlStatsNodeResponse1, mlStatsNodeResponse2),
@@ -151,11 +150,11 @@ public class MLTaskDispatcherTests extends OpenSearchTestCase {
     }
 
     private MLStatsNodesResponse getNodesResponse_TaskCountExceedLimits() {
-        Map<String, Object> stateMap = new HashMap<>();
-        stateMap.put(JVM_HEAP_USAGE.getName(), 50l);
-        stateMap.put(ML_NODE_EXECUTING_TASK_COUNT, 15l);
-        MLStatsNodeResponse mlStatsNodeResponse1 = new MLStatsNodeResponse(node1, stateMap);
-        MLStatsNodeResponse mlStatsNodeResponse2 = new MLStatsNodeResponse(node1, stateMap);
+        Map<MLNodeLevelStat, Object> nodeStats = new HashMap<>();
+        nodeStats.put(MLNodeLevelStat.ML_NODE_JVM_HEAP_USAGE, 50l);
+        nodeStats.put(MLNodeLevelStat.ML_NODE_EXECUTING_TASK_COUNT, 15l);
+        MLStatsNodeResponse mlStatsNodeResponse1 = new MLStatsNodeResponse(node1, nodeStats);
+        MLStatsNodeResponse mlStatsNodeResponse2 = new MLStatsNodeResponse(node1, nodeStats);
         return new MLStatsNodesResponse(
             new ClusterName(clusterName),
             Arrays.asList(mlStatsNodeResponse1, mlStatsNodeResponse2),

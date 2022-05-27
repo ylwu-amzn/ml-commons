@@ -14,6 +14,7 @@ import java.util.function.Consumer;
 import org.apache.http.HttpEntity;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.opensearch.client.Response;
 import org.opensearch.index.query.MatchAllQueryBuilder;
 import org.opensearch.ml.common.FunctionName;
@@ -41,6 +42,7 @@ public class RestMLTrainAndPredictIT extends MLCommonsRestTestCase {
         deleteIndexWithAdminClient(irisIndex);
     }
 
+    @Ignore
     public void testTrainAndPredictKmeans() throws IOException {
         validateStats(FunctionName.KMEANS, ActionName.TRAIN_PREDICT, 0, 0, 0, 0);
         trainAndPredictKmeansWithCustomParam();
