@@ -43,7 +43,7 @@ public class MLStatsNodesResponseTests extends OpenSearchTestCase {
         List<MLStatsNodeResponse> nodes = new ArrayList<>();
         DiscoveryNode node = new DiscoveryNode("node0", buildNewFakeTransportAddress(), Version.CURRENT);
         Map<String, Object> statsToValues = new HashMap<>();
-        statsToValues.put(StatNames.ML_TOTAL_REQUEST_COUNT, 100);
+        statsToValues.put(StatNames.ML_NODE_TOTAL_REQUEST_COUNT, 100);
         nodes.add(new MLStatsNodeResponse(node, statsToValues));
         List<FailedNodeException> failures = new ArrayList<>();
         MLStatsNodesResponse response = new MLStatsNodesResponse(clusterName, nodes, failures);

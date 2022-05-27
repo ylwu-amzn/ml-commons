@@ -18,6 +18,7 @@ import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.inject.Inject;
 import org.opensearch.common.io.stream.StreamInput;
 import org.opensearch.env.Environment;
+import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.stats.InternalStatNames;
 import org.opensearch.ml.stats.MLStats;
 import org.opensearch.monitor.jvm.JvmService;
@@ -91,18 +92,31 @@ public class MLStatsNodesTransportAction extends
         Map<String, Object> statValues = new HashMap<>();
         Set<String> statsToBeRetrieved = mlStatsNodesRequest.getStatsToBeRetrieved();
         boolean retrieveAllStats = mlStatsNodesRequest.isRetrieveAllStats();
+        Set<FunctionName> algorithmsToBeRetrived = mlStatsNodesRequest.getAlgorithmsToBeRetrived();
 
-        if (retrieveAllStats || statsToBeRetrieved.contains(InternalStatNames.JVM_HEAP_USAGE.getName())) {
-            long heapUsedPercent = jvmService.stats().getMem().getHeapUsedPercent();
-            statValues.put(InternalStatNames.JVM_HEAP_USAGE.getName(), heapUsedPercent);
-        }
+        if (algorithmsToBeRetrived == null) {
+            if (retrieveAllStats || statsToBeRetrieved.contains(InternalStatNames.JVM_HEAP_USAGE.getName())) {
+                long heapUsedPercent = jvmService.stats().getMem().getHeapUsedPercent();
+                statValues.put(InternalStatNames.JVM_HEAP_USAGE.getName(), heapUsedPercent);
+            }
 
-        for (String statName : mlStats.getNodeStats().keySet()) {
-            if (retrieveAllStats || statsToBeRetrieved.contains(statName)) {
-                statValues.put(statName, mlStats.getStats().get(statName).getValue());
+            for (String statName : mlStats.getNodeStats().keySet()) {
+                if (retrieveAllStats || statsToBeRetrieved.contains(statName)) {
+                    statValues.put(statName, mlStats.getStats().get(statName).getValue());
+                }
             }
         }
 
-        return new MLStatsNodeResponse(clusterService.localNode(), statValues);
+        Map<String, MLAlgoActionStats> algorithmStats = new HashMap<>();
+        if (statsToBeRetrieved.contains("algorithm")) {
+            for (FunctionName algoName : mlStats.getAllAlgorithms()) {
+                if (algorithmsToBeRetrived == null || algorithmsToBeRetrived.contains(algoName)) {
+                    Map<String, MLAlgoStats> algoActionStatsMap = mlStats.getAlgorithmStats(algoName);
+                    algorithmStats.put(algoName.name(), new MLAlgoActionStats(algoActionStatsMap));
+                }
+            }
+        }
+
+        return new MLStatsNodeResponse(clusterService.localNode(), statValues, algorithmStats);
     }
 }

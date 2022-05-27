@@ -10,8 +10,8 @@ import static org.opensearch.commons.ConfigConstants.OPENSEARCH_SECURITY_SSL_HTT
 import static org.opensearch.commons.ConfigConstants.OPENSEARCH_SECURITY_SSL_HTTP_KEYSTORE_KEYPASSWORD;
 import static org.opensearch.commons.ConfigConstants.OPENSEARCH_SECURITY_SSL_HTTP_KEYSTORE_PASSWORD;
 import static org.opensearch.commons.ConfigConstants.OPENSEARCH_SECURITY_SSL_HTTP_PEMCERT_FILEPATH;
-import static org.opensearch.ml.stats.StatNames.ML_TOTAL_FAILURE_COUNT;
-import static org.opensearch.ml.stats.StatNames.ML_TOTAL_REQUEST_COUNT;
+import static org.opensearch.ml.stats.StatNames.ML_NODE_TOTAL_FAILURE_COUNT;
+import static org.opensearch.ml.stats.StatNames.ML_NODE_TOTAL_REQUEST_COUNT;
 import static org.opensearch.ml.utils.TestData.trainModelDataJson;
 
 import java.io.IOException;
@@ -277,15 +277,15 @@ public abstract class MLCommonsRestTestCase extends OpenSearchRestTestCase {
         int totalAlgoRequestCount = 0;
         for (String key : map.keySet()) {
             Map<String, Object> nodeStatsMap = (Map<String, Object>) map.get(key);
-            if (nodeStatsMap.containsKey(ML_TOTAL_FAILURE_COUNT)) {
-                totalFailureCount += (Double) nodeStatsMap.get(ML_TOTAL_FAILURE_COUNT);
+            if (nodeStatsMap.containsKey(ML_NODE_TOTAL_FAILURE_COUNT)) {
+                totalFailureCount += (Double) nodeStatsMap.get(ML_NODE_TOTAL_FAILURE_COUNT);
             }
             String failureCountStat = StatNames.failureCountStat(functionName, actionName);
             if (nodeStatsMap.containsKey(failureCountStat)) {
                 totalAlgoFailureCount += (Double) nodeStatsMap.get(failureCountStat);
             }
-            if (nodeStatsMap.containsKey(ML_TOTAL_REQUEST_COUNT)) {
-                totalRequestCount += (Double) nodeStatsMap.get(ML_TOTAL_REQUEST_COUNT);
+            if (nodeStatsMap.containsKey(ML_NODE_TOTAL_REQUEST_COUNT)) {
+                totalRequestCount += (Double) nodeStatsMap.get(ML_NODE_TOTAL_REQUEST_COUNT);
             }
             String requestCountStat = StatNames.requestCountStat(functionName, actionName);
             if (nodeStatsMap.containsKey(requestCountStat)) {

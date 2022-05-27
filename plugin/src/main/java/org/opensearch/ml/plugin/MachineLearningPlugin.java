@@ -71,12 +71,15 @@ import org.opensearch.ml.stats.MLStat;
 import org.opensearch.ml.stats.MLStats;
 import org.opensearch.ml.stats.StatNames;
 import org.opensearch.ml.stats.suppliers.CounterSupplier;
+import org.opensearch.ml.stats.suppliers.IndexStatusSupplier;
+import org.opensearch.ml.stats.suppliers.SettableSupplier;
 import org.opensearch.ml.task.MLExecuteTaskRunner;
 import org.opensearch.ml.task.MLPredictTaskRunner;
 import org.opensearch.ml.task.MLTaskDispatcher;
 import org.opensearch.ml.task.MLTaskManager;
 import org.opensearch.ml.task.MLTrainAndPredictTaskRunner;
 import org.opensearch.ml.task.MLTrainingTaskRunner;
+import org.opensearch.ml.utils.IndexUtils;
 import org.opensearch.monitor.jvm.JvmService;
 import org.opensearch.plugins.ActionPlugin;
 import org.opensearch.plugins.Plugin;
@@ -91,6 +94,9 @@ import org.opensearch.watcher.ResourceWatcherService;
 
 import com.google.common.collect.ImmutableList;
 
+import static org.opensearch.ml.indices.MLIndicesHandler.ML_MODEL_INDEX;
+import static org.opensearch.ml.indices.MLIndicesHandler.ML_TASK_INDEX;
+
 public class MachineLearningPlugin extends Plugin implements ActionPlugin {
     public static final String TASK_THREAD_POOL = "OPENSEARCH_ML_TASK_THREAD_POOL";
     public static final String ML_BASE_URI = "/_plugins/_ml";
@@ -103,6 +109,7 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin {
     private MLPredictTaskRunner mlPredictTaskRunner;
     private MLTrainAndPredictTaskRunner mlTrainAndPredictTaskRunner;
     private MLExecuteTaskRunner mlExecuteTaskRunner;
+    private IndexUtils indexUtils;
 
     private Client client;
     private ClusterService clusterService;
@@ -149,6 +156,7 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin {
         IndexNameExpressionResolver indexNameExpressionResolver,
         Supplier<RepositoriesService> repositoriesServiceSupplier
     ) {
+        this.indexUtils = new IndexUtils(client, clusterService, indexNameExpressionResolver);
         this.client = client;
         this.threadPool = threadPool;
         this.clusterService = clusterService;
@@ -158,11 +166,16 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin {
         MLCircuitBreakerService mlCircuitBreakerService = new MLCircuitBreakerService(jvmService).init();
 
         Map<String, MLStat<?>> stats = new ConcurrentHashMap<>();
-        stats.put(StatNames.ML_EXECUTING_TASK_COUNT, new MLStat<>(false, new CounterSupplier()));
-        stats.put(StatNames.ML_TOTAL_REQUEST_COUNT, new MLStat<>(false, new CounterSupplier()));
-        stats.put(StatNames.ML_TOTAL_FAILURE_COUNT, new MLStat<>(false, new CounterSupplier()));
-        stats.put(StatNames.ML_TOTAL_MODEL_COUNT, new MLStat<>(false, new CounterSupplier()));
-        stats.put(StatNames.ML_TOTAL_CIRCUIT_BREAKER_TRIGGER_COUNT, new MLStat<>(false, new CounterSupplier()));
+        stats.put(StatNames.ML_MODEL_INDEX_STATUS, new MLStat<>(true, new IndexStatusSupplier(indexUtils, ML_MODEL_INDEX)));
+        stats.put(StatNames.ML_TASK_INDEX_STATUS, new MLStat<>(true, new IndexStatusSupplier(indexUtils, ML_TASK_INDEX)));
+        stats.put(StatNames.ML_MODEL_COUNT, new MLStat<>(true, new CounterSupplier()));
+        stats.put(StatNames.ML_NODE_EXECUTING_TASK_COUNT, new MLStat<>(false, new CounterSupplier()));
+        stats.put(StatNames.ML_NODE_TOTAL_REQUEST_COUNT, new MLStat<>(false, new CounterSupplier()));
+        stats.put(StatNames.ML_NODE_TOTAL_FAILURE_COUNT, new MLStat<>(false, new CounterSupplier()));
+        stats.put(StatNames.ML_NODE_TOTAL_MODEL_COUNT, new MLStat<>(false, new CounterSupplier()));
+        stats.put(StatNames.ML_NODE_TOTAL_CIRCUIT_BREAKER_TRIGGER_COUNT, new MLStat<>(false, new CounterSupplier()));
+        stats.put(StatNames.ML_MODEL_COUNT, new MLStat<>(true, new CounterSupplier()));
+        stats.put(StatNames.ML_MODEL_COUNT, new MLStat<>(true, new SettableSupplier()));
         this.mlStats = new MLStats(stats);
 
         mlIndicesHandler = new MLIndicesHandler(clusterService, client);
@@ -246,7 +259,7 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin {
         IndexNameExpressionResolver indexNameExpressionResolver,
         Supplier<DiscoveryNodes> nodesInCluster
     ) {
-        RestStatsMLAction restStatsMLAction = new RestStatsMLAction(mlStats);
+        RestStatsMLAction restStatsMLAction = new RestStatsMLAction(mlStats, clusterService, indexUtils);
         RestMLTrainingAction restMLTrainingAction = new RestMLTrainingAction();
         RestMLTrainAndPredictAction restMLTrainAndPredictAction = new RestMLTrainAndPredictAction();
         RestMLPredictionAction restMLPredictionAction = new RestMLPredictionAction();

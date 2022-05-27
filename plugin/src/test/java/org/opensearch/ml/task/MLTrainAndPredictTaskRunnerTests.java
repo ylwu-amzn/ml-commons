@@ -103,10 +103,10 @@ public class MLTrainAndPredictTaskRunnerTests extends OpenSearchTestCase {
         }).when(executorService).execute(any(Runnable.class));
 
         Map<String, MLStat<?>> stats = new ConcurrentHashMap<>();
-        stats.put(StatNames.ML_EXECUTING_TASK_COUNT, new MLStat<>(false, new CounterSupplier()));
-        stats.put(StatNames.ML_TOTAL_REQUEST_COUNT, new MLStat<>(false, new CounterSupplier()));
-        stats.put(StatNames.ML_TOTAL_FAILURE_COUNT, new MLStat<>(false, new CounterSupplier()));
-        stats.put(StatNames.ML_TOTAL_MODEL_COUNT, new MLStat<>(false, new CounterSupplier()));
+        stats.put(StatNames.ML_NODE_EXECUTING_TASK_COUNT, new MLStat<>(false, new CounterSupplier()));
+        stats.put(StatNames.ML_NODE_TOTAL_REQUEST_COUNT, new MLStat<>(false, new CounterSupplier()));
+        stats.put(StatNames.ML_NODE_TOTAL_FAILURE_COUNT, new MLStat<>(false, new CounterSupplier()));
+        stats.put(StatNames.ML_NODE_TOTAL_MODEL_COUNT, new MLStat<>(false, new CounterSupplier()));
         this.mlStats = new MLStats(stats);
 
         mlInputDatasetHandler = spy(new MLInputDatasetHandler(client));

@@ -6,7 +6,10 @@
 package org.opensearch.ml.action.stats;
 
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.EnumSet;
 import java.util.HashSet;
+import java.util.Locale;
 import java.util.Set;
 
 import lombok.Getter;
@@ -15,6 +18,8 @@ import org.opensearch.action.support.nodes.BaseNodesRequest;
 import org.opensearch.cluster.node.DiscoveryNode;
 import org.opensearch.common.io.stream.StreamInput;
 import org.opensearch.common.io.stream.StreamOutput;
+import org.opensearch.ml.common.FunctionName;
+import org.opensearch.ml.engine.annotation.Function;
 
 public class MLStatsNodesRequest extends BaseNodesRequest<MLStatsNodesRequest> {
     /**
@@ -29,10 +34,16 @@ public class MLStatsNodesRequest extends BaseNodesRequest<MLStatsNodesRequest> {
      */
     private boolean retrieveAllStats = false;
 
+    @Getter
+    private EnumSet<FunctionName> algorithmsToBeRetrived;
+
     public MLStatsNodesRequest(StreamInput in) throws IOException {
         super(in);
         retrieveAllStats = in.readBoolean();
         statsToBeRetrieved = in.readSet(StreamInput::readString);
+        if (in.readBoolean()) {
+            algorithmsToBeRetrived = in.readEnumSet(FunctionName.class);
+        }
     }
 
     /**
@@ -40,9 +51,19 @@ public class MLStatsNodesRequest extends BaseNodesRequest<MLStatsNodesRequest> {
      *
      * @param nodeIds nodeIds of nodes' stats to be retrieved
      */
-    public MLStatsNodesRequest(String... nodeIds) {
+    public MLStatsNodesRequest(String[] nodeIds, String[] algos) {
         super(nodeIds);
-        statsToBeRetrieved = new HashSet<>();
+        this.statsToBeRetrieved = new HashSet<>();
+        Set<FunctionName> functionNames = new HashSet<>();
+        if (algos != null && algos.length > 0) {
+            for (String algo : algos) {
+                functionNames.add(FunctionName.from(algo.toUpperCase(Locale.ROOT)));
+            }
+            algorithmsToBeRetrived = EnumSet.copyOf(functionNames);
+        }
+//        else {
+//            algorithmsToBeRetrived = EnumSet.allOf(FunctionName.class);
+//        }
     }
 
     /**
@@ -86,10 +107,7 @@ public class MLStatsNodesRequest extends BaseNodesRequest<MLStatsNodesRequest> {
      */
     public void clear() {
         statsToBeRetrieved.clear();
-    }
-
-    public void readFrom(StreamInput in) throws IOException {
-        statsToBeRetrieved = in.readSet(StreamInput::readString);
+        algorithmsToBeRetrived.clear();
     }
 
     @Override
@@ -97,5 +115,11 @@ public class MLStatsNodesRequest extends BaseNodesRequest<MLStatsNodesRequest> {
         super.writeTo(out);
         out.writeBoolean(retrieveAllStats);
         out.writeStringCollection(statsToBeRetrieved);
+        if (algorithmsToBeRetrived == null) {
+            out.writeBoolean(false);
+        } else {
+            out.writeBoolean(true);
+            out.writeEnumSet(algorithmsToBeRetrived);
+        }
     }
 }

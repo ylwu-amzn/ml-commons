@@ -19,7 +19,9 @@ import org.opensearch.common.xcontent.XContentBuilder;
 
 public class MLStatsNodeResponse extends BaseNodeResponse implements ToXContentFragment {
     @Getter
-    private Map<String, Object> statsMap;
+    private Map<String, Object> nodeStats;// node level stats
+    @Getter
+    private Map<String, MLAlgoActionStats> algorithmStats; // kmeans -> { train -> { request_count: 1} }
 
     /**
      * Constructor
@@ -29,18 +31,23 @@ public class MLStatsNodeResponse extends BaseNodeResponse implements ToXContentF
      */
     public MLStatsNodeResponse(StreamInput in) throws IOException {
         super(in);
-        this.statsMap = in.readMap(StreamInput::readString, StreamInput::readGenericValue);
+        this.nodeStats = in.readMap(StreamInput::readString, StreamInput::readGenericValue);
+        this.nodeStats = in.readMap(StreamInput::readString, MLAlgoActionStats::new);
     }
 
-    /**
-     * Constructor
-     *
-     * @param node node
-     * @param statsToValues Mapping of stat name to value
-     */
-    public MLStatsNodeResponse(DiscoveryNode node, Map<String, Object> statsToValues) {
+    public MLStatsNodeResponse(DiscoveryNode node, Map<String, Object> nodeStats) {
         super(node);
-        this.statsMap = statsToValues;
+        this.nodeStats = nodeStats;
+    }
+
+    public MLStatsNodeResponse(DiscoveryNode node, Map<String, Object> nodeStats, Map<String, MLAlgoActionStats> algorithmStats) {
+        super(node);
+        this.nodeStats = nodeStats;
+        this.algorithmStats = algorithmStats;
+    }
+
+    public boolean isEmpty() {
+        return (nodeStats == null || nodeStats.size() == 0) && (algorithmStats == null || algorithmStats.size() == 0);
     }
 
     /**
@@ -57,7 +64,8 @@ public class MLStatsNodeResponse extends BaseNodeResponse implements ToXContentF
     @Override
     public void writeTo(StreamOutput out) throws IOException {
         super.writeTo(out);
-        out.writeMap(statsMap, StreamOutput::writeString, StreamOutput::writeGenericValue);
+        out.writeMap(nodeStats, StreamOutput::writeString, StreamOutput::writeGenericValue);
+        out.writeMap(algorithmStats, StreamOutput::writeString, (stream, stats) -> stats.writeTo(stream));
     }
 
     /**
@@ -69,8 +77,17 @@ public class MLStatsNodeResponse extends BaseNodeResponse implements ToXContentF
      * @throws IOException thrown by builder for invalid field
      */
     public XContentBuilder toXContent(XContentBuilder builder, Params params) throws IOException {
-        for (String stat : statsMap.keySet()) {
-            builder.field(stat, statsMap.get(stat));
+        for (Map.Entry<String, Object> stat : nodeStats.entrySet()) {
+            builder.field(stat.getKey(), stat.getValue());
+        }
+        if (algorithmStats != null && algorithmStats.size() > 0) {
+            builder.startObject("algorithms");
+            for (Map.Entry<String, MLAlgoActionStats> stat : algorithmStats.entrySet()) {
+                builder.startObject(stat.getKey());
+                stat.getValue().toXContent(builder, params);
+                builder.endObject();
+            }
+            builder.endObject();
         }
         return builder;
     }

@@ -88,9 +88,9 @@ public class MLStatsNodesTransportActionTests extends OpenSearchIntegTestCase {
         statsNodeResponse.writeTo(out);
         StreamInput in = out.bytes().streamInput();
         MLStatsNodeResponse newStatsNodeResponse = action.newNodeResponse(in);
-        Assert.assertEquals(statsNodeResponse.getStatsMap().size(), newStatsNodeResponse.getStatsMap().size());
-        for (String statName : newStatsNodeResponse.getStatsMap().keySet()) {
-            Assert.assertTrue(statsNodeResponse.getStatsMap().containsKey(statName));
+        Assert.assertEquals(statsNodeResponse.getNodeStats().size(), newStatsNodeResponse.getNodeStats().size());
+        for (String statName : newStatsNodeResponse.getNodeStats().keySet()) {
+            Assert.assertTrue(statsNodeResponse.getNodeStats().containsKey(statName));
         }
     }
 
@@ -107,7 +107,7 @@ public class MLStatsNodesTransportActionTests extends OpenSearchIntegTestCase {
 
         MLStatsNodeResponse response = action.nodeOperation(new MLStatsNodeRequest(mlStatsNodesRequest));
 
-        Map<String, Object> stats = response.getStatsMap();
+        Map<String, Object> stats = response.getNodeStats();
 
         Assert.assertEquals(statsToBeRetrieved.size(), stats.size());
         for (String statName : stats.keySet()) {
@@ -128,7 +128,7 @@ public class MLStatsNodesTransportActionTests extends OpenSearchIntegTestCase {
 
         MLStatsNodeResponse response = action.nodeOperation(new MLStatsNodeRequest(mlStatsNodesRequest));
 
-        Map<String, Object> stats = response.getStatsMap();
+        Map<String, Object> stats = response.getNodeStats();
 
         Assert.assertEquals(statsToBeRetrieved.size(), stats.size());
         for (String statName : stats.keySet()) {
@@ -149,7 +149,7 @@ public class MLStatsNodesTransportActionTests extends OpenSearchIntegTestCase {
 
         MLStatsNodeResponse response = action.nodeOperation(new MLStatsNodeRequest(mlStatsNodesRequest));
 
-        Map<String, Object> stats = response.getStatsMap();
+        Map<String, Object> stats = response.getNodeStats();
 
         Assert.assertEquals(0, stats.size());
     }

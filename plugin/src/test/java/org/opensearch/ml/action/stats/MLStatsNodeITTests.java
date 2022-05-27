@@ -43,7 +43,7 @@ public class MLStatsNodeITTests extends OpenSearchIntegTestCase {
 
     public void testNormalCase() throws ExecutionException, InterruptedException {
         MLStatsNodesRequest request = new MLStatsNodesRequest(new String[0]);
-        request.addStat(StatNames.ML_EXECUTING_TASK_COUNT);
+        request.addStat(StatNames.ML_NODE_EXECUTING_TASK_COUNT);
 
         ActionFuture<MLStatsNodesResponse> future = client().execute(MLStatsNodesAction.INSTANCE, request);
         MLStatsNodesResponse response = future.get();
@@ -55,7 +55,7 @@ public class MLStatsNodeITTests extends OpenSearchIntegTestCase {
         assertNotNull(responseList);
 
         MLStatsNodeResponse nodeResponse = responseList.get(0);
-        Map<String, Object> statsMap = nodeResponse.getStatsMap();
+        Map<String, Object> statsMap = nodeResponse.getNodeStats();
 
         assertEquals(1, statsMap.size());
         assertEquals(0l, statsMap.get("ml_executing_task_count"));

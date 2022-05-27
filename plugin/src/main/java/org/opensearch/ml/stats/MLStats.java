@@ -7,10 +7,13 @@ package org.opensearch.ml.stats;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 
 import lombok.Getter;
 
+import org.opensearch.ml.action.stats.MLAlgoStats;
+import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.stats.suppliers.CounterSupplier;
 
 /**
@@ -19,6 +22,7 @@ import org.opensearch.ml.stats.suppliers.CounterSupplier;
 public class MLStats {
     @Getter
     private Map<String, MLStat<?>> stats;
+    private Map<FunctionName, Map<ActionName, Map<String, MLStat>>> algoStats;// {"kmeans":{"train":{"request_count":10}}}
 
     /**
      * Constructor
@@ -27,6 +31,7 @@ public class MLStats {
      */
     public MLStats(Map<String, MLStat<?>> stats) {
         this.stats = stats;
+        this.algoStats = new ConcurrentHashMap<>();
     }
 
     /**
@@ -50,6 +55,16 @@ public class MLStats {
      */
     public MLStat<?> createCounterStatIfAbsent(String key) {
         return createStatIfAbsent(key, () -> new MLStat<>(false, new CounterSupplier()));
+    }
+
+    public MLStat<?> createCounterStatIfAbsent(FunctionName algoName, ActionName action, String statKey) {
+        Map<ActionName, Map<String, MLStat>> actionStats = algoStats.computeIfAbsent(algoName, it -> new ConcurrentHashMap<>());
+        Map<String, MLStat> algoActionStats = actionStats.computeIfAbsent(action, it -> new ConcurrentHashMap<>());
+        return createAlgoStatIfAbsent(algoActionStats, statKey, () -> new MLStat<>(false, new CounterSupplier()));
+    }
+
+    public synchronized MLStat<?> createAlgoStatIfAbsent(Map<String, MLStat> algoActionStats, String key, Supplier<MLStat> supplier) {
+        return algoActionStats.computeIfAbsent(key, k -> supplier.get());
     }
 
     /**
@@ -89,5 +104,52 @@ public class MLStats {
             }
         }
         return statsMap;
+    }
+
+    // public Map<FunctionName, Map<ActionName, Map<String, MLStat>>> getAllAlgorithmStats() {
+    // Map<FunctionName, Map<ActionName, Map<String, MLStat>>> algoStats = new HashMap<>();
+    // for (FunctionName algoName : algoStats.keySet()) {
+    // Map<ActionName, Map<String, MLStat>> stats = getAlgorithmStats(algoName);
+    // if (stats != null) {
+    // algoStats.put(algoName, stats);
+    // }
+    // }
+    // return algoStats;
+    // }
+
+    // public Map<ActionName, Map<String, MLStat>> getAlgorithmStats(FunctionName algoName) {
+    // if (!algoStats.containsKey(algoName)) {
+    // return null;
+    // }
+    // Map<ActionName, Map<String, MLStat>> algoActionStats = new HashMap<>();
+    //
+    // for (Map.Entry<ActionName, Map<String, MLStat>> entry : algoStats.get(algoName).entrySet()) {
+    // Map<String, MLStat> stats = new HashMap<>();
+    // for (Map.Entry<String, MLStat> state: entry.getValue().entrySet()) {
+    // stats.put(state.getKey(), state.getValue());
+    // }
+    // algoActionStats.put(entry.getKey(), stats);
+    // }
+    // return algoActionStats;
+    // }
+
+    public Map<String, MLAlgoStats> getAlgorithmStats(FunctionName algoName) {
+        if (!algoStats.containsKey(algoName)) {
+            return null;
+        }
+        Map<String, MLAlgoStats> algoActionStats = new HashMap<>();
+
+        for (Map.Entry<ActionName, Map<String, MLStat>> entry : algoStats.get(algoName).entrySet()) {
+            Map<String, Object> statsMap = new HashMap<>();
+            for (Map.Entry<String, MLStat> state : entry.getValue().entrySet()) {
+                statsMap.put(state.getKey(), state.getValue().getValue());
+            }
+            algoActionStats.put(entry.getKey().name(), new MLAlgoStats(statsMap));
+        }
+        return algoActionStats;
+    }
+
+    public FunctionName[] getAllAlgorithms() {
+        return algoStats.keySet().toArray(new FunctionName[0]);
     }
 }

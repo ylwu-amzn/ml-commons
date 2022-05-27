@@ -8,7 +8,7 @@ package org.opensearch.ml.task;
 import static org.mockito.Mockito.*;
 import static org.opensearch.ml.common.breaker.MemoryCircuitBreaker.DEFAULT_JVM_HEAP_USAGE_THRESHOLD;
 import static org.opensearch.ml.stats.InternalStatNames.JVM_HEAP_USAGE;
-import static org.opensearch.ml.stats.StatNames.ML_EXECUTING_TASK_COUNT;
+import static org.opensearch.ml.stats.StatNames.ML_NODE_EXECUTING_TASK_COUNT;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -115,7 +115,7 @@ public class MLTaskDispatcherTests extends OpenSearchTestCase {
     private MLStatsNodesResponse getMlStatsNodesResponse() {
         Map<String, Object> stateMap = new HashMap<>();
         stateMap.put(JVM_HEAP_USAGE.getName(), 50l);
-        stateMap.put(ML_EXECUTING_TASK_COUNT, 5l);
+        stateMap.put(ML_NODE_EXECUTING_TASK_COUNT, 5l);
         MLStatsNodeResponse mlStatsNodeResponse1 = new MLStatsNodeResponse(node1, stateMap);
         MLStatsNodeResponse mlStatsNodeResponse2 = new MLStatsNodeResponse(node1, stateMap);
         return new MLStatsNodesResponse(
@@ -140,7 +140,7 @@ public class MLTaskDispatcherTests extends OpenSearchTestCase {
     private MLStatsNodesResponse getNodesResponse_MemoryExceedLimits() {
         Map<String, Object> stateMap = new HashMap<>();
         stateMap.put(JVM_HEAP_USAGE.getName(), 90l);
-        stateMap.put(ML_EXECUTING_TASK_COUNT, 5l);
+        stateMap.put(ML_NODE_EXECUTING_TASK_COUNT, 5l);
         MLStatsNodeResponse mlStatsNodeResponse1 = new MLStatsNodeResponse(node1, stateMap);
         MLStatsNodeResponse mlStatsNodeResponse2 = new MLStatsNodeResponse(node1, stateMap);
         return new MLStatsNodesResponse(
@@ -153,7 +153,7 @@ public class MLTaskDispatcherTests extends OpenSearchTestCase {
     private MLStatsNodesResponse getNodesResponse_TaskCountExceedLimits() {
         Map<String, Object> stateMap = new HashMap<>();
         stateMap.put(JVM_HEAP_USAGE.getName(), 50l);
-        stateMap.put(ML_EXECUTING_TASK_COUNT, 15l);
+        stateMap.put(ML_NODE_EXECUTING_TASK_COUNT, 15l);
         MLStatsNodeResponse mlStatsNodeResponse1 = new MLStatsNodeResponse(node1, stateMap);
         MLStatsNodeResponse mlStatsNodeResponse2 = new MLStatsNodeResponse(node1, stateMap);
         return new MLStatsNodesResponse(
