@@ -19,10 +19,10 @@ import org.opensearch.client.Client;
 import org.opensearch.cluster.ClusterState;
 import org.opensearch.cluster.node.DiscoveryNode;
 import org.opensearch.cluster.service.ClusterService;
-import org.opensearch.ml.action.stats.MLNodeLevelStat;
 import org.opensearch.ml.action.stats.MLStatsNodeResponse;
 import org.opensearch.ml.action.stats.MLStatsNodesAction;
 import org.opensearch.ml.action.stats.MLStatsNodesRequest;
+import org.opensearch.ml.stats.MLNodeLevelStat;
 
 import com.google.common.collect.ImmutableSet;
 

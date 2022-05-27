@@ -219,7 +219,10 @@ List<String> jacocoExclusions = [
         'org.opensearch.ml.action.stats.MLStatLevel',
         'org.opensearch.ml.action.stats.MLStatsNodeResponse',
         'org.opensearch.ml.stats.MLStats',
-        'org.opensearch.ml.stats.StatNames'
+        'org.opensearch.ml.stats.StatNames',
+        'org.opensearch.ml.stats.MLActionStats',
+        'org.opensearch.ml.stats.MLActionLevelStat',
+        'org.opensearch.ml.stats.MLAlgoActionStats'
 ]
 
 jacocoTestCoverageVerification {

@@ -3,12 +3,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package org.opensearch.ml.action.stats;
+package org.opensearch.ml.stats;
 
 public enum MLStatLevel {
     CLUSTER,
     NODE,
-    ALGORITHM;
+    ALGORITHM,
+    ACTION;
 
     public static MLStatLevel from(String value) {
         try {

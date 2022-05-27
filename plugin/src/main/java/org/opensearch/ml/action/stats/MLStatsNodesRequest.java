@@ -14,6 +14,9 @@ import org.opensearch.action.support.nodes.BaseNodesRequest;
 import org.opensearch.cluster.node.DiscoveryNode;
 import org.opensearch.common.io.stream.StreamInput;
 import org.opensearch.common.io.stream.StreamOutput;
+import org.opensearch.ml.stats.MLNodeLevelStat;
+import org.opensearch.ml.stats.MLStatLevel;
+import org.opensearch.ml.stats.MLStatsInput;
 
 public class MLStatsNodesRequest extends BaseNodesRequest<MLStatsNodesRequest> {
 

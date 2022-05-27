@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package org.opensearch.ml.action.stats;
+package org.opensearch.ml.stats;
 
 public enum MLNodeLevelStat {
     ML_NODE_JVM_HEAP_USAGE,

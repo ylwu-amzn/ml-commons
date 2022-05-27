@@ -32,14 +32,14 @@ import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.xcontent.ToXContent;
 import org.opensearch.common.xcontent.XContentBuilder;
 import org.opensearch.common.xcontent.XContentParser;
-import org.opensearch.ml.action.stats.MLClusterLevelStat;
-import org.opensearch.ml.action.stats.MLNodeLevelStat;
-import org.opensearch.ml.action.stats.MLStatLevel;
-import org.opensearch.ml.action.stats.MLStatsInput;
 import org.opensearch.ml.action.stats.MLStatsNodeResponse;
 import org.opensearch.ml.action.stats.MLStatsNodesAction;
 import org.opensearch.ml.action.stats.MLStatsNodesRequest;
+import org.opensearch.ml.stats.MLClusterLevelStat;
+import org.opensearch.ml.stats.MLNodeLevelStat;
+import org.opensearch.ml.stats.MLStatLevel;
 import org.opensearch.ml.stats.MLStats;
+import org.opensearch.ml.stats.MLStatsInput;
 import org.opensearch.ml.utils.IndexUtils;
 import org.opensearch.rest.BaseRestHandler;
 import org.opensearch.rest.BytesRestResponse;
@@ -163,8 +163,10 @@ public class RestStatsMLAction extends BaseRestHandler {
     ) throws IOException {
         Set<MLStatLevel> targetStatLevels = mlStatsInput.getTargetStatLevels();
         XContentBuilder builder = channel.newBuilder();
-        if (!targetStatLevels.contains(MLStatLevel.NODE) && !targetStatLevels.contains(MLStatLevel.ALGORITHM)) {
-            // cluster level stats
+        if (!targetStatLevels.contains(MLStatLevel.NODE)
+            && !targetStatLevels.contains(MLStatLevel.ALGORITHM)
+            && !targetStatLevels.contains(MLStatLevel.ACTION)) {
+            // only return cluster level stats
             builder.startObject();
             if (clusterStatsMap != null && clusterStatsMap.size() > 0) {
                 for (Map.Entry<MLClusterLevelStat, Object> entry : clusterStatsMap.entrySet()) {
@@ -174,6 +176,7 @@ public class RestStatsMLAction extends BaseRestHandler {
             builder.endObject();
             channel.sendResponse(new BytesRestResponse(RestStatus.OK, builder));
         } else {
+            // retrieve node level stats
             client.execute(MLStatsNodesAction.INSTANCE, mlStatsNodesRequest, ActionListener.wrap(r -> {
                 builder.startObject();
                 // cluster level stats
@@ -182,7 +185,7 @@ public class RestStatsMLAction extends BaseRestHandler {
                         builder.field(entry.getKey().name().toLowerCase(Locale.ROOT), entry.getValue());
                     }
                 }
-                // node level stats
+                // node level stats: include algorithm and action level stats
                 List<MLStatsNodeResponse> nodeStats = r.getNodes().stream().filter(s -> !s.isEmpty()).collect(Collectors.toList());
                 if (nodeStats != null && nodeStats.size() > 0) {
                     // builder.startObject("nodes");

@@ -19,6 +19,8 @@ import org.junit.Before;
 import org.junit.Ignore;
 import org.opensearch.action.ActionFuture;
 import org.opensearch.ml.plugin.MachineLearningPlugin;
+import org.opensearch.ml.stats.MLNodeLevelStat;
+import org.opensearch.ml.stats.MLStatsInput;
 import org.opensearch.plugins.Plugin;
 import org.opensearch.test.OpenSearchIntegTestCase;
 

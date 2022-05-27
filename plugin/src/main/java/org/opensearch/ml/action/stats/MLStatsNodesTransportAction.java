@@ -19,7 +19,12 @@ import org.opensearch.common.io.stream.StreamInput;
 import org.opensearch.env.Environment;
 import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.stats.ActionName;
+import org.opensearch.ml.stats.MLActionStats;
+import org.opensearch.ml.stats.MLAlgoActionStats;
+import org.opensearch.ml.stats.MLNodeLevelStat;
+import org.opensearch.ml.stats.MLStatLevel;
 import org.opensearch.ml.stats.MLStats;
+import org.opensearch.ml.stats.MLStatsInput;
 import org.opensearch.monitor.jvm.JvmService;
 import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.transport.TransportService;
@@ -107,12 +112,18 @@ public class MLStatsNodesTransportAction extends
 
         Map<FunctionName, MLAlgoActionStats> algorithmStats = new HashMap<>();
         // return algorithm level stats
-        if (mlStatsInput.getTargetStatLevels().contains(MLStatLevel.ALGORITHM)) {
+        if (mlStatsInput.getTargetStatLevels().contains(MLStatLevel.ALGORITHM)
+            || mlStatsInput.getTargetStatLevels().contains(MLStatLevel.ACTION)) {
             boolean retrieveAllAlgoStats = mlStatsInput.getAlgorithms().size() == 0;
             for (FunctionName algoName : mlStats.getAllAlgorithms()) {
                 if (retrieveAllAlgoStats || mlStatsInput.getAlgorithms().contains(algoName)) {
-                    Map<ActionName, MLAlgoStats> algoActionStatsMap = mlStats.getAlgorithmStats(algoName);
-                    algorithmStats.put(algoName, new MLAlgoActionStats(algoActionStatsMap));
+                    Map<ActionName, MLActionStats> actionStatsMap = new HashMap<>();
+                    for (Map.Entry<ActionName, MLActionStats> entry : mlStats.getAlgorithmStats(algoName).entrySet()) {
+                        if (mlStatsInput.getActions().size() == 0 || mlStatsInput.getActions().contains(entry.getKey())) {
+                            actionStatsMap.put(entry.getKey(), entry.getValue());
+                        }
+                    }
+                    algorithmStats.put(algoName, new MLAlgoActionStats(actionStatsMap));
                 }
             }
         }

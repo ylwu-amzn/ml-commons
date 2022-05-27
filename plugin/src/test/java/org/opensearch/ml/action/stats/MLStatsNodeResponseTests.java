@@ -20,6 +20,10 @@ import org.opensearch.common.xcontent.XContentBuilder;
 import org.opensearch.common.xcontent.XContentType;
 import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.stats.ActionName;
+import org.opensearch.ml.stats.MLActionLevelStat;
+import org.opensearch.ml.stats.MLActionStats;
+import org.opensearch.ml.stats.MLAlgoActionStats;
+import org.opensearch.ml.stats.MLNodeLevelStat;
 import org.opensearch.ml.utils.TestHelper;
 import org.opensearch.test.OpenSearchTestCase;
 
@@ -66,18 +70,18 @@ public class MLStatsNodeResponseTests extends OpenSearchTestCase {
         Map<MLNodeLevelStat, Object> statsToValues = new HashMap<>();
         statsToValues.put(MLNodeLevelStat.ML_NODE_TOTAL_REQUEST_COUNT, 100);
         Map<FunctionName, MLAlgoActionStats> algoStats = new HashMap<>();
-        Map<ActionName, MLAlgoStats> algoActionStats = new HashMap<>();
-        Map<String, Object> algoActionStatMap = new HashMap<>();
-        algoActionStatMap.put("request_count", 111);
-        algoActionStatMap.put("request_failure", 22);
-        algoActionStats.put(ActionName.TRAIN, new MLAlgoStats(algoActionStatMap));
+        Map<ActionName, MLActionStats> algoActionStats = new HashMap<>();
+        Map<MLActionLevelStat, Object> algoActionStatMap = new HashMap<>();
+        algoActionStatMap.put(MLActionLevelStat.ML_ACTION_REQUEST_COUNT, 111);
+        algoActionStatMap.put(MLActionLevelStat.ML_ACTION_FAILURE_COUNT, 22);
+        algoActionStats.put(ActionName.TRAIN, new MLActionStats(algoActionStatMap));
         algoStats.put(FunctionName.KMEANS, new MLAlgoActionStats(algoActionStats));
         response = new MLStatsNodeResponse(node, statsToValues, algoStats);
         response.toXContent(builder, ToXContent.EMPTY_PARAMS);
         builder.endObject();
         String taskContent = TestHelper.xContentBuilderToString(builder);
         assertEquals(
-            "{\"ml_node_total_request_count\":100,\"algorithms\":{\"kmeans\":{\"train\":{\"request_failure\":22,\"request_count\":111}}}}",
+            "{\"ml_node_total_request_count\":100,\"algorithms\":{\"kmeans\":{\"train\":{\"ml_action_request_count\":111,\"ml_action_failure_count\":22}}}}",
             taskContent
         );
     }

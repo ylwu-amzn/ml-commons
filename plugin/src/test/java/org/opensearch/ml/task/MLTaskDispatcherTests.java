@@ -28,11 +28,11 @@ import org.opensearch.cluster.node.DiscoveryNode;
 import org.opensearch.cluster.node.DiscoveryNodeRole;
 import org.opensearch.cluster.node.DiscoveryNodes;
 import org.opensearch.cluster.service.ClusterService;
-import org.opensearch.ml.action.stats.MLNodeLevelStat;
 import org.opensearch.ml.action.stats.MLStatsNodeResponse;
 import org.opensearch.ml.action.stats.MLStatsNodesAction;
 import org.opensearch.ml.action.stats.MLStatsNodesRequest;
 import org.opensearch.ml.action.stats.MLStatsNodesResponse;
+import org.opensearch.ml.stats.MLNodeLevelStat;
 import org.opensearch.test.OpenSearchTestCase;
 
 public class MLTaskDispatcherTests extends OpenSearchTestCase {

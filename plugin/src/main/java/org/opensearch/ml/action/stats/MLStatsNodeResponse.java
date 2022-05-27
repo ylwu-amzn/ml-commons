@@ -18,6 +18,8 @@ import org.opensearch.common.io.stream.StreamOutput;
 import org.opensearch.common.xcontent.ToXContentFragment;
 import org.opensearch.common.xcontent.XContentBuilder;
 import org.opensearch.ml.common.FunctionName;
+import org.opensearch.ml.stats.MLAlgoActionStats;
+import org.opensearch.ml.stats.MLNodeLevelStat;
 
 public class MLStatsNodeResponse extends BaseNodeResponse implements ToXContentFragment {
     @Getter

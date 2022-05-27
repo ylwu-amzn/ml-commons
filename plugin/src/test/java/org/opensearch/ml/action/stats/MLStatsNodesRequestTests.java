@@ -9,6 +9,8 @@ import java.io.IOException;
 
 import org.junit.Assert;
 import org.opensearch.common.io.stream.BytesStreamOutput;
+import org.opensearch.ml.stats.MLNodeLevelStat;
+import org.opensearch.ml.stats.MLStatsInput;
 import org.opensearch.test.OpenSearchTestCase;
 
 import com.google.common.collect.ImmutableSet;

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package org.opensearch.ml.action.stats;
+package org.opensearch.ml.stats;
 
 import java.io.IOException;
 import java.util.Locale;
@@ -14,17 +14,16 @@ import org.opensearch.common.io.stream.StreamOutput;
 import org.opensearch.common.io.stream.Writeable;
 import org.opensearch.common.xcontent.ToXContentFragment;
 import org.opensearch.common.xcontent.XContentBuilder;
-import org.opensearch.ml.stats.ActionName;
 
 public class MLAlgoActionStats implements ToXContentFragment, Writeable {
 
-    private Map<ActionName, MLAlgoStats> algoStats; // train -> { request_count: 1}
+    private Map<ActionName, MLActionStats> algoStats; // train -> { request_count: 1}
 
     public MLAlgoActionStats(StreamInput in) throws IOException {
-        this.algoStats = in.readMap(stream -> stream.readEnum(ActionName.class), MLAlgoStats::new);
+        this.algoStats = in.readMap(stream -> stream.readEnum(ActionName.class), MLActionStats::new);
     }
 
-    public MLAlgoActionStats(Map<ActionName, MLAlgoStats> algoStats) {
+    public MLAlgoActionStats(Map<ActionName, MLActionStats> algoStats) {
         this.algoStats = algoStats;
     }
 
@@ -36,7 +35,7 @@ public class MLAlgoActionStats implements ToXContentFragment, Writeable {
     @Override
     public XContentBuilder toXContent(XContentBuilder builder, Params params) throws IOException {
         if (algoStats != null && algoStats.size() > 0) {
-            for (Map.Entry<ActionName, MLAlgoStats> entry : algoStats.entrySet()) {
+            for (Map.Entry<ActionName, MLActionStats> entry : algoStats.entrySet()) {
                 builder.startObject(entry.getKey().name().toLowerCase(Locale.ROOT));
                 entry.getValue().toXContent(builder, params);
                 builder.endObject();

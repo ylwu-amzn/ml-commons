@@ -10,4 +10,12 @@ public enum ActionName {
     PREDICT,
     TRAIN_PREDICT,
     EXECUTE;
+
+    public static ActionName from(String value) {
+        try {
+            return ActionName.valueOf(value);
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Wrong action name");
+        }
+    }
 }

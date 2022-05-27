@@ -12,7 +12,6 @@ import java.util.function.Supplier;
 
 import lombok.Getter;
 
-import org.opensearch.ml.action.stats.MLAlgoStats;
 import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.stats.suppliers.CounterSupplier;
 
@@ -22,7 +21,7 @@ import org.opensearch.ml.stats.suppliers.CounterSupplier;
 public class MLStats {
     @Getter
     private Map<Enum, MLStat<?>> stats;
-    private Map<FunctionName, Map<ActionName, Map<String, MLStat>>> algoStats;// {"kmeans":{"train":{"request_count":10}}}
+    private Map<FunctionName, Map<ActionName, Map<MLActionLevelStat, MLStat>>> algoStats;// {"kmeans":{"train":{"request_count":10}}}
 
     /**
      * Constructor
@@ -57,13 +56,17 @@ public class MLStats {
         return createStatIfAbsent(key, () -> new MLStat<>(false, new CounterSupplier()));
     }
 
-    public MLStat<?> createCounterStatIfAbsent(FunctionName algoName, ActionName action, String statKey) {
-        Map<ActionName, Map<String, MLStat>> actionStats = algoStats.computeIfAbsent(algoName, it -> new ConcurrentHashMap<>());
-        Map<String, MLStat> algoActionStats = actionStats.computeIfAbsent(action, it -> new ConcurrentHashMap<>());
-        return createAlgoStatIfAbsent(algoActionStats, statKey, () -> new MLStat<>(false, new CounterSupplier()));
+    public MLStat<?> createCounterStatIfAbsent(FunctionName algoName, ActionName action, MLActionLevelStat stat) {
+        Map<ActionName, Map<MLActionLevelStat, MLStat>> actionStats = algoStats.computeIfAbsent(algoName, it -> new ConcurrentHashMap<>());
+        Map<MLActionLevelStat, MLStat> algoActionStats = actionStats.computeIfAbsent(action, it -> new ConcurrentHashMap<>());
+        return createAlgoStatIfAbsent(algoActionStats, stat, () -> new MLStat<>(false, new CounterSupplier()));
     }
 
-    public synchronized MLStat<?> createAlgoStatIfAbsent(Map<String, MLStat> algoActionStats, String key, Supplier<MLStat> supplier) {
+    public synchronized MLStat<?> createAlgoStatIfAbsent(
+        Map<MLActionLevelStat, MLStat> algoActionStats,
+        MLActionLevelStat key,
+        Supplier<MLStat> supplier
+    ) {
         return algoActionStats.computeIfAbsent(key, k -> supplier.get());
     }
 
@@ -133,18 +136,18 @@ public class MLStats {
     // return algoActionStats;
     // }
 
-    public Map<ActionName, MLAlgoStats> getAlgorithmStats(FunctionName algoName) {
+    public Map<ActionName, MLActionStats> getAlgorithmStats(FunctionName algoName) {
         if (!algoStats.containsKey(algoName)) {
             return null;
         }
-        Map<ActionName, MLAlgoStats> algoActionStats = new HashMap<>();
+        Map<ActionName, MLActionStats> algoActionStats = new HashMap<>();
 
-        for (Map.Entry<ActionName, Map<String, MLStat>> entry : algoStats.get(algoName).entrySet()) {
-            Map<String, Object> statsMap = new HashMap<>();
-            for (Map.Entry<String, MLStat> state : entry.getValue().entrySet()) {
+        for (Map.Entry<ActionName, Map<MLActionLevelStat, MLStat>> entry : algoStats.get(algoName).entrySet()) {
+            Map<MLActionLevelStat, Object> statsMap = new HashMap<>();
+            for (Map.Entry<MLActionLevelStat, MLStat> state : entry.getValue().entrySet()) {
                 statsMap.put(state.getKey(), state.getValue().getValue());
             }
-            algoActionStats.put(entry.getKey(), new MLAlgoStats(statsMap));
+            algoActionStats.put(entry.getKey(), new MLActionStats(statsMap));
         }
         return algoActionStats;
     }

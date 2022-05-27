@@ -6,8 +6,6 @@
 package org.opensearch.ml.task;
 
 import static org.opensearch.ml.plugin.MachineLearningPlugin.TASK_THREAD_POOL;
-import static org.opensearch.ml.stats.StatNames.FAILURE_COUNT;
-import static org.opensearch.ml.stats.StatNames.REQUEST_COUNT;
 
 import lombok.extern.log4j.Log4j2;
 
@@ -15,7 +13,6 @@ import org.opensearch.action.ActionListener;
 import org.opensearch.action.ActionListenerResponseHandler;
 import org.opensearch.client.Client;
 import org.opensearch.cluster.service.ClusterService;
-import org.opensearch.ml.action.stats.MLNodeLevelStat;
 import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.common.breaker.MLCircuitBreakerService;
 import org.opensearch.ml.common.input.Input;
@@ -26,6 +23,8 @@ import org.opensearch.ml.common.transport.execute.MLExecuteTaskResponse;
 import org.opensearch.ml.engine.MLEngine;
 import org.opensearch.ml.indices.MLInputDatasetHandler;
 import org.opensearch.ml.stats.ActionName;
+import org.opensearch.ml.stats.MLActionLevelStat;
+import org.opensearch.ml.stats.MLNodeLevelStat;
 import org.opensearch.ml.stats.MLStats;
 import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.transport.TransportResponseHandler;
@@ -78,7 +77,9 @@ public class MLExecuteTaskRunner extends MLTaskRunner<MLExecuteTaskRequest, MLEx
             try {
                 mlStats.getStat(MLNodeLevelStat.ML_NODE_EXECUTING_TASK_COUNT).increment();
                 mlStats.getStat(MLNodeLevelStat.ML_NODE_TOTAL_REQUEST_COUNT).increment();
-                mlStats.createCounterStatIfAbsent(request.getFunctionName(), ActionName.TRAIN, REQUEST_COUNT).increment();
+                mlStats
+                    .createCounterStatIfAbsent(request.getFunctionName(), ActionName.TRAIN, MLActionLevelStat.ML_ACTION_REQUEST_COUNT)
+                    .increment();
 
                 // ActionListener<MLExecuteTaskResponse> wrappedListener = ActionListener.runBefore(listener, )
 
@@ -88,7 +89,9 @@ public class MLExecuteTaskRunner extends MLTaskRunner<MLExecuteTaskRequest, MLEx
                 MLExecuteTaskResponse response = new MLExecuteTaskResponse(functionName, output);
                 listener.onResponse(response);
             } catch (Exception e) {
-                mlStats.createCounterStatIfAbsent(request.getFunctionName(), ActionName.TRAIN, FAILURE_COUNT).increment();
+                mlStats
+                    .createCounterStatIfAbsent(request.getFunctionName(), ActionName.TRAIN, MLActionLevelStat.ML_ACTION_FAILURE_COUNT)
+                    .increment();
                 listener.onFailure(e);
             }
         });
