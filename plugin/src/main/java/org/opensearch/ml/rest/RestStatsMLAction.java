@@ -14,13 +14,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 import lombok.extern.log4j.Log4j2;
@@ -60,8 +58,9 @@ public class RestStatsMLAction extends BaseRestHandler {
 
     /**
      * Constructor
-     *
      * @param mlStats MLStats object
+     * @param clusterService cluster service
+     * @param indexUtils index util
      */
     public RestStatsMLAction(MLStats mlStats, ClusterService clusterService, IndexUtils indexUtils) {
         this.mlStats = mlStats;
@@ -97,20 +96,19 @@ public class RestStatsMLAction extends BaseRestHandler {
             mlStatsInput = createMlStatsInputFromRequestParams(request);
         }
 
-        String[] nodeIds = mlStatsInput.getNodeIds().size() == 0 ? getAllNodes() : mlStatsInput.getNodeIds().toArray(new String[0]);
+        String[] nodeIds = mlStatsInput.retrieveStatsOnAllNodes() ? getAllNodes() : mlStatsInput.getNodeIds().toArray(new String[0]);
         MLStatsNodesRequest mlStatsNodesRequest = new MLStatsNodesRequest(nodeIds, mlStatsInput);
-        Set<MLClusterLevelStat> clusterStateToBeRetrieved = new HashSet<>(mlStatsInput.getClusterLevelStats());
-        Map<MLClusterLevelStat, Object> clusterStatsMap = new HashMap<>();
 
+        Map<MLClusterLevelStat, Object> clusterStatsMap = new HashMap<>();
         if (mlStatsInput.getTargetStatLevels().contains(MLStatLevel.CLUSTER)) {
-            clusterStatsMap.putAll(getClusterStatsMap(clusterStateToBeRetrieved, clusterStateToBeRetrieved.size() == 0));
+            clusterStatsMap.putAll(getClusterStatsMap(mlStatsInput));
         }
 
         // copy to make a effectively final temp variable finalMlStatsInput
         MLStatsInput finalMlStatsInput = mlStatsInput;
         return channel -> {
             if (finalMlStatsInput.getTargetStatLevels().contains(MLStatLevel.CLUSTER)
-                && (finalMlStatsInput.getClusterLevelStats().size() == 0
+                && (finalMlStatsInput.retrieveAllClusterLevelStats()
                     || finalMlStatsInput.getClusterLevelStats().contains(MLClusterLevelStat.ML_MODEL_COUNT))) {
                 indexUtils.getNumberOfDocumentsInIndex(ML_MODEL_INDEX, ActionListener.wrap(count -> {
                     clusterStatsMap.put(MLClusterLevelStat.ML_MODEL_COUNT, count);
@@ -126,7 +124,7 @@ public class RestStatsMLAction extends BaseRestHandler {
         };
     }
 
-    private MLStatsInput createMlStatsInputFromRequestParams(RestRequest request) {
+    MLStatsInput createMlStatsInputFromRequestParams(RestRequest request) {
         MLStatsInput mlStatsInput = new MLStatsInput();
         Optional<String[]> nodeIds = splitCommaSeparatedParam(request, "nodeId");
         if (nodeIds.isPresent()) {
@@ -136,6 +134,7 @@ public class RestStatsMLAction extends BaseRestHandler {
         if (stats.isPresent()) {
             for (String state : stats.get()) {
                 state = state.toUpperCase(Locale.ROOT);
+                // only support cluster and node level stats for bwc
                 if (state.startsWith("ML_NODE")) {
                     mlStatsInput.getNodeLevelStats().add(MLNodeLevelStat.from(state));
                 } else {
@@ -154,18 +153,15 @@ public class RestStatsMLAction extends BaseRestHandler {
         return mlStatsInput;
     }
 
-    private void getNodeStats(
+    void getNodeStats(
         MLStatsInput mlStatsInput,
         Map<MLClusterLevelStat, Object> clusterStatsMap,
         NodeClient client,
         MLStatsNodesRequest mlStatsNodesRequest,
         RestChannel channel
     ) throws IOException {
-        Set<MLStatLevel> targetStatLevels = mlStatsInput.getTargetStatLevels();
         XContentBuilder builder = channel.newBuilder();
-        if (!targetStatLevels.contains(MLStatLevel.NODE)
-            && !targetStatLevels.contains(MLStatLevel.ALGORITHM)
-            && !targetStatLevels.contains(MLStatLevel.ACTION)) {
+        if (mlStatsInput.onlyRetrieveClusterLevelStats()) {
             // only return cluster level stats
             builder.startObject();
             if (clusterStatsMap != null && clusterStatsMap.size() > 0) {
@@ -221,16 +217,13 @@ public class RestStatsMLAction extends BaseRestHandler {
         channel.sendResponse(bytesRestResponse);
     }
 
-    private Map<MLClusterLevelStat, Object> getClusterStatsMap(
-        Set<MLClusterLevelStat> statsToBeRetrieved,
-        boolean retrieveAllClusterStats
-    ) {
+    private Map<MLClusterLevelStat, Object> getClusterStatsMap(MLStatsInput mlStatsInput) {
         Map<MLClusterLevelStat, Object> clusterStats = new HashMap<>();
         mlStats
             .getClusterStats()
             .entrySet()
             .stream()
-            .filter(s -> retrieveAllClusterStats || statsToBeRetrieved.contains(s.getKey()))
+            .filter(s -> mlStatsInput.retrieveStat(s.getKey()))
             .forEach(s -> clusterStats.put((MLClusterLevelStat) s.getKey(), s.getValue().getValue()));
         return clusterStats;
     }

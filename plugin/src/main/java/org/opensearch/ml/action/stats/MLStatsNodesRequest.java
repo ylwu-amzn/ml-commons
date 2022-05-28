@@ -30,8 +30,8 @@ public class MLStatsNodesRequest extends BaseNodesRequest<MLStatsNodesRequest> {
 
     /**
      * Constructor
-     *
      * @param nodeIds nodeIds of nodes' stats to be retrieved
+     * @param mlStatsInput ML status input
      */
     public MLStatsNodesRequest(String[] nodeIds, MLStatsInput mlStatsInput) {
         super(nodeIds);
@@ -46,7 +46,6 @@ public class MLStatsNodesRequest extends BaseNodesRequest<MLStatsNodesRequest> {
     public MLStatsNodesRequest(DiscoveryNode... nodes) {
         super(nodes);
         mlStatsInput = new MLStatsInput();
-        mlStatsInput.getTargetStatLevels().add(MLStatLevel.NODE);
     }
 
     @Override
@@ -56,6 +55,7 @@ public class MLStatsNodesRequest extends BaseNodesRequest<MLStatsNodesRequest> {
     }
 
     public void addNodeLevelStats(Set<MLNodeLevelStat> stats) {
+        mlStatsInput.getTargetStatLevels().add(MLStatLevel.NODE);
         this.mlStatsInput.getNodeLevelStats().addAll(stats);
     }
 }

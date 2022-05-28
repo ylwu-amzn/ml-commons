@@ -11,8 +11,6 @@
 
 package org.opensearch.ml.utils;
 
-import static org.opensearch.ml.indices.MLIndicesHandler.ML_MODEL_INDEX;
-
 import java.util.List;
 import java.util.Locale;
 
@@ -96,11 +94,11 @@ public class IndexUtils {
     }
 
     public void getNumberOfDocumentsInIndex(String indexName, ActionListener<Long> listener) {
-        if (clusterService.state().getRoutingTable().hasIndex(ML_MODEL_INDEX)) {
+        if (clusterService.state().getRoutingTable().hasIndex(indexName)) {
             IndicesStatsRequest indicesStatsRequest = new IndicesStatsRequest();
-            indicesStatsRequest.indices(ML_MODEL_INDEX);
+            indicesStatsRequest.indices(indexName);
             client.admin().indices().stats(indicesStatsRequest, ActionListener.wrap(r -> {
-                long count = r.getIndex(ML_MODEL_INDEX).getPrimaries().docs.getCount();
+                long count = r.getIndex(indexName).getPrimaries().docs.getCount();
                 listener.onResponse(count);
             }, e -> { listener.onFailure(e); }));
         } else {

@@ -20,7 +20,7 @@ import org.opensearch.env.Environment;
 import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.stats.ActionName;
 import org.opensearch.ml.stats.MLActionStats;
-import org.opensearch.ml.stats.MLAlgoActionStats;
+import org.opensearch.ml.stats.MLAlgoStats;
 import org.opensearch.ml.stats.MLNodeLevelStat;
 import org.opensearch.ml.stats.MLStatLevel;
 import org.opensearch.ml.stats.MLStats;
@@ -92,38 +92,35 @@ public class MLStatsNodesTransportAction extends
         return createMLStatsNodeResponse(request.getMlStatsNodesRequest());
     }
 
-    private MLStatsNodeResponse createMLStatsNodeResponse(MLStatsNodesRequest mlStatsNodesRequest) {
+    MLStatsNodeResponse createMLStatsNodeResponse(MLStatsNodesRequest mlStatsNodesRequest) {
         Map<MLNodeLevelStat, Object> statValues = new HashMap<>();
         MLStatsInput mlStatsInput = mlStatsNodesRequest.getMlStatsInput();
         // return node level stats
         if (mlStatsInput.getTargetStatLevels().contains(MLStatLevel.NODE)) {
-            boolean retrieveAllNodeStats = mlStatsInput.getNodeLevelStats().size() == 0;
-            if (retrieveAllNodeStats || mlStatsInput.getNodeLevelStats().contains(MLNodeLevelStat.ML_NODE_JVM_HEAP_USAGE)) {
+            if (mlStatsInput.retrieveStat(MLNodeLevelStat.ML_NODE_JVM_HEAP_USAGE)) {
                 long heapUsedPercent = jvmService.stats().getMem().getHeapUsedPercent();
                 statValues.put(MLNodeLevelStat.ML_NODE_JVM_HEAP_USAGE, heapUsedPercent);
             }
 
             for (Enum statName : mlStats.getNodeStats().keySet()) {
-                if (retrieveAllNodeStats || mlStatsInput.getNodeLevelStats().contains(statName)) {
+                if (mlStatsInput.retrieveStat(statName)) {
                     statValues.put((MLNodeLevelStat) statName, mlStats.getStats().get(statName).getValue());
                 }
             }
         }
 
-        Map<FunctionName, MLAlgoActionStats> algorithmStats = new HashMap<>();
+        Map<FunctionName, MLAlgoStats> algorithmStats = new HashMap<>();
         // return algorithm level stats
-        if (mlStatsInput.getTargetStatLevels().contains(MLStatLevel.ALGORITHM)
-            || mlStatsInput.getTargetStatLevels().contains(MLStatLevel.ACTION)) {
-            boolean retrieveAllAlgoStats = mlStatsInput.getAlgorithms().size() == 0;
+        if (mlStatsInput.includeAlgoStats()) {
             for (FunctionName algoName : mlStats.getAllAlgorithms()) {
-                if (retrieveAllAlgoStats || mlStatsInput.getAlgorithms().contains(algoName)) {
+                if (mlStatsInput.retrieveStatsForAlgo(algoName)) {
                     Map<ActionName, MLActionStats> actionStatsMap = new HashMap<>();
                     for (Map.Entry<ActionName, MLActionStats> entry : mlStats.getAlgorithmStats(algoName).entrySet()) {
-                        if (mlStatsInput.getActions().size() == 0 || mlStatsInput.getActions().contains(entry.getKey())) {
+                        if (mlStatsInput.retrieveStatsForAction(entry.getKey())) {
                             actionStatsMap.put(entry.getKey(), entry.getValue());
                         }
                     }
-                    algorithmStats.put(algoName, new MLAlgoActionStats(actionStatsMap));
+                    algorithmStats.put(algoName, new MLAlgoStats(actionStatsMap));
                 }
             }
         }

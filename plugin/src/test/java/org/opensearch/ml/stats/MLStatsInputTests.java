@@ -57,6 +57,76 @@ public class MLStatsInputTests extends OpenSearchTestCase {
         verifyParsedMLStatsInput(parsedMLStatsInput);
     }
 
+    public void testRetrieveAll() {
+        assertFalse(mlStatsInput.retrieveStatsForAllAlgos());
+        assertFalse(mlStatsInput.retrieveAllNodeLevelStats());
+        assertFalse(mlStatsInput.retrieveStatsForAllActions());
+        assertFalse(mlStatsInput.retrieveAllClusterLevelStats());
+        assertFalse(mlStatsInput.retrieveStatsOnAllNodes());
+        assertFalse(mlStatsInput.retrieveAllActionLevelStats());
+
+        MLStatsInput mlStatsInput = MLStatsInput.builder().build();
+        assertTrue(mlStatsInput.retrieveStatsForAllAlgos());
+        assertTrue(mlStatsInput.retrieveAllNodeLevelStats());
+        assertTrue(mlStatsInput.retrieveStatsForAllActions());
+        assertTrue(mlStatsInput.retrieveAllClusterLevelStats());
+        assertTrue(mlStatsInput.retrieveStatsOnAllNodes());
+        assertTrue(mlStatsInput.retrieveAllActionLevelStats());
+
+        mlStatsInput = new MLStatsInput();
+        assertTrue(mlStatsInput.retrieveStatsForAllAlgos());
+        assertTrue(mlStatsInput.retrieveAllNodeLevelStats());
+        assertTrue(mlStatsInput.retrieveStatsForAllActions());
+        assertTrue(mlStatsInput.retrieveAllClusterLevelStats());
+        assertTrue(mlStatsInput.retrieveStatsOnAllNodes());
+        assertTrue(mlStatsInput.retrieveAllActionLevelStats());
+    }
+
+    public void testShouldRetrieveStat() {
+        assertTrue(mlStatsInput.retrieveStat(MLClusterLevelStat.ML_MODEL_COUNT));
+        assertTrue(mlStatsInput.retrieveStat(MLNodeLevelStat.ML_NODE_TOTAL_REQUEST_COUNT));
+        assertTrue(mlStatsInput.retrieveStat(MLActionLevelStat.ML_ACTION_REQUEST_COUNT));
+
+        MLStatsInput mlStatsInput = MLStatsInput.builder().build();
+        assertTrue(mlStatsInput.retrieveStat(MLClusterLevelStat.ML_MODEL_COUNT));
+        assertTrue(mlStatsInput.retrieveStat(MLNodeLevelStat.ML_NODE_TOTAL_REQUEST_COUNT));
+        assertTrue(mlStatsInput.retrieveStat(MLActionLevelStat.ML_ACTION_REQUEST_COUNT));
+
+        mlStatsInput = new MLStatsInput();
+        assertTrue(mlStatsInput.retrieveStat(MLClusterLevelStat.ML_MODEL_COUNT));
+        assertTrue(mlStatsInput.retrieveStat(MLNodeLevelStat.ML_NODE_TOTAL_REQUEST_COUNT));
+        assertTrue(mlStatsInput.retrieveStat(MLActionLevelStat.ML_ACTION_REQUEST_COUNT));
+
+        mlStatsInput = MLStatsInput
+            .builder()
+            .clusterLevelStats(EnumSet.of(MLClusterLevelStat.ML_TASK_INDEX_STATUS))
+            .nodeLevelStats(EnumSet.of(MLNodeLevelStat.ML_NODE_TOTAL_FAILURE_COUNT))
+            .actionLevelStats(EnumSet.of(MLActionLevelStat.ML_ACTION_FAILURE_COUNT))
+            .build();
+        assertFalse(mlStatsInput.retrieveStat(MLClusterLevelStat.ML_MODEL_COUNT));
+        assertFalse(mlStatsInput.retrieveStat(MLNodeLevelStat.ML_NODE_TOTAL_REQUEST_COUNT));
+        assertFalse(mlStatsInput.retrieveStat(MLActionLevelStat.ML_ACTION_REQUEST_COUNT));
+    }
+
+    public void testOnlyRetrieveClusterLevelStats() {
+        assertFalse(mlStatsInput.onlyRetrieveClusterLevelStats());
+
+        MLStatsInput mlStatsInput = MLStatsInput.builder().build();
+        assertFalse(mlStatsInput.onlyRetrieveClusterLevelStats());
+
+        mlStatsInput = MLStatsInput.builder().targetStatLevels(EnumSet.of(MLStatLevel.CLUSTER)).build();
+        assertTrue(mlStatsInput.onlyRetrieveClusterLevelStats());
+
+        mlStatsInput = MLStatsInput.builder().targetStatLevels(EnumSet.of(MLStatLevel.NODE)).build();
+        assertFalse(mlStatsInput.onlyRetrieveClusterLevelStats());
+
+        mlStatsInput = MLStatsInput.builder().targetStatLevels(EnumSet.of(MLStatLevel.ALGORITHM)).build();
+        assertFalse(mlStatsInput.onlyRetrieveClusterLevelStats());
+
+        mlStatsInput = MLStatsInput.builder().targetStatLevels(EnumSet.of(MLStatLevel.ACTION)).build();
+        assertFalse(mlStatsInput.onlyRetrieveClusterLevelStats());
+    }
+
     private void verifyParsedMLStatsInput(MLStatsInput parsedMLStatsInput) {
         assertArrayEquals(
             mlStatsInput.getTargetStatLevels().toArray(new MLStatLevel[0]),

@@ -39,10 +39,20 @@ public class MLStatsInput implements ToXContentObject, Writeable {
     private EnumSet<MLClusterLevelStat> clusterLevelStats;
     private EnumSet<MLNodeLevelStat> nodeLevelStats;
     private EnumSet<MLActionLevelStat> actionLevelStats;
+    private Set<String> nodeIds;
     private EnumSet<FunctionName> algorithms;
     private EnumSet<ActionName> actions;
-    private Set<String> nodeIds;
 
+    /**
+     * Constructor
+     * @param targetStatLevels target stat levels which will be retrieved
+     * @param clusterLevelStats cluster level stats which will be retrieved
+     * @param nodeLevelStats node level stats which will be retrieved
+     * @param actionLevelStats action level stats which will be retrieved
+     * @param nodeIds retrieve stats on these nodes
+     * @param algorithms retrieve stats for which algorithms
+     * @param actions retrieve stats for which actions
+     */
     @Builder
     public MLStatsInput(
         EnumSet<MLStatLevel> targetStatLevels,
@@ -74,41 +84,11 @@ public class MLStatsInput implements ToXContentObject, Writeable {
 
     public MLStatsInput(StreamInput input) throws IOException {
         targetStatLevels = input.readBoolean() ? input.readEnumSet(MLStatLevel.class) : EnumSet.noneOf(MLStatLevel.class);
-        // if (input.readBoolean()) {
-        // clusterLevelStats = input.readEnumSet(MLClusterLevelStat.class);
-        // } else {
-        // clusterLevelStats = EnumSet.noneOf(MLClusterLevelStat.class);
-        // }
         clusterLevelStats = input.readBoolean() ? input.readEnumSet(MLClusterLevelStat.class) : EnumSet.noneOf(MLClusterLevelStat.class);
-        // if (input.readBoolean()) {
-        // nodeLevelStats = input.readEnumSet(MLNodeLevelStat.class);
-        // } else {
-        // nodeLevelStats = EnumSet.noneOf(MLNodeLevelStat.class);
-        // }
         nodeLevelStats = input.readBoolean() ? input.readEnumSet(MLNodeLevelStat.class) : EnumSet.noneOf(MLNodeLevelStat.class);
-        // if (input.readBoolean()) {
-        // actionLevelStats = input.readEnumSet(MLActionLevelStat.class);
-        // } else {
-        // actionLevelStats = EnumSet.noneOf(MLActionLevelStat.class);
-        // }
         actionLevelStats = input.readBoolean() ? input.readEnumSet(MLActionLevelStat.class) : EnumSet.noneOf(MLActionLevelStat.class);
-        // if (input.readBoolean()) {
-        // nodeIds = new HashSet<>(input.readStringList());
-        // } else {
-        // nodeIds = new HashSet<>();
-        // }
         nodeIds = input.readBoolean() ? new HashSet<>(input.readStringList()) : new HashSet<>();
-        // if (input.readBoolean()) {
-        // algorithms = input.readEnumSet(FunctionName.class);
-        // } else {
-        // algorithms = EnumSet.noneOf(FunctionName.class);
-        // }
         algorithms = input.readBoolean() ? input.readEnumSet(FunctionName.class) : EnumSet.noneOf(FunctionName.class);
-        // if (input.readBoolean()) {
-        // actions = input.readEnumSet(ActionName.class);
-        // } else {
-        // actions = EnumSet.noneOf(ActionName.class);
-        // }
         actions = input.readBoolean() ? input.readEnumSet(ActionName.class) : EnumSet.noneOf(ActionName.class);
     }
 
@@ -123,7 +103,7 @@ public class MLStatsInput implements ToXContentObject, Writeable {
         writeEnumSet(out, actions);
     }
 
-    private void writeEnumSet(StreamOutput out, EnumSet set) throws IOException {
+    private void writeEnumSet(StreamOutput out, EnumSet<?> set) throws IOException {
         if (set != null && set.size() > 0) {
             out.writeBoolean(true);
             out.writeEnumSet(set);
@@ -148,25 +128,40 @@ public class MLStatsInput implements ToXContentObject, Writeable {
 
             switch (fieldName) {
                 case TARGET_STAT_LEVEL:
-                    parseField(parser, targetStatLevels, input -> MLStatLevel.from(input.toUpperCase(Locale.ROOT)));
+                    parseField(parser, targetStatLevels, input -> MLStatLevel.from(input.toUpperCase(Locale.ROOT)), MLStatLevel.class);
                     break;
                 case CLUSTER_LEVEL_STATS:
-                    parseField(parser, clusterLevelStats, input -> MLClusterLevelStat.from(input.toUpperCase(Locale.ROOT)));
+                    parseField(
+                        parser,
+                        clusterLevelStats,
+                        input -> MLClusterLevelStat.from(input.toUpperCase(Locale.ROOT)),
+                        MLClusterLevelStat.class
+                    );
                     break;
                 case NODE_LEVEL_STATS:
-                    parseField(parser, nodeLevelStats, input -> MLNodeLevelStat.from(input.toUpperCase(Locale.ROOT)));
+                    parseField(
+                        parser,
+                        nodeLevelStats,
+                        input -> MLNodeLevelStat.from(input.toUpperCase(Locale.ROOT)),
+                        MLNodeLevelStat.class
+                    );
                     break;
                 case ACTION_LEVEL_STATS:
-                    parseField(parser, actionLevelStats, input -> MLActionLevelStat.from(input.toUpperCase(Locale.ROOT)));
+                    parseField(
+                        parser,
+                        actionLevelStats,
+                        input -> MLActionLevelStat.from(input.toUpperCase(Locale.ROOT)),
+                        MLActionLevelStat.class
+                    );
                     break;
                 case NODE_IDS:
                     parseField(parser, nodeIds);
                     break;
                 case ALGORITHMS:
-                    parseField(parser, algorithms, input -> FunctionName.from(input.toUpperCase(Locale.ROOT)));
+                    parseField(parser, algorithms, input -> FunctionName.from(input.toUpperCase(Locale.ROOT)), FunctionName.class);
                     break;
                 case ACTIONS:
-                    parseField(parser, actions, input -> ActionName.from(input.toUpperCase(Locale.ROOT)));
+                    parseField(parser, actions, input -> ActionName.from(input.toUpperCase(Locale.ROOT)), ActionName.class);
                     break;
                 default:
                     parser.skipChildren();
@@ -188,30 +183,104 @@ public class MLStatsInput implements ToXContentObject, Writeable {
     @Override
     public XContentBuilder toXContent(XContentBuilder builder, Params params) throws IOException {
         builder.startObject();
-        builder.field(TARGET_STAT_LEVEL, targetStatLevels);
-        builder.field(CLUSTER_LEVEL_STATS, clusterLevelStats);
-        builder.field(NODE_LEVEL_STATS, nodeLevelStats);
-        builder.field(ACTION_LEVEL_STATS, actionLevelStats);
-        builder.field(NODE_IDS, nodeIds);
-        builder.field(ALGORITHMS, algorithms);
-        builder.field(ACTIONS, actions);
+        if (targetStatLevels != null) {
+            builder.field(TARGET_STAT_LEVEL, targetStatLevels);
+        }
+        if (clusterLevelStats != null) {
+            builder.field(CLUSTER_LEVEL_STATS, clusterLevelStats);
+        }
+        if (nodeLevelStats != null) {
+            builder.field(NODE_LEVEL_STATS, nodeLevelStats);
+        }
+        if (actionLevelStats != null) {
+            builder.field(ACTION_LEVEL_STATS, actionLevelStats);
+        }
+        if (nodeIds != null) {
+            builder.field(NODE_IDS, nodeIds);
+        }
+        if (algorithms != null) {
+            builder.field(ALGORITHMS, algorithms);
+        }
+        if (actions != null) {
+            builder.field(ACTIONS, actions);
+        }
         builder.endObject();
         return builder;
     }
 
-    private static void parseField(XContentParser parser, Set<?> set) throws IOException {
-        parseField(parser, set, null);
+    public boolean retrieveAllClusterLevelStats() {
+        return clusterLevelStats == null || clusterLevelStats.size() == 0;
     }
 
-    private static <T> void parseField(XContentParser parser, Set<T> set, Function<String, T> function) throws IOException {
+    public boolean retrieveAllNodeLevelStats() {
+        return nodeLevelStats == null || nodeLevelStats.size() == 0;
+    }
+
+    public boolean retrieveAllActionLevelStats() {
+        return actionLevelStats == null || actionLevelStats.size() == 0;
+    }
+
+    public boolean retrieveStatsOnAllNodes() {
+        return nodeIds == null || nodeIds.size() == 0;
+    }
+
+    public boolean retrieveStatsForAllAlgos() {
+        return algorithms == null || algorithms.size() == 0;
+    }
+
+    public boolean retrieveStatsForAlgo(FunctionName algoName) {
+        return retrieveStatsForAllAlgos() || algorithms.contains(algoName);
+    }
+
+    public boolean retrieveStatsForAction(ActionName actionName) {
+        return retrieveStatsForAllActions() || actions.contains(actionName);
+    }
+
+    public boolean retrieveStatsForAllActions() {
+        return actions == null || actions.size() == 0;
+    }
+
+    private static void parseField(XContentParser parser, Set<String> set) throws IOException {
+        parseField(parser, set, null, String.class);
+    }
+
+    private static <T> void parseField(XContentParser parser, Set<T> set, Function<String, T> function, Class<T> clazz) throws IOException {
         ensureExpectedToken(XContentParser.Token.START_ARRAY, parser.currentToken(), parser);
         while (parser.nextToken() != XContentParser.Token.END_ARRAY) {
             String value = parser.text();
             if (function != null) {
                 set.add(function.apply(value));
             } else {
-                set.add((T) value);
+                if (clazz.isInstance(value)) {
+                    set.add(clazz.cast(value));
+                }
             }
         }
+    }
+
+    public boolean retrieveStat(Enum<?> key) {
+        if (key instanceof MLClusterLevelStat) {
+            return retrieveAllClusterLevelStats() || clusterLevelStats.contains(key);
+        }
+        if (key instanceof MLNodeLevelStat) {
+            return retrieveAllNodeLevelStats() || nodeLevelStats.contains(key);
+        }
+        if (key instanceof MLActionLevelStat) {
+            return retrieveAllActionLevelStats() || actionLevelStats.contains(key);
+        }
+        return false;
+    }
+
+    public boolean onlyRetrieveClusterLevelStats() {
+        if (targetStatLevels == null || targetStatLevels.size() == 0) {
+            return false;
+        }
+        return !targetStatLevels.contains(MLStatLevel.NODE)
+            && !targetStatLevels.contains(MLStatLevel.ALGORITHM)
+            && !targetStatLevels.contains(MLStatLevel.ACTION);
+    }
+
+    public boolean includeAlgoStats() {
+        return targetStatLevels.contains(MLStatLevel.ALGORITHM) || targetStatLevels.contains(MLStatLevel.ACTION);
     }
 }

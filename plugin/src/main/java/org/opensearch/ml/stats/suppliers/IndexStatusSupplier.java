@@ -35,7 +35,7 @@ public class IndexStatusSupplier implements Supplier<String> {
     public String get() {
         try {
             return indexUtils.getIndexHealthStatus(indexName);
-        } catch (IllegalArgumentException e) {
+        } catch (Exception e) {
             return UNABLE_TO_RETRIEVE_HEALTH_MESSAGE;
         }
 

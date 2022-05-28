@@ -17,6 +17,10 @@ public class MLTaskCache {
     MLTask mlTask;
     Semaphore updateTaskIndexSemaphore;
 
+    /**
+     * Constructor
+     * @param mlTask ML Task
+     */
     @Builder
     public MLTaskCache(MLTask mlTask) {
         this.mlTask = mlTask;
