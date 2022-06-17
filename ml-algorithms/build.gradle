@@ -30,7 +30,19 @@ dependencies {
     testImplementation group: 'junit', name: 'junit', version: '4.12'
     testImplementation group: 'org.mockito', name: 'mockito-core', version: '4.4.0'
     testImplementation group: 'org.mockito', name: 'mockito-inline', version: '4.4.0'
+
+    // https://mvnrepository.com/artifact/ai.djl/api
+    implementation group: 'ai.djl', name: 'api', version: '0.17.0'
+    implementation group: 'ai.djl.tensorflow', name: 'tensorflow-engine', version: '0.17.0'
+    implementation group: 'ai.djl.tensorflow', name: 'tensorflow-model-zoo', version: '0.17.0'
+    // implementation group: 'ai.djl.tensorflow', name: 'tensorflow-native-auto', version: '2.4.1'
 }
+
+//configurations.all {
+//    resolutionStrategy.force 'net.java.dev.jna:jna:5.10.0'
+//    resolutionStrategy.force 'org.apache.commons:commons-lang3:3.10'
+//    resolutionStrategy.force 'commons-logging:commons-logging:1.2'
+//}
 
 jacocoTestReport {
     reports {
