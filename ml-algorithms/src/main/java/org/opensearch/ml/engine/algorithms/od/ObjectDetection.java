@@ -18,6 +18,7 @@ import lombok.extern.log4j.Log4j2;
 import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.common.exception.MLException;
 import org.opensearch.ml.common.input.Input;
+import org.opensearch.ml.common.input.execute.od.ObjectDetectionInput;
 import org.opensearch.ml.common.output.Output;
 import org.opensearch.ml.common.output.execute.od.ObjectDetectionOutput;
 import org.opensearch.ml.engine.Executable;
@@ -33,7 +34,6 @@ import java.util.stream.Collectors;
 @Function(FunctionName.OBJECT_DETECTION)
 public class ObjectDetection implements Executable {
     private static final int DEFAULT_SAMPLE_PARAM = -1;
-    private String url;
     private Predictor<Image, DetectedObjects> predictor;
 
     public ObjectDetection() {
@@ -130,6 +130,7 @@ public class ObjectDetection implements Executable {
                                 .build();
 
 //        String url = "https://github.com/awslabs/djl/raw/master/examples/src/test/resources/dog_bike_car.jpg";
+                String url = ((ObjectDetectionInput)input).getImageUrl();
                 Image img = ImageFactory.getInstance().fromUrl(new URL(url));
                 ZooModel<Image, DetectedObjects> model = null;
                 try {
@@ -149,9 +150,9 @@ public class ObjectDetection implements Executable {
                     log.error("Failed to predict ", e);
                     throw new MLException("Failed to detect");
                 } finally {
-                    if (model != null) {
-                        model.close();
-                    }
+//                    if (model != null) {
+//                        model.close();
+//                    }
                 }
             } catch (Exception e) {
                 log.error("Failed to detect object from image", e);

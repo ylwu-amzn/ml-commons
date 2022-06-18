@@ -40,7 +40,7 @@ public class ObjectDetectionInput implements Input {
     public static final String IMAGE_URL_FIELD = "url";
     public static final NamedXContentRegistry.Entry XCONTENT_REGISTRY_ENTRY = new NamedXContentRegistry.Entry(
             Input.class,
-            new ParseField(FunctionName.ANOMALY_LOCALIZATION.name()),
+            new ParseField(FunctionName.OBJECT_DETECTION.name()),
             parser -> parse(parser)
     );
 
@@ -63,7 +63,7 @@ public class ObjectDetectionInput implements Input {
         return new ObjectDetectionInput(imageUrl);
     }
 
-    private final String imageUrl; // name pattern of the data index
+    private final String imageUrl;
 
     public ObjectDetectionInput(StreamInput in) throws IOException {
         this.imageUrl = in.readString();

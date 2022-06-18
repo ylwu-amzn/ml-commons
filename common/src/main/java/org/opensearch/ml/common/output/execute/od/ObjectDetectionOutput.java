@@ -39,11 +39,9 @@ public class ObjectDetectionOutput implements Output {
 
     @Override
     public XContentBuilder toXContent(XContentBuilder builder, Params params) throws IOException {
-        builder.startObject();
         if (objects != null) {
             builder.field(OBJECTS_FIELD, objects);
         }
-        builder.endObject();
         return builder;
     }
 }
