@@ -11,21 +11,13 @@ grant {
     permission java.util.PropertyPermission "*", "read,write";
     permission java.net.SocketPermission "*", "connect,resolve";
     permission java.lang.RuntimePermission "setContextClassLoader";
-    permission java.io.FilePermission "<<ALL FILES>>", "read,write";
+    permission java.io.FilePermission "<<ALL FILES>>", "read,write,execute";
     permission java.net.URLPermission "https://github.com/awslabs/djl/raw/master/examples/src/test/resources/dog_bike_car.jpg", "GET";
-};
-
-grant codebase "file:/local/home/ylwu/Downloads/os2.0.1/opensearch-2.0.1/lib/*" {
-    permission java.security.AllPermission;
-    permission java.io.FilePermission "<<ALL FILES>>", "read,write";
-};
-
-grant codebase "file:/local/home/ylwu/Downloads/os2.0.1/opensearch-2.0.1/plugins/opensearch-ml/*" {
-    permission java.security.AllPermission;
-    permission java.io.FilePermission "<<ALL FILES>>", "read,write";
-};
-
-grant codebase "file:/local/home/ylwu/Downloads/os2.0.1/opensearch-2.0.1/lib/jna-5.5.0.jar" {
-    permission java.security.AllPermission;
-    permission java.io.FilePermission "<<ALL FILES>>", "read,write";
+    permission java.util.PropertyPermission "jna.boot.library.path", "read";
+    permission java.lang.RuntimePermission "loadLibrary.jnidispatch";
+    permission java.lang.RuntimePermission "loadLibrary.iomp5";
+    permission java.lang.RuntimePermission "loadLibrary.mklml";
+    permission java.lang.RuntimePermission "loadLibrary.mklml_intel";
+    permission java.lang.RuntimePermission "loadLibrary./home/ylwu/tmp/tensorflow/2.7.0-cpu-linux-x86_64/libtensorflow_framework.so.2";
+    permission java.lang.RuntimePermission "*";
 };

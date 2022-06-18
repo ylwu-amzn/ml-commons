@@ -68,7 +68,7 @@ public class ObjectDetection implements Predictable {
 
     @Override
     public MLOutput predict(DataFrame dataFrame, Model model1) {
-        AccessController.doPrivileged((PrivilegedAction<ObjectDetectionOutput>) () -> {
+        ObjectDetectionOutput objectDetectionOutput = AccessController.doPrivileged((PrivilegedAction<ObjectDetectionOutput>) () -> {
             ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
             try {
                 System.setProperty("DJL_CACHE_DIR", "/home/ylwu/tmp");
@@ -112,7 +112,7 @@ public class ObjectDetection implements Predictable {
                 Thread.currentThread().setContextClassLoader(contextClassLoader);
             }
         });
-        return ObjectDetectionOutput.builder().objects(new ArrayList<>()).build();
+        return objectDetectionOutput;
     }
 
 }
