@@ -65,6 +65,7 @@ import org.opensearch.ml.common.transport.training.MLTrainingTaskAction;
 import org.opensearch.ml.common.transport.trainpredict.MLTrainAndPredictionTaskAction;
 import org.opensearch.ml.engine.MLEngineClassLoader;
 import org.opensearch.ml.engine.algorithms.anomalylocalization.AnomalyLocalizerImpl;
+import org.opensearch.ml.engine.algorithms.od.ObjectDetection;
 import org.opensearch.ml.engine.algorithms.sample.LocalSampleCalculator;
 import org.opensearch.ml.indices.MLIndicesHandler;
 import org.opensearch.ml.indices.MLInputDatasetHandler;
@@ -221,6 +222,9 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin {
         // Register thread-safe ML objects here.
         LocalSampleCalculator localSampleCalculator = new LocalSampleCalculator(client, settings);
         MLEngineClassLoader.register(FunctionName.LOCAL_SAMPLE_CALCULATOR, localSampleCalculator);
+
+        ObjectDetection objectDetection = new ObjectDetection();
+        MLEngineClassLoader.register(FunctionName.OBJECT_DETECTION, objectDetection);
 
         AnomalyLocalizerImpl anomalyLocalizer = new AnomalyLocalizerImpl(client, settings, clusterService, indexNameExpressionResolver);
         MLEngineClassLoader.register(FunctionName.ANOMALY_LOCALIZATION, anomalyLocalizer);

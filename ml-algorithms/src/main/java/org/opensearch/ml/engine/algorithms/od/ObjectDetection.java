@@ -11,76 +11,50 @@ import ai.djl.modality.Classifications;
 import ai.djl.modality.cv.Image;
 import ai.djl.modality.cv.ImageFactory;
 import ai.djl.modality.cv.output.DetectedObjects;
-import ai.djl.ndarray.types.Shape;
 import ai.djl.repository.zoo.Criteria;
 import ai.djl.repository.zoo.ZooModel;
-import ai.djl.tensorflow.engine.TfEngine;
-import ai.djl.tensorflow.zoo.TfModelZoo;
-import ai.djl.tensorflow.zoo.cv.objectdetction.TfSsdTranslator;
 import ai.djl.training.util.ProgressBar;
-import ai.djl.util.Pair;
-import ai.djl.util.Platform;
-import ai.djl.util.cuda.CudaUtils;
-import io.protostuff.ProtostuffIOUtil;
 import lombok.extern.log4j.Log4j2;
 import org.opensearch.ml.common.FunctionName;
-import org.opensearch.ml.common.Model;
-import org.opensearch.ml.common.dataframe.DataFrame;
 import org.opensearch.ml.common.exception.MLException;
-import org.opensearch.ml.common.input.parameter.MLAlgoParams;
-import org.opensearch.ml.common.input.parameter.od.ObjectDetectionParams;
-import org.opensearch.ml.common.input.parameter.sample.SampleAlgoParams;
-import org.opensearch.ml.common.output.MLOutput;
-import org.opensearch.ml.common.output.od.ObjectDetectionOutput;
-import org.opensearch.ml.common.output.sample.SampleAlgoOutput;
-import org.opensearch.ml.engine.Predictable;
-import org.opensearch.ml.engine.Trainable;
+import org.opensearch.ml.common.input.Input;
+import org.opensearch.ml.common.output.Output;
+import org.opensearch.ml.common.output.execute.od.ObjectDetectionOutput;
+import org.opensearch.ml.engine.Executable;
 import org.opensearch.ml.engine.annotation.Function;
-import org.opensearch.ml.engine.utils.ModelSerDeSer;
 
-import java.io.File;
 import java.net.URL;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-import java.util.Optional;
-import java.util.Properties;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 @Log4j2
 @Function(FunctionName.OBJECT_DETECTION)
-public class ObjectDetection implements Predictable {
+public class ObjectDetection implements Executable {
     private static final int DEFAULT_SAMPLE_PARAM = -1;
     private String url;
+    private Predictor<Image, DetectedObjects> predictor;
 
     public ObjectDetection() {
     }
 
-    public ObjectDetection(MLAlgoParams parameters) {
-        this.url = ((ObjectDetectionParams) parameters).getUrl();
-    }
-
-    @Override
+    /*@Override
     public MLOutput predict(DataFrame dataFrame, Model model1) {
         ObjectDetectionOutput objectDetectionOutput = AccessController.doPrivileged((PrivilegedAction<ObjectDetectionOutput>) () -> {
-            ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
+            ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();//AppClassLoader
             try {
                 System.setProperty("DJL_CACHE_DIR", "/home/ylwu/tmp");
                 System.setProperty("java.library.path", "/home/ylwu/tf");
 //                Thread.currentThread().setContextClassLoader(Application.class.getClassLoader());
 //                Thread.currentThread().setContextClassLoader(Platform.class.getClassLoader());
-                Thread.currentThread().setContextClassLoader(CudaUtils.class.getClassLoader());
+//                Thread.currentThread().setContextClassLoader(CudaUtils.class.getClassLoader());
+                Thread.currentThread().setContextClassLoader(getClass().getClassLoader()); //FactoryURLClassLoader
 
-                File file = new File("/usr/lib64", "libcudart.so");
-                file = new File("/usr/lib64/libcudart.so");
-                boolean exist = file.exists();
-                Files.exists(Paths.get("/usr/lib64/libcudart.so"));
+//                File file = new File("/usr/lib64", "libcudart.so");
+//                file = new File("/usr/lib64/libcudart.so");
+//                boolean exist = file.exists();
+//                Files.exists(Paths.get("/usr/lib64/libcudart.so"));
                 Criteria<Image, DetectedObjects> criteria =
                         Criteria.builder()
                                 .optApplication(Application.CV.OBJECT_DETECTION)
@@ -95,8 +69,13 @@ public class ObjectDetection implements Predictable {
 
 //        String url = "https://github.com/awslabs/djl/raw/master/examples/src/test/resources/dog_bike_car.jpg";
                 Image img = ImageFactory.getInstance().fromUrl(new URL(url));
-                try (ZooModel<Image, DetectedObjects> model = criteria.loadModel();
-                     Predictor<Image, DetectedObjects> predictor = model.newPredictor()) {
+                ZooModel<Image, DetectedObjects> model = null;
+                try {
+                    if (predictor == null) {
+                        model = criteria.loadModel();
+                        predictor = model.newPredictor();
+                    }
+                    
                     DetectedObjects result = predictor.predict(img);
                     List<String> classes =
                             result.items()
@@ -104,6 +83,75 @@ public class ObjectDetection implements Predictable {
                                     .map(Classifications.Classification::getClassName)
                                     .collect(Collectors.toList());
                     return ObjectDetectionOutput.builder().objects(classes).build();
+                } catch (Exception e) {
+                    log.error("Failed to predict ", e);
+                    throw new MLException("Failed to detect");
+                } finally {
+                    if (model != null) {
+                        model.close();
+                    }
+                }
+            } catch (Exception e) {
+                log.error("Failed to detect object from image", e);
+                throw new MLException("Failed to detect object");
+            } finally {
+                Thread.currentThread().setContextClassLoader(contextClassLoader);
+            }
+        });
+        return objectDetectionOutput;
+    }*/
+
+    @Override
+    public Output execute(Input input) {
+        ObjectDetectionOutput objectDetectionOutput = AccessController.doPrivileged((PrivilegedAction<ObjectDetectionOutput>) () -> {
+            ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();//AppClassLoader
+            try {
+                System.setProperty("DJL_CACHE_DIR", "/home/ylwu/tmp");
+                System.setProperty("java.library.path", "/home/ylwu/tf");
+//                Thread.currentThread().setContextClassLoader(Application.class.getClassLoader());
+//                Thread.currentThread().setContextClassLoader(Platform.class.getClassLoader());
+//                Thread.currentThread().setContextClassLoader(CudaUtils.class.getClassLoader());
+                Thread.currentThread().setContextClassLoader(getClass().getClassLoader()); //FactoryURLClassLoader
+
+//                File file = new File("/usr/lib64", "libcudart.so");
+//                file = new File("/usr/lib64/libcudart.so");
+//                boolean exist = file.exists();
+//                Files.exists(Paths.get("/usr/lib64/libcudart.so"));
+                Criteria<Image, DetectedObjects> criteria =
+                        Criteria.builder()
+                                .optApplication(Application.CV.OBJECT_DETECTION)
+                                .setTypes(Image.class, DetectedObjects.class)
+                                .optArtifactId("ssd") // download from S3
+                                .optFilter("backbone", "mobilenet_v2")
+//                                .optModelPath() // specify local file path
+//                                .optModelUrls()// search from jar (pre-set context classl loader)/http,
+                                .optEngine("TensorFlow")
+                                .optProgress(new ProgressBar())
+                                .build();
+
+//        String url = "https://github.com/awslabs/djl/raw/master/examples/src/test/resources/dog_bike_car.jpg";
+                Image img = ImageFactory.getInstance().fromUrl(new URL(url));
+                ZooModel<Image, DetectedObjects> model = null;
+                try {
+                    if (predictor == null) {
+                        model = criteria.loadModel();
+                        predictor = model.newPredictor();
+                    }
+
+                    DetectedObjects result = predictor.predict(img);
+                    List<String> classes =
+                            result.items()
+                                    .stream()
+                                    .map(Classifications.Classification::getClassName)
+                                    .collect(Collectors.toList());
+                    return ObjectDetectionOutput.builder().objects(classes.toArray(new String[0])).build();
+                } catch (Exception e) {
+                    log.error("Failed to predict ", e);
+                    throw new MLException("Failed to detect");
+                } finally {
+                    if (model != null) {
+                        model.close();
+                    }
                 }
             } catch (Exception e) {
                 log.error("Failed to detect object from image", e);
@@ -114,5 +162,4 @@ public class ObjectDetection implements Predictable {
         });
         return objectDetectionOutput;
     }
-
 }

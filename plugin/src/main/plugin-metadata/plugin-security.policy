@@ -3,6 +3,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+grant codeBase "${codebase.jna}" {
+  permission java.io.FilePermission "<<ALL FILES>>", "read,write";
+};
+
 grant {
     permission java.lang.RuntimePermission "accessDeclaredMembers";
     permission java.lang.RuntimePermission "getClassLoader";

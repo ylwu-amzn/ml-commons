@@ -3,44 +3,37 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package org.opensearch.ml.common.output.od;
+package org.opensearch.ml.common.output.execute.od;
 
 import lombok.Builder;
 import lombok.Data;
-import lombok.EqualsAndHashCode;
 import org.opensearch.common.io.stream.StreamInput;
 import org.opensearch.common.io.stream.StreamOutput;
 import org.opensearch.common.xcontent.XContentBuilder;
-import org.opensearch.ml.common.annotation.MLAlgoOutput;
-import org.opensearch.ml.common.output.MLOutput;
-import org.opensearch.ml.common.output.MLOutputType;
+import org.opensearch.ml.common.FunctionName;
+import org.opensearch.ml.common.annotation.ExecuteOutput;
+import org.opensearch.ml.common.output.Output;
 
 import java.io.IOException;
-import java.util.List;
 
+@ExecuteOutput(algorithms={FunctionName.OBJECT_DETECTION})
 @Data
-@EqualsAndHashCode(callSuper=false)
-@MLAlgoOutput(MLOutputType.OBJECT_DETECTION)
-public class ObjectDetectionOutput extends MLOutput {
+public class ObjectDetectionOutput implements Output {
 
-    private static final MLOutputType OUTPUT_TYPE = MLOutputType.OBJECT_DETECTION;
-    public static final String OBJECTS_FIELD = "sample_result";
+    public static final String OBJECTS_FIELD = "objects";
     private String[] objects;
 
     @Builder
-    public ObjectDetectionOutput(final List<String> objects) {
-        super(OUTPUT_TYPE);
-        this.objects = objects == null? new String[0] : objects.toArray(new String[0]);
+    public ObjectDetectionOutput(final String[] objects) {
+        this.objects = objects;
     }
 
     public ObjectDetectionOutput(StreamInput in) throws IOException {
-        super(OUTPUT_TYPE);
         objects = in.readOptionalStringArray();
     }
 
     @Override
     public void writeTo(StreamOutput out) throws IOException {
-        super.writeTo(out);
         out.writeOptionalStringArray(objects);
     }
 
@@ -52,10 +45,5 @@ public class ObjectDetectionOutput extends MLOutput {
         }
         builder.endObject();
         return builder;
-    }
-
-    @Override
-    public MLOutputType getType() {
-        return OUTPUT_TYPE;
     }
 }
