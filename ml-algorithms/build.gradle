@@ -35,6 +35,10 @@ dependencies {
     implementation group: 'ai.djl', name: 'api', version: '0.17.0'
     implementation group: 'ai.djl.tensorflow', name: 'tensorflow-engine', version: '0.17.0'
     implementation group: 'ai.djl.tensorflow', name: 'tensorflow-model-zoo', version: '0.17.0'
+    implementation group: 'ai.djl.mxnet', name: 'mxnet-engine', version: '0.17.0'
+    implementation group: 'ai.djl.mxnet', name: 'mxnet-model-zoo', version: '0.17.0'
+    implementation group: 'ai.djl.pytorch', name: 'pytorch-engine', version: '0.17.0'
+    implementation group: 'ai.djl.pytorch', name: 'pytorch-model-zoo', version: '0.17.0'
     // implementation group: 'ai.djl.tensorflow', name: 'tensorflow-native-auto', version: '2.4.1'
 }
 

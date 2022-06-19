@@ -14,7 +14,9 @@ public enum FunctionName {
     FIT_RCF,
     BATCH_RCF,
     ANOMALY_LOCALIZATION,
-    OBJECT_DETECTION;
+    OBJECT_DETECTION,
+    RESNET18,
+    BERT_QA;
 
     public static FunctionName from(String value) {
         try {

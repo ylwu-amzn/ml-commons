@@ -46,6 +46,7 @@ import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.common.breaker.MLCircuitBreakerService;
 import org.opensearch.ml.common.input.execute.anomalylocalization.AnomalyLocalizationInput;
 import org.opensearch.ml.common.input.execute.od.ObjectDetectionInput;
+import org.opensearch.ml.common.input.execute.resnet18.Resnet18Input;
 import org.opensearch.ml.common.input.execute.samplecalculator.LocalSampleCalculatorInput;
 import org.opensearch.ml.common.input.parameter.ad.AnomalyDetectionLibSVMParams;
 import org.opensearch.ml.common.input.parameter.clustering.KMeansParams;
@@ -302,7 +303,8 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin {
                 BatchRCFParams.XCONTENT_REGISTRY,
                 LocalSampleCalculatorInput.XCONTENT_REGISTRY,
                 AnomalyLocalizationInput.XCONTENT_REGISTRY_ENTRY,
-                ObjectDetectionInput.XCONTENT_REGISTRY_ENTRY
+                ObjectDetectionInput.XCONTENT_REGISTRY_ENTRY,
+                Resnet18Input.XCONTENT_REGISTRY_ENTRY
             );
     }
 }
