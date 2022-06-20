@@ -5,12 +5,10 @@
 
 package org.opensearch.ml.engine.algorithms.resnet18;
 
-import ai.djl.Application;
 import ai.djl.inference.Predictor;
 import ai.djl.modality.Classifications;
 import ai.djl.modality.cv.Image;
 import ai.djl.modality.cv.ImageFactory;
-import ai.djl.modality.cv.output.DetectedObjects;
 import ai.djl.modality.cv.transform.CenterCrop;
 import ai.djl.modality.cv.transform.Normalize;
 import ai.djl.modality.cv.transform.Resize;
@@ -25,20 +23,15 @@ import lombok.extern.log4j.Log4j2;
 import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.common.exception.MLException;
 import org.opensearch.ml.common.input.Input;
-import org.opensearch.ml.common.input.execute.od.ObjectDetectionInput;
 import org.opensearch.ml.common.input.execute.resnet18.Resnet18Input;
 import org.opensearch.ml.common.output.Output;
-import org.opensearch.ml.common.output.execute.od.ObjectDetectionOutput;
 import org.opensearch.ml.common.output.execute.resnet18.Resnet18Output;
 import org.opensearch.ml.engine.Executable;
 import org.opensearch.ml.engine.annotation.Function;
 
-import java.net.URL;
 import java.nio.file.Paths;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
-import java.util.List;
-import java.util.stream.Collectors;
 
 @Log4j2
 @Function(FunctionName.RESNET18)
@@ -53,6 +46,8 @@ public class Resnet18 implements Executable {
         Resnet18Output output = AccessController.doPrivileged((PrivilegedAction<Resnet18Output>) () -> {
             ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();//AppClassLoader
             try {
+                //System.setProperty("ai.djl.default_engine", "PyTorch");
+                System.setProperty("PYTORCH_PRECXX11", "true");
                 System.setProperty("DJL_CACHE_DIR", "/home/ylwu/tmp");
                 System.setProperty("java.library.path", "/home/ylwu/tf");
                 Thread.currentThread().setContextClassLoader(getClass().getClassLoader()); //FactoryURLClassLoader
