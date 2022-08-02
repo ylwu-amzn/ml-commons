@@ -46,6 +46,7 @@ public class LinearRegressionParams implements MLAlgoParams {
     public static final String BATCH_SIZE_FIELD = "batch_size";
     public static final String SEED_FIELD = "seed";
     public static final String TARGET_FIELD = "target";
+    public static final String LOGGING_INTERVAL_FIELD = "logging_interval";
 
     private ObjectiveType objectiveType;
     private OptimizerType optimizerType;
@@ -60,9 +61,10 @@ public class LinearRegressionParams implements MLAlgoParams {
     private Integer batchSize;
     private Long seed;
     private String target;
+    private Integer loggingInterval;
 
     @Builder(toBuilder = true)
-    public LinearRegressionParams(ObjectiveType objectiveType, OptimizerType optimizerType, Double learningRate, MomentumType momentumType, Double momentumFactor, Double epsilon, Double beta1, Double beta2, Double decayRate, Integer epochs, Integer batchSize, Long seed, String target) {
+    public LinearRegressionParams(ObjectiveType objectiveType, OptimizerType optimizerType, Double learningRate, MomentumType momentumType, Double momentumFactor, Double epsilon, Double beta1, Double beta2, Double decayRate, Integer epochs, Integer batchSize, Long seed, String target, Integer loggingInterval) {
         this.objectiveType = objectiveType;
         this.optimizerType = optimizerType;
         this.learningRate = learningRate;
@@ -76,6 +78,7 @@ public class LinearRegressionParams implements MLAlgoParams {
         this.batchSize = batchSize;
         this.seed = seed;
         this.target = target;
+        this.loggingInterval = loggingInterval;
     }
 
     public LinearRegressionParams(StreamInput in) throws IOException {
@@ -98,6 +101,7 @@ public class LinearRegressionParams implements MLAlgoParams {
         this.batchSize = in.readOptionalInt();
         this.seed = in.readOptionalLong();
         this.target = in.readOptionalString();
+        this.loggingInterval = in.readOptionalInt();
     }
 
     public static MLAlgoParams parse(XContentParser parser) throws IOException {
@@ -114,6 +118,7 @@ public class LinearRegressionParams implements MLAlgoParams {
         Integer batchSize = null;
         Long seed = null;
         String target = null;
+        Integer loggingInterval = null;
 
         ensureExpectedToken(XContentParser.Token.START_OBJECT, parser.currentToken(), parser);
         while (parser.nextToken() != XContentParser.Token.END_OBJECT) {
@@ -160,12 +165,15 @@ public class LinearRegressionParams implements MLAlgoParams {
                 case TARGET_FIELD:
                     target = parser.text();
                     break;
+                case LOGGING_INTERVAL_FIELD:
+                    loggingInterval = parser.intValue(false);
+                    break;
                 default:
                     parser.skipChildren();
                     break;
             }
         }
-        return new LinearRegressionParams(objective,  optimizerType,  learningRate,  momentumType,  momentumFactor, epsilon, beta1, beta2,decayRate, epochs, batchSize, seed, target);
+        return new LinearRegressionParams(objective,  optimizerType,  learningRate,  momentumType,  momentumFactor, epsilon, beta1, beta2,decayRate, epochs, batchSize, seed, target, loggingInterval);
     }
 
     @Override
@@ -203,6 +211,7 @@ public class LinearRegressionParams implements MLAlgoParams {
         out.writeOptionalInt(batchSize);
         out.writeOptionalLong(seed);
         out.writeOptionalString(target);
+        out.writeOptionalInt(loggingInterval);
     }
 
     @Override
@@ -246,6 +255,9 @@ public class LinearRegressionParams implements MLAlgoParams {
         }
         if (target != null) {
             builder.field(TARGET_FIELD, target);
+        }
+        if (loggingInterval != null) {
+            builder.field(LOGGING_INTERVAL_FIELD, loggingInterval);
         }
         builder.endObject();
         return builder;

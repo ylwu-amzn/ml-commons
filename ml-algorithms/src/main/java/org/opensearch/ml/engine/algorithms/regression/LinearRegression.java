@@ -59,7 +59,7 @@ public class LinearRegression implements Trainable, Predictable {
     private static final double DEFAULT_DECAY_RATE = 0.9;
 
     private static final int DEFAULT_EPOCHS = 10;
-    private static final int DEFAULT_INTERVAL = -1;
+    private static final int DEFAULT_LOGGING_INTERVAL = -1; //Log the loss after this many iterations. By default it's -1 don't log anything.
     private static final int DEFAULT_BATCH_SIZE = 1;
 
     private LinearRegressionParams parameters;
@@ -200,7 +200,10 @@ public class LinearRegression implements Trainable, Predictable {
         MutableDataset<Regressor> trainDataset = TribuoUtil.generateDatasetWithTarget(dataFrame, new RegressionFactory(),
                 "Linear regression training data from opensearch", TribuoOutputType.REGRESSOR, parameters.getTarget());
         Integer epochs = Optional.ofNullable(parameters.getEpochs()).orElse(DEFAULT_EPOCHS);
-        LinearSGDTrainer linearSGDTrainer = new LinearSGDTrainer(objective, optimiser, epochs, DEFAULT_INTERVAL, DEFAULT_BATCH_SIZE, seed);
+        Integer loggingInterval = Optional.ofNullable(parameters.getLoggingInterval()).orElse(DEFAULT_LOGGING_INTERVAL);
+        Integer batchSize = Optional.ofNullable(parameters.getBatchSize()).orElse(DEFAULT_BATCH_SIZE);
+        // fix default batch size
+        LinearSGDTrainer linearSGDTrainer = new LinearSGDTrainer(objective, optimiser, epochs, loggingInterval, batchSize, seed);
         org.tribuo.Model<Regressor> regressionModel = linearSGDTrainer.train(trainDataset);
         Model model = new Model();
         model.setName(FunctionName.LINEAR_REGRESSION.name());
