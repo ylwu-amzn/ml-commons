@@ -59,6 +59,7 @@ public class Resnet18 implements Executable {
     @Override
     public Output execute(Input input) {
         Resnet18Output output = AccessController.doPrivileged((PrivilegedAction<Resnet18Output>) () -> {
+            long start = System.currentTimeMillis();
             ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
             try {
                 System.setProperty("PYTORCH_PRECXX11", "true");
@@ -91,6 +92,8 @@ public class Resnet18 implements Executable {
                 throw new MLException("Failed to run RESNET18");
             } finally {
                 Thread.currentThread().setContextClassLoader(contextClassLoader);
+                long end = System.currentTimeMillis();
+                log.info("Time consumed to execute ResNet18: {} millisecond", (end - start));
             }
         });
         return output;

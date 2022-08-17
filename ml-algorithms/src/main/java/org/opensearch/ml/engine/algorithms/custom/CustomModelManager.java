@@ -199,6 +199,7 @@ public class CustomModelManager {
 
     public String predict(MLPredictModelInput predictInput) throws IOException, PrivilegedActionException {
         return AccessController.doPrivileged((PrivilegedExceptionAction<String>) () -> {
+            long start = System.currentTimeMillis();
             Thread.currentThread().setContextClassLoader(getClass().getClassLoader());
             String modelName = predictInput.getModelName();
             Integer version = predictInput.getVersion();
@@ -220,6 +221,8 @@ public class CustomModelManager {
             Predictor<Input, Output> predictor = predictors.get(key);
             Output output = predictor.predict(input);
             String content = output.getAsString(0);
+            long end = System.currentTimeMillis();
+            log.info("Time consumed to execute {}: {] millisecond", modelName, (end - start));
             return content;
         });
     }
