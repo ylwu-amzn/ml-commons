@@ -222,7 +222,7 @@ public class CustomModelManager {
             Output output = predictor.predict(input);
             String content = output.getAsString(0);
             long end = System.currentTimeMillis();
-            log.info("Time consumed to execute {}: {] millisecond", modelName, (end - start));
+            log.info("Time consumed to execute {}: {} millisecond", modelName, (end - start));
             return content;
         });
     }
