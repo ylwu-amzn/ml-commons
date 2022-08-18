@@ -6,6 +6,7 @@
 package org.opensearch.ml.engine.algorithms.od;
 
 import ai.djl.Application;
+import ai.djl.engine.Engine;
 import ai.djl.inference.Predictor;
 import ai.djl.modality.Classifications;
 import ai.djl.modality.cv.Image;
@@ -48,6 +49,7 @@ public class ObjectDetection implements Executable {
                 System.setProperty("DJL_CACHE_DIR", DJL_CACHE_PATH.toAbsolutePath().toString());
                 System.setProperty("java.library.path", DJL_CACHE_PATH.toAbsolutePath().toString());
                 Thread.currentThread().setContextClassLoader(getClass().getClassLoader());
+                Engine.debugEnvironment();
 
                 String url = ((ObjectDetectionInput)input).getImageUrl();
                 Image img = ImageFactory.getInstance().fromUrl(new URL(url));

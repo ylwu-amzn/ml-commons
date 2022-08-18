@@ -6,6 +6,7 @@
 package org.opensearch.ml.engine.algorithms.custom;
 
 import ai.djl.Application;
+import ai.djl.engine.Engine;
 import ai.djl.inference.Predictor;
 import ai.djl.modality.Input;
 import ai.djl.modality.Output;
@@ -157,6 +158,7 @@ public class CustomModelManager {
                 System.setProperty("DJL_CACHE_DIR", DJL_CACHE_PATH.toAbsolutePath().toString());
                 System.setProperty("java.library.path", DJL_CACHE_PATH.toAbsolutePath().toString());
                 Thread.currentThread().setContextClassLoader(ai.djl.Model.class.getClassLoader());
+                Engine.debugEnvironment();
 
                 Path modelPath = getCustomModelPath(modelName, version);
                 File pathFile = new File(modelPath.toUri());

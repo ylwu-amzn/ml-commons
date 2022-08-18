@@ -5,6 +5,7 @@
 
 package org.opensearch.ml.engine.algorithms.bertqa;
 
+import ai.djl.engine.Engine;
 import ai.djl.inference.Predictor;
 import ai.djl.modality.nlp.qa.QAInput;
 import ai.djl.repository.zoo.Criteria;
@@ -48,6 +49,7 @@ public class BertQA implements Executable {
                 System.setProperty("DJL_CACHE_DIR", DJL_CACHE_PATH.toAbsolutePath().toString());
                 System.setProperty("java.library.path", DJL_CACHE_PATH.toAbsolutePath().toString());
                 Thread.currentThread().setContextClassLoader(getClass().getClassLoader());
+                Engine.debugEnvironment();
 
                 String predictResult = null;
                 BertQAInput bertQAInput = (BertQAInput) input;
