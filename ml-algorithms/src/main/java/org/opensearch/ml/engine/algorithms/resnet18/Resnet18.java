@@ -5,6 +5,7 @@
 
 package org.opensearch.ml.engine.algorithms.resnet18;
 
+import ai.djl.engine.Engine;
 import ai.djl.inference.Predictor;
 import ai.djl.modality.Classifications;
 import ai.djl.modality.cv.Image;
@@ -68,6 +69,8 @@ public class Resnet18 implements Executable {
                 Thread.currentThread().setContextClassLoader(getClass().getClassLoader());
                 String javaLibPath = System.getProperty("java.library.path");
                 log.info("java library path is : {}", javaLibPath);
+                Engine.debugEnvironment();
+
 
                 if (predictor == null) {
                     Path outputPath = DJL_BUILT_IN_MODELS_PATH.resolve(version + "").resolve("resnet18");
