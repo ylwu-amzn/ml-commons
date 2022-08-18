@@ -66,6 +66,8 @@ public class Resnet18 implements Executable {
                 System.setProperty("DJL_CACHE_DIR", DJL_CACHE_PATH.toAbsolutePath().toString());
                 System.setProperty("java.library.path", DJL_CACHE_PATH.toAbsolutePath().toString());
                 Thread.currentThread().setContextClassLoader(getClass().getClassLoader());
+                String javaLibPath = System.getProperty("java.library.path");
+                log.info("java library path is : {}", javaLibPath);
 
                 if (predictor == null) {
                     Path outputPath = DJL_BUILT_IN_MODELS_PATH.resolve(version + "").resolve("resnet18");
