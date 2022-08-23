@@ -1,6 +1,6 @@
 ## Version 2.2.0.0 Release Notes
 
-Compatible with OpenSearch 2.2.0
+~~Compatible with OpenSearch 2.2.0~~ Compatibility rolled back to OpenSearch 2.1.0 for now
 
 ### Features
 
