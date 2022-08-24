@@ -70,7 +70,7 @@ public class MLModelChunkUploader {
                 indexRequest.setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE);
 
                 client.index(indexRequest, ActionListener.wrap(r -> {
-                    log.info("Index model successfully {}", modelName);
+                    log.info("Index model successfully {}, chunk number {}", modelName, chunkNum);
 //                        mlTaskManager.updateMLTask(taskId, ImmutableMap.of(MLTask.STATE_FIELD, MLTaskState.COMPLETED), TIMEOUT_IN_MILLIS);
 //                        mlTaskManager.remove(taskId);
                     listener.onResponse(new LoadModelResponse("0", "1"));
