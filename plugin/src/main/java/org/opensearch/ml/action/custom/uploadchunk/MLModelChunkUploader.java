@@ -69,7 +69,7 @@ public class MLModelChunkUploader {
                 indexRequest.setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE);
 
                 client.index(indexRequest, ActionListener.wrap(r -> {
-                    log.info("Index model successfully {}, chunk number {} out of {}", modelName, chunkNum, totalChunks);
+                    log.info("Index model successfully {}, chunk number {} out of {}", modelName, chunkNum + 1, totalChunks);
                     listener.onResponse(new LoadModelResponse("0", "1"));
                 }, e -> {
                     log.error("Failed to index model", e);
