@@ -61,6 +61,7 @@ public class MLModelChunkUploader {
                         .algorithm(FunctionName.CUSTOM)
                         .version(version)
                         .chunkNumber(chunkNum)
+                        .totalChunks(47)
                         .content(Base64.getEncoder().encodeToString(bytes))
                         .build();
                 IndexRequest indexRequest = new IndexRequest(ML_MODEL_INDEX);
