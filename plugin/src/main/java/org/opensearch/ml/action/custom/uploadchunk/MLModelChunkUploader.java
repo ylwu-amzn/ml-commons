@@ -27,6 +27,7 @@ import static org.opensearch.ml.common.CommonValue.ML_MODEL_INDEX;
 public class MLModelChunkUploader {
 
     public static final int TIMEOUT_IN_MILLIS = 5000;
+    public static final int MAX_ACCEPTED_CHUNK_SIZE_STRING_LEN = 100000000;  /* 100MB */
     private final CustomModelManager customModelManager;
     private final MLIndicesHandler mlIndicesHandler;
     private final MLTaskManager mlTaskManager;
@@ -41,14 +42,11 @@ public class MLModelChunkUploader {
         this.client = client;
     }
 
-    public void uploadModel(MLUploadChunkInput mlUploadInput, MLTask mlTask, ActionListener<LoadModelResponse> listener) {
-        String taskId = mlTask.getTaskId();
-//        mlTaskManager.add(mlTask);
+    public void uploadModel(MLUploadChunkInput mlUploadInput, ActionListener<LoadModelResponse> listener) {
 
         try {
             String modelName = mlUploadInput.getName(); // get name of model
             Integer version = mlUploadInput.getVersion(); // get version of model
-//            customModelManager.readDownloadedChunk(modelName, version, mlUploadInput.getUrl(), mlUploadInput.getChunkNumber(), ActionListener.wrap(destFileName -> {
             mlIndicesHandler.initModelIndexIfAbsent(ActionListener.wrap(res -> {
                 byte[] bytes = mlUploadInput.getUrl();
                 Model model = new Model();
@@ -56,12 +54,13 @@ public class MLModelChunkUploader {
                 model.setVersion(1);
                 model.setContent(bytes);
                 int chunkNum = mlUploadInput.getChunkNumber();
+                int totalChunks = mlUploadInput.getTotalChunks();
                 MLModel mlModel = MLModel.builder()
                         .name(modelName)
                         .algorithm(FunctionName.CUSTOM)
                         .version(version)
                         .chunkNumber(chunkNum)
-                        .totalChunks(47)
+                        .totalChunks(totalChunks)
                         .content(Base64.getEncoder().encodeToString(bytes))
                         .build();
                 IndexRequest indexRequest = new IndexRequest(ML_MODEL_INDEX);
@@ -70,35 +69,18 @@ public class MLModelChunkUploader {
                 indexRequest.setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE);
 
                 client.index(indexRequest, ActionListener.wrap(r -> {
-                    log.info("Index model successfully {}, chunk number {}", modelName, chunkNum);
-//                        mlTaskManager.updateMLTask(taskId, ImmutableMap.of(MLTask.STATE_FIELD, MLTaskState.COMPLETED), TIMEOUT_IN_MILLIS);
-//                        mlTaskManager.remove(taskId);
+                    log.info("Index model successfully {}, chunk number {} out of {}", modelName, chunkNum, totalChunks);
                     listener.onResponse(new LoadModelResponse("0", "1"));
                 }, e -> {
                     log.error("Failed to index model", e);
-//                        mlTaskManager.updateMLTask(taskId, ImmutableMap.of(MLTask.ERROR_FIELD, ExceptionUtils.getStackTrace(e),
-//                                MLTask.STATE_FIELD, MLTaskState.FAILED), TIMEOUT_IN_MILLIS);
-//                        mlTaskManager.remove(taskId);
                     listener.onFailure(e);
                 }));
             }, ex -> {
                 log.error("Failed to init model index", ex);
-//                    mlTaskManager.updateMLTask(taskId, ImmutableMap.of(MLTask.ERROR_FIELD, ExceptionUtils.getStackTrace(ex),
-//                            MLTask.STATE_FIELD, MLTaskState.FAILED), TIMEOUT_IN_MILLIS);
-//                    mlTaskManager.remove(taskId);
                 listener.onFailure(ex);
             }));
-//            }, e -> {
-//                log.error("Failed to download model", e);
-////                mlTaskManager.updateMLTask(taskId, ImmutableMap.of(MLTask.ERROR_FIELD, ExceptionUtils.getStackTrace(e),
-////                        MLTask.STATE_FIELD, MLTaskState.FAILED), TIMEOUT_IN_MILLIS);
-////                mlTaskManager.remove(taskId);
-//            }));
         } catch (Exception e) {
             log.error("Failed to upload model ", e);
-//            mlTaskManager.updateMLTask(taskId, ImmutableMap.of(MLTask.ERROR_FIELD, ExceptionUtils.getStackTrace(e),
-//                    MLTask.STATE_FIELD, MLTaskState.FAILED), TIMEOUT_IN_MILLIS);
-//            mlTaskManager.remove(taskId);
             listener.onFailure(e);
         }
     }

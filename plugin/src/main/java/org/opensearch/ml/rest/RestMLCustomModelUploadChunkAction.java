@@ -37,7 +37,7 @@ public class RestMLCustomModelUploadChunkAction extends BaseRestHandler {
     @Override
     public List<Route> routes() {
         return ImmutableList
-                .of(new Route(RestRequest.Method.POST, String.format(Locale.ROOT, "%s/custom_model/upload_chunk/{%s}/{%s}/{%s}", ML_BASE_URI, "name", "version", "chunk_number")));
+                .of(new Route(RestRequest.Method.POST, String.format(Locale.ROOT, "%s/custom_model/upload_chunk/{%s}/{%s}/{%s}/{%s}", ML_BASE_URI, "name", "version", "chunk_number","total_chunks")));
     }
 
     @Override
@@ -60,9 +60,10 @@ public class RestMLCustomModelUploadChunkAction extends BaseRestHandler {
 //        System.out.println(version);
         String chunk_number = request.param("chunk_number");
 //        System.out.println(chunk_number);
+        String total_chunks = request.param("total_chunks");
         byte[] content = request.content().streamInput().readAllBytes();
 //        System.out.println(content.length);
-        MLUploadChunkInput mlInput = new MLUploadChunkInput(name, Integer.parseInt(version), content, Integer.parseInt(chunk_number));
+        MLUploadChunkInput mlInput = new MLUploadChunkInput(name, Integer.parseInt(version), content, Integer.parseInt(chunk_number), Integer.parseInt(total_chunks));
 
         return new MLUploadModelChunkRequest(mlInput);
     }

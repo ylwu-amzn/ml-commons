@@ -86,7 +86,7 @@ public class TransportUploadModelChunkAction extends HandledTransportAction<Acti
                     .state(MLTaskState.CREATED)//TODO: mark task as done or failed
                     .workerNode(clusterService.localNode().getId())
                     .build();
-            mlModelUploader.uploadModel(mlUploadChunkInput, mlTask, listener);
+            mlModelUploader.uploadModel(mlUploadChunkInput, listener);
         } catch (Exception e) {
             log.error("Failed to upload ML model", e);
             listener.onFailure(e);
