@@ -1,3 +1,7 @@
+/*
+ * Copyright OpenSearch Contributors
+ * SPDX-License-Identifier: Apache-2.0
+ */
 package org.opensearch.ml.action.custom.uploadchunk;
 
 import lombok.extern.log4j.Log4j2;
@@ -51,7 +55,7 @@ public class MLModelChunkUploader {
                 byte[] bytes = mlUploadInput.getUrl();
                 Model model = new Model();
                 model.setName(FunctionName.CUSTOM.name());
-                model.setVersion(1);
+                model.setVersion(version);
                 model.setContent(bytes);
                 int chunkNum = mlUploadInput.getChunkNumber();
                 int totalChunks = mlUploadInput.getTotalChunks();
@@ -61,7 +65,7 @@ public class MLModelChunkUploader {
                         .version(version)
                         .chunkNumber(chunkNum)
                         .totalChunks(totalChunks)
-                        .content(Base64.getEncoder().encodeToString(bytes))
+                        .content(Base64.getEncoder().encodeToString(bytes))//TODO: performance testing to evaluate what limits to place on model size
                         .build();
                 IndexRequest indexRequest = new IndexRequest(ML_MODEL_INDEX);
                 indexRequest.id(MLModel.customModelId(modelName, version, chunkNum));//TODO: limit model name size and not include "_"
