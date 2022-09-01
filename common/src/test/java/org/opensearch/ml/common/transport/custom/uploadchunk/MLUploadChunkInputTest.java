@@ -15,6 +15,7 @@ import org.opensearch.common.io.stream.BytesStreamOutput;
 import org.opensearch.common.xcontent.XContentParser;
 
 import java.io.IOException;
+import java.util.Arrays;
 
 public class MLUploadChunkInputTest {
 
@@ -23,9 +24,7 @@ public class MLUploadChunkInputTest {
     @Rule
     public ExpectedException exceptionRule = ExpectedException.none();
 
-    private final byte[] content = new byte[] { (byte)0xe0, 0x4f, (byte)0xd0,
-            0x20, (byte)0xea, 0x3a, 0x69, 0x10, (byte)0xa2, (byte)0xd8, 0x08, 0x00, 0x2b,
-            0x30, 0x30, (byte)0x9d };
+    private byte[] content = {0x02, 0x08, 0x16, 0x0, 0x00, 0x33, (byte) 0xC6, 0x1B};
 
     private final String name = "test_model";
 
@@ -50,30 +49,34 @@ public class MLUploadChunkInputTest {
                 .totalChunks(totalChunks)
                 .url(content)
                 .build();
+        System.out.println(mlUploadChunkInput.getUrl());
         BytesStreamOutput bytesStreamOutput = new BytesStreamOutput();
         mlUploadChunkInput.writeTo(bytesStreamOutput);
+        System.out.println(mlUploadChunkInput.getUrl());
         MLUploadChunkInput parsedModel = new MLUploadChunkInput(bytesStreamOutput.bytes().streamInput());
-        Assert.assertEquals(parsedModel.getName(), name);
-        Assert.assertEquals(parsedModel.getVersion(), version);
-        Assert.assertEquals(parsedModel.getChunkNumber(), chunkNumber);
-        Assert.assertEquals(parsedModel.getTotalChunks(), totalChunks);
-        Assert.assertEquals(parsedModel.getUrl(), content);
+        Assert.assertEquals(mlUploadChunkInput.getName(), parsedModel.getName());
+        Assert.assertEquals(mlUploadChunkInput.getVersion(), parsedModel.getVersion());
+        Assert.assertEquals(mlUploadChunkInput.getChunkNumber(), parsedModel.getChunkNumber());
+        Assert.assertEquals(mlUploadChunkInput.getTotalChunks(), parsedModel.getTotalChunks());
+        Assert.assertTrue(Arrays.equals(mlUploadChunkInput.getUrl(), parsedModel.getUrl()));
     }
 
     @Test
     public void testParseModelChunkSuccess() throws IOException {
         String query =
-                String.format("{\"name\":%s,\"version\":%d,\"chunk_number\":%d,\"total_chunks\":%d}", name, version, chunkNumber, totalChunks);
+                String.format("{\"name\":\"%s\",\"version\":%d,\"chunk_number\":%d,\"total_chunks\":%d}", name, version, chunkNumber, totalChunks);
         XContentParser parser = parser(query);
         mlUploadChunkInput = MLUploadChunkInput.parse(parser, content);
         String actualName = mlUploadChunkInput.getName();
         Integer actualVersion = mlUploadChunkInput.getVersion();
         Integer actualChunkNumber = mlUploadChunkInput.getChunkNumber();
         Integer actualTotalChunks = mlUploadChunkInput.getTotalChunks();
+        byte[] actualContent = mlUploadChunkInput.getUrl();
         Assert.assertEquals(name, actualName);
         Assert.assertEquals(version, actualVersion);
         Assert.assertEquals(chunkNumber, actualChunkNumber);
         Assert.assertEquals(totalChunks, actualTotalChunks);
+        Assert.assertTrue(Arrays.equals(content, actualContent));
     }
 
 

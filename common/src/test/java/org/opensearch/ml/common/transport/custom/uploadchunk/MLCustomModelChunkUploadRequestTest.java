@@ -14,9 +14,9 @@ import org.opensearch.common.io.stream.StreamOutput;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.util.Arrays;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotSame;
+import static org.junit.Assert.*;
 
 public class MLCustomModelChunkUploadRequestTest {
 
@@ -38,7 +38,12 @@ public class MLCustomModelChunkUploadRequestTest {
         BytesStreamOutput bytesStreamOutput = new BytesStreamOutput();
         mlUploadModelChunkRequest.writeTo(bytesStreamOutput);
         MLUploadModelChunkRequest parsedModel = new MLUploadModelChunkRequest(bytesStreamOutput.bytes().streamInput());
-        assertEquals(parsedModel.getMlUploadInput(), mlUploadChunkInput);
+        MLUploadChunkInput parsedInput = parsedModel.getMlUploadInput();
+        assertEquals(parsedInput.getName(), mlUploadChunkInput.getName());
+        assertEquals(parsedInput.getVersion(), mlUploadChunkInput.getVersion());
+        assertEquals(parsedInput.getChunkNumber(), mlUploadChunkInput.getChunkNumber());
+        assertEquals(parsedInput.getTotalChunks(), mlUploadChunkInput.getTotalChunks());
+        assertTrue(Arrays.equals(parsedInput.getUrl(), mlUploadChunkInput.getUrl()));
     }
 
     @Test
@@ -65,8 +70,14 @@ public class MLCustomModelChunkUploadRequestTest {
             }
         };
         MLUploadModelChunkRequest result = MLUploadModelChunkRequest.fromActionRequest(actionRequest);
+        MLUploadChunkInput resultInput = result.getMlUploadInput();
+        MLUploadChunkInput requestInput = mlModelGetRequest.getMlUploadInput();
         assertNotSame(result, mlModelGetRequest);
-        assertEquals(result.getMlUploadInput(), mlModelGetRequest.getMlUploadInput());
+        assertEquals(resultInput.getName(), requestInput.getName());
+        assertEquals(resultInput.getVersion(), requestInput.getVersion());
+        assertEquals(resultInput.getChunkNumber(), requestInput.getChunkNumber());
+        assertEquals(resultInput.getTotalChunks(), requestInput.getTotalChunks());
+        assertTrue(Arrays.equals(resultInput.getUrl(), requestInput.getUrl()));
     }
 
     @Test(expected = UncheckedIOException.class)
