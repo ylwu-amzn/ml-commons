@@ -5,6 +5,15 @@
 
 package org.opensearch.ml.rest;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.times;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 import org.junit.Before;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
@@ -25,15 +34,6 @@ import org.opensearch.test.OpenSearchTestCase;
 import org.opensearch.test.rest.FakeRestRequest;
 import org.opensearch.threadpool.TestThreadPool;
 import org.opensearch.threadpool.ThreadPool;
-
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.*;
-import static org.mockito.Mockito.times;
 
 public class RestMLCustomModelUploadChunkActionTests extends OpenSearchTestCase {
 
@@ -106,12 +106,11 @@ public class RestMLCustomModelUploadChunkActionTests extends OpenSearchTestCase 
         params.put("version", "1");
         params.put("chunk_number", "0");
         params.put("total_chunks", "1");
-        RestRequest request = new FakeRestRequest
-                .Builder(NamedXContentRegistry.EMPTY)
-                .withMethod(method)
-                .withParams(params)
-                .withContent(content, null)
-                .build();
+        RestRequest request = new FakeRestRequest.Builder(NamedXContentRegistry.EMPTY)
+            .withMethod(method)
+            .withParams(params)
+            .withContent(content, null)
+            .build();
         return request;
     }
 }

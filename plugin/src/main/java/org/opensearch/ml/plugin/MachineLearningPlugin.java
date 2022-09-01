@@ -30,9 +30,6 @@ import org.opensearch.common.settings.SettingsFilter;
 import org.opensearch.common.xcontent.NamedXContentRegistry;
 import org.opensearch.env.Environment;
 import org.opensearch.env.NodeEnvironment;
-import org.opensearch.ml.action.custom.uploadchunk.MLModelChunkUploader;
-import org.opensearch.ml.action.custom.uploadchunk.TransportUploadModelChunkAction;
-import org.opensearch.ml.common.transport.custom.uploadchunk.MLUploadModelChunkAction;
 import org.opensearch.ml.action.custom.TransportForwardAction;
 import org.opensearch.ml.action.custom.load.TransportLoadModelAction;
 import org.opensearch.ml.action.custom.load.TransportLoadModelOnNodeAction;
@@ -40,6 +37,8 @@ import org.opensearch.ml.action.custom.predict.TransportPredictModelAction;
 import org.opensearch.ml.action.custom.unload.TransportUnloadModelAction;
 import org.opensearch.ml.action.custom.upload.MLModelUploader;
 import org.opensearch.ml.action.custom.upload.TransportUploadModelAction;
+import org.opensearch.ml.action.custom.uploadchunk.MLModelChunkUploader;
+import org.opensearch.ml.action.custom.uploadchunk.TransportUploadModelChunkAction;
 import org.opensearch.ml.action.execute.TransportExecuteTaskAction;
 import org.opensearch.ml.action.handler.MLSearchHandler;
 import org.opensearch.ml.action.models.DeleteModelTransportAction;
@@ -75,6 +74,7 @@ import org.opensearch.ml.common.transport.custom.load.MLLoadModelOnNodeAction;
 import org.opensearch.ml.common.transport.custom.predict.MLPredictModelAction;
 import org.opensearch.ml.common.transport.custom.unload.MLUnloadModelAction;
 import org.opensearch.ml.common.transport.custom.upload.MLUploadModelAction;
+import org.opensearch.ml.common.transport.custom.uploadchunk.MLUploadModelChunkAction;
 import org.opensearch.ml.common.transport.execute.MLExecuteTaskAction;
 import org.opensearch.ml.common.transport.model.MLModelDeleteAction;
 import org.opensearch.ml.common.transport.model.MLModelGetAction;
@@ -259,12 +259,7 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin {
             mlTaskDispatcher,
             mlCircuitBreakerService
         );
-        mlModelChunkUploader = new MLModelChunkUploader(
-                customModelManager,
-                mlIndicesHandler,
-                mlTaskManager,
-                threadPool,
-                client);
+        mlModelChunkUploader = new MLModelChunkUploader(customModelManager, mlIndicesHandler, mlTaskManager, threadPool, client);
         customModelManager = new CustomModelManager();
         mlModelUploader = new MLModelUploader(customModelManager, mlIndicesHandler, mlTaskManager, threadPool, client);
 

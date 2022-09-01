@@ -18,7 +18,7 @@ import org.opensearch.ml.task.MLTaskManager;
 import org.opensearch.test.OpenSearchTestCase;
 import org.opensearch.threadpool.ThreadPool;
 
-public class MLModelChunkUploaderTests extends OpenSearchTestCase{
+public class MLModelChunkUploaderTests extends OpenSearchTestCase {
     @Mock
     CustomModelManager customModelManager;
 
@@ -44,11 +44,11 @@ public class MLModelChunkUploaderTests extends OpenSearchTestCase{
 
     public void testConstructor() {
         MLModelChunkUploader mlModelChunkUploader = new MLModelChunkUploader(
-                customModelManager,
-                mlIndicesHandler,
-                mlTaskManager,
-                threadPool,
-                client
+            customModelManager,
+            mlIndicesHandler,
+            mlTaskManager,
+            threadPool,
+            client
         );
         assertNotNull(mlModelChunkUploader);
     }
