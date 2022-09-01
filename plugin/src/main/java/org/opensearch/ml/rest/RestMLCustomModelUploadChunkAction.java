@@ -50,7 +50,7 @@ public class RestMLCustomModelUploadChunkAction extends BaseRestHandler {
      * Creates a MLTrainingTaskRequest from a RestRequest
      *
      * @param request RestRequest
-     * @return MLTrainingTaskRequest
+     * @return MLUploadModelChunkRequest
      */
     @VisibleForTesting
     MLUploadModelChunkRequest getRequest(RestRequest request) throws IOException {
