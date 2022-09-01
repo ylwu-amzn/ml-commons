@@ -43,15 +43,15 @@ public class MLUploadChunkInput implements ToXContentObject, Writeable {
     private Integer totalChunks;
 
     @Builder(toBuilder = true)
-    public MLUploadChunkInput(String name, Integer version, byte[] url, Integer chunkNumber, Integer totalChunks) {
+    public MLUploadChunkInput(String name, Integer version, byte[] content, Integer chunkNumber, Integer totalChunks) {
         Objects.requireNonNull(name);
         Objects.requireNonNull(version);
-        Objects.requireNonNull(url);
+        Objects.requireNonNull(content);
         Objects.requireNonNull(chunkNumber);
         Objects.requireNonNull(totalChunks);
         this.name = name;
         this.version = version;
-        this.content = url;
+        this.content = content;
         this.chunkNumber = chunkNumber;
         this.algorithm = FunctionName.CUSTOM;
         this.totalChunks = totalChunks;

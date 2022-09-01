@@ -47,7 +47,7 @@ public class MLUploadChunkInputTest {
                 .version(version)
                 .chunkNumber(chunkNumber)
                 .totalChunks(totalChunks)
-                .url(content)
+                .content(content)
                 .build();
         BytesStreamOutput bytesStreamOutput = new BytesStreamOutput();
         mlUploadChunkInput.writeTo(bytesStreamOutput);
