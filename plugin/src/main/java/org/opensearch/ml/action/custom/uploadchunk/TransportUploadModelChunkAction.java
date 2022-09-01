@@ -77,17 +77,6 @@ public class TransportUploadModelChunkAction extends HandledTransportAction<Acti
         MLUploadChunkInput mlUploadChunkInput = uploadModelRequest.getMlUploadInput();
 
         try (ThreadContext.StoredContext context = client.threadPool().getThreadContext().stashContext()) {
-            MLTask mlTask = MLTask
-                .builder()
-                .async(true)
-                .taskType(MLTaskType.UPLOAD_MODEL)
-                .functionName(FunctionName.CUSTOM)
-                .inputType(MLInputDataType.SEARCH_QUERY)
-                .createTime(Instant.now())
-                .lastUpdateTime(Instant.now())
-                .state(MLTaskState.CREATED)// TODO: mark task as done or failed
-                .workerNode(clusterService.localNode().getId())
-                .build();
             mlModelUploader.uploadModel(mlUploadChunkInput, listener);
         } catch (Exception e) {
             log.error("Failed to upload ML model", e);

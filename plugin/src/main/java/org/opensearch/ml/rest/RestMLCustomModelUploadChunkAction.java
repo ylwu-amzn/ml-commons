@@ -70,14 +70,10 @@ public class RestMLCustomModelUploadChunkAction extends BaseRestHandler {
     @VisibleForTesting
     MLUploadModelChunkRequest getRequest(RestRequest request) throws IOException {
         String name = request.param("name");
-        // System.out.println(name);
         String version = request.param("version");
-        // System.out.println(version);
         String chunk_number = request.param("chunk_number");
-        // System.out.println(chunk_number);
         String total_chunks = request.param("total_chunks");
         byte[] content = request.content().streamInput().readAllBytes();
-        // System.out.println(content.length);
         MLUploadChunkInput mlInput = new MLUploadChunkInput(
             name,
             Integer.parseInt(version),

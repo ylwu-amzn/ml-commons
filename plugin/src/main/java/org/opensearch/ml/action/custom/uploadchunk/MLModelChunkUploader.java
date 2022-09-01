@@ -58,7 +58,7 @@ public class MLModelChunkUploader {
             String modelName = mlUploadInput.getName(); // get name of model
             Integer version = mlUploadInput.getVersion(); // get version of model
             mlIndicesHandler.initModelIndexIfAbsent(ActionListener.wrap(res -> {
-                byte[] bytes = mlUploadInput.getUrl();
+                byte[] bytes = mlUploadInput.getContent();
                 Model model = new Model();
                 model.setName(FunctionName.CUSTOM.name());
                 model.setVersion(version);

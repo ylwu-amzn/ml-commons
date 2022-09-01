@@ -95,7 +95,7 @@ public class RestMLCustomModelUploadChunkActionTests extends OpenSearchTestCase 
         assertEquals(Integer.valueOf(1), uploadChunkInput.getVersion());
         assertEquals(Integer.valueOf(0), uploadChunkInput.getChunkNumber());
         assertEquals(Integer.valueOf(1), uploadChunkInput.getTotalChunks());
-        assertNotNull(uploadChunkInput.getUrl());
+        assertNotNull(uploadChunkInput.getContent());
     }
 
     private RestRequest getRestRequest() {

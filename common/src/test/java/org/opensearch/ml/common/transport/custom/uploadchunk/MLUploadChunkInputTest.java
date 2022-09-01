@@ -49,16 +49,14 @@ public class MLUploadChunkInputTest {
                 .totalChunks(totalChunks)
                 .url(content)
                 .build();
-        System.out.println(mlUploadChunkInput.getUrl());
         BytesStreamOutput bytesStreamOutput = new BytesStreamOutput();
         mlUploadChunkInput.writeTo(bytesStreamOutput);
-        System.out.println(mlUploadChunkInput.getUrl());
         MLUploadChunkInput parsedModel = new MLUploadChunkInput(bytesStreamOutput.bytes().streamInput());
         Assert.assertEquals(mlUploadChunkInput.getName(), parsedModel.getName());
         Assert.assertEquals(mlUploadChunkInput.getVersion(), parsedModel.getVersion());
         Assert.assertEquals(mlUploadChunkInput.getChunkNumber(), parsedModel.getChunkNumber());
         Assert.assertEquals(mlUploadChunkInput.getTotalChunks(), parsedModel.getTotalChunks());
-        Assert.assertTrue(Arrays.equals(mlUploadChunkInput.getUrl(), parsedModel.getUrl()));
+        Assert.assertTrue(Arrays.equals(mlUploadChunkInput.getContent(), parsedModel.getContent()));
     }
 
     @Test
@@ -71,7 +69,7 @@ public class MLUploadChunkInputTest {
         Integer actualVersion = mlUploadChunkInput.getVersion();
         Integer actualChunkNumber = mlUploadChunkInput.getChunkNumber();
         Integer actualTotalChunks = mlUploadChunkInput.getTotalChunks();
-        byte[] actualContent = mlUploadChunkInput.getUrl();
+        byte[] actualContent = mlUploadChunkInput.getContent();
         Assert.assertEquals(name, actualName);
         Assert.assertEquals(version, actualVersion);
         Assert.assertEquals(chunkNumber, actualChunkNumber);

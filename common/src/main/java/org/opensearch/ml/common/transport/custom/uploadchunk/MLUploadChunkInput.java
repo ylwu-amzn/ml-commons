@@ -38,7 +38,7 @@ public class MLUploadChunkInput implements ToXContentObject, Writeable {
 
     private String name;
     private Integer version;
-    private byte[] url;
+    private byte[] content;
     private Integer chunkNumber;
     private Integer totalChunks;
 
@@ -48,9 +48,10 @@ public class MLUploadChunkInput implements ToXContentObject, Writeable {
         Objects.requireNonNull(version);
         Objects.requireNonNull(url);
         Objects.requireNonNull(chunkNumber);
+        Objects.requireNonNull(totalChunks);
         this.name = name;
         this.version = version;
-        this.url = url;
+        this.content = url;
         this.chunkNumber = chunkNumber;
         this.algorithm = FunctionName.CUSTOM;
         this.totalChunks = totalChunks;
@@ -65,7 +66,7 @@ public class MLUploadChunkInput implements ToXContentObject, Writeable {
         this.totalChunks = in.readInt();
         boolean uploadModel = in.readBoolean();
         if (uploadModel) {
-            this.url = in.readByteArray();
+            this.content = in.readByteArray();
         }
     }
 
@@ -76,11 +77,11 @@ public class MLUploadChunkInput implements ToXContentObject, Writeable {
         out.writeInt(version);
         out.writeInt(chunkNumber);
         out.writeInt(totalChunks);
-        if (url == null) {
+        if (content == null) {
             out.writeBoolean(false);
         } else {
             out.writeBoolean(true);
-            out.writeByteArray(url);
+            out.writeByteArray(content);
         }
     }
 
@@ -92,7 +93,7 @@ public class MLUploadChunkInput implements ToXContentObject, Writeable {
         builder.field(VERSION_FIELD, version);
         builder.field(CHUNK_NUMBER_FIELD, chunkNumber);
         builder.field(TOTAL_CHUNKS_FIELD, totalChunks);
-        builder.field(CONTENT_FIELD, url);
+        builder.field(CONTENT_FIELD, content);
         builder.endObject();
         return builder;
     }

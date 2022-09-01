@@ -43,7 +43,7 @@ public class MLCustomModelChunkUploadRequestTest {
         assertEquals(parsedInput.getVersion(), mlUploadChunkInput.getVersion());
         assertEquals(parsedInput.getChunkNumber(), mlUploadChunkInput.getChunkNumber());
         assertEquals(parsedInput.getTotalChunks(), mlUploadChunkInput.getTotalChunks());
-        assertTrue(Arrays.equals(parsedInput.getUrl(), mlUploadChunkInput.getUrl()));
+        assertTrue(Arrays.equals(parsedInput.getContent(), mlUploadChunkInput.getContent()));
     }
 
     @Test
@@ -77,7 +77,7 @@ public class MLCustomModelChunkUploadRequestTest {
         assertEquals(resultInput.getVersion(), requestInput.getVersion());
         assertEquals(resultInput.getChunkNumber(), requestInput.getChunkNumber());
         assertEquals(resultInput.getTotalChunks(), requestInput.getTotalChunks());
-        assertTrue(Arrays.equals(resultInput.getUrl(), requestInput.getUrl()));
+        assertTrue(Arrays.equals(resultInput.getContent(), requestInput.getContent()));
     }
 
     @Test(expected = UncheckedIOException.class)
