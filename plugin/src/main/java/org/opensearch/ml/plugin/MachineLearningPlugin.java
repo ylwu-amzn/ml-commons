@@ -37,6 +37,8 @@ import org.opensearch.ml.action.custom.predict.TransportPredictModelAction;
 import org.opensearch.ml.action.custom.unload.TransportUnloadModelAction;
 import org.opensearch.ml.action.custom.upload.MLModelUploader;
 import org.opensearch.ml.action.custom.upload.TransportUploadModelAction;
+import org.opensearch.ml.action.custom.uploadchunk.MLModelChunkUploader;
+import org.opensearch.ml.action.custom.uploadchunk.TransportUploadModelChunkAction;
 import org.opensearch.ml.action.execute.TransportExecuteTaskAction;
 import org.opensearch.ml.action.handler.MLSearchHandler;
 import org.opensearch.ml.action.models.DeleteModelTransportAction;
@@ -72,6 +74,7 @@ import org.opensearch.ml.common.transport.custom.load.MLLoadModelOnNodeAction;
 import org.opensearch.ml.common.transport.custom.predict.MLPredictModelAction;
 import org.opensearch.ml.common.transport.custom.unload.MLUnloadModelAction;
 import org.opensearch.ml.common.transport.custom.upload.MLUploadModelAction;
+import org.opensearch.ml.common.transport.custom.uploadchunk.MLUploadModelChunkAction;
 import org.opensearch.ml.common.transport.execute.MLExecuteTaskAction;
 import org.opensearch.ml.common.transport.model.MLModelDeleteAction;
 import org.opensearch.ml.common.transport.model.MLModelGetAction;
@@ -93,22 +96,7 @@ import org.opensearch.ml.engine.algorithms.sample.LocalSampleCalculator;
 import org.opensearch.ml.engine.algorithms.sentence_transformer.SentenceTransformer;
 import org.opensearch.ml.indices.MLIndicesHandler;
 import org.opensearch.ml.indices.MLInputDatasetHandler;
-import org.opensearch.ml.rest.RestMLCustomModelLoadAction;
-import org.opensearch.ml.rest.RestMLCustomModelPredictAction;
-import org.opensearch.ml.rest.RestMLCustomModelUnloadAction;
-import org.opensearch.ml.rest.RestMLCustomModelUploadAction;
-import org.opensearch.ml.rest.RestMLDeleteModelAction;
-import org.opensearch.ml.rest.RestMLDeleteTaskAction;
-import org.opensearch.ml.rest.RestMLExecuteAction;
-import org.opensearch.ml.rest.RestMLGetModelAction;
-import org.opensearch.ml.rest.RestMLGetTaskAction;
-import org.opensearch.ml.rest.RestMLKNNSearchAction;
-import org.opensearch.ml.rest.RestMLPredictionAction;
-import org.opensearch.ml.rest.RestMLSearchModelAction;
-import org.opensearch.ml.rest.RestMLSearchTaskAction;
-import org.opensearch.ml.rest.RestMLStatsAction;
-import org.opensearch.ml.rest.RestMLTrainAndPredictAction;
-import org.opensearch.ml.rest.RestMLTrainingAction;
+import org.opensearch.ml.rest.*;
 import org.opensearch.ml.stats.MLClusterLevelStat;
 import org.opensearch.ml.stats.MLNodeLevelStat;
 import org.opensearch.ml.stats.MLStat;
@@ -151,6 +139,7 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin {
     private IndexUtils indexUtils;
     private CustomModelManager customModelManager;
     private MLModelUploader mlModelUploader;
+    private MLModelChunkUploader mlModelChunkUploader;
 
     private Client client;
     private ClusterService clusterService;
@@ -180,7 +169,8 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin {
                 new ActionHandler<>(MLLoadModelOnNodeAction.INSTANCE, TransportLoadModelOnNodeAction.class),
                 new ActionHandler<>(MLUnloadModelAction.INSTANCE, TransportUnloadModelAction.class),
                 new ActionHandler<>(MLPredictModelAction.INSTANCE, TransportPredictModelAction.class),
-                new ActionHandler<>(MLForwardAction.INSTANCE, TransportForwardAction.class)
+                new ActionHandler<>(MLForwardAction.INSTANCE, TransportForwardAction.class),
+                new ActionHandler<>(MLUploadModelChunkAction.INSTANCE, TransportUploadModelChunkAction.class)
             );
     }
 
@@ -269,6 +259,7 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin {
             mlTaskDispatcher,
             mlCircuitBreakerService
         );
+        mlModelChunkUploader = new MLModelChunkUploader(customModelManager, mlIndicesHandler, mlTaskManager, threadPool, client);
         customModelManager = new CustomModelManager();
         mlModelUploader = new MLModelUploader(customModelManager, mlIndicesHandler, mlTaskManager, threadPool, client);
 
@@ -297,7 +288,8 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin {
                 mlSearchHandler,
                 mlTaskDispatcher,
                 customModelManager,
-                mlModelUploader
+                mlModelUploader,
+                mlModelChunkUploader
             );
     }
 
@@ -327,6 +319,7 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin {
         RestMLCustomModelPredictAction restMLPredictAction = new RestMLCustomModelPredictAction();
         RestMLCustomModelUnloadAction restMLCustomModelUnloadAction = new RestMLCustomModelUnloadAction(clusterService);
         RestMLKNNSearchAction restMLKNNSearchAction = new RestMLKNNSearchAction(xContentRegistry);
+        RestMLCustomModelUploadChunkAction restMLCustomModelUploadChunkAction = new RestMLCustomModelUploadChunkAction();
 
         return ImmutableList
             .of(
@@ -345,7 +338,8 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin {
                 restMLDeployModelAction,
                 restMLPredictAction,
                 restMLCustomModelUnloadAction,
-                restMLKNNSearchAction
+                restMLKNNSearchAction,
+                restMLCustomModelUploadChunkAction
             );
     }
 
