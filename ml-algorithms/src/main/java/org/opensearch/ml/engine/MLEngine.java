@@ -13,10 +13,23 @@ import org.opensearch.ml.common.output.MLOutput;
 import org.opensearch.ml.common.Model;
 import org.opensearch.ml.common.output.Output;
 
+import java.nio.file.Path;
+
 /**
  * This is the interface to all ml algorithms.
  */
 public class MLEngine {
+
+    public static Path DJL_CACHE_PATH;
+    public static Path DJL_CUSTOM_MODELS_PATH;
+    public static void setDjlCachePath(Path opensearchDataFolder) {
+        DJL_CACHE_PATH = opensearchDataFolder.resolve("djl");
+        DJL_CUSTOM_MODELS_PATH = DJL_CACHE_PATH.resolve("custom_models");
+    }
+
+    public static Path getUploadModelPath(String modelId, String modelName, Integer version) {
+        return DJL_CUSTOM_MODELS_PATH.resolve("upload").resolve(modelId).resolve(version + "").resolve(modelName);
+    }
 
     public static Model train(Input input) {
         validateMLInput(input);
