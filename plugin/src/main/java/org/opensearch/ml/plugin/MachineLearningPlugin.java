@@ -30,6 +30,7 @@ import org.opensearch.common.settings.SettingsFilter;
 import org.opensearch.common.xcontent.NamedXContentRegistry;
 import org.opensearch.env.Environment;
 import org.opensearch.env.NodeEnvironment;
+import org.opensearch.ml.action.custom_model.upload.MLModelUploader;
 import org.opensearch.ml.action.custom_model.upload.TransportUploadModelAction;
 import org.opensearch.ml.action.execute.TransportExecuteTaskAction;
 import org.opensearch.ml.action.handler.MLSearchHandler;
@@ -72,9 +73,11 @@ import org.opensearch.ml.common.transport.trainpredict.MLTrainAndPredictionTaskA
 import org.opensearch.ml.engine.MLEngine;
 import org.opensearch.ml.engine.MLEngineClassLoader;
 import org.opensearch.ml.engine.algorithms.anomalylocalization.AnomalyLocalizerImpl;
+import org.opensearch.ml.engine.algorithms.custom.CustomModelManager;
 import org.opensearch.ml.engine.algorithms.sample.LocalSampleCalculator;
 import org.opensearch.ml.indices.MLIndicesHandler;
 import org.opensearch.ml.indices.MLInputDatasetHandler;
+import org.opensearch.ml.model.MLModelManager;
 import org.opensearch.ml.rest.*;
 import org.opensearch.ml.settings.MLCommonsSettings;
 import org.opensearch.ml.stats.MLClusterLevelStat;
@@ -121,6 +124,10 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin {
     private Client client;
     private ClusterService clusterService;
     private ThreadPool threadPool;
+
+    private MLModelManager mlModelManager;
+    private CustomModelManager customModelManager;
+    private MLModelUploader mlModelUploader;
 
     public static final String ML_ROLE_NAME = "ml";
 
@@ -184,6 +191,9 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin {
         mlIndicesHandler = new MLIndicesHandler(clusterService, client);
         mlTaskManager = new MLTaskManager(client, mlIndicesHandler);
         mlInputDatasetHandler = new MLInputDatasetHandler(client);
+        mlModelManager = new MLModelManager(client, threadPool, xContentRegistry, customModelManager);
+        customModelManager = new CustomModelManager();
+        mlModelUploader = new MLModelUploader(customModelManager, mlIndicesHandler, mlTaskManager,mlModelManager, threadPool, client);
 
         MLTaskDispatcher mlTaskDispatcher = new MLTaskDispatcher(clusterService, client, settings);
         mlTrainingTaskRunner = new MLTrainingTaskRunner(

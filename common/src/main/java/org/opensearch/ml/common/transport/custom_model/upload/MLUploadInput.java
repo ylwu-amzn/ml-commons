@@ -19,7 +19,6 @@ import org.opensearch.ml.common.model.TextEmbeddingModelConfig;
 
 import java.io.IOException;
 import java.util.Locale;
-import java.util.Objects;
 
 import static org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken;
 
@@ -29,7 +28,6 @@ import static org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedT
 @Data
 public class MLUploadInput implements ToXContentObject, Writeable {
 
-    public static final String ALGORITHM_FIELD = "algorithm";
     public static final String NAME_FIELD = "name";
     public static final String VERSION_FIELD = "version";
     public static final String URL_FIELD = "url";
@@ -44,9 +42,18 @@ public class MLUploadInput implements ToXContentObject, Writeable {
 
     @Builder(toBuilder = true)
     public MLUploadInput(String name, Integer version, String url, MLModelFormat modelFormat, MLModelConfig modelConfig) {
-        Objects.requireNonNull(name);
-        Objects.requireNonNull(version);
-        Objects.requireNonNull(url);
+        if (name == null) {
+            throw new IllegalArgumentException("model name is null");
+        }
+        if (version == null) {
+            throw new IllegalArgumentException("model version is null");
+        }
+        if (url == null) {
+            throw new IllegalArgumentException("model file url is null");
+        }
+        if (modelFormat == null) {
+            throw new IllegalArgumentException("model format is null");
+        }
         this.name = name;
         this.version = version;
         this.url = url;
@@ -125,6 +132,4 @@ public class MLUploadInput implements ToXContentObject, Writeable {
         }
         return new MLUploadInput(name, version, url, modelFormat, modelConfig);
     }
-
-
 }

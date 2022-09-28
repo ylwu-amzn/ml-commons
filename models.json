@@ -1,0 +1,141 @@
+{
+  "sentence-transformers/LaBSE": {
+    "application": "nlp/text_embedding",
+    "downloads": 78898,
+    "result": "success",
+    "sha1": "931b5f9a111859fa72549cd1a7cb32168ebbe010",
+    "size": 1755432215
+  },
+  "sentence-transformers/all-MiniLM-L12-v2": {
+    "application": "nlp/text_embedding",
+    "downloads": 589509,
+    "result": "success",
+    "sha1": "9e16800aed25dbd1a96dfa6949c68c4d81d5dded",
+    "size": 123106031
+  },
+  "sentence-transformers/all-MiniLM-L6-v2": {
+    "application": "nlp/text_embedding",
+    "downloads": 3748552,
+    "result": "success",
+    "sha1": "717413c64de70e37b55cf53c9cdff0e2d331fac3",
+    "size": 83478502
+  },
+  "sentence-transformers/all-mpnet-base-v1": {
+    "application": "nlp/text_embedding",
+    "downloads": 91362,
+    "reason": "Failed to run inference on jit model",
+    "result": "failed",
+    "sha1": "5db7848555eaffcf26ac367f5dc9e0711acb2106",
+    "size": -1
+  },
+  "sentence-transformers/all-mpnet-base-v2": {
+    "application": "nlp/text_embedding",
+    "downloads": 755768,
+    "reason": "Failed to run inference on jit model",
+    "result": "failed",
+    "sha1": "bd44305fd6a1b43c16baf96765e2ecb20bca8e1d",
+    "size": -1
+  },
+  "sentence-transformers/bert-base-nli-mean-tokens": {
+    "application": "nlp/text_embedding",
+    "downloads": 984232,
+    "result": "success",
+    "sha1": "18fc720063106176044380e71bad038d01e821d1",
+    "size": 405943318
+  },
+  "sentence-transformers/distilbert-base-nli-mean-tokens": {
+    "application": "nlp/text_embedding",
+    "downloads": 94959,
+    "result": "success",
+    "sha1": "683b927b0b0f77e70b9a7d15f7f7601a515925a9",
+    "size": 245080599
+  },
+  "sentence-transformers/distilbert-multilingual-nli-stsb-quora-ranking": {
+    "application": "nlp/text_embedding",
+    "downloads": 333277,
+    "result": "success",
+    "sha1": "8ae74eb0fbe7c8d82bb3d1a91fca56f352074e7f",
+    "size": 501401481
+  },
+  "sentence-transformers/distiluse-base-multilingual-cased": {
+    "application": "nlp/text_embedding",
+    "downloads": 173317,
+    "reason": "Failed to trace model",
+    "result": "failed",
+    "sha1": "47709c6fb2c53d30c871b05b8fb2693a5428d96a",
+    "size": -1
+  },
+  "sentence-transformers/distiluse-base-multilingual-cased-v2": {
+    "application": "nlp/text_embedding",
+    "downloads": 524053,
+    "reason": "Failed to trace model",
+    "result": "failed",
+    "sha1": "896fbacdabde59de4cb8d75dea7b9bff6066015c",
+    "size": -1
+  },
+  "sentence-transformers/multi-qa-MiniLM-L6-cos-v1": {
+    "application": "nlp/text_embedding",
+    "downloads": 140732,
+    "result": "success",
+    "sha1": "2ad254dbef118e9d73b90b0797a1632cb455fedf",
+    "size": 83553191
+  },
+  "sentence-transformers/multi-qa-mpnet-base-dot-v1": {
+    "application": "nlp/text_embedding",
+    "downloads": 578736,
+    "reason": "Failed to run inference on jit model",
+    "result": "failed",
+    "sha1": "69cf9082c6abd4f70bdf8fca0ca826b6b5d16ebc",
+    "size": -1
+  },
+  "sentence-transformers/paraphrase-MiniLM-L3-v2": {
+    "application": "nlp/text_embedding",
+    "downloads": 189704,
+    "result": "success",
+    "sha1": "74e7eed84a0b0ccca7e8769c9b0e5990f41d7125",
+    "size": 63856786
+  },
+  "sentence-transformers/paraphrase-MiniLM-L6-v2": {
+    "application": "nlp/text_embedding",
+    "downloads": 1841133,
+    "result": "success",
+    "sha1": "68b97aaedb0c72be3c88c1af64296b3bbb8001fa",
+    "size": 83658161
+  },
+  "sentence-transformers/paraphrase-mpnet-base-v2": {
+    "application": "nlp/text_embedding",
+    "downloads": 349654,
+    "reason": "Failed to run inference on jit model",
+    "result": "failed",
+    "sha1": "18df4b22cd35517843308534d066190182ff39ef",
+    "size": -1
+  },
+  "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2": {
+    "application": "nlp/text_embedding",
+    "downloads": 412980,
+    "result": "success",
+    "sha1": "b8ef00830037f9868450f778081ea683e900fe39",
+    "size": 435734278
+  },
+  "sentence-transformers/paraphrase-multilingual-mpnet-base-v2": {
+    "application": "nlp/text_embedding",
+    "downloads": 206443,
+    "result": "success",
+    "sha1": "ef15aed8b328d308d7237b9bf15269f2cd19e268",
+    "size": 1013788581
+  },
+  "sentence-transformers/paraphrase-xlm-r-multilingual-v1": {
+    "application": "nlp/text_embedding",
+    "downloads": 185146,
+    "result": "success",
+    "sha1": "50f7fa9e273db3db51beceacc1b111e4a1a31d34",
+    "size": 1015720760
+  },
+  "shibing624/text2vec-base-chinese": {
+    "application": "nlp/text_embedding",
+    "downloads": 537065,
+    "result": "success",
+    "sha1": "b455bb011898ad5d8b16cea238d070cd34db4b05",
+    "size": 380065713
+  }
+}

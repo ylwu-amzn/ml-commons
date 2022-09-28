@@ -57,24 +57,11 @@ public class MLForwardInput implements ToXContentObject, Writeable {
     private MLForwardRequestType requestType;
     private MLTask mlTask;
     private String url;
-    MLPredictModelInput predictModelInput;
     MLInput modelInput;
     private MLModelFormat modelFormat;
     private MLModelConfig modelConfig;
     private String error;
     private String[] workerNodes;
-
-//    @Builder(toBuilder = true)
-//    public MLForwardInput(String name, Integer version, String taskId, String workerNodeId, MLForwardRequestType requestType, MLTask mlTask, String url, MLPredictModelInput predictModelInput) {
-//        this.name = name;
-//        this.version = version;
-//        this.taskId = taskId;
-//        this.workerNodeId = workerNodeId;
-//        this.requestType = requestType;
-//        this.mlTask = mlTask;
-//        this.url = url;
-//        this.predictModelInput = predictModelInput;
-//    }
 
     @Builder(toBuilder = true)
     public MLForwardInput(String name, Integer version, String taskId,String modelId, String workerNodeId, MLForwardRequestType requestType,
@@ -109,9 +96,6 @@ public class MLForwardInput implements ToXContentObject, Writeable {
             mlTask = new MLTask(in);
         }
         if (in.readBoolean()) {
-            this.predictModelInput = new MLPredictModelInput(in);
-        }
-        if (in.readBoolean()) {
             this.modelInput = new MLInput(in);
         }
         if (in.readBoolean()) {
@@ -137,12 +121,6 @@ public class MLForwardInput implements ToXContentObject, Writeable {
         if (this.mlTask != null) {
             out.writeBoolean(true);
             mlTask.writeTo(out);
-        } else {
-            out.writeBoolean(false);
-        }
-        if (predictModelInput != null) {
-            out.writeBoolean(true);
-            predictModelInput.writeTo(out);
         } else {
             out.writeBoolean(false);
         }
@@ -184,9 +162,6 @@ public class MLForwardInput implements ToXContentObject, Writeable {
         if (url != null) {
             builder.field(URL_FIELD, url);
         }
-        if (predictModelInput != null) {
-            predictModelInput.toXContent(builder, params);
-        }
         if (modelFormat != null) {
             builder.field(MLModel.MODEL_FORMAT_FIELD, modelFormat);
         }
@@ -214,7 +189,6 @@ public class MLForwardInput implements ToXContentObject, Writeable {
         MLForwardRequestType requestType = null;
         MLTask mlTask = null;
         String url = null;
-        MLPredictModelInput predictModelInput = null;
         MLModelFormat modelFormat = null;
         MLModelConfig modelConfig = null;
         String error = null;
@@ -252,9 +226,6 @@ public class MLForwardInput implements ToXContentObject, Writeable {
                     break;
                 case URL_FIELD:
                     url = parser.text();
-                    break;
-                case PREDICT_INPUT_FIELD:
-                    predictModelInput = MLPredictModelInput.parse(parser);
                     break;
                 case MLModel.MODEL_FORMAT_FIELD:
                     modelFormat = MLModelFormat.from(parser.text().toUpperCase(Locale.ROOT));

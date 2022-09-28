@@ -23,8 +23,5 @@ package org.opensearch.ml.common.transport.custom_model.forward;
  * </ul>
  */
 public enum MLForwardRequestType {
-    LOAD_MODEL_DONE,
-    UPLOAD_MODEL,
-    PREDICT_MODEL,
-    SYNC_MODEL_WORKER_NODE
+    UPLOAD_MODEL;
 }
