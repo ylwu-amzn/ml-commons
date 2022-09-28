@@ -100,16 +100,17 @@ public abstract class MLTaskRunner<Request extends MLTaskRequest, Response exten
     }
 
     protected void dispatchTask(Request request, TransportService transportService, ActionListener<Response> listener) {
-        mlTaskDispatcher.dispatchTask(ActionListener.wrap(node -> {
-            if (clusterService.localNode().getId().equals(node.getId())) {
+        mlTaskDispatcher.dispatch(ActionListener.wrap(nodeId -> {
+            if (clusterService.localNode().getId().equals(nodeId)) {
                 // Execute ML task locally
-                log.info("Execute ML request {} locally on node {}", request.getRequestID(), node.getId());
+                log.info("Execute ML request {} locally on node {}", request.getRequestID(), nodeId);
                 executeTask(request, listener);
             } else {
                 // Execute ML task remotely
-                log.info("Execute ML request {} remotely on node {}", request.getRequestID(), node.getId());
+                log.info("Execute ML request {} remotely on node {}", request.getRequestID(), nodeId);
                 request.setDispatchTask(false);
-                transportService.sendRequest(node, getTransportActionName(), request, getResponseHandler(listener));
+                transportService
+                    .sendRequest(mlTaskDispatcher.getNode(nodeId), getTransportActionName(), request, getResponseHandler(listener));
             }
         }, e -> listener.onFailure(e)));
     }

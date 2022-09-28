@@ -167,7 +167,7 @@ public class MLEngineTest {
         MLAlgoParams parameters = KMeansParams.builder().build();
         DataFrame dataFrame = constructTestDataFrame(dataSize);
         MLInputDataset inputData = new DataFrameInputDataset(dataFrame);
-        Input input = new MLInput(FunctionName.KMEANS, parameters, inputData);
+        Input input = new MLInput(FunctionName.KMEANS, parameters, inputData, null);
         MLPredictionOutput output = (MLPredictionOutput) MLEngine.trainAndPredict(input);
         Assert.assertEquals(dataSize, output.getPredictionResult().size());
     }

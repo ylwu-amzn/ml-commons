@@ -12,6 +12,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 
@@ -24,19 +25,27 @@ import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.io.stream.NamedWriteableRegistry;
 import org.opensearch.common.settings.ClusterSettings;
 import org.opensearch.common.settings.IndexScopedSettings;
+import org.opensearch.common.settings.Setting;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.common.settings.SettingsFilter;
 import org.opensearch.common.xcontent.NamedXContentRegistry;
 import org.opensearch.env.Environment;
 import org.opensearch.env.NodeEnvironment;
+import org.opensearch.ml.action.custom_model.forward.TransportForwardAction;
+import org.opensearch.ml.action.custom_model.load.TransportLoadModelAction;
+import org.opensearch.ml.action.custom_model.load.TransportLoadModelOnNodeAction;
+import org.opensearch.ml.action.custom_model.predict.TransportPredictModelAction;
+import org.opensearch.ml.action.custom_model.syncup.TransportSyncUpOnNodeAction;
+import org.opensearch.ml.action.custom_model.syncup.TransportSyncupAction;
+import org.opensearch.ml.action.custom_model.unload.TransportUnloadModelAction;
+import org.opensearch.ml.action.custom_model.upload.MLModelUploader;
+import org.opensearch.ml.action.custom_model.upload.TransportUploadModelAction;
 import org.opensearch.ml.action.execute.TransportExecuteTaskAction;
 import org.opensearch.ml.action.handler.MLSearchHandler;
 import org.opensearch.ml.action.models.DeleteModelTransportAction;
 import org.opensearch.ml.action.models.GetModelTransportAction;
 import org.opensearch.ml.action.models.SearchModelTransportAction;
 import org.opensearch.ml.action.prediction.TransportPredictionTaskAction;
-import org.opensearch.ml.action.profile.MLProfileAction;
-import org.opensearch.ml.action.profile.MLProfileTransportAction;
 import org.opensearch.ml.action.stats.MLStatsNodesAction;
 import org.opensearch.ml.action.stats.MLStatsNodesTransportAction;
 import org.opensearch.ml.action.tasks.DeleteTaskTransportAction;
@@ -44,6 +53,7 @@ import org.opensearch.ml.action.tasks.GetTaskTransportAction;
 import org.opensearch.ml.action.tasks.SearchTaskTransportAction;
 import org.opensearch.ml.action.training.TransportTrainingTaskAction;
 import org.opensearch.ml.action.trainpredict.TransportTrainAndPredictionTaskAction;
+import org.opensearch.ml.cluster.MLCommonsClusterEventListener;
 import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.common.breaker.MLCircuitBreakerService;
 import org.opensearch.ml.common.input.execute.anomalylocalization.AnomalyLocalizationInput;
@@ -56,6 +66,15 @@ import org.opensearch.ml.common.input.parameter.rcf.FitRCFParams;
 import org.opensearch.ml.common.input.parameter.regression.LinearRegressionParams;
 import org.opensearch.ml.common.input.parameter.regression.LogisticRegressionParams;
 import org.opensearch.ml.common.input.parameter.sample.SampleAlgoParams;
+import org.opensearch.ml.common.model.TextEmbeddingModelConfig;
+import org.opensearch.ml.common.transport.custom_model.forward.MLForwardAction;
+import org.opensearch.ml.common.transport.custom_model.load.MLLoadModelAction;
+import org.opensearch.ml.common.transport.custom_model.load.MLLoadModelOnNodeAction;
+import org.opensearch.ml.common.transport.custom_model.predict.MLPredictModelAction;
+import org.opensearch.ml.common.transport.custom_model.sync.MLSyncUpAction;
+import org.opensearch.ml.common.transport.custom_model.sync.MLSyncUpOnNodeAction;
+import org.opensearch.ml.common.transport.custom_model.unload.MLUnloadModelAction;
+import org.opensearch.ml.common.transport.custom_model.upload.MLUploadModelAction;
 import org.opensearch.ml.common.transport.execute.MLExecuteTaskAction;
 import org.opensearch.ml.common.transport.model.MLModelDeleteAction;
 import org.opensearch.ml.common.transport.model.MLModelGetAction;
@@ -66,12 +85,29 @@ import org.opensearch.ml.common.transport.task.MLTaskGetAction;
 import org.opensearch.ml.common.transport.task.MLTaskSearchAction;
 import org.opensearch.ml.common.transport.training.MLTrainingTaskAction;
 import org.opensearch.ml.common.transport.trainpredict.MLTrainAndPredictionTaskAction;
+import org.opensearch.ml.engine.MLEngine;
 import org.opensearch.ml.engine.MLEngineClassLoader;
 import org.opensearch.ml.engine.algorithms.anomalylocalization.AnomalyLocalizerImpl;
+import org.opensearch.ml.engine.algorithms.custom.CustomModelManager;
 import org.opensearch.ml.engine.algorithms.sample.LocalSampleCalculator;
 import org.opensearch.ml.indices.MLIndicesHandler;
 import org.opensearch.ml.indices.MLInputDatasetHandler;
-import org.opensearch.ml.rest.*;
+import org.opensearch.ml.model.MLModelManager;
+import org.opensearch.ml.rest.RestMLDeleteModelAction;
+import org.opensearch.ml.rest.RestMLDeleteTaskAction;
+import org.opensearch.ml.rest.RestMLExecuteAction;
+import org.opensearch.ml.rest.RestMLGetModelAction;
+import org.opensearch.ml.rest.RestMLGetTaskAction;
+import org.opensearch.ml.rest.RestMLLoadModelAction;
+import org.opensearch.ml.rest.RestMLPredictionAction;
+import org.opensearch.ml.rest.RestMLSearchModelAction;
+import org.opensearch.ml.rest.RestMLSearchTaskAction;
+import org.opensearch.ml.rest.RestMLStatsAction;
+import org.opensearch.ml.rest.RestMLTrainAndPredictAction;
+import org.opensearch.ml.rest.RestMLTrainingAction;
+import org.opensearch.ml.rest.RestMLUnloadModelAction;
+import org.opensearch.ml.rest.RestMLUploadModelAction;
+import org.opensearch.ml.settings.MLCommonsSettings;
 import org.opensearch.ml.stats.MLClusterLevelStat;
 import org.opensearch.ml.stats.MLNodeLevelStat;
 import org.opensearch.ml.stats.MLStat;
@@ -105,6 +141,7 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin {
 
     private MLStats mlStats;
     private MLTaskManager mlTaskManager;
+    private MLModelManager mlModelManager;
     private MLIndicesHandler mlIndicesHandler;
     private MLInputDatasetHandler mlInputDatasetHandler;
     private MLTrainingTaskRunner mlTrainingTaskRunner;
@@ -112,12 +149,16 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin {
     private MLTrainAndPredictTaskRunner mlTrainAndPredictTaskRunner;
     private MLExecuteTaskRunner mlExecuteTaskRunner;
     private IndexUtils indexUtils;
+    private CustomModelManager customModelManager;
+    private MLModelUploader mlModelUploader;
 
     private Client client;
     private ClusterService clusterService;
     private ThreadPool threadPool;
+    private Set<String> indicesToListen;
 
     public static final String ML_ROLE_NAME = "ml";
+    private NamedXContentRegistry xContentRegistry;
 
     @Override
     public List<ActionHandler<? extends ActionRequest, ? extends ActionResponse>> getActions() {
@@ -134,7 +175,14 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin {
                 new ActionHandler<>(MLTaskGetAction.INSTANCE, GetTaskTransportAction.class),
                 new ActionHandler<>(MLTaskDeleteAction.INSTANCE, DeleteTaskTransportAction.class),
                 new ActionHandler<>(MLTaskSearchAction.INSTANCE, SearchTaskTransportAction.class),
-                new ActionHandler<>(MLProfileAction.INSTANCE, MLProfileTransportAction.class)
+                new ActionHandler<>(MLUploadModelAction.INSTANCE, TransportUploadModelAction.class),
+                new ActionHandler<>(MLLoadModelAction.INSTANCE, TransportLoadModelAction.class),
+                new ActionHandler<>(MLLoadModelOnNodeAction.INSTANCE, TransportLoadModelOnNodeAction.class),
+                new ActionHandler<>(MLUnloadModelAction.INSTANCE, TransportUnloadModelAction.class),
+                new ActionHandler<>(MLPredictModelAction.INSTANCE, TransportPredictModelAction.class),
+                new ActionHandler<>(MLForwardAction.INSTANCE, TransportForwardAction.class),
+                new ActionHandler<>(MLSyncUpAction.INSTANCE, TransportSyncupAction.class),
+                new ActionHandler<>(MLSyncUpOnNodeAction.INSTANCE, TransportSyncUpOnNodeAction.class)
             );
     }
 
@@ -156,7 +204,9 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin {
         this.client = client;
         this.threadPool = threadPool;
         this.clusterService = clusterService;
+        this.xContentRegistry = xContentRegistry;
         Settings settings = environment.settings();
+        MLEngine.setDjlCachePath(environment.dataFiles()[0]);
 
         JvmService jvmService = new JvmService(environment.settings());
         MLCircuitBreakerService mlCircuitBreakerService = new MLCircuitBreakerService(jvmService).init();
@@ -176,9 +226,12 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin {
 
         mlIndicesHandler = new MLIndicesHandler(clusterService, client);
         mlTaskManager = new MLTaskManager(client, mlIndicesHandler);
+        customModelManager = new CustomModelManager();
+        mlModelManager = new MLModelManager(client, threadPool, xContentRegistry, customModelManager);
         mlInputDatasetHandler = new MLInputDatasetHandler(client);
+        mlModelUploader = new MLModelUploader(customModelManager, mlIndicesHandler, mlTaskManager, mlModelManager, threadPool, client);
 
-        MLTaskDispatcher mlTaskDispatcher = new MLTaskDispatcher(clusterService, client);
+        MLTaskDispatcher mlTaskDispatcher = new MLTaskDispatcher(clusterService, client, settings);
         mlTrainingTaskRunner = new MLTrainingTaskRunner(
             threadPool,
             clusterService,
@@ -231,17 +284,28 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin {
 
         MLSearchHandler mlSearchHandler = new MLSearchHandler(client, xContentRegistry);
 
+        MLCommonsClusterEventListener mlCommonsClusterEventListener = new MLCommonsClusterEventListener(
+            clusterService,
+            mlModelManager,
+            mlTaskManager
+        );
+
         return ImmutableList
             .of(
                 mlStats,
                 mlTaskManager,
+                mlModelManager,
                 mlIndicesHandler,
                 mlInputDatasetHandler,
                 mlTrainingTaskRunner,
                 mlPredictTaskRunner,
                 mlTrainAndPredictTaskRunner,
                 mlExecuteTaskRunner,
-                mlSearchHandler
+                mlSearchHandler,
+                mlTaskDispatcher,
+                customModelManager,
+                mlModelUploader,
+                mlCommonsClusterEventListener
             );
     }
 
@@ -266,7 +330,9 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin {
         RestMLGetTaskAction restMLGetTaskAction = new RestMLGetTaskAction();
         RestMLDeleteTaskAction restMLDeleteTaskAction = new RestMLDeleteTaskAction();
         RestMLSearchTaskAction restMLSearchTaskAction = new RestMLSearchTaskAction();
-        RestMLProfileAction restMLProfileAction = new RestMLProfileAction(clusterService);
+        RestMLUploadModelAction restMLUploadModelAction = new RestMLUploadModelAction();
+        RestMLLoadModelAction restMLLoadModelAction = new RestMLLoadModelAction();
+        RestMLUnloadModelAction restMLCustomModelUnloadAction = new RestMLUnloadModelAction(clusterService);
 
         return ImmutableList
             .of(
@@ -281,7 +347,9 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin {
                 restMLGetTaskAction,
                 restMLDeleteTaskAction,
                 restMLSearchTaskAction,
-                restMLProfileAction
+                restMLUploadModelAction,
+                restMLLoadModelAction,
+                restMLCustomModelUnloadAction
             );
     }
 
@@ -305,7 +373,14 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin {
                 LocalSampleCalculatorInput.XCONTENT_REGISTRY,
                 AnomalyLocalizationInput.XCONTENT_REGISTRY_ENTRY,
                 RCFSummarizeParams.XCONTENT_REGISTRY,
-                LogisticRegressionParams.XCONTENT_REGISTRY
+                LogisticRegressionParams.XCONTENT_REGISTRY,
+                TextEmbeddingModelConfig.XCONTENT_REGISTRY
             );
+    }
+
+    @Override
+    public List<Setting<?>> getSettings() {
+        List<Setting<?>> settings = ImmutableList.of(MLCommonsSettings.ML_COMMONS_TASK_DISPATCH_POLICY);
+        return settings;
     }
 }

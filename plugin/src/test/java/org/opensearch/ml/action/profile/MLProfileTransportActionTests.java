@@ -73,7 +73,7 @@ public class MLProfileTransportActionTests extends OpenSearchIntegTestCase {
         taskCacheMap.put("test_id", new MLTaskCache(mlTask));
         mlTaskManager = mock(MLTaskManager.class);
         when(mlTaskManager.getAllTaskIds()).thenReturn(new String[] { "test_id" });
-        when(mlTaskManager.get("test_id")).thenReturn(mlTask);
+        when(mlTaskManager.getMLTask("test_id")).thenReturn(mlTask);
 
         action = new MLProfileTransportAction(
             client().threadPool(),

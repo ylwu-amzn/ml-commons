@@ -24,6 +24,7 @@ import org.opensearch.action.ActionListener;
 import org.opensearch.client.node.NodeClient;
 import org.opensearch.common.Strings;
 import org.opensearch.common.settings.Settings;
+import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.common.input.MLInput;
 import org.opensearch.ml.common.transport.MLTaskResponse;
 import org.opensearch.ml.common.transport.prediction.MLPredictionTaskAction;
@@ -89,7 +90,7 @@ public class RestMLPredictionActionTests extends OpenSearchTestCase {
 
     public void testGetRequest() throws IOException {
         RestRequest request = getRestRequest_PredictModel();
-        MLPredictionTaskRequest mlPredictionTaskRequest = restMLPredictionAction.getRequest(request);
+        MLPredictionTaskRequest mlPredictionTaskRequest = restMLPredictionAction.getRequest(FunctionName.KMEANS.name(), request);
 
         MLInput mlInput = mlPredictionTaskRequest.getMlInput();
         verifyParsedKMeansMLInput(mlInput);
