@@ -7,6 +7,8 @@ package org.opensearch.ml.action.custom_model.syncup;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import lombok.extern.log4j.Log4j2;
 
@@ -103,12 +105,25 @@ public class TransportSyncUpOnNodeAction extends
         MLSyncUpInput syncUpInput = loadModelNodesRequest.getSyncUpInput();
         String modelId = syncUpInput.getModelId();
         String[] addedWorkerNodes = syncUpInput.getAddedWorkerNodes();
-        String[] removedWorkerNodes = syncUpInput.getRemovedWorkerNOdes();
+        String[] removedWorkerNodes = syncUpInput.getRemovedWorkerNodes();
+        Map<String, Set<String>> modelRoutingTable = syncUpInput.getModelRoutingTable();
 
         mlModelManager.addModelWorkerNode(modelId, addedWorkerNodes);
         mlModelManager.removeModelWorkerNode(modelId, removedWorkerNodes);
 
-        return new MLSyncUpNodeResponse(clusterService.localNode(), "ok");
+        String[] loadedModelIds = null;
+        if (syncUpInput.isGetLoadedModels()) {
+            loadedModelIds = mlModelManager.getLocalLoadedModels();
+        }
+
+        if (modelRoutingTable != null) {
+            for (Map.Entry<String, Set<String>> entry : modelRoutingTable.entrySet()) {
+                log.debug("latest routing table for model: {}:  {}", entry.getKey(), entry.getValue().toArray(new String[0]));
+            }
+            mlModelManager.syncModelRouting(modelRoutingTable);
+        }
+
+        return new MLSyncUpNodeResponse(clusterService.localNode(), "ok", loadedModelIds);
     }
 
 }

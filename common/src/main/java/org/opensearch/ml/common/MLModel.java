@@ -43,7 +43,7 @@ public class MLModel implements ToXContentObject {
     public static final String MODEL_CONTENT_HASH_FIELD = "model_content_hash";
     public static final String MODEL_CONFIG_FIELD = "model_config";
     public static final String CREATED_TIME_FIELD = "created_time";
-    public static final String LATEST_UPLOADED_TIME_FIELD = "latest_uploaded_time";
+    public static final String LATEST_UPLOADED_TIME_FIELD = "latest_uploaded_time";//TODO: change to last, to keep consistent with MLTask?
     public static final String LATEST_LOADED_TIME_FIELD = "latest_loaded_time";
     public static final String LATEST_UNLOADED_TIME_FIELD = "latest_unloaded_time";
 

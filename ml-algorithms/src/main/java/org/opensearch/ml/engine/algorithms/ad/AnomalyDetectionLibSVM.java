@@ -48,6 +48,7 @@ public class AnomalyDetectionLibSVM implements Trainable, Predictable {
     private static KernelType DEFAULT_KERNEL_TYPE = KernelType.RBF;
 
     private AnomalyDetectionLibSVMParams parameters;
+    private LibSVMModel libSVMAnomalyModel = null;
 
     public AnomalyDetectionLibSVM() {}
 
@@ -68,16 +69,20 @@ public class AnomalyDetectionLibSVM implements Trainable, Predictable {
 
     }
 
-    @Override
-    public MLOutput predict(DataFrame dataFrame, Model model) {
-        if (model == null) {
-            throw new IllegalArgumentException("No model found for KMeans prediction.");
-        }
 
+    @Override
+    public void initModel(Model model) {
+        libSVMAnomalyModel = (LibSVMModel) ModelSerDeSer.deserialize(model.getContent());
+    }
+
+    @Override
+    public MLOutput predict(DataFrame dataFrame) {
+        if (libSVMAnomalyModel == null) {
+            throw new IllegalArgumentException("model not loaded");
+        }
         List<Prediction<Event>> predictions;
         MutableDataset<Event> predictionDataset = TribuoUtil.generateDataset(dataFrame, new AnomalyFactory(),
                 "Anomaly detection LibSVM prediction data from OpenSearch", TribuoOutputType.ANOMALY_DETECTION_LIBSVM);
-        LibSVMModel libSVMAnomalyModel = (LibSVMModel) ModelSerDeSer.deserialize(model.getContent());
         predictions = libSVMAnomalyModel.predict(predictionDataset);
 
         List<Map<String, Object>> adResults = new ArrayList<>();
@@ -89,6 +94,16 @@ public class AnomalyDetectionLibSVM implements Trainable, Predictable {
         });
 
         return MLPredictionOutput.builder().predictionResult(DataFrameBuilder.load(adResults)).build();
+    }
+
+    @Override
+    public MLOutput predict(DataFrame dataFrame, Model model) {
+        if (model == null) {
+            throw new IllegalArgumentException("No model found for KMeans prediction.");
+        }
+
+        libSVMAnomalyModel = (LibSVMModel) ModelSerDeSer.deserialize(model.getContent());
+        return predict(dataFrame);
     }
 
     @Override

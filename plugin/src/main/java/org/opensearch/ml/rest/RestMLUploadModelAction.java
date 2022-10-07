@@ -7,6 +7,9 @@ package org.opensearch.ml.rest;
 
 import static org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken;
 import static org.opensearch.ml.plugin.MachineLearningPlugin.ML_BASE_URI;
+import static org.opensearch.ml.utils.RestActionUtils.PARAMETER_LOAD_MODEL;
+import static org.opensearch.ml.utils.RestActionUtils.PARAMETER_MODEL_ID;
+import static org.opensearch.ml.utils.RestActionUtils.PARAMETER_VERSION;
 
 import java.io.IOException;
 import java.util.List;
@@ -39,7 +42,14 @@ public class RestMLUploadModelAction extends BaseRestHandler {
 
     @Override
     public List<Route> routes() {
-        return ImmutableList.of(new Route(RestRequest.Method.POST, String.format(Locale.ROOT, "%s/models/_upload", ML_BASE_URI)));
+        return ImmutableList
+            .of(
+                new Route(RestRequest.Method.POST, String.format(Locale.ROOT, "%s/models/_upload", ML_BASE_URI)),
+                new Route(
+                    RestRequest.Method.POST,
+                    String.format(Locale.ROOT, "%s/models/{%s}/{%s}/_upload", ML_BASE_URI, PARAMETER_MODEL_ID, PARAMETER_VERSION)
+                )
+            );
     }
 
     @Override
@@ -56,10 +66,20 @@ public class RestMLUploadModelAction extends BaseRestHandler {
      */
     @VisibleForTesting
     MLUploadModelRequest getRequest(RestRequest request) throws IOException {
+        String modelName = request.param(PARAMETER_MODEL_ID);
+        String versionStr = request.param(PARAMETER_VERSION);
+        boolean loadModel = request.paramAsBoolean(PARAMETER_LOAD_MODEL, false);
+        Integer version = versionStr == null ? null : Integer.valueOf(versionStr);
+        if (modelName != null && !request.hasContent()) {
+            MLUploadInput mlInput = MLUploadInput.builder().loadModel(loadModel).modelName(modelName).version(version).build();
+            return new MLUploadModelRequest(mlInput);
+        }
+
         XContentParser parser = request.contentParser();
         ensureExpectedToken(XContentParser.Token.START_OBJECT, parser.nextToken(), parser);
-        MLUploadInput mlInput = MLUploadInput.parse(parser);
-
+        MLUploadInput mlInput = modelName == null
+            ? MLUploadInput.parse(parser)
+            : MLUploadInput.parse(parser, modelName, version, loadModel);
         return new MLUploadModelRequest(mlInput);
     }
 }

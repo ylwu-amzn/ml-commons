@@ -22,4 +22,8 @@ public interface Predictable {
      */
     MLOutput predict(DataFrame dataFrame, Model model);
 
+    MLOutput predict(DataFrame dataFrame);
+
+    void initModel(Model model);
+
 }

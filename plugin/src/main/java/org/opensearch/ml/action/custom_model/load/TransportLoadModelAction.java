@@ -27,6 +27,7 @@ import org.opensearch.client.Client;
 import org.opensearch.cluster.node.DiscoveryNode;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.inject.Inject;
+import org.opensearch.common.util.concurrent.ThreadContext;
 import org.opensearch.common.xcontent.NamedXContentRegistry;
 import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.common.MLModel;
@@ -94,7 +95,7 @@ public class TransportLoadModelAction extends HandledTransportAction<ActionReque
     protected void doExecute(Task task, ActionRequest request, ActionListener<LoadModelResponse> listener) {
         MLLoadModelRequest deployModelRequest = MLLoadModelRequest.fromActionRequest(request);
         String modelId = deployModelRequest.getModelId();
-        String[] targetNodeIds = deployModelRequest.getNodeIds();
+        String[] targetNodeIds = deployModelRequest.getModelNodeIds();
         try {
             DiscoveryNode[] allEligibleNodes = mlTaskDispatcher.getEligibleNodes();
             Map<String, DiscoveryNode> nodeMapping = new HashMap();
@@ -127,69 +128,95 @@ public class TransportLoadModelAction extends HandledTransportAction<ActionReque
             String workerNodes = String.join(",", nodeIds);
             log.warn("Will load model on these nodes: {}", workerNodes);
             String localNodeId = clusterService.localNode().getId();
-            MLTask mlTask = MLTask
-                .builder()
-                .async(true)
-                .modelId(modelId)
-                .taskType(MLTaskType.LOAD_MODEL)
-                .functionName(FunctionName.CUSTOM)
-                .inputType(MLInputDataType.SEARCH_QUERY)
-                .createTime(Instant.now())
-                .lastUpdateTime(Instant.now())
-                .state(MLTaskState.CREATED)
-                .workerNode(localNodeId)
-                .build();
-            mlTaskManager.createMLTask(mlTask, ActionListener.wrap(response -> {
-                String taskId = response.getId();
-                mlTask.setTaskId(taskId);
 
-                try {
-                    mlTaskManager.add(mlTask, nodeIds);
-                    listener.onResponse(new LoadModelResponse(taskId, MLTaskState.CREATED.name()));
-                    threadPool.executor(TASK_THREAD_POOL).execute(() -> {
-                        LoadModelInput loadModelInput = new LoadModelInput(modelId, taskId, eligibleNodes.size(), localNodeId, mlTask);
-                        LoadModelNodesRequest loadModelRequest = new LoadModelNodesRequest(
-                            eligibleNodes.toArray(new DiscoveryNode[0]),
-                            loadModelInput
-                        );
-                        ActionListener<LoadModelNodesResponse> actionListener = ActionListener.wrap(r -> {
-                            if (mlTaskManager.contains(taskId)) {
-                                mlTaskManager.updateMLTask(taskId, ImmutableMap.of(MLTask.STATE_FIELD, MLTaskState.RUNNING), 5000);
-                            }
-                        }, e -> {
-                            log.error("Failed to load model " + modelId, e);
-                            mlTaskManager
-                                .updateMLTask(
+            String[] includes = new String[] { MLModel.MODEL_NAME_FIELD, MLModel.MODEL_VERSION_FIELD, MLModel.ALGORITHM_FIELD };
+            try (ThreadContext.StoredContext context = client.threadPool().getThreadContext().stashContext()) {
+                mlModelManager.getModel(modelId, includes, null, ActionListener.wrap(mlModel -> {
+                    FunctionName algorithm = mlModel.getAlgorithm();
+                    MLTask mlTask = MLTask
+                        .builder()
+                        .async(true)
+                        .modelId(modelId)
+                        .taskType(MLTaskType.LOAD_MODEL)
+                        .functionName(algorithm)
+                        .inputType(MLInputDataType.SEARCH_QUERY)
+                        .createTime(Instant.now())
+                        .lastUpdateTime(Instant.now())
+                        .state(MLTaskState.CREATED)
+                        .workerNode(localNodeId)
+                        .build();
+                    mlTaskManager.createMLTask(mlTask, ActionListener.wrap(response -> {
+                        String taskId = response.getId();
+                        mlTask.setTaskId(taskId);
+
+                        try {
+                            mlTaskManager.add(mlTask, nodeIds);
+                            listener.onResponse(new LoadModelResponse(taskId, MLTaskState.CREATED.name()));
+                            threadPool.executor(TASK_THREAD_POOL).execute(() -> {
+                                LoadModelInput loadModelInput = new LoadModelInput(
+                                    modelId,
                                     taskId,
-                                    ImmutableMap
-                                        .of(MLTask.ERROR_FIELD, ExceptionUtils.getStackTrace(e), MLTask.STATE_FIELD, MLTaskState.FAILED),
-                                    5000
+                                    eligibleNodes.size(),
+                                    localNodeId,
+                                    mlTask
                                 );
+                                LoadModelNodesRequest loadModelRequest = new LoadModelNodesRequest(
+                                    eligibleNodes.toArray(new DiscoveryNode[0]),
+                                    loadModelInput
+                                );
+                                ActionListener<LoadModelNodesResponse> actionListener = ActionListener.wrap(r -> {
+                                    if (mlTaskManager.contains(taskId)) {
+                                        mlTaskManager.updateMLTask(taskId, ImmutableMap.of(MLTask.STATE_FIELD, MLTaskState.RUNNING), 5000);
+                                    }
+                                }, e -> {
+                                    log.error("Failed to load model " + modelId, e);
+                                    mlTaskManager
+                                        .updateMLTask(
+                                            taskId,
+                                            ImmutableMap
+                                                .of(
+                                                    MLTask.ERROR_FIELD,
+                                                    ExceptionUtils.getStackTrace(e),
+                                                    MLTask.STATE_FIELD,
+                                                    MLTaskState.FAILED
+                                                ),
+                                            5000
+                                        );
+                                    mlTaskManager.remove(taskId);
+                                });
+                                mlModelManager
+                                    .updateModel(
+                                        modelId,
+                                        ImmutableMap.of(MLModel.MODEL_STATE_FIELD, MLModelState.LOADING),
+                                        ActionListener
+                                            .wrap(
+                                                r -> {
+                                                    client.execute(MLLoadModelOnNodeAction.INSTANCE, loadModelRequest, actionListener);
+                                                },
+                                                e -> {
+                                                    e.printStackTrace();
+                                                    actionListener.onFailure(e);
+                                                }
+                                            )
+                                    );
+                            });
+                        } catch (Exception ex) {
+                            log.error("Failed to load custom model", ex);
                             mlTaskManager.remove(taskId);
-                        });
-                        mlModelManager
-                            .updateModel(
-                                modelId,
-                                ImmutableMap.of(MLModel.MODEL_STATE_FIELD, MLModelState.LOADING),
-                                ActionListener
-                                    .wrap(
-                                        r -> { client.execute(MLLoadModelOnNodeAction.INSTANCE, loadModelRequest, actionListener); },
-                                        e -> {
-                                            e.printStackTrace();
-                                            actionListener.onFailure(e);
-                                        }
-                                    )
-                            );
-                    });
-                } catch (Exception ex) {
-                    log.error("Failed to load custom model", ex);
-                    mlTaskManager.remove(taskId);
-                    listener.onFailure(ex);
-                }
-            }, exception -> {
-                log.error("Failed to create upload model task for " + modelId, exception);
-                listener.onFailure(exception);
-            }));
+                            listener.onFailure(ex);
+                        }
+                    }, exception -> {
+                        log.error("Failed to create upload model task for " + modelId, exception);
+                        listener.onFailure(exception);
+                    }));
+                }, e -> {
+                    log.error("Failed to get model " + modelId, e);
+                    listener.onFailure(e);
+                }));
+            } catch (Exception e) {
+                log.error("Failed to load " + modelId, e);
+                listener.onFailure(e);
+            }
         } catch (Exception e) {
             log.error("Failed to download custom model " + modelId, e);
             listener.onFailure(e);

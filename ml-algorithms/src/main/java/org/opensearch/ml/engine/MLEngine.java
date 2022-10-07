@@ -5,6 +5,7 @@
 
 package org.opensearch.ml.engine;
 
+import org.opensearch.ml.common.MLModel;
 import org.opensearch.ml.common.dataframe.DataFrame;
 import org.opensearch.ml.common.input.Input;
 import org.opensearch.ml.common.input.parameter.MLAlgoParams;
@@ -14,6 +15,7 @@ import org.opensearch.ml.common.Model;
 import org.opensearch.ml.common.output.Output;
 
 import java.nio.file.Path;
+import java.util.Base64;
 
 /**
  * This is the interface to all ml algorithms.
@@ -26,6 +28,18 @@ public class MLEngine {
     public static void setDjlCachePath(Path opensearchDataFolder) {
         DJL_CACHE_PATH = opensearchDataFolder.resolve("djl");
         DJL_CUSTOM_MODELS_PATH = DJL_CACHE_PATH.resolve("custom_models");
+    }
+
+    public static Path getLocalPrebuiltModelConfigPath(String modelName, Integer version) {
+        //TODO: change to public opensearch repo URL
+        // /home/ylwu/Downloads/os2.3/opensearch-2.3.0/data/djl/models/all-MiniLM-L6-v2/all-MiniLM-L6-v2.zip
+        return DJL_CACHE_PATH.resolve("models").resolve(version + "").resolve(modelName).resolve("config.json");
+    }
+
+    public static Path getLocalPrebuiltModelPath(String modelName, Integer version) {
+        //TODO: change to public opensearch repo URL
+        // /home/ylwu/Downloads/os2.3/opensearch-2.3.0/data/djl/models/all-MiniLM-L6-v2/all-MiniLM-L6-v2.zip
+        return DJL_CACHE_PATH.resolve("models").resolve(version + "").resolve(modelName).resolve(modelName + ".zip");
     }
 
     public static Path getUploadModelPath(String modelId, String modelName, Integer version) {
@@ -79,6 +93,18 @@ public class MLEngine {
             throw new IllegalArgumentException("Unsupported algorithm: " + mlInput.getAlgorithm());
         }
         return trainable.train(mlInput.getDataFrame());
+    }
+
+    public static Predictable load(MLModel mlModel) {
+        Model model = new Model();
+        model.setName(mlModel.getName());
+        model.setVersion(mlModel.getVersion());
+        byte[] decoded = Base64.getDecoder().decode(mlModel.getContent());
+        model.setContent(decoded);
+
+        Predictable predictable = MLEngineClassLoader.initInstance(mlModel.getAlgorithm(), null, MLAlgoParams.class);
+        predictable.initModel(model);
+        return predictable;
     }
 
     public static MLOutput predict(Input input, Model model) {

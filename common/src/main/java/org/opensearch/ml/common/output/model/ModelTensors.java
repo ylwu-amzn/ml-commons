@@ -69,6 +69,7 @@ public class ModelTensors implements Writeable, ToXContentObject {
         List<Integer> targetResponsePositions = resultFilter.getTargetResponsePositions();
         if ((targetResponse == null || targetResponse.size() == 0)
                 && (targetResponsePositions == null || targetResponsePositions.size() == 0)) {
+            mlModelTensors.forEach(output -> filter(output, returnBytes,  returnNUmber));
             return;
         }
         List<ModelTensor> targetOutput = new ArrayList<>();
@@ -76,10 +77,10 @@ public class ModelTensors implements Writeable, ToXContentObject {
             for (int i = 0 ; i<mlModelTensors.size(); i++) {
                 ModelTensor output = mlModelTensors.get(i);
                 if (targetResponse != null && targetResponse.contains(output.getName())) {
-                    filter(returnBytes, output, returnNUmber);
+                    filter(output, returnBytes,  returnNUmber);
                     targetOutput.add(output);
                 } else if (targetResponsePositions != null && targetResponsePositions.contains(i)) {
-                    filter(returnBytes, output, returnNUmber);
+                    filter(output, returnBytes,  returnNUmber);
                     targetOutput.add(output);
                 }
             }
@@ -87,7 +88,7 @@ public class ModelTensors implements Writeable, ToXContentObject {
         this.mlModelTensors = targetOutput;
     }
 
-    private void filter(boolean returnBytes, ModelTensor output, boolean returnNUmber) {
+    private void filter(ModelTensor output, boolean returnBytes,  boolean returnNUmber) {
         if (!returnBytes) {
             output.setByteBuffer(null);
         }

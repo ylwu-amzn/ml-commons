@@ -47,6 +47,7 @@ public class KMeans implements TrainAndPredictable {
     private long seed = System.currentTimeMillis();
     private KMeansTrainer.Distance distance;
 
+    private KMeansModel kMeansModel;
     public KMeans() {}
 
     public KMeans(MLAlgoParams parameters) {
@@ -83,21 +84,28 @@ public class KMeans implements TrainAndPredictable {
     }
 
     @Override
-    public MLOutput predict(DataFrame dataFrame, Model model) {
-        if (model == null) {
-            throw new IllegalArgumentException("No model found for KMeans prediction.");
-        }
+    public void initModel(Model model) {
+        this.kMeansModel = (KMeansModel) ModelSerDeSer.deserialize(model.getContent());
+    }
 
-        List<Prediction<ClusterID>> predictions;
+    @Override
+    public MLOutput predict(DataFrame dataFrame) {
         MutableDataset<ClusterID> predictionDataset = TribuoUtil.generateDataset(dataFrame, new ClusteringFactory(),
                 "KMeans prediction data from opensearch", TribuoOutputType.CLUSTERID);
-        KMeansModel kMeansModel = (KMeansModel) ModelSerDeSer.deserialize(model.getContent());
-        predictions = kMeansModel.predict(predictionDataset);
-
+        List<Prediction<ClusterID>> predictions = kMeansModel.predict(predictionDataset);
         List<Map<String, Object>> listClusterID = new ArrayList<>();
         predictions.forEach(e -> listClusterID.add(Collections.singletonMap("ClusterID", e.getOutput().getID())));
 
         return MLPredictionOutput.builder().predictionResult(DataFrameBuilder.load(listClusterID)).build();
+    }
+
+    @Override
+    public MLOutput predict(DataFrame dataFrame, Model model) {
+        if (model == null) {
+            throw new IllegalArgumentException("No model found for KMeans prediction.");
+        }
+        this.kMeansModel = (KMeansModel) ModelSerDeSer.deserialize(model.getContent());
+        return predict(dataFrame);
     }
 
     @Override

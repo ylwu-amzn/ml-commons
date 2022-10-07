@@ -48,6 +48,8 @@ public class BatchRandomCutForest implements TrainAndPredictable {
 
     private static final RandomCutForestMapper rcfMapper = new RandomCutForestMapper();
 
+    private RandomCutForest forest;
+
     public BatchRandomCutForest(){}
 
     public BatchRandomCutForest(MLAlgoParams parameters) {
@@ -63,14 +65,25 @@ public class BatchRandomCutForest implements TrainAndPredictable {
     }
 
     @Override
+    public void initModel(Model model) {
+        RandomCutForestState state = RCFModelSerDeSer.deserializeRCF(model.getContent());
+        forest = rcfMapper.toModel(state);
+    }
+
+    @Override
+    public MLOutput predict(DataFrame dataFrame) {
+        List<Map<String, Object>> predictResult = process(dataFrame, forest, 0);
+        return MLPredictionOutput.builder().predictionResult(DataFrameBuilder.load(predictResult)).build();
+    }
+
+    @Override
     public MLOutput predict(DataFrame dataFrame, Model model) {
         if (model == null) {
             throw new IllegalArgumentException("No model found for batch RCF prediction.");
         }
         RandomCutForestState state = RCFModelSerDeSer.deserializeRCF(model.getContent());
-        RandomCutForest forest = rcfMapper.toModel(state);
-        List<Map<String, Object>> predictResult = process(dataFrame, forest, 0);
-        return MLPredictionOutput.builder().predictionResult(DataFrameBuilder.load(predictResult)).build();
+        forest = rcfMapper.toModel(state);
+        return predict(dataFrame);
     }
 
     @Override

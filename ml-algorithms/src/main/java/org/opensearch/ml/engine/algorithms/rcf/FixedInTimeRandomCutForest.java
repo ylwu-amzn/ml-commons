@@ -27,6 +27,8 @@ import org.opensearch.ml.common.output.MLOutput;
 import org.opensearch.ml.common.output.MLPredictionOutput;
 import org.opensearch.ml.engine.TrainAndPredictable;
 import org.opensearch.ml.engine.annotation.Function;
+import org.opensearch.ml.engine.utils.ModelSerDeSer;
+import org.tribuo.clustering.kmeans.KMeansModel;
 
 import java.text.DateFormat;
 import java.text.ParseException;
@@ -67,6 +69,8 @@ public class FixedInTimeRandomCutForest implements TrainAndPredictable {
     private DateFormat simpleDateFormat;
     private static final ThresholdedRandomCutForestMapper trcfMapper = new ThresholdedRandomCutForestMapper();
 
+    private ThresholdedRandomCutForest forest;
+
     public FixedInTimeRandomCutForest(){}
 
     public FixedInTimeRandomCutForest(MLAlgoParams parameters) {
@@ -93,15 +97,27 @@ public class FixedInTimeRandomCutForest implements TrainAndPredictable {
         }
     }
 
+
+    @Override
+    public void initModel(Model model) {
+        ThresholdedRandomCutForestState state = RCFModelSerDeSer.deserializeTRCF(model.getContent());
+        this.forest = trcfMapper.toModel(state);
+    }
+
+    @Override
+    public MLOutput predict(DataFrame dataFrame) {
+        List<Map<String, Object>> predictResult = process(dataFrame, forest);
+        return MLPredictionOutput.builder().predictionResult(DataFrameBuilder.load(predictResult)).build();
+    }
+
     @Override
     public MLOutput predict(DataFrame dataFrame, Model model) {
         if (model == null) {
             throw new IllegalArgumentException("No model found for FIT RCF prediction.");
         }
         ThresholdedRandomCutForestState state = RCFModelSerDeSer.deserializeTRCF(model.getContent());
-        ThresholdedRandomCutForest forest = trcfMapper.toModel(state);
-        List<Map<String, Object>> predictResult = process(dataFrame, forest);
-        return MLPredictionOutput.builder().predictionResult(DataFrameBuilder.load(predictResult)).build();
+        forest = trcfMapper.toModel(state);
+        return predict(dataFrame);
     }
 
     @Override

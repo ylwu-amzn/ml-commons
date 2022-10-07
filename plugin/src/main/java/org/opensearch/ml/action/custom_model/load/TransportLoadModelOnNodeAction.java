@@ -130,28 +130,20 @@ public class TransportLoadModelOnNodeAction extends
         String localNodeId = clusterService.localNode().getId();
 
         ActionListener<MLForwardResponse> taskDoneListener = ActionListener
-            .wrap(res -> { log.debug("load model done " + res); }, ex -> { log.error(ex); });
+            .wrap(res -> { log.info("load model done " + res); }, ex -> { log.error(ex); });
 
         loadModel(modelId, localNodeId, coordinatingNodeId, mlTask, ActionListener.wrap(r -> {
             if (!coordinatingNodeId.equals(localNodeId)) {
                 mlTaskManager.remove(taskId);
             }
-            MLForwardInput forwardInput = new MLForwardInput(
-                null,
-                null,
-                taskId,
-                modelId,
-                clusterService.localNode().getId(),
-                MLForwardRequestType.LOAD_MODEL_DONE,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null
-            );
-            MLForwardRequest loadModelDoneMessage = new MLForwardRequest(forwardInput);
+            MLForwardInput mlForwardInput = MLForwardInput
+                .builder()
+                .requestType(MLForwardRequestType.LOAD_MODEL_DONE)
+                .taskId(taskId)
+                .modelId(modelId)
+                .workerNodeId(clusterService.localNode().getId())
+                .build();
+            MLForwardRequest loadModelDoneMessage = new MLForwardRequest(mlForwardInput);
 
             transportService
                 .sendRequest(
@@ -173,22 +165,15 @@ public class TransportLoadModelOnNodeAction extends
                 // remove task cache on worker node
                 mlTaskManager.remove(taskId);
             }
-            MLForwardInput forwardInput = new MLForwardInput(
-                null,
-                null,
-                taskId,
-                modelId,
-                clusterService.localNode().getId(),
-                MLForwardRequestType.LOAD_MODEL_DONE,
-                null,
-                null,
-                null,
-                null,
-                null,
-                ExceptionUtils.getStackTrace(e),
-                null
-            );
-            MLForwardRequest loadModelDoneMessage = new MLForwardRequest(forwardInput);
+            MLForwardInput mlForwardInput = MLForwardInput
+                .builder()
+                .requestType(MLForwardRequestType.LOAD_MODEL_DONE)
+                .taskId(taskId)
+                .modelId(modelId)
+                .workerNodeId(clusterService.localNode().getId())
+                .error(ExceptionUtils.getStackTrace(e))
+                .build();
+            MLForwardRequest loadModelDoneMessage = new MLForwardRequest(mlForwardInput);
 
             transportService
                 .sendRequest(
@@ -221,7 +206,7 @@ public class TransportLoadModelOnNodeAction extends
             }
             mlModelManager.loadModel1(modelId, listener);
         } catch (Exception e) {
-            log.error("Failed to loaddd custom model " + modelId, e);
+            log.error("Failed to load custom model " + modelId, e);
             listener.onFailure(e);
         }
     }

@@ -86,7 +86,7 @@ public class TransportUploadModelAction extends HandledTransportAction<ActionReq
             .async(true)
             .taskType(MLTaskType.UPLOAD_MODEL)
             .functionName(FunctionName.CUSTOM)
-            .inputType(MLInputDataType.SEARCH_QUERY)
+            .inputType(MLInputDataType.SEARCH_QUERY)// TODO: fix this
             .createTime(Instant.now())
             .lastUpdateTime(Instant.now())
             .state(MLTaskState.CREATED)
@@ -98,26 +98,15 @@ public class TransportUploadModelAction extends HandledTransportAction<ActionReq
 
             mlTaskDispatcher.dispatch(ActionListener.wrap(nodeId -> {
                 if (clusterService.localNode().getId().equals(nodeId)) {
-                    mlModelUploader.uploadModel(mlUploadInput, mlTask);
+                    mlModelUploader.newUploadMoadel(mlUploadInput, mlTask);
                 } else {
-                    MLForwardRequest forwardRequest = new MLForwardRequest(
-                        new MLForwardInput(
-                            mlUploadInput.getName(),
-                            mlUploadInput.getVersion(),
-                            taskId,
-                            null,
-                            nodeId,
-                            MLForwardRequestType.UPLOAD_MODEL,
-                            mlTask,
-                            mlUploadInput.getUrl(),
-                            null,
-                            mlUploadInput.getModelFormat(),
-                            mlUploadInput.getModelConfig(),
-                            null,
-                            null
-                        )
-                    );
-
+                    MLForwardInput forwardInput = MLForwardInput
+                        .builder()
+                        .requestType(MLForwardRequestType.UPLOAD_MODEL)
+                        .uploadInput(mlUploadInput)
+                        .mlTask(mlTask)
+                        .build();
+                    MLForwardRequest forwardRequest = new MLForwardRequest(forwardInput);
                     ActionListener<MLForwardResponse> myListener = ActionListener
                         .wrap(
                             res -> { log.debug("Response from model node: " + res); },

@@ -53,7 +53,9 @@ import org.opensearch.ml.action.tasks.GetTaskTransportAction;
 import org.opensearch.ml.action.tasks.SearchTaskTransportAction;
 import org.opensearch.ml.action.training.TransportTrainingTaskAction;
 import org.opensearch.ml.action.trainpredict.TransportTrainAndPredictionTaskAction;
+import org.opensearch.ml.cluster.DiscoveryNodeFilterer;
 import org.opensearch.ml.cluster.MLCommonsClusterEventListener;
+import org.opensearch.ml.cluster.MLCommonsClusterManagerEventListener;
 import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.common.breaker.MLCircuitBreakerService;
 import org.opensearch.ml.common.input.execute.anomalylocalization.AnomalyLocalizationInput;
@@ -151,6 +153,7 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin {
     private IndexUtils indexUtils;
     private CustomModelManager customModelManager;
     private MLModelUploader mlModelUploader;
+    private DiscoveryNodeFilterer nodeFilter;
 
     private Client client;
     private ClusterService clusterService;
@@ -212,6 +215,8 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin {
         MLCircuitBreakerService mlCircuitBreakerService = new MLCircuitBreakerService(jvmService).init();
 
         Map<Enum, MLStat<?>> stats = new ConcurrentHashMap<>();
+
+        nodeFilter = new DiscoveryNodeFilterer(clusterService);
         // cluster level stats
         stats.put(MLClusterLevelStat.ML_MODEL_INDEX_STATUS, new MLStat<>(true, new IndexStatusSupplier(indexUtils, ML_MODEL_INDEX)));
         stats.put(MLClusterLevelStat.ML_TASK_INDEX_STATUS, new MLStat<>(true, new IndexStatusSupplier(indexUtils, ML_TASK_INDEX)));
@@ -227,7 +232,7 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin {
         mlIndicesHandler = new MLIndicesHandler(clusterService, client);
         mlTaskManager = new MLTaskManager(client, mlIndicesHandler);
         customModelManager = new CustomModelManager();
-        mlModelManager = new MLModelManager(client, threadPool, xContentRegistry, customModelManager);
+        mlModelManager = new MLModelManager(clusterService, client, threadPool, xContentRegistry, customModelManager, settings);
         mlInputDatasetHandler = new MLInputDatasetHandler(client);
         mlModelUploader = new MLModelUploader(customModelManager, mlIndicesHandler, mlTaskManager, mlModelManager, threadPool, client);
 
@@ -252,7 +257,8 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin {
             mlInputDatasetHandler,
             mlTaskDispatcher,
             mlCircuitBreakerService,
-            xContentRegistry
+            xContentRegistry,
+            mlModelManager
         );
         mlTrainAndPredictTaskRunner = new MLTrainAndPredictTaskRunner(
             threadPool,
@@ -289,9 +295,19 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin {
             mlModelManager,
             mlTaskManager
         );
+        MLCommonsClusterManagerEventListener clusterManagerEventListener = new MLCommonsClusterManagerEventListener(
+            clusterService,
+            client,
+            settings,
+            threadPool,
+            mlModelManager,
+            mlTaskManager,
+            nodeFilter
+        );
 
         return ImmutableList
             .of(
+                nodeFilter,
                 mlStats,
                 mlTaskManager,
                 mlModelManager,
@@ -305,7 +321,8 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin {
                 mlTaskDispatcher,
                 customModelManager,
                 mlModelUploader,
-                mlCommonsClusterEventListener
+                mlCommonsClusterEventListener,
+                clusterManagerEventListener
             );
     }
 
@@ -380,7 +397,13 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin {
 
     @Override
     public List<Setting<?>> getSettings() {
-        List<Setting<?>> settings = ImmutableList.of(MLCommonsSettings.ML_COMMONS_TASK_DISPATCH_POLICY);
+        List<Setting<?>> settings = ImmutableList
+            .of(
+                MLCommonsSettings.ML_COMMONS_TASK_DISPATCH_POLICY,
+                MLCommonsSettings.ML_COMMONS_MAX_MODELS_PER_NODE,
+                MLCommonsSettings.ML_COMMONS_ONLY_RUN_ON_ML_NODE,
+                MLCommonsSettings.ML_COMMONS_SYNC_UP_JOB_INTERVAL_IN_SECONDS
+            );
         return settings;
     }
 }

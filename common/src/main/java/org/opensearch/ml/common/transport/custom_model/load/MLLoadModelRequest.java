@@ -34,16 +34,16 @@ import static org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedT
 @ToString
 public class MLLoadModelRequest extends MLTaskRequest {
 
-    private static final String NODE_IDS_FIELD = "node_ids";
+    private static final String MODEL_NODE_IDS_FIELD = "model_node_ids";
     private String modelId;
-    private String[] nodeIds;
+    private String[] modelNodeIds;
     boolean async;
 
     @Builder
-    public MLLoadModelRequest(String modelId, String[] nodeIds, boolean async, boolean dispatchTask) {
+    public MLLoadModelRequest(String modelId, String[] modelNodeIds, boolean async, boolean dispatchTask) {
         super(dispatchTask);
         this.modelId = modelId;
-        this.nodeIds = nodeIds;
+        this.modelNodeIds = modelNodeIds;
         this.async = async;
     }
 
@@ -54,7 +54,7 @@ public class MLLoadModelRequest extends MLTaskRequest {
     public MLLoadModelRequest(StreamInput in) throws IOException {
         super(in);
         this.modelId = in.readString();
-        this.nodeIds = in.readOptionalStringArray();
+        this.modelNodeIds = in.readOptionalStringArray();
         this.async = in.readBoolean();
     }
 
@@ -72,7 +72,7 @@ public class MLLoadModelRequest extends MLTaskRequest {
     public void writeTo(StreamOutput out) throws IOException {
         super.writeTo(out);
         out.writeString(modelId);
-        out.writeOptionalStringArray(nodeIds);
+        out.writeOptionalStringArray(modelNodeIds);
         out.writeBoolean(async);
     }
 
@@ -84,7 +84,7 @@ public class MLLoadModelRequest extends MLTaskRequest {
             parser.nextToken();
 
             switch (fieldName) {
-                case NODE_IDS_FIELD:
+                case MODEL_NODE_IDS_FIELD:
                     ensureExpectedToken(XContentParser.Token.START_ARRAY, parser.currentToken(), parser);
                     while (parser.nextToken() != XContentParser.Token.END_ARRAY) {
                         nodeIdList.add(parser.text());

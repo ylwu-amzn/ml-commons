@@ -22,8 +22,6 @@ import org.opensearch.ml.action.custom_model.upload.MLModelUploader;
 import org.opensearch.ml.common.MLModel;
 import org.opensearch.ml.common.MLTask;
 import org.opensearch.ml.common.MLTaskState;
-import org.opensearch.ml.common.model.MLModelConfig;
-import org.opensearch.ml.common.model.MLModelFormat;
 import org.opensearch.ml.common.model.MLModelState;
 import org.opensearch.ml.common.output.model.ModelTensorOutput;
 import org.opensearch.ml.common.transport.custom_model.forward.MLForwardAction;
@@ -94,16 +92,14 @@ public class TransportForwardAction extends HandledTransportAction<ActionRequest
         MLForwardRequest mlForwardRequest = MLForwardRequest.fromActionRequest(request);
         MLForwardInput forwardInput = mlForwardRequest.getForwardInput();
         String modelId = forwardInput.getModelId();
-        String modelName = forwardInput.getName();
-        Integer version = forwardInput.getVersion();
         String taskId = forwardInput.getTaskId();
-        String workerNodeId = forwardInput.getWorkerNodeId();
+        MLUploadInput uploadInput = forwardInput.getUploadInput();
         MLTask mlTask = forwardInput.getMlTask();
+        String workerNodeId = forwardInput.getWorkerNodeId();
         MLForwardRequestType requestType = forwardInput.getRequestType();
-        String url = forwardInput.getUrl();
-        MLModelFormat modelFormat = forwardInput.getModelFormat();
-        MLModelConfig modelConfig = forwardInput.getModelConfig();
+
         String error = forwardInput.getError();
+        log.info("receive forward request: " + forwardInput.getRequestType());
         try {
             switch (requestType) {
                 case LOAD_MODEL_DONE:
@@ -137,9 +133,12 @@ public class TransportForwardAction extends HandledTransportAction<ActionRequest
                                     );
                             }
                         }
-                        String errors = mlTaskCache.getErrors().toString();
-                        mlTaskManager
-                            .updateMLTask(taskId, ImmutableMap.of(MLTask.STATE_FIELD, taskState, MLTask.ERROR_FIELD, errors), 5000);
+                        ImmutableMap.Builder<String, Object> builder = ImmutableMap.builder();
+                        builder.put(MLTask.STATE_FIELD, taskState);
+                        if (mlTaskCache.hasError()) {
+                            builder.put(MLTask.ERROR_FIELD, mlTaskCache.getErrors().toString());
+                        }
+                        mlTaskManager.updateMLTask(taskId, builder.build(), 5000);
 
                         if (!mlTaskCache.allNodeFailed()) {
                             MLModelState modelState = mlTaskCache.hasError() ? MLModelState.PARTIALLY_LOADED : MLModelState.LOADED;
@@ -156,12 +155,12 @@ public class TransportForwardAction extends HandledTransportAction<ActionRequest
                                 );
                         }
 
-                        mlTaskManager.remove(taskId);
+                        mlTaskManager.remove(taskId); // TODO: change task state as finished.
                     }
                     listener.onResponse(new MLForwardResponse("ok", null));
                     break;
                 case UPLOAD_MODEL:
-                    mlModelUploader.uploadModel(new MLUploadInput(modelName, version, url, modelFormat, modelConfig), mlTask);
+                    mlModelUploader.newUploadMoadel(uploadInput, mlTask);
                     listener.onResponse(new MLForwardResponse("ok", null));
                     break;
                 case PREDICT_MODEL:
@@ -172,7 +171,7 @@ public class TransportForwardAction extends HandledTransportAction<ActionRequest
                     throw new IllegalArgumentException("unsupported request type");
             }
         } catch (Exception e) {
-            log.error("Failed to execute forward action for " + modelName, e);
+            log.error("Failed to execute forward action", e);
             listener.onFailure(e);
         }
     }

@@ -74,7 +74,12 @@ public class TransportSyncupAction extends HandledTransportAction<ActionRequest,
         String[] removedWorkerNodes = deployModelRequest.getRemovedWorkerNodes();
         try {
             String[] nodeIds = mlTaskDispatcher.getAllNodes();
-            MLSyncUpInput syncUpInput = new MLSyncUpInput(modelId, addedWorkerNodes, removedWorkerNodes);
+            MLSyncUpInput syncUpInput = MLSyncUpInput
+                .builder()
+                .modelId(modelId)
+                .addedWorkerNodes(addedWorkerNodes)
+                .removedWorkerNodes(removedWorkerNodes)
+                .build();
             MLSyncUpNodesRequest syncUpRequest = new MLSyncUpNodesRequest(nodeIds, syncUpInput);
             client
                 .execute(

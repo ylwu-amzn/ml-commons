@@ -69,6 +69,8 @@ public class LogisticRegression implements Trainable, Predictable {
     private LogisticRegressionParams parameters;
     private StochasticGradientOptimiser optimiser;
     private LabelObjective objective;
+    private org.tribuo.Model<Label> classificationModel;
+
     /**
      * Initialize a linear regression algorithm.
      * @param parameters the parameters for linear regression algorithm
@@ -181,12 +183,12 @@ public class LogisticRegression implements Trainable, Predictable {
     }
 
     @Override
-    public MLOutput predict(DataFrame dataFrame, Model model) {
-        if (model == null) {
-            throw new IllegalArgumentException("No model found for logistic regression prediction.");
-        }
+    public void initModel(Model model) {
+        this.classificationModel = (org.tribuo.Model<Label>)ModelSerDeSer.deserialize(model.getContent());
+    }
 
-        org.tribuo.Model<Label> classificationModel = (org.tribuo.Model<Label>)ModelSerDeSer.deserialize(model.getContent());
+    @Override
+    public MLOutput predict(DataFrame dataFrame) {
         MutableDataset<Label> predictionDataset = TribuoUtil.generateDataset(dataFrame, new LabelFactory(),
                 "Logistic regression prediction data from OpenSearch", TribuoOutputType.LABEL);
 
@@ -195,5 +197,15 @@ public class LogisticRegression implements Trainable, Predictable {
         predictions.forEach(e -> listPrediction.add(Collections.singletonMap("result", e.getOutput().getLabel())));
 
         return MLPredictionOutput.builder().predictionResult(DataFrameBuilder.load(listPrediction)).build();
+    }
+
+    @Override
+    public MLOutput predict(DataFrame dataFrame, Model model) {
+        if (model == null) {
+            throw new IllegalArgumentException("No model found for logistic regression prediction.");
+        }
+
+        classificationModel = (org.tribuo.Model<Label>)ModelSerDeSer.deserialize(model.getContent());
+        return predict(dataFrame);
     }
 }

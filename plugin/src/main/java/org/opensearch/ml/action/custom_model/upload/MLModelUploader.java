@@ -39,6 +39,8 @@ import org.opensearch.ml.common.MLTask;
 import org.opensearch.ml.common.MLTaskState;
 import org.opensearch.ml.common.model.MLModelState;
 import org.opensearch.ml.common.model.MLModelTaskType;
+import org.opensearch.ml.common.transport.custom_model.load.MLLoadModelAction;
+import org.opensearch.ml.common.transport.custom_model.load.MLLoadModelRequest;
 import org.opensearch.ml.common.transport.custom_model.upload.MLUploadInput;
 import org.opensearch.ml.engine.algorithms.custom.CustomModelManager;
 import org.opensearch.ml.indices.MLIndicesHandler;
@@ -76,6 +78,35 @@ public class MLModelUploader {
         this.client = client;
     }
 
+    public void newUploadMoadel(MLUploadInput uploadInput, MLTask mlTask) {
+        if (uploadInput.getUrl() != null) {
+            uploadModel(uploadInput, mlTask);
+        } else {
+            uploadPrebuiltModel(uploadInput, mlTask);
+        }
+    }
+
+    public void uploadPrebuiltModel(MLUploadInput uploadInput, MLTask mlTask) {
+        String modelName = uploadInput.getModelName();
+        String taskId = mlTask.getTaskId();
+        Integer version = uploadInput.getVersion();
+        boolean loadModel = uploadInput.isLoadModel();
+        mlTaskManager.add(mlTask);
+        customModelManager.downloadPrebuiltModelConfig(taskId, uploadInput, ActionListener.wrap(response -> {
+            mlTaskManager.remove(taskId);
+            uploadModel(response, mlTask);
+        }, e -> {
+            e.printStackTrace();
+            mlTaskManager
+                .updateMLTask(
+                    taskId,
+                    ImmutableMap.of(MLTask.ERROR_FIELD, ExceptionUtils.getStackTrace(e), MLTask.STATE_FIELD, MLTaskState.FAILED),
+                    TIMEOUT_IN_MILLIS
+                );
+            mlTaskManager.remove(taskId);
+        }));
+    }
+
     public void uploadModel(MLUploadInput mlUploadInput, MLTask mlTask) {
         Semaphore semaphore = new Semaphore(1);
         String taskId = mlTask.getTaskId();
@@ -83,7 +114,7 @@ public class MLModelUploader {
 
         AtomicInteger uploaded = new AtomicInteger(0);
         threadPool.executor(TASK_THREAD_POOL).execute(() -> {
-            String modelName = mlUploadInput.getName();
+            String modelName = mlUploadInput.getModelName();
             Integer version = mlUploadInput.getVersion();
 
             try (ThreadContext.StoredContext context = client.threadPool().getThreadContext().stashContext()) {
@@ -94,7 +125,7 @@ public class MLModelUploader {
                         .algorithm(FunctionName.CUSTOM)
                         .version(version)
                         .modelFormat(mlUploadInput.getModelFormat())
-                        .modelTaskType(MLModelTaskType.TEXT_EMBEDDING)
+                        .modelTaskType(MLModelTaskType.TEXT_EMBEDDING)// TODO: support other task type
                         .modelState(MLModelState.UPLOADING)
                         .modelConfig(mlUploadInput.getModelConfig())
                         .createdTime(Instant.now())
@@ -170,6 +201,25 @@ public class MLModelUploader {
                                                                 TIMEOUT_IN_MILLIS
                                                             );
                                                         mlTaskManager.remove(taskId);
+                                                        if (mlUploadInput.isLoadModel()) {
+                                                            String[] modelNodeIds = mlUploadInput.getModelNodeIds();
+                                                            MLLoadModelRequest mlLoadModelRequest = new MLLoadModelRequest(
+                                                                modelId,
+                                                                modelNodeIds,
+                                                                false,
+                                                                true
+                                                            );
+                                                            client
+                                                                .execute(
+                                                                    MLLoadModelAction.INSTANCE,
+                                                                    mlLoadModelRequest,
+                                                                    ActionListener
+                                                                        .wrap(
+                                                                            response -> { log.info(response); },
+                                                                            exc -> { exc.printStackTrace(); }
+                                                                        )
+                                                                );
+                                                        }
                                                     }, exception -> {
                                                         log.error("Failed to index model chunk", exception);
                                                         mlTaskManager

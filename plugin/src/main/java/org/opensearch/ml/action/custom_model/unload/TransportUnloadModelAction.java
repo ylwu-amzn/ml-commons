@@ -5,6 +5,9 @@
 
 package org.opensearch.ml.action.custom_model.unload;
 
+import static org.opensearch.ml.common.CommonValue.DELETED;
+import static org.opensearch.ml.common.CommonValue.NOT_FOUND;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -84,7 +87,7 @@ public class TransportUnloadModelAction extends
                 Map<String, String> modelUnloadStatus = r.getModelUnloadStatus();
                 for (Map.Entry<String, String> entry : modelUnloadStatus.entrySet()) {
                     String status = entry.getValue();
-                    if ("deleted".equals(status) || "not_found".equals(status)) {
+                    if (DELETED.equals(status) || NOT_FOUND.equals(status)) {
                         String modelId = entry.getKey();
                         if (!removedNodeMap.containsKey(modelId)) {
                             removedNodeMap.put(modelId, new ArrayList<>());
@@ -102,7 +105,7 @@ public class TransportUnloadModelAction extends
                         MLSyncUpAction.INSTANCE,
                         syncUpRequest,
                         ActionListener
-                            .wrap(r -> { log.debug("sync up removed nodes"); }, e -> { log.error("failed to sync up removed node", e); })
+                            .wrap(r -> { log.info("sync up removed nodes"); }, e -> { log.error("failed to sync up removed node", e); })
                     );
             }
         }
@@ -136,9 +139,14 @@ public class TransportUnloadModelAction extends
             }
         }
 
-        mlModelManager.unloadModel(unloadModelInput);
+        Map<String, String> modelStatus = mlModelManager.unloadModel(unloadModelInput);
+        modelUnloadStatus.putAll(modelStatus);
         Map<String, String> status = customModelManager.unloadModel(unloadModelInput);
-        modelUnloadStatus.putAll(status);
+        status.entrySet().forEach(entry -> {
+            if (!NOT_FOUND.equals(entry.getValue())) {
+                modelUnloadStatus.put(entry.getKey(), entry.getValue());
+            }
+        });
         return new UnloadModelNodeResponse(clusterService.localNode(), modelUnloadStatus);
     }
 }

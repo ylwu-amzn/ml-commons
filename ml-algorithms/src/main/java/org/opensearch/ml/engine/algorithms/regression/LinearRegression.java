@@ -71,6 +71,7 @@ public class LinearRegression implements Trainable, Predictable {
     private int loggingInterval;
     private int minibatchSize;
     private long seed;
+    private org.tribuo.Model<Regressor> regressionModel;
 
     public LinearRegression() {}
 
@@ -191,13 +192,17 @@ public class LinearRegression implements Trainable, Predictable {
         seed = Optional.ofNullable(parameters.getSeed()).orElse(DEFAULT_SEED);
     }
 
-    @Override
-    public MLOutput predict(DataFrame dataFrame, Model model) {
-        if (model == null) {
-            throw new IllegalArgumentException("No model found for linear regression prediction.");
-        }
 
-        org.tribuo.Model<Regressor> regressionModel = (org.tribuo.Model<Regressor>) ModelSerDeSer.deserialize(model.getContent());
+    @Override
+    public void initModel(Model model) {
+        regressionModel = (org.tribuo.Model<Regressor>) ModelSerDeSer.deserialize(model.getContent());
+    }
+
+    @Override
+    public MLOutput predict(DataFrame dataFrame) {
+        if (regressionModel == null) {
+            throw new IllegalArgumentException("model not loaded");
+        }
         MutableDataset<Regressor> predictionDataset = TribuoUtil.generateDataset(dataFrame, new RegressionFactory(),
                 "Linear regression prediction data from opensearch", TribuoOutputType.REGRESSOR);
         List<Prediction<Regressor>> predictions = regressionModel.predict(predictionDataset);
@@ -205,6 +210,16 @@ public class LinearRegression implements Trainable, Predictable {
         predictions.forEach(e -> listPrediction.add(Collections.singletonMap(e.getOutput().getNames()[0], e.getOutput().getValues()[0])));
 
         return MLPredictionOutput.builder().predictionResult(DataFrameBuilder.load(listPrediction)).build();
+    }
+
+    @Override
+    public MLOutput predict(DataFrame dataFrame, Model model) {
+        if (model == null) {
+            throw new IllegalArgumentException("No model found for linear regression prediction.");
+        }
+
+        regressionModel = (org.tribuo.Model<Regressor>) ModelSerDeSer.deserialize(model.getContent());
+        return predict(dataFrame);
     }
 
     @Override

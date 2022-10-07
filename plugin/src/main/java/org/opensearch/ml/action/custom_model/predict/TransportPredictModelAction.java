@@ -74,23 +74,13 @@ public class TransportPredictModelAction extends HandledTransportAction<ActionRe
                     ModelTensorOutput result = customModelManager.predict(modelId, input);
                     listener.onResponse(MLTaskResponse.builder().output(result).build());
                 } else {
-                    MLForwardRequest forwardRequest = new MLForwardRequest(
-                        new MLForwardInput(
-                            null,
-                            null,
-                            null,
-                            modelId,
-                            nodeId,
-                            MLForwardRequestType.PREDICT_MODEL,
-                            null,
-                            null,
-                            input,
-                            null,
-                            null,
-                            null,
-                            null
-                        )
-                    );
+                    MLForwardInput mlForwardInput = MLForwardInput
+                        .builder()
+                        .requestType(MLForwardRequestType.PREDICT_MODEL)
+                        .modelId(modelId)
+                        .modelInput(input)
+                        .build();
+                    MLForwardRequest forwardRequest = new MLForwardRequest(mlForwardInput);
                     ActionListener<MLForwardResponse> myListener = ActionListener
                         .wrap(
                             res -> { listener.onResponse(MLTaskResponse.builder().output(res.getMlOutput()).build()); },

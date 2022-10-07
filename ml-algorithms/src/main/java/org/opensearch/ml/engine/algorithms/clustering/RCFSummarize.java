@@ -22,6 +22,7 @@ import org.opensearch.ml.engine.utils.TribuoUtil;
 import com.amazon.randomcutforest.returntypes.SampleSummary;
 import com.amazon.randomcutforest.summarization.Summarizer;
 import org.opensearch.ml.engine.algorithms.clustering.SerializableSummary;
+import org.tribuo.clustering.kmeans.KMeansModel;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -43,6 +44,7 @@ public class RCFSummarize implements TrainAndPredictable {
     // Parameters
     private RCFSummarizeParams parameters;
     private BiFunction<float[], float[], Double> distance;
+    private SampleSummary summary;
 
     public RCFSummarize() {}
 
@@ -128,12 +130,12 @@ public class RCFSummarize implements TrainAndPredictable {
     }
 
     @Override
-    public MLOutput predict(DataFrame dataFrame, Model model) {
-        if (model == null) {
-            throw new IllegalArgumentException("No model found for RCFSummarize prediction.");
-        }
+    public void initModel(Model model) {
+        this.summary = ((SerializableSummary)ModelSerDeSer.deserialize(model.getContent())).getSummary();
+    }
 
-        SampleSummary summary = ((SerializableSummary)ModelSerDeSer.deserialize(model.getContent())).getSummary();
+    @Override
+    public MLOutput predict(DataFrame dataFrame) {
         Iterable<float[]> centroidsLst = Arrays.asList(summary.summaryPoints);
         Tuple<String[], float[][]> featureNamesValues = TribuoUtil.transformDataFrameFloat(dataFrame);
         List<Integer> predictions = new ArrayList<>();
@@ -143,6 +145,16 @@ public class RCFSummarize implements TrainAndPredictable {
         predictions.forEach(e -> listClusterID.add(Collections.singletonMap("ClusterID", e)));
 
         return MLPredictionOutput.builder().predictionResult(DataFrameBuilder.load(listClusterID)).build();
+    }
+
+    @Override
+    public MLOutput predict(DataFrame dataFrame, Model model) {
+        if (model == null) {
+            throw new IllegalArgumentException("No model found for RCFSummarize prediction.");
+        }
+
+        summary = ((SerializableSummary)ModelSerDeSer.deserialize(model.getContent())).getSummary();
+        return predict(dataFrame);
     }
 
     @Override
