@@ -33,7 +33,7 @@ public class MLCommonsClusterManagerEventListener implements LocalNodeClusterMan
 
     private ThreadPool threadPool;
     private Scheduler.Cancellable syncModelRoutingCron;
-    private DiscoveryNodeFilterer nodeFilter;
+    private DiscoveryNodeHelper nodeHelper;
 
     private volatile Integer jobInterval;
 
@@ -44,7 +44,7 @@ public class MLCommonsClusterManagerEventListener implements LocalNodeClusterMan
         ThreadPool threadPool,
         MLModelManager mlModelManager,
         MLTaskManager mlTaskManager,
-        DiscoveryNodeFilterer nodeFilter
+        DiscoveryNodeHelper nodeHelper
     ) {
         this.clusterService = clusterService;
         this.client = client;
@@ -53,13 +53,15 @@ public class MLCommonsClusterManagerEventListener implements LocalNodeClusterMan
         this.clusterService.addListener(this);
         this.mlModelManager = mlModelManager;
         this.mlTaskManager = mlTaskManager;
-        this.nodeFilter = nodeFilter;
+        this.nodeHelper = nodeHelper;
 
         this.jobInterval = ML_COMMONS_SYNC_UP_JOB_INTERVAL_IN_SECONDS.get(settings);
         clusterService.getClusterSettings().addSettingsUpdateConsumer(ML_COMMONS_SYNC_UP_JOB_INTERVAL_IN_SECONDS, it -> {
             jobInterval = it;
-            if (syncModelRoutingCron != null) {
-                cancel(syncModelRoutingCron);
+            cancel(syncModelRoutingCron);
+            if (jobInterval <= 0) {
+                log.debug("Stop ML syncup job as its interval is <=0");
+            } else {
                 startSyncModelRoutingCron();
             }
         });
@@ -74,11 +76,7 @@ public class MLCommonsClusterManagerEventListener implements LocalNodeClusterMan
 
     private void startSyncModelRoutingCron() {
         syncModelRoutingCron = threadPool
-            .scheduleWithFixedDelay(
-                new SyncUpModelRoutingCron(client, nodeFilter),
-                TimeValue.timeValueSeconds(jobInterval),
-                TASK_THREAD_POOL
-            );
+            .scheduleWithFixedDelay(new MLSyncUpCron(client, nodeHelper), TimeValue.timeValueSeconds(jobInterval), TASK_THREAD_POOL);
         clusterService.addLifecycleListener(new LifecycleListener() {
             @Override
             public void beforeStop() {

@@ -114,9 +114,13 @@ public class RestMLProfileAction extends BaseRestHandler {
         if (taskIds.isPresent()) {
             mlProfileInput.getTaskIds().addAll(Arrays.asList(taskIds.get()));
         }
-        if (modelIds.isEmpty() && taskIds.isEmpty()) {
+        if (taskIds.isEmpty()) {
             // return all tasks in cache memory
-            mlProfileInput.setReturnAllMLTasks(true);
+            mlProfileInput.setReturnAllTasks(true);
+        }
+        if (modelIds.isEmpty()) {
+            // return all models in cache memory
+            mlProfileInput.setReturnAllModels(true);
         }
 
         return mlProfileInput;

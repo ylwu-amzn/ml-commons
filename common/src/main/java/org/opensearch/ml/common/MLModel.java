@@ -22,7 +22,6 @@ import org.opensearch.ml.common.model.TextEmbeddingModelConfig;
 
 import java.io.IOException;
 import java.time.Instant;
-import java.util.Base64;
 
 import static org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken;
 import static org.opensearch.ml.common.CommonValue.USER;
@@ -96,13 +95,6 @@ public class MLModel implements ToXContentObject {
         this.modelId = modelId;
         this.chunkNumber = chunkNumber;
         this.totalChunks = totalChunks;
-    }
-
-    public MLModel(FunctionName algorithm, Model model) {
-        this.name = model.getName();
-        this.algorithm = algorithm;
-        this.version = model.getVersion();
-        this.content = Base64.getEncoder().encodeToString(model.getContent());
     }
 
     public MLModel(StreamInput input) throws IOException{

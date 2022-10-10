@@ -194,6 +194,7 @@ public class MLInput implements Input {
                     break;
                 case INPUT_DATA_FIELD:
                     dataFrame = DefaultDataFrame.parse(parser);
+                    break;
                 case MODEL_TASK_TYPE_FIELD:
                     modelTaskType = MLModelTaskType.from(parser.text().toUpperCase(Locale.ROOT));
                     break;
@@ -228,19 +229,10 @@ public class MLInput implements Input {
         }
         MLModelTaskType mlModelTaskType = null;
         MLInputDataset inputDataSet = null;
-        if (algorithm == FunctionName.CUSTOM) {
-            if (modelTaskType == null) {
-                throw new IllegalArgumentException("model task type not set");
-            }
-            switch (modelTaskType) {
-                case TEXT_EMBEDDING:
-                    ModelResultFilter filter = new ModelResultFilter(returnBytes, returnNumber, targetResponse, targetResponsePositions);
-                    inputDataSet = new TextDocsInputDataSet(textDocs, filter);
-                    mlModelTaskType = MLModelTaskType.TEXT_EMBEDDING;
-                    break;
-                default:
-                    throw new IllegalArgumentException("unknown model task type");
-            }
+        if (algorithm == FunctionName.TEXT_EMBEDDING) {
+            ModelResultFilter filter = new ModelResultFilter(returnBytes, returnNumber, targetResponse, targetResponsePositions);
+            inputDataSet = new TextDocsInputDataSet(textDocs, filter);
+            mlModelTaskType = MLModelTaskType.TEXT_EMBEDDING;
         }
         return new MLInput(algorithm, mlParameters, searchSourceBuilder, sourceIndices, dataFrame, inputDataSet, mlModelTaskType);
     }
@@ -258,13 +250,6 @@ public class MLInput implements Input {
     @Override
     public FunctionName getFunctionName() {
         return this.algorithm;
-    }
-
-    public DataFrame getDataFrame() {
-        if (inputDataset == null || !(inputDataset instanceof DataFrameInputDataset)) {
-            return null;
-        }
-        return ((DataFrameInputDataset)inputDataset).getDataFrame();
     }
 
 }

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package org.opensearch.ml.engine.algorithms.custom;
+package org.opensearch.ml.engine.algorithms.text_embedding;
 
 import ai.djl.huggingface.tokenizers.Encoding;
 import ai.djl.huggingface.tokenizers.HuggingFaceTokenizer;
@@ -27,7 +27,6 @@ import org.opensearch.ml.common.output.model.ModelTensor;
 import java.io.IOException;
 import java.lang.reflect.Type;
 import java.nio.ByteBuffer;
-import java.nio.FloatBuffer;
 import java.nio.file.Path;
 import  java.util.ArrayList;
 import java.util.Iterator;

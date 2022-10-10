@@ -35,6 +35,7 @@ import org.opensearch.common.util.concurrent.ThreadContext;
 import org.opensearch.index.Index;
 import org.opensearch.index.query.MatchAllQueryBuilder;
 import org.opensearch.index.shard.ShardId;
+import org.opensearch.ml.cluster.DiscoveryNodeHelper;
 import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.common.MLTask;
 import org.opensearch.ml.common.breaker.MLCircuitBreakerService;
@@ -83,6 +84,8 @@ public class MLTrainingTaskRunnerTests extends OpenSearchTestCase {
     ActionListener<MLTaskResponse> listener;
     @Mock
     ExecutorService executorService;
+    @Mock
+    DiscoveryNodeHelper nodeHelper;
 
     MLStats mlStats;
     DataFrame dataFrame;
@@ -130,7 +133,8 @@ public class MLTrainingTaskRunnerTests extends OpenSearchTestCase {
                 mlIndicesHandler,
                 mlInputDatasetHandler,
                 mlTaskDispatcher,
-                mlCircuitBreakerService
+                mlCircuitBreakerService,
+                nodeHelper
             )
         );
 

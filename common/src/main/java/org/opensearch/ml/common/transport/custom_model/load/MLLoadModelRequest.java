@@ -34,7 +34,7 @@ import static org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedT
 @ToString
 public class MLLoadModelRequest extends MLTaskRequest {
 
-    private static final String MODEL_NODE_IDS_FIELD = "model_node_ids";
+    private static final String NODE_IDS_FIELD = "node_ids";
     private String modelId;
     private String[] modelNodeIds;
     boolean async;
@@ -84,7 +84,7 @@ public class MLLoadModelRequest extends MLTaskRequest {
             parser.nextToken();
 
             switch (fieldName) {
-                case MODEL_NODE_IDS_FIELD:
+                case NODE_IDS_FIELD:
                     ensureExpectedToken(XContentParser.Token.START_ARRAY, parser.currentToken(), parser);
                     while (parser.nextToken() != XContentParser.Token.END_ARRAY) {
                         nodeIdList.add(parser.text());

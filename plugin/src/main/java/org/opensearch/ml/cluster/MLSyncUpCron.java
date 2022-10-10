@@ -16,18 +16,18 @@ import lombok.extern.log4j.Log4j2;
 import org.opensearch.action.ActionListener;
 import org.opensearch.client.Client;
 import org.opensearch.cluster.node.DiscoveryNode;
+import org.opensearch.ml.common.transport.custom_model.sync.MLSyncUpAction;
 import org.opensearch.ml.common.transport.custom_model.sync.MLSyncUpInput;
 import org.opensearch.ml.common.transport.custom_model.sync.MLSyncUpNodeResponse;
 import org.opensearch.ml.common.transport.custom_model.sync.MLSyncUpNodesRequest;
-import org.opensearch.ml.common.transport.custom_model.sync.MLSyncUpOnNodeAction;
 
 @Log4j2
-public class SyncUpModelRoutingCron implements Runnable {
+public class MLSyncUpCron implements Runnable {
 
     private Client client;
-    private DiscoveryNodeFilterer nodeFilter;
+    private DiscoveryNodeHelper nodeFilter;
 
-    public SyncUpModelRoutingCron(Client client, DiscoveryNodeFilterer nodeFilter) {
+    public MLSyncUpCron(Client client, DiscoveryNodeHelper nodeFilter) {
         this.client = client;
         this.nodeFilter = nodeFilter;
     }
@@ -38,7 +38,7 @@ public class SyncUpModelRoutingCron implements Runnable {
         DiscoveryNode[] allNodes = nodeFilter.getAllNodes();
         MLSyncUpInput syncUpInput = MLSyncUpInput.builder().getLoadedModels(true).build();
         MLSyncUpNodesRequest syncUpRequest = new MLSyncUpNodesRequest(allNodes, syncUpInput);
-        client.execute(MLSyncUpOnNodeAction.INSTANCE, syncUpRequest, ActionListener.wrap(r -> {
+        client.execute(MLSyncUpAction.INSTANCE, syncUpRequest, ActionListener.wrap(r -> {
             List<MLSyncUpNodeResponse> responses = r.getNodes();
             Map<String, Set<String>> modelRoutingTable = new HashMap<>();
             for (MLSyncUpNodeResponse response : responses) {
@@ -54,20 +54,25 @@ public class SyncUpModelRoutingCron implements Runnable {
             for (Map.Entry<String, Set<String>> entry : modelRoutingTable.entrySet()) {
                 log.debug("will sync model routing job for model: {}: {}", entry.getKey(), entry.getValue().toArray(new String[0]));
             }
-            if (modelRoutingTable.size() > 0) {
-                MLSyncUpInput syncUpInput2 = MLSyncUpInput.builder().modelRoutingTable(modelRoutingTable).build();
-                MLSyncUpNodesRequest syncUpRequest2 = new MLSyncUpNodesRequest(allNodes, syncUpInput2);
-                client
-                    .execute(
-                        MLSyncUpOnNodeAction.INSTANCE,
-                        syncUpRequest2,
-                        ActionListener
-                            .wrap(
-                                re -> { log.debug("sync model routing job finished"); },
-                                ex -> { log.error("Failed to sync model routing", ex); }
-                            )
-                    );
+            MLSyncUpInput.MLSyncUpInputBuilder inputBuilder = MLSyncUpInput.builder();
+            if (modelRoutingTable.size() == 0) {
+                log.debug("No loaded model found. Will clear model routing on all nodes");
+                inputBuilder.clearRoutingTable(true);
+            } else {
+                inputBuilder.modelRoutingTable(modelRoutingTable);
             }
+            MLSyncUpInput syncUpInput2 = inputBuilder.build();
+            MLSyncUpNodesRequest syncUpRequest2 = new MLSyncUpNodesRequest(allNodes, syncUpInput2);
+            client
+                .execute(
+                    MLSyncUpAction.INSTANCE,
+                    syncUpRequest2,
+                    ActionListener
+                        .wrap(
+                            re -> { log.debug("sync model routing job finished"); },
+                            ex -> { log.error("Failed to sync model routing", ex); }
+                        )
+                );
         }, e -> { log.error("Failed to sync model routing", e); }));
     }
 }

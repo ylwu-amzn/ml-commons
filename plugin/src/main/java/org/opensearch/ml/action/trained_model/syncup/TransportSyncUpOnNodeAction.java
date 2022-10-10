@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package org.opensearch.ml.action.custom_model.syncup;
+package org.opensearch.ml.action.trained_model.syncup;
 
 import java.io.IOException;
 import java.util.List;
@@ -20,13 +20,13 @@ import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.inject.Inject;
 import org.opensearch.common.io.stream.StreamInput;
 import org.opensearch.common.xcontent.NamedXContentRegistry;
+import org.opensearch.ml.common.transport.custom_model.sync.MLSyncUpAction;
 import org.opensearch.ml.common.transport.custom_model.sync.MLSyncUpInput;
 import org.opensearch.ml.common.transport.custom_model.sync.MLSyncUpNodeRequest;
 import org.opensearch.ml.common.transport.custom_model.sync.MLSyncUpNodeResponse;
 import org.opensearch.ml.common.transport.custom_model.sync.MLSyncUpNodesRequest;
 import org.opensearch.ml.common.transport.custom_model.sync.MLSyncUpNodesResponse;
-import org.opensearch.ml.common.transport.custom_model.sync.MLSyncUpOnNodeAction;
-import org.opensearch.ml.engine.algorithms.custom.CustomModelManager;
+import org.opensearch.ml.engine.ModelHelper;
 import org.opensearch.ml.model.MLModelManager;
 import org.opensearch.ml.task.MLTaskManager;
 import org.opensearch.threadpool.ThreadPool;
@@ -36,7 +36,7 @@ import org.opensearch.transport.TransportService;
 public class TransportSyncUpOnNodeAction extends
     TransportNodesAction<MLSyncUpNodesRequest, MLSyncUpNodesResponse, MLSyncUpNodeRequest, MLSyncUpNodeResponse> {
     TransportService transportService;
-    CustomModelManager customModelManager;
+    ModelHelper customModelManager;
     MLTaskManager mlTaskManager;
     MLModelManager mlModelManager;
     ClusterService clusterService;
@@ -48,7 +48,7 @@ public class TransportSyncUpOnNodeAction extends
     public TransportSyncUpOnNodeAction(
         TransportService transportService,
         ActionFilters actionFilters,
-        CustomModelManager customModelManager,
+        ModelHelper customModelManager,
         MLTaskManager mlTaskManager,
         MLModelManager mlModelManager,
         ClusterService clusterService,
@@ -57,7 +57,7 @@ public class TransportSyncUpOnNodeAction extends
         NamedXContentRegistry xContentRegistry
     ) {
         super(
-            MLSyncUpOnNodeAction.NAME,
+            MLSyncUpAction.NAME,
             threadPool,
             clusterService,
             transportService,
@@ -103,20 +103,29 @@ public class TransportSyncUpOnNodeAction extends
 
     private MLSyncUpNodeResponse createSyncUpNodeResponse(MLSyncUpNodesRequest loadModelNodesRequest) {
         MLSyncUpInput syncUpInput = loadModelNodesRequest.getSyncUpInput();
-        String modelId = syncUpInput.getModelId();
-        String[] addedWorkerNodes = syncUpInput.getAddedWorkerNodes();
-        String[] removedWorkerNodes = syncUpInput.getRemovedWorkerNodes();
+        Map<String, String[]> addedWorkerNodes = syncUpInput.getAddedWorkerNodes();
+        Map<String, String[]> removedWorkerNodes = syncUpInput.getRemovedWorkerNodes();
         Map<String, Set<String>> modelRoutingTable = syncUpInput.getModelRoutingTable();
 
-        mlModelManager.addModelWorkerNode(modelId, addedWorkerNodes);
-        mlModelManager.removeModelWorkerNode(modelId, removedWorkerNodes);
+        if (addedWorkerNodes != null && addedWorkerNodes.size() > 0) {
+            for (Map.Entry<String, String[]> entry : addedWorkerNodes.entrySet()) {
+                mlModelManager.addModelWorkerNode(entry.getKey(), entry.getValue());
+            }
+        }
+        if (removedWorkerNodes != null && removedWorkerNodes.size() > 0) {
+            for (Map.Entry<String, String[]> entry : removedWorkerNodes.entrySet()) {
+                mlModelManager.removeModelWorkerNode(entry.getKey(), entry.getValue());
+            }
+        }
 
         String[] loadedModelIds = null;
         if (syncUpInput.isGetLoadedModels()) {
             loadedModelIds = mlModelManager.getLocalLoadedModels();
         }
 
-        if (modelRoutingTable != null) {
+        if (syncUpInput.isClearRoutingTable()) {
+            mlModelManager.clearRoutingTable();
+        } else if (modelRoutingTable != null) {
             for (Map.Entry<String, Set<String>> entry : modelRoutingTable.entrySet()) {
                 log.debug("latest routing table for model: {}:  {}", entry.getKey(), entry.getValue().toArray(new String[0]));
             }

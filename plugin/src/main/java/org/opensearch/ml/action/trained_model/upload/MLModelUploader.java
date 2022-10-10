@@ -3,18 +3,19 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package org.opensearch.ml.action.custom_model.upload;
+package org.opensearch.ml.action.trained_model.upload;
 
 import static org.opensearch.ml.common.CommonValue.ML_MODEL_INDEX;
 import static org.opensearch.ml.engine.MLEngine.getUploadModelPath;
-import static org.opensearch.ml.engine.algorithms.custom.CustomModelManager.CHUNK_FILES;
-import static org.opensearch.ml.engine.algorithms.custom.CustomModelManager.MODEL_FILE_HASH;
-import static org.opensearch.ml.engine.algorithms.custom.CustomModelManager.MODEL_SIZE_IN_BYTES;
+import static org.opensearch.ml.engine.ModelHelper.CHUNK_FILES;
+import static org.opensearch.ml.engine.ModelHelper.MODEL_FILE_HASH;
+import static org.opensearch.ml.engine.ModelHelper.MODEL_SIZE_IN_BYTES;
 import static org.opensearch.ml.engine.utils.MLFileUtils.deleteFileQuietly;
 import static org.opensearch.ml.plugin.MachineLearningPlugin.TASK_THREAD_POOL;
 
 import java.io.File;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.List;
 import java.util.concurrent.Semaphore;
@@ -42,9 +43,13 @@ import org.opensearch.ml.common.model.MLModelTaskType;
 import org.opensearch.ml.common.transport.custom_model.load.MLLoadModelAction;
 import org.opensearch.ml.common.transport.custom_model.load.MLLoadModelRequest;
 import org.opensearch.ml.common.transport.custom_model.upload.MLUploadInput;
-import org.opensearch.ml.engine.algorithms.custom.CustomModelManager;
+import org.opensearch.ml.engine.ModelHelper;
 import org.opensearch.ml.indices.MLIndicesHandler;
 import org.opensearch.ml.model.MLModelManager;
+import org.opensearch.ml.stats.ActionName;
+import org.opensearch.ml.stats.MLActionLevelStat;
+import org.opensearch.ml.stats.MLNodeLevelStat;
+import org.opensearch.ml.stats.MLStats;
 import org.opensearch.ml.task.MLTaskManager;
 import org.opensearch.threadpool.ThreadPool;
 
@@ -55,20 +60,22 @@ import com.google.common.io.Files;
 public class MLModelUploader {
 
     public static final int TIMEOUT_IN_MILLIS = 5000;
-    private final CustomModelManager customModelManager;
+    private final ModelHelper customModelManager;
     private final MLIndicesHandler mlIndicesHandler;
     private final MLTaskManager mlTaskManager;
     private final MLModelManager mlModelManager;
     private final ThreadPool threadPool;
     private final Client client;
+    private final MLStats mlStats;
 
     public MLModelUploader(
-        CustomModelManager customModelManager,
+        ModelHelper customModelManager,
         MLIndicesHandler mlIndicesHandler,
         MLTaskManager mlTaskManager,
         MLModelManager mlModelManager,
         ThreadPool threadPool,
-        Client client
+        Client client,
+        MLStats mlStats
     ) {
         this.customModelManager = customModelManager;
         this.mlIndicesHandler = mlIndicesHandler;
@@ -76,13 +83,27 @@ public class MLModelUploader {
         this.mlModelManager = mlModelManager;
         this.threadPool = threadPool;
         this.client = client;
+        this.mlStats = mlStats;
     }
 
     public void newUploadMoadel(MLUploadInput uploadInput, MLTask mlTask) {
-        if (uploadInput.getUrl() != null) {
-            uploadModel(uploadInput, mlTask);
-        } else {
-            uploadPrebuiltModel(uploadInput, mlTask);
+        mlStats.getStat(MLNodeLevelStat.ML_NODE_EXECUTING_TASK_COUNT).increment();
+        mlStats.getStat(MLNodeLevelStat.ML_NODE_TOTAL_REQUEST_COUNT).increment();
+        mlStats
+            .createCounterStatIfAbsent(mlTask.getFunctionName(), ActionName.UPLOAD, MLActionLevelStat.ML_ACTION_REQUEST_COUNT)
+            .increment();
+        try {
+            if (uploadInput.getUrl() != null) {
+                uploadModel(uploadInput, mlTask);
+            } else {
+                uploadPrebuiltModel(uploadInput, mlTask);
+            }
+        } catch (Exception e) {
+            mlStats
+                .createCounterStatIfAbsent(mlTask.getFunctionName(), ActionName.UPLOAD, MLActionLevelStat.ML_ACTION_FAILURE_COUNT)
+                .increment();
+        } finally {
+            mlStats.getStat(MLNodeLevelStat.ML_NODE_EXECUTING_TASK_COUNT).increment();
         }
     }
 
@@ -122,7 +143,7 @@ public class MLModelUploader {
                     MLModel mlModelMeta = MLModel
                         .builder()
                         .name(modelName)
-                        .algorithm(FunctionName.CUSTOM)
+                        .algorithm(FunctionName.TEXT_EMBEDDING)
                         .version(version)
                         .modelFormat(mlUploadInput.getModelFormat())
                         .modelTaskType(MLModelTaskType.TEXT_EMBEDDING)// TODO: support other task type
@@ -136,6 +157,7 @@ public class MLModelUploader {
                     indexModelMetaRequest.setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE);
                     client.index(indexModelMetaRequest, ActionListener.wrap(modelMetaRes -> {
                         String modelId = modelMetaRes.getId();
+                        log.info("create new model meta doc {} for upload task {}", modelId, taskId);
                         customModelManager
                             .downloadAndSplit(modelId, modelName, version, mlUploadInput.getUrl(), ActionListener.wrap(result -> {
                                 Long modelSizeInBytes = (Long) result.get(MODEL_SIZE_IN_BYTES);
@@ -150,7 +172,7 @@ public class MLModelUploader {
                                         .builder()
                                         .modelId(modelId)
                                         .name(modelName)
-                                        .algorithm(FunctionName.CUSTOM)
+                                        .algorithm(FunctionName.TEXT_EMBEDDING)
                                         .version(version)
                                         .modelFormat(mlUploadInput.getModelFormat())
                                         .modelTaskType(MLModelTaskType.TEXT_EMBEDDING) // TODO: get this from mlUploadInput
@@ -203,6 +225,12 @@ public class MLModelUploader {
                                                         mlTaskManager.remove(taskId);
                                                         if (mlUploadInput.isLoadModel()) {
                                                             String[] modelNodeIds = mlUploadInput.getModelNodeIds();
+                                                            log
+                                                                .debug(
+                                                                    "uploading model done, start loading model {} on nodes: {}",
+                                                                    modelId,
+                                                                    Arrays.toString(modelNodeIds)
+                                                                );
                                                             MLLoadModelRequest mlLoadModelRequest = new MLLoadModelRequest(
                                                                 modelId,
                                                                 modelNodeIds,

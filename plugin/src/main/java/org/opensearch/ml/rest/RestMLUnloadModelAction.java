@@ -15,6 +15,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 
+import org.apache.commons.lang3.ArrayUtils;
 import org.opensearch.client.node.NodeClient;
 import org.opensearch.cluster.node.DiscoveryNode;
 import org.opensearch.cluster.service.ClusterService;
@@ -69,13 +70,27 @@ public class RestMLUnloadModelAction extends BaseRestHandler {
     @VisibleForTesting
     UnloadModelNodesRequest getRequest(RestRequest request) throws IOException {
         String modelId = request.param(PARAMETER_MODEL_ID);
+        String[] targetModelIds = null;
         if (modelId != null) {
-            return new UnloadModelNodesRequest(getAllNodes(), UnloadModelInput.builder().modelIds(new String[] { modelId }).build());
+            targetModelIds = new String[] { modelId };
         }
-        XContentParser parser = request.contentParser();
-        ensureExpectedToken(XContentParser.Token.START_OBJECT, parser.nextToken(), parser);
-        UnloadModelInput mlInput = UnloadModelInput.parse(parser);
-        return new UnloadModelNodesRequest(getAllNodes(), mlInput);
+        String[] targetNodeIds = getAllNodes();
+        if (request.hasContent()) {
+            XContentParser parser = request.contentParser();
+            ensureExpectedToken(XContentParser.Token.START_OBJECT, parser.nextToken(), parser);
+            UnloadModelInput mlInput = UnloadModelInput.parse(parser);
+            String[] nodeIds = mlInput.getNodeIds();
+            String[] modelIds = mlInput.getModelIds();
+
+            if (ArrayUtils.isNotEmpty(nodeIds)) {
+                targetNodeIds = nodeIds;
+            }
+            if (ArrayUtils.isNotEmpty(modelIds)) {
+                targetModelIds = modelIds;
+            }
+        }
+
+        return new UnloadModelNodesRequest(targetNodeIds, targetModelIds);
     }
 
     private String[] getAllNodes() {

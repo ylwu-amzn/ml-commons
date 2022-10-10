@@ -7,7 +7,9 @@ package org.opensearch.ml.cluster;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.function.Predicate;
 
 import lombok.extern.log4j.Log4j2;
@@ -22,13 +24,22 @@ import org.opensearch.ml.utils.MLNodeUtils;
  * Util class to filter nodes
  */
 @Log4j2
-public class DiscoveryNodeFilterer {
+public class DiscoveryNodeHelper {
     private final ClusterService clusterService;
     private final HotDataNodePredicate eligibleNodeFilter;
 
-    public DiscoveryNodeFilterer(ClusterService clusterService) {
+    public DiscoveryNodeHelper(ClusterService clusterService) {
         this.clusterService = clusterService;
         eligibleNodeFilter = new HotDataNodePredicate();
+    }
+
+    public String[] getEligibleNodeIds() {
+        DiscoveryNode[] nodes = getEligibleNodes();
+        String[] nodeIds = new String[nodes.length];
+        for (int i = 0; i < nodes.length; i++) {
+            nodeIds[i] = nodes[i].getId();
+        }
+        return nodeIds;
     }
 
     public DiscoveryNode[] getEligibleNodes() {
@@ -63,8 +74,50 @@ public class DiscoveryNodeFilterer {
         return nodes.toArray(new DiscoveryNode[0]);
     }
 
+    public String[] getAllNodeIds() {
+        ClusterState state = this.clusterService.state();
+        final List<String> allNodes = new ArrayList<>();
+        for (DiscoveryNode node : state.nodes()) {
+            allNodes.add(node.getId());
+        }
+        return allNodes.toArray(new String[0]);
+    }
+
+    public DiscoveryNode[] getNodes(String[] nodeIds) {
+        ClusterState state = this.clusterService.state();
+        Set<String> nodes = new HashSet<>();
+        for (String nodeId : nodeIds) {
+            nodes.add(nodeId);
+        }
+        List<DiscoveryNode> discoveryNodes = new ArrayList<>();
+        for (DiscoveryNode node : state.nodes()) {
+            if (nodes.contains(node.getId())) {
+                discoveryNodes.add(node);
+            }
+        }
+        return discoveryNodes.toArray(new DiscoveryNode[0]);
+    }
+
+    public String[] getNodeIds(DiscoveryNode[] nodes) {
+        List<String> nodeIds = new ArrayList<>();
+        for (DiscoveryNode node : nodes) {
+            nodeIds.add(node.getId());
+        }
+        return nodeIds.toArray(new String[0]);
+    }
+
     public boolean isEligibleDataNode(DiscoveryNode node) {
         return eligibleNodeFilter.test(node);
+    }
+
+    public DiscoveryNode getNode(String nodeId) {
+        ClusterState state = this.clusterService.state();
+        for (DiscoveryNode node : state.nodes()) {
+            if (node.getId().equals(nodeId)) {
+                return node;
+            }
+        }
+        return null;
     }
 
     static class HotDataNodePredicate implements Predicate<DiscoveryNode> {

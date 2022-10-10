@@ -5,10 +5,12 @@
 
 package org.opensearch.ml.engine.algorithms.regression;
 
-import org.opensearch.ml.common.Model;
+import org.opensearch.ml.common.MLModel;
 import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.common.dataframe.DataFrame;
 import org.opensearch.ml.common.dataframe.DataFrameBuilder;
+import org.opensearch.ml.common.dataset.DataFrameInputDataset;
+import org.opensearch.ml.common.dataset.MLInputDataset;
 import org.opensearch.ml.common.input.parameter.MLAlgoParams;
 import org.opensearch.ml.common.input.parameter.regression.LogisticRegressionParams;
 import org.opensearch.ml.common.output.MLOutput;
@@ -40,6 +42,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+
+import static org.opensearch.ml.engine.utils.ModelSerDeSer.serializeToBase64;
 
 @Function(FunctionName.LOGISTIC_REGRESSION)
 public class LogisticRegression implements Trainable, Predictable {
@@ -168,27 +172,36 @@ public class LogisticRegression implements Trainable, Predictable {
     }
 
     @Override
-    public Model train(DataFrame dataFrame) {
+    public MLModel train(MLInputDataset inputDataset) {
+        DataFrame dataFrame = ((DataFrameInputDataset)inputDataset).getDataFrame();
         MutableDataset<Label> trainDataset = TribuoUtil.generateDatasetWithTarget(dataFrame, new LabelFactory(),
                 "Logistic regression training data from OpenSearch", TribuoOutputType.LABEL, parameters.getTarget());
         // LinearSGDTrainer(objective=LogMulticlass,optimiser=AdaGrad(initialLearningRate=1.0,epsilon=0.1,initialValue=0.0),epochs=5,minibatchSize=1,seed=12345)
         Trainer<Label> logisticRegressionTrainer = new LinearSGDTrainer(objective, optimiser, epochs, loggingInterval, minibatchSize, seed);
         org.tribuo.Model<Label> classificationModel = logisticRegressionTrainer.train(trainDataset);
-        Model model = new Model();
-        model.setName(FunctionName.LOGISTIC_REGRESSION.name());
-        model.setVersion(1);
-        model.setContent(ModelSerDeSer.serialize(classificationModel));
 
+        MLModel model = MLModel.builder()
+                .name(FunctionName.LOGISTIC_REGRESSION.name())
+                .algorithm(FunctionName.LOGISTIC_REGRESSION)
+                .version(1)
+                .content(serializeToBase64(classificationModel))
+                .build();
         return model;
     }
 
     @Override
-    public void initModel(Model model) {
-        this.classificationModel = (org.tribuo.Model<Label>)ModelSerDeSer.deserialize(model.getContent());
+    public void initModel(MLModel model, Map<String, Object> params) {
+        this.classificationModel = (org.tribuo.Model<Label>)ModelSerDeSer.deserialize(model);
     }
 
     @Override
-    public MLOutput predict(DataFrame dataFrame) {
+    public void close() {
+        this.classificationModel = null;
+    }
+
+    @Override
+    public MLOutput predict(MLInputDataset inputDataset) {
+        DataFrame dataFrame = ((DataFrameInputDataset)inputDataset).getDataFrame();
         MutableDataset<Label> predictionDataset = TribuoUtil.generateDataset(dataFrame, new LabelFactory(),
                 "Logistic regression prediction data from OpenSearch", TribuoOutputType.LABEL);
 
@@ -200,12 +213,12 @@ public class LogisticRegression implements Trainable, Predictable {
     }
 
     @Override
-    public MLOutput predict(DataFrame dataFrame, Model model) {
+    public MLOutput predict(MLInputDataset inputDataset, MLModel model) {
         if (model == null) {
             throw new IllegalArgumentException("No model found for logistic regression prediction.");
         }
 
-        classificationModel = (org.tribuo.Model<Label>)ModelSerDeSer.deserialize(model.getContent());
-        return predict(dataFrame);
+        classificationModel = (org.tribuo.Model<Label>)ModelSerDeSer.deserialize(model);
+        return predict(inputDataset);
     }
 }

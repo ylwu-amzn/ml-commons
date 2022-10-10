@@ -7,12 +7,12 @@ package org.opensearch.ml.common.transport.custom_model.sync;
 
 import org.opensearch.action.ActionType;
 
-public class MLSyncUpAction extends ActionType<MLSyncUpResponse> {
+public class MLSyncUpAction extends ActionType<MLSyncUpNodesResponse> {
     public static MLSyncUpAction INSTANCE = new MLSyncUpAction();
-    public static final String NAME = "cluster:admin/opensearch/ml/sync_up";
+    public static final String NAME = "cluster:admin/opensearch/ml/syncup";
 
     private MLSyncUpAction() {
-        super(NAME, MLSyncUpResponse::new);
+        super(NAME, MLSyncUpNodesResponse::new);
     }
 
 }

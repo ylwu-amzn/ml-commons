@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package org.opensearch.ml.action.custom_model.upload;
+package org.opensearch.ml.action.trained_model.upload;
 
 import java.time.Instant;
 
@@ -17,6 +17,7 @@ import org.opensearch.action.support.HandledTransportAction;
 import org.opensearch.client.Client;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.inject.Inject;
+import org.opensearch.ml.cluster.DiscoveryNodeHelper;
 import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.common.MLTask;
 import org.opensearch.ml.common.MLTaskState;
@@ -31,8 +32,10 @@ import org.opensearch.ml.common.transport.custom_model.upload.MLUploadInput;
 import org.opensearch.ml.common.transport.custom_model.upload.MLUploadModelAction;
 import org.opensearch.ml.common.transport.custom_model.upload.MLUploadModelRequest;
 import org.opensearch.ml.common.transport.custom_model.upload.UploadModelResponse;
-import org.opensearch.ml.engine.algorithms.custom.CustomModelManager;
+import org.opensearch.ml.engine.ModelHelper;
 import org.opensearch.ml.indices.MLIndicesHandler;
+import org.opensearch.ml.stats.MLNodeLevelStat;
+import org.opensearch.ml.stats.MLStats;
 import org.opensearch.ml.task.MLTaskDispatcher;
 import org.opensearch.ml.task.MLTaskManager;
 import org.opensearch.tasks.Task;
@@ -42,27 +45,31 @@ import org.opensearch.transport.TransportService;
 @Log4j2
 public class TransportUploadModelAction extends HandledTransportAction<ActionRequest, UploadModelResponse> {
     TransportService transportService;
-    CustomModelManager customModelManager;
+    ModelHelper customModelManager;
     MLIndicesHandler mlIndicesHandler;
     MLTaskManager mlTaskManager;
     ClusterService clusterService;
     ThreadPool threadPool;
     Client client;
+    DiscoveryNodeHelper nodeFilter;
     MLTaskDispatcher mlTaskDispatcher;
     MLModelUploader mlModelUploader;
+    MLStats mlStats;
 
     @Inject
     public TransportUploadModelAction(
         TransportService transportService,
         ActionFilters actionFilters,
-        CustomModelManager customModelManager,
+        ModelHelper customModelManager,
         MLIndicesHandler mlIndicesHandler,
         MLTaskManager mlTaskManager,
         ClusterService clusterService,
         ThreadPool threadPool,
         Client client,
+        DiscoveryNodeHelper nodeFilter,
         MLTaskDispatcher mlTaskDispatcher,
-        MLModelUploader mlModelUploader
+        MLModelUploader mlModelUploader,
+        MLStats mlStats
     ) {
         super(MLUploadModelAction.NAME, transportService, actionFilters, MLUploadModelRequest::new);
         this.transportService = transportService;
@@ -72,20 +79,27 @@ public class TransportUploadModelAction extends HandledTransportAction<ActionReq
         this.clusterService = clusterService;
         this.threadPool = threadPool;
         this.client = client;
+        this.nodeFilter = nodeFilter;
         this.mlTaskDispatcher = mlTaskDispatcher;
         this.mlModelUploader = mlModelUploader;
+        this.mlStats = mlStats;
     }
 
     @Override
     protected void doExecute(Task task, ActionRequest request, ActionListener<UploadModelResponse> listener) {
         MLUploadModelRequest uploadModelRequest = MLUploadModelRequest.fromActionRequest(request);
         MLUploadInput mlUploadInput = uploadModelRequest.getMlUploadInput();
+        // mlStats.getStat(MLNodeLevelStat.ML_NODE_EXECUTING_TASK_COUNT).increment();
+        mlStats.getStat(MLNodeLevelStat.ML_NODE_TOTAL_REQUEST_COUNT).increment();
+        // //TODO: track executing task; track upload failures
+        // mlStats.createCounterStatIfAbsent(FunctionName.TEXT_EMBEDDING, ActionName.UPLOAD,
+        // MLActionLevelStat.ML_ACTION_REQUEST_COUNT).increment();
 
         MLTask mlTask = MLTask
             .builder()
             .async(true)
             .taskType(MLTaskType.UPLOAD_MODEL)
-            .functionName(FunctionName.CUSTOM)
+            .functionName(FunctionName.TEXT_EMBEDDING)// TODO: from input ?
             .inputType(MLInputDataType.SEARCH_QUERY)// TODO: fix this
             .createTime(Instant.now())
             .lastUpdateTime(Instant.now())
@@ -114,7 +128,7 @@ public class TransportUploadModelAction extends HandledTransportAction<ActionReq
                         );
                     transportService
                         .sendRequest(
-                            mlTaskDispatcher.getNode(nodeId),
+                            nodeFilter.getNode(nodeId),
                             MLForwardAction.NAME,
                             forwardRequest,
                             new ActionListenerResponseHandler<>(myListener, MLForwardResponse::new)
@@ -123,10 +137,16 @@ public class TransportUploadModelAction extends HandledTransportAction<ActionReq
                 listener.onResponse(new UploadModelResponse(taskId, MLTaskState.CREATED.name()));
             }, e -> {
                 log.error("Failed to dispatch upload model task ", e);
+                // mlStats.getStat(MLNodeLevelStat.ML_NODE_EXECUTING_TASK_COUNT).decrement();
+                // mlStats.createCounterStatIfAbsent(FunctionName.TEXT_EMBEDDING, ActionName.UPLOAD,
+                // MLActionLevelStat.ML_ACTION_FAILURE_COUNT).increment();
                 listener.onFailure(e);
             }));
         }, exception -> {
             log.error("Failed to create upload model task", exception);
+            // mlStats.getStat(MLNodeLevelStat.ML_NODE_EXECUTING_TASK_COUNT).decrement();
+            // mlStats.createCounterStatIfAbsent(FunctionName.TEXT_EMBEDDING, ActionName.UPLOAD,
+            // MLActionLevelStat.ML_ACTION_FAILURE_COUNT).increment();
             listener.onFailure(exception);
         }));
     }

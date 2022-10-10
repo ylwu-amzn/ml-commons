@@ -32,6 +32,7 @@ import org.opensearch.cluster.node.DiscoveryNode;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.index.query.MatchAllQueryBuilder;
+import org.opensearch.ml.cluster.DiscoveryNodeHelper;
 import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.common.MLTask;
 import org.opensearch.ml.common.MLTaskState;
@@ -78,6 +79,8 @@ public class MLTrainAndPredictTaskRunnerTests extends OpenSearchTestCase {
     ActionListener<MLTaskResponse> listener;
     @Mock
     ExecutorService executorService;
+    @Mock
+    DiscoveryNodeHelper nodeHelper;
 
     MLStats mlStats;
     DataFrame dataFrame;
@@ -123,7 +126,8 @@ public class MLTrainAndPredictTaskRunnerTests extends OpenSearchTestCase {
                 mlStats,
                 mlInputDatasetHandler,
                 mlTaskDispatcher,
-                mlCircuitBreakerService
+                mlCircuitBreakerService,
+                nodeHelper
             )
         );
         dataFrame = TestData.constructTestDataFrame(100);

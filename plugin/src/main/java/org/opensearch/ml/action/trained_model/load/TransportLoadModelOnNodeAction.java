@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package org.opensearch.ml.action.custom_model.load;
+package org.opensearch.ml.action.trained_model.load;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -26,6 +26,7 @@ import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.inject.Inject;
 import org.opensearch.common.io.stream.StreamInput;
 import org.opensearch.common.xcontent.NamedXContentRegistry;
+import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.common.MLTask;
 import org.opensearch.ml.common.MLTaskState;
 import org.opensearch.ml.common.transport.custom_model.forward.MLForwardAction;
@@ -39,7 +40,7 @@ import org.opensearch.ml.common.transport.custom_model.load.LoadModelNodeRespons
 import org.opensearch.ml.common.transport.custom_model.load.LoadModelNodesRequest;
 import org.opensearch.ml.common.transport.custom_model.load.LoadModelNodesResponse;
 import org.opensearch.ml.common.transport.custom_model.load.MLLoadModelOnNodeAction;
-import org.opensearch.ml.engine.algorithms.custom.CustomModelManager;
+import org.opensearch.ml.engine.ModelHelper;
 import org.opensearch.ml.model.MLModelManager;
 import org.opensearch.ml.task.MLTaskManager;
 import org.opensearch.threadpool.ThreadPool;
@@ -51,7 +52,7 @@ import com.google.common.collect.ImmutableMap;
 public class TransportLoadModelOnNodeAction extends
     TransportNodesAction<LoadModelNodesRequest, LoadModelNodesResponse, LoadModelNodeRequest, LoadModelNodeResponse> {
     TransportService transportService;
-    CustomModelManager customModelManager;
+    ModelHelper customModelManager;
     MLTaskManager mlTaskManager;
     MLModelManager mlModelManager;
     ClusterService clusterService;
@@ -63,7 +64,7 @@ public class TransportLoadModelOnNodeAction extends
     public TransportLoadModelOnNodeAction(
         TransportService transportService,
         ActionFilters actionFilters,
-        CustomModelManager customModelManager,
+        ModelHelper customModelManager,
         MLTaskManager mlTaskManager,
         MLModelManager mlModelManager,
         ClusterService clusterService,
@@ -132,7 +133,7 @@ public class TransportLoadModelOnNodeAction extends
         ActionListener<MLForwardResponse> taskDoneListener = ActionListener
             .wrap(res -> { log.info("load model done " + res); }, ex -> { log.error(ex); });
 
-        loadModel(modelId, localNodeId, coordinatingNodeId, mlTask, ActionListener.wrap(r -> {
+        loadModel(modelId, mlTask.getFunctionName(), localNodeId, coordinatingNodeId, mlTask, ActionListener.wrap(r -> {
             if (!coordinatingNodeId.equals(localNodeId)) {
                 mlTaskManager.remove(taskId);
             }
@@ -199,12 +200,20 @@ public class TransportLoadModelOnNodeAction extends
         return null;
     }
 
-    private void loadModel(String modelId, String localNodeId, String coordinatingNodeId, MLTask mlTask, ActionListener<String> listener) {
+    private void loadModel(
+        String modelId,
+        FunctionName functionName,
+        String localNodeId,
+        String coordinatingNodeId,
+        MLTask mlTask,
+        ActionListener<String> listener
+    ) {
         try {
+            log.debug("rrrrrrrrrr--- start loading model {}", modelId);
             if (!coordinatingNodeId.equals(localNodeId)) {
                 mlTaskManager.add(mlTask);
             }
-            mlModelManager.loadModel1(modelId, listener);
+            mlModelManager.loadModel1(modelId, functionName, listener);
         } catch (Exception e) {
             log.error("Failed to load custom model " + modelId, e);
             listener.onFailure(e);

@@ -143,7 +143,8 @@ public class MLPredictTaskRunnerTests extends OpenSearchTestCase {
                 mlTaskDispatcher,
                 mlCircuitBreakerService,
                 xContentRegistry(),
-                null // TODO: fix this
+                null, // TODO: fix this
+                null
             )
         );
 

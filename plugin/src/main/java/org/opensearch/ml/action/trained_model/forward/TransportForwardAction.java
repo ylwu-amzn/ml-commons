@@ -3,9 +3,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package org.opensearch.ml.action.custom_model.forward;
+package org.opensearch.ml.action.trained_model.forward;
 
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.List;
 
 import lombok.extern.log4j.Log4j2;
@@ -15,24 +16,26 @@ import org.opensearch.action.ActionRequest;
 import org.opensearch.action.support.ActionFilters;
 import org.opensearch.action.support.HandledTransportAction;
 import org.opensearch.client.Client;
+import org.opensearch.cluster.node.DiscoveryNode;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.inject.Inject;
 import org.opensearch.common.xcontent.NamedXContentRegistry;
-import org.opensearch.ml.action.custom_model.upload.MLModelUploader;
+import org.opensearch.ml.action.trained_model.upload.MLModelUploader;
+import org.opensearch.ml.cluster.DiscoveryNodeHelper;
 import org.opensearch.ml.common.MLModel;
 import org.opensearch.ml.common.MLTask;
 import org.opensearch.ml.common.MLTaskState;
 import org.opensearch.ml.common.model.MLModelState;
-import org.opensearch.ml.common.output.model.ModelTensorOutput;
 import org.opensearch.ml.common.transport.custom_model.forward.MLForwardAction;
 import org.opensearch.ml.common.transport.custom_model.forward.MLForwardInput;
 import org.opensearch.ml.common.transport.custom_model.forward.MLForwardRequest;
 import org.opensearch.ml.common.transport.custom_model.forward.MLForwardRequestType;
 import org.opensearch.ml.common.transport.custom_model.forward.MLForwardResponse;
 import org.opensearch.ml.common.transport.custom_model.sync.MLSyncUpAction;
-import org.opensearch.ml.common.transport.custom_model.sync.MLSyncUpRequest;
+import org.opensearch.ml.common.transport.custom_model.sync.MLSyncUpInput;
+import org.opensearch.ml.common.transport.custom_model.sync.MLSyncUpNodesRequest;
 import org.opensearch.ml.common.transport.custom_model.upload.MLUploadInput;
-import org.opensearch.ml.engine.algorithms.custom.CustomModelManager;
+import org.opensearch.ml.engine.ModelHelper;
 import org.opensearch.ml.indices.MLIndicesHandler;
 import org.opensearch.ml.model.MLModelManager;
 import org.opensearch.ml.task.MLTaskCache;
@@ -47,7 +50,7 @@ import com.google.common.collect.ImmutableMap;
 @Log4j2
 public class TransportForwardAction extends HandledTransportAction<ActionRequest, MLForwardResponse> {
     TransportService transportService;
-    CustomModelManager customModelManager;
+    ModelHelper customModelManager;
     MLTaskManager mlTaskManager;
     ClusterService clusterService;
     ThreadPool threadPool;
@@ -57,12 +60,13 @@ public class TransportForwardAction extends HandledTransportAction<ActionRequest
     MLIndicesHandler mlIndicesHandler;
     MLModelUploader mlModelUploader;
     MLModelManager mlModelManager;
+    private DiscoveryNodeHelper nodeFilter;
 
     @Inject
     public TransportForwardAction(
         TransportService transportService,
         ActionFilters actionFilters,
-        CustomModelManager customModelManager,
+        ModelHelper customModelManager,
         MLTaskManager mlTaskManager,
         ClusterService clusterService,
         ThreadPool threadPool,
@@ -71,7 +75,8 @@ public class TransportForwardAction extends HandledTransportAction<ActionRequest
         MLTaskDispatcher mlTaskDispatcher,
         MLIndicesHandler mlIndicesHandler,
         MLModelUploader mlModelUploader,
-        MLModelManager mlModelManager
+        MLModelManager mlModelManager,
+        DiscoveryNodeHelper nodeFilter
     ) {
         super(MLForwardAction.NAME, transportService, actionFilters, MLForwardRequest::new);
         this.transportService = transportService;
@@ -85,6 +90,7 @@ public class TransportForwardAction extends HandledTransportAction<ActionRequest
         this.mlIndicesHandler = mlIndicesHandler;
         this.mlModelUploader = mlModelUploader;
         this.mlModelManager = mlModelManager;
+        this.nodeFilter = nodeFilter;
     }
 
     @Override
@@ -99,7 +105,7 @@ public class TransportForwardAction extends HandledTransportAction<ActionRequest
         MLForwardRequestType requestType = forwardInput.getRequestType();
 
         String error = forwardInput.getError();
-        log.info("receive forward request: " + forwardInput.getRequestType());
+        log.debug("receive forward request: " + forwardInput.getRequestType());
         try {
             switch (requestType) {
                 case LOAD_MODEL_DONE:
@@ -120,10 +126,19 @@ public class TransportForwardAction extends HandledTransportAction<ActionRequest
                         if (mlTaskCache.allNodeFailed()) {
                             taskState = MLTaskState.FAILED;
                         } else {
-                            String[] allNodes = mlTaskDispatcher.getAllNodes();
+                            DiscoveryNode[] allNodes = nodeFilter.getAllNodes();
                             String[] workerNodes = mlModelManager.getWorkerNodes(modelId);
                             if (allNodes.length > 1 && workerNodes.length > 0) {
-                                MLSyncUpRequest syncUpRequest = new MLSyncUpRequest(modelId, workerNodes, false);
+                                log
+                                    .debug(
+                                        "rrrrrrrrrrrrr: sync model routing to other nodes. model loaded on nodes: {}",
+                                        Arrays.toString(workerNodes)
+                                    );
+                                MLSyncUpInput syncUpInput = MLSyncUpInput
+                                    .builder()
+                                    .addedWorkerNodes(ImmutableMap.of(modelId, workerNodes))
+                                    .build();
+                                MLSyncUpNodesRequest syncUpRequest = new MLSyncUpNodesRequest(allNodes, syncUpInput);
                                 client
                                     .execute(
                                         MLSyncUpAction.INSTANCE,
@@ -163,10 +178,10 @@ public class TransportForwardAction extends HandledTransportAction<ActionRequest
                     mlModelUploader.newUploadMoadel(uploadInput, mlTask);
                     listener.onResponse(new MLForwardResponse("ok", null));
                     break;
-                case PREDICT_MODEL:
-                    ModelTensorOutput output = customModelManager.predict(forwardInput.getModelId(), forwardInput.getModelInput());
-                    listener.onResponse(new MLForwardResponse("ok", output));
-                    break;
+                // case PREDICT_MODEL:
+                // ModelTensorOutput output = customModelManager.predict(forwardInput.getModelId(), forwardInput.getModelInput());
+                // listener.onResponse(new MLForwardResponse("ok", output));
+                // break;
                 default:
                     throw new IllegalArgumentException("unsupported request type");
             }

@@ -56,9 +56,9 @@ List<String> jacocoExclusions = [
         'org.opensearch.ml.engine.algorithms.clustering.RCFSummarize',
         'org.opensearch.ml.engine.algorithms.regression.*',
         'org.opensearch.ml.engine.MLEngineClassLoader',
-        'org.opensearch.ml.engine.algorithms.custom.*',
         'org.opensearch.ml.engine.algorithms.rcf.*',
-        'org.opensearch.ml.engine.algorithms.sentence_transformer.*',
+        'org.opensearch.ml.engine.algorithms.text_embedding.*',
+        'org.opensearch.ml.engine.ModelHelper',
         'org.opensearch.ml.engine.exceptions.*',
         'org.opensearch.ml.engine.utils.*',
 ]

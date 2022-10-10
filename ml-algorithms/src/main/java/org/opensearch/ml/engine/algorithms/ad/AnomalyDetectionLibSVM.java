@@ -5,14 +5,16 @@
 
 package org.opensearch.ml.engine.algorithms.ad;
 
+import org.opensearch.ml.common.MLModel;
 import org.opensearch.ml.common.dataframe.DataFrame;
 import org.opensearch.ml.common.dataframe.DataFrameBuilder;
 import org.opensearch.ml.common.FunctionName;
+import org.opensearch.ml.common.dataset.DataFrameInputDataset;
+import org.opensearch.ml.common.dataset.MLInputDataset;
 import org.opensearch.ml.common.input.parameter.ad.AnomalyDetectionLibSVMParams;
 import org.opensearch.ml.common.input.parameter.MLAlgoParams;
 import org.opensearch.ml.common.output.MLOutput;
 import org.opensearch.ml.common.output.MLPredictionOutput;
-import org.opensearch.ml.common.Model;
 import org.opensearch.ml.engine.Predictable;
 import org.opensearch.ml.engine.Trainable;
 import org.opensearch.ml.engine.annotation.Function;
@@ -69,14 +71,19 @@ public class AnomalyDetectionLibSVM implements Trainable, Predictable {
 
     }
 
-
     @Override
-    public void initModel(Model model) {
-        libSVMAnomalyModel = (LibSVMModel) ModelSerDeSer.deserialize(model.getContent());
+    public void initModel(MLModel model, Map<String, Object> params) {
+        this.libSVMAnomalyModel = (LibSVMModel) ModelSerDeSer.deserialize(model);
     }
 
     @Override
-    public MLOutput predict(DataFrame dataFrame) {
+    public void close() {
+        this.libSVMAnomalyModel = null;
+    }
+
+    @Override
+    public MLOutput predict(MLInputDataset inputDataset) {
+        DataFrame dataFrame = ((DataFrameInputDataset)inputDataset).getDataFrame();
         if (libSVMAnomalyModel == null) {
             throw new IllegalArgumentException("model not loaded");
         }
@@ -97,17 +104,18 @@ public class AnomalyDetectionLibSVM implements Trainable, Predictable {
     }
 
     @Override
-    public MLOutput predict(DataFrame dataFrame, Model model) {
+    public MLOutput predict(MLInputDataset inputDataset, MLModel model) {
         if (model == null) {
             throw new IllegalArgumentException("No model found for KMeans prediction.");
         }
 
-        libSVMAnomalyModel = (LibSVMModel) ModelSerDeSer.deserialize(model.getContent());
-        return predict(dataFrame);
+        libSVMAnomalyModel = (LibSVMModel) ModelSerDeSer.deserialize(model);
+        return predict(inputDataset);
     }
 
     @Override
-    public Model train(DataFrame dataFrame) {
+    public MLModel train(MLInputDataset inputDataset) {
+        DataFrame dataFrame = ((DataFrameInputDataset)inputDataset).getDataFrame();
         KernelType kernelType = parseKernelType();
         SVMParameters params = new SVMParameters<>(new SVMAnomalyType(SVMAnomalyType.SVMMode.ONE_CLASS), kernelType);
         Double gamma = Optional.ofNullable(parameters.getGamma()).orElse(DEFAULT_GAMMA);
@@ -133,10 +141,13 @@ public class AnomalyDetectionLibSVM implements Trainable, Predictable {
 
         LibSVMModel libSVMModel = trainer.train(data);
         ((LibSVMAnomalyModel)libSVMModel).getNumberOfSupportVectors();
-        Model model = new Model();
-        model.setName(FunctionName.AD_LIBSVM.name());
-        model.setVersion(VERSION);
-        model.setContent(ModelSerDeSer.serialize(libSVMModel));
+
+        MLModel model = MLModel.builder()
+                .name(FunctionName.AD_LIBSVM.name())
+                .algorithm(FunctionName.AD_LIBSVM)
+                .version(VERSION)
+                .content(ModelSerDeSer.serializeToBase64(libSVMModel))
+                .build();
         return model;
     }
 

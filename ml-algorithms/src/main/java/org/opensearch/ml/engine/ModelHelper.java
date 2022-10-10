@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package org.opensearch.ml.engine.algorithms.custom;
+package org.opensearch.ml.engine;
 
 import ai.djl.Application;
 import ai.djl.engine.Engine;
@@ -26,6 +26,7 @@ import org.apache.commons.io.FileUtils;
 import org.opensearch.action.ActionListener;
 import org.opensearch.common.bytes.BytesReference;
 import org.opensearch.common.io.stream.StreamInput;
+import org.opensearch.ml.common.dataset.MLInputDataset;
 import org.opensearch.ml.common.dataset.TextDocsInputDataSet;
 import org.opensearch.ml.common.exception.MLException;
 import org.opensearch.ml.common.exception.MLResourceNotFoundException;
@@ -39,8 +40,10 @@ import org.opensearch.ml.common.output.model.ModelResultFilter;
 import org.opensearch.ml.common.output.model.ModelTensor;
 import org.opensearch.ml.common.output.model.ModelTensorOutput;
 import org.opensearch.ml.common.output.model.ModelTensors;
-import org.opensearch.ml.common.transport.custom_model.unload.UnloadModelInput;
 import org.opensearch.ml.common.transport.custom_model.upload.MLUploadInput;
+import org.opensearch.ml.engine.algorithms.text_embedding.MLTextEmbeddingTranslatorFactory;
+import org.opensearch.ml.engine.algorithms.text_embedding.ONNXSentenceTransformerTextEmbeddingTranslator;
+import org.opensearch.ml.engine.algorithms.text_embedding.SentenceTransformerTextEmbeddingTranslator;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -61,8 +64,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
-import static org.opensearch.ml.common.CommonValue.DELETED;
-import static org.opensearch.ml.common.CommonValue.NOT_FOUND;
 import static org.opensearch.ml.common.model.TextEmbeddingModelConfig.FrameworkType.SENTENCE_TRANSFORMERS;
 import static org.opensearch.ml.engine.MLEngine.DJL_CACHE_PATH;
 import static org.opensearch.ml.engine.MLEngine.getCustomModelPath;
@@ -70,13 +71,13 @@ import static org.opensearch.ml.engine.MLEngine.getLoadModelPath;
 import static org.opensearch.ml.engine.MLEngine.getLocalPrebuiltModelConfigPath;
 import static org.opensearch.ml.engine.MLEngine.getLocalPrebuiltModelPath;
 import static org.opensearch.ml.engine.MLEngine.getUploadModelPath;
-import static org.opensearch.ml.engine.algorithms.custom.MLTextEmbeddingServingTranslator.toFloats;
-import static org.opensearch.ml.engine.algorithms.custom.SentenceTransformerTextEmbeddingTranslator.TEXT_FIELDS;
+import static org.opensearch.ml.engine.algorithms.text_embedding.MLTextEmbeddingServingTranslator.toFloats;
+import static org.opensearch.ml.engine.algorithms.text_embedding.SentenceTransformerTextEmbeddingTranslator.TEXT_FIELDS;
 import static org.opensearch.ml.engine.utils.MLFileUtils.deleteFileQuietly;
 import static org.opensearch.ml.engine.utils.MLFileUtils.readAndFragment;
 
 @Log4j2
-public class CustomModelManager {
+public class ModelHelper {
     public static final String CHUNK_FILES = "chunk_files";
     public static final String MODEL_SIZE_IN_BYTES = "model_size_in_bytes";
     public static final String MODEL_FILE_HASH = "model_file_hash";
@@ -88,7 +89,7 @@ public class CustomModelManager {
     private Map<String, ZooModel> models;
     private Gson gson;
 
-    public CustomModelManager() {
+    public ModelHelper() {
         modelTransformersTypes = new ConcurrentHashMap<>();
         predictors = new ConcurrentHashMap<>();
         models = new ConcurrentHashMap<>();
@@ -227,73 +228,79 @@ public class CustomModelManager {
 
     public void loadModel(File modelZipFile, String modelId, String modelName, MLModelTaskType modelTaskType, Integer version,
                           MLModelConfig modelConfig,
-                          String engine) throws PrivilegedActionException {
-        AccessController.doPrivileged((PrivilegedExceptionAction<Void>) () -> {
-            ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
-            try {
-                System.setProperty("PYTORCH_PRECXX11", "true");
-                System.setProperty("DJL_CACHE_DIR", DJL_CACHE_PATH.toAbsolutePath().toString());
-                System.setProperty("java.library.path", DJL_CACHE_PATH.toAbsolutePath().toString());
-                Thread.currentThread().setContextClassLoader(ai.djl.Model.class.getClassLoader());
-                Engine.debugEnvironment();
-                Path modelPath = getCustomModelPath(modelId, modelName, version);
-                File pathFile = new File(modelPath.toUri());
-                if (pathFile.exists()) {
-                    FileUtils.deleteDirectory(pathFile);
-                }
-                ZipUtils.unzip(new FileInputStream(modelZipFile), modelPath);
-                boolean findModelFile = false;
-                for (File file : pathFile.listFiles()) {
-                    String name = file.getName();
-                    if (name.endsWith(".pt") || name.endsWith(".onnx")) {
-                        if (findModelFile) {
-                            throw new IllegalArgumentException("found multiple models");
-                        }
-                        findModelFile = true;
-                        String suffix = name.substring(name.lastIndexOf("."));
-                        file.renameTo(new File(modelPath.resolve(modelName + suffix).toUri()));
-                    }
-                }
+                          String engine) {
+        try {
+            AccessController.doPrivileged((PrivilegedExceptionAction<Void>) () -> {
+                ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
                 try {
-                    Map<String, Object> arguments = new HashMap<>();
-                    arguments.put("engine", engine);
-                    Criteria.Builder<Input, Output> criteriaBuilder = Criteria.builder()
-                            .setTypes(Input.class, Output.class)
-                            .optApplication(Application.UNDEFINED)
-                            .optArguments(arguments)
-                            .optModelPath(modelPath);
-                    if (modelTaskType == MLModelTaskType.TEXT_EMBEDDING) {
-                        TextEmbeddingModelConfig textEmbeddingModelConfig = (TextEmbeddingModelConfig) modelConfig;
-                        TextEmbeddingModelConfig.FrameworkType transformersType = textEmbeddingModelConfig.getFrameworkType();
-                        if ("OnnxRuntime".equals(engine)) {
-                            criteriaBuilder.optTranslator(new ONNXSentenceTransformerTextEmbeddingTranslator());
-                        } else {
-                            if (transformersType == SENTENCE_TRANSFORMERS) {
-                                criteriaBuilder.optTranslator(new SentenceTransformerTextEmbeddingTranslator());
-                            } else {
-                                criteriaBuilder.optTranslatorFactory(new MLTextEmbeddingTranslatorFactory());
-                            }
-                        }
-                        modelTransformersTypes.put(modelId, transformersType);
+                    System.setProperty("PYTORCH_PRECXX11", "true");
+                    System.setProperty("DJL_CACHE_DIR", DJL_CACHE_PATH.toAbsolutePath().toString());
+                    System.setProperty("java.library.path", DJL_CACHE_PATH.toAbsolutePath().toString());
+                    Thread.currentThread().setContextClassLoader(ai.djl.Model.class.getClassLoader());
+                    Engine.debugEnvironment();
+                    Path modelPath = getCustomModelPath(modelId, modelName, version);
+                    File pathFile = new File(modelPath.toUri());
+                    if (pathFile.exists()) {
+                        FileUtils.deleteDirectory(pathFile);
                     }
-                    Criteria<Input, Output> criteria = criteriaBuilder.build();
-                    ZooModel<Input, Output> model = criteria.loadModel();
-                    Predictor<Input, Output> predictor = model.newPredictor();
-                    predictors.put(modelId, predictor);
-                    models.put(modelId, model);
-                } catch (Exception e) {
-                    String errorMessage = "Failed to load model " + modelName + ", version: " + version;
-                    log.error(errorMessage, e);
-                    removeModel(modelId);
-                    throw new MLException(errorMessage);
+                    ZipUtils.unzip(new FileInputStream(modelZipFile), modelPath);
+                    boolean findModelFile = false;
+                    for (File file : pathFile.listFiles()) {
+                        String name = file.getName();
+                        if (name.endsWith(".pt") || name.endsWith(".onnx")) {
+                            if (findModelFile) {
+                                throw new IllegalArgumentException("found multiple models");
+                            }
+                            findModelFile = true;
+                            String suffix = name.substring(name.lastIndexOf("."));
+                            file.renameTo(new File(modelPath.resolve(modelName + suffix).toUri()));
+                        }
+                    }
+                    try {
+                        Map<String, Object> arguments = new HashMap<>();
+                        arguments.put("engine", engine);
+                        Criteria.Builder<Input, Output> criteriaBuilder = Criteria.builder()
+                                .setTypes(Input.class, Output.class)
+                                .optApplication(Application.UNDEFINED)
+                                .optArguments(arguments)
+                                .optModelPath(modelPath);
+                        if (modelTaskType == MLModelTaskType.TEXT_EMBEDDING) {
+                            TextEmbeddingModelConfig textEmbeddingModelConfig = (TextEmbeddingModelConfig) modelConfig;
+                            TextEmbeddingModelConfig.FrameworkType transformersType = textEmbeddingModelConfig.getFrameworkType();
+                            if ("OnnxRuntime".equals(engine)) {
+                                criteriaBuilder.optTranslator(new ONNXSentenceTransformerTextEmbeddingTranslator());
+                            } else {
+                                if (transformersType == SENTENCE_TRANSFORMERS) {
+                                    criteriaBuilder.optTranslator(new SentenceTransformerTextEmbeddingTranslator());
+                                } else {
+                                    criteriaBuilder.optTranslatorFactory(new MLTextEmbeddingTranslatorFactory());
+                                }
+                            }
+                            modelTransformersTypes.put(modelId, transformersType);
+                        }
+                        Criteria<Input, Output> criteria = criteriaBuilder.build();
+                        ZooModel<Input, Output> model = criteria.loadModel();
+                        Predictor<Input, Output> predictor = model.newPredictor();
+                        predictors.put(modelId, predictor);
+                        models.put(modelId, model);
+                    } catch (Exception e) {
+                        String errorMessage = "Failed to load model " + modelName + ", version: " + version;
+                        log.error(errorMessage, e);
+                        removeModel(modelId);
+                        throw new MLException(errorMessage);
+                    } finally {
+                        deleteFileQuietly(getLoadModelPath(modelId));
+                    }
+                    return null;
                 } finally {
-                    deleteFileQuietly(getLoadModelPath(modelId));
+                    Thread.currentThread().setContextClassLoader(contextClassLoader);
                 }
-                return null;
-            } finally {
-                Thread.currentThread().setContextClassLoader(contextClassLoader);
-            }
-        });
+            });
+        } catch (PrivilegedActionException e) {
+            String errorMsg = "Failed to load model";
+            log.error(errorMsg, e);
+            throw new MLException(errorMsg, e);
+        }
     }
 
     private void removeModel(String modelId) {
@@ -303,7 +310,7 @@ public class CustomModelManager {
     }
 
     public ModelTensorOutput predict(String modelId, MLInput mlInput) throws IOException, PrivilegedActionException {
-        log.info("start to predict {}", modelId);
+        log.debug("start to predict {}", modelId);
         return AccessController.doPrivileged((PrivilegedExceptionAction<ModelTensorOutput>) () -> {
             Thread.currentThread().setContextClassLoader(getClass().getClassLoader());
             if (!predictors.containsKey(modelId)) {
@@ -352,29 +359,97 @@ public class CustomModelManager {
         });
     }
 
-    public Map<String, String> unloadModel(UnloadModelInput unloadModelInput) {
-        Map<String, String> modelUnloadStatus = new HashMap<>();
-        String[] modelIds = unloadModelInput.getModelIds();
-        if (modelIds != null && modelIds.length > 0) {
-            for (String modelId : modelIds) {
-                deleteFileQuietly(getCustomModelPath(modelId));
-                deleteFileQuietly(getLoadModelPath(modelId));
-                deleteFileQuietly(getUploadModelPath(modelId));
-                if (predictors.containsKey(modelId)) {
-                    predictors.get(modelId).close();
-                    predictors.remove(modelId);
-                    modelUnloadStatus.put(modelId, DELETED);
+    public ModelTensorOutput predictTextEmbedding(String modelId, MLInputDataset inputDataSet) {
+        log.debug("start to predict {}", modelId);
+        try {
+            return AccessController.doPrivileged((PrivilegedExceptionAction<ModelTensorOutput>) () -> {
+                Thread.currentThread().setContextClassLoader(getClass().getClassLoader());
+                if (!predictors.containsKey(modelId)) {
+                    throw new MLResourceNotFoundException("Model not loaded.");
+                }
+                Predictor<Input, Output> predictor = predictors.get(modelId);
+                List<ModelTensors> tensorOutputs = new ArrayList<>();
+                Output output;
+                TextDocsInputDataSet textDocsInput = (TextDocsInputDataSet) inputDataSet;
+                ModelResultFilter resultFilter = textDocsInput.getResultFilter();
+                if (modelTransformersTypes.get(modelId) == SENTENCE_TRANSFORMERS) {
+                    Input input = new Input();
+                    input.add(TEXT_FIELDS, JsonUtils.GSON.toJson(textDocsInput.getDocs()));
+                    output = predictor.predict(input);
+                    parseModelTensorOutput(output, resultFilter, tensorOutputs);
                 } else {
-                    modelUnloadStatus.put(modelId, NOT_FOUND);
+                    for (String doc : textDocsInput.getDocs()) {
+                        Input input = new Input();
+                        input.add(doc);
+                        output = predictor.predict(input);
+                        byte[] bytes = output.getData().getAsBytes();
+                        Number[] data = toFloats(bytes);
+                        List<ModelTensor> modelTensors = new ArrayList<>();
+                        ByteBuffer byteBuffer = null;
+                        if (resultFilter.isReturnBytes()) {
+                            byteBuffer = ByteBuffer.wrap(bytes);
+                            byteBuffer.order(ByteOrder.nativeOrder());
+                        }
+                        ModelTensor modelTensor = new ModelTensor(EMBEDDING, data, new long[]{1, data.length}, MLResultDataType.FLOAT32, byteBuffer);
+                        modelTensors.add(modelTensor);
+                        ModelTensors mlModelTensorOutput = new ModelTensors(modelTensors);
+                        mlModelTensorOutput.filter(resultFilter);
+                        tensorOutputs.add(mlModelTensorOutput);
+                    }
                 }
-                if (models.containsKey(modelId)) {
-                    models.get(modelId).close();
-                    models.remove(modelId);
-                }
-                log.info("Unload model {}", modelId);
-            }
+                return new ModelTensorOutput(tensorOutputs);
+            });
+        } catch (PrivilegedActionException e) {
+            String errorMsg = "Failed to inference text embedding";
+            log.error(errorMsg, e);
+            throw new MLException(errorMsg, e);
         }
-        return modelUnloadStatus;
+    }
+
+//    private Map<String, String> unloadModel(String[] modelIds) {
+//        Map<String, String> modelUnloadStatus = new HashMap<>();
+////        String[] modelIds = unloadModelInput.getModelIds();
+//        if (modelIds != null && modelIds.length > 0) {
+//            log.debug("rrrrrrrrrr----- custom model: unload modes: {}", Arrays.toString(modelIds));
+//            for (String modelId : modelIds) {
+//                deleteFileQuietly(getCustomModelPath(modelId));
+//                deleteFileQuietly(getLoadModelPath(modelId));
+//                deleteFileQuietly(getUploadModelPath(modelId));
+//                if (predictors.containsKey(modelId)) {
+//                    modelUnloadStatus.put(modelId, DELETED);
+//                } else {
+//                    modelUnloadStatus.put(modelId, NOT_FOUND);
+//                }
+//                unloadModel(modelId);
+//                log.info("Unload model {}", modelId);
+//            }
+//        } else {
+//            log.debug("rrrrrrrrrr----- custom model: unload all predictors: {}", Arrays.toString(predictors.keySet().toArray(new String[0])));
+//            log.debug("rrrrrrrrrr----- custom model: unload all modes: {}", Arrays.toString(models.keySet().toArray(new String[0])));
+//            for (String modelId : predictors.keySet()) {
+//                modelUnloadStatus.put(modelId, DELETED);
+//            }
+//            for (String modelId : models.keySet()) {
+//                unloadModel(modelId);
+//            }
+//        }
+//        return modelUnloadStatus;
+//    }
+
+    public void unloadModel(String modelId) {
+        deleteFileQuietly(getCustomModelPath(modelId));
+        deleteFileQuietly(getLoadModelPath(modelId));
+        deleteFileQuietly(getUploadModelPath(modelId));
+        if (predictors.containsKey(modelId)) {
+            log.debug("ylwudebug11111111111111----- unload mode: close and remove predictor {}", modelId);
+            predictors.get(modelId).close();
+            predictors.remove(modelId);
+        }
+        if (models.containsKey(modelId)) {
+            log.debug("ylwudebug11111111111111----- unload mode: close and remove model {}", modelId);
+            models.get(modelId).close();
+            models.remove(modelId);
+        }
     }
 
     private void parseModelTensorOutput(Output output, ModelResultFilter resultFilter, List<ModelTensors> tensorOutputs) {
@@ -395,7 +470,7 @@ public class CustomModelManager {
         }
     }
 
-    public String[] getLocalLoadedModels() {
-        return predictors.keySet().toArray(new String[0]);
-    }
+//    public String[] getLoadedCustomModels() {
+//        return predictors.keySet().toArray(new String[0]);
+//    }
 }

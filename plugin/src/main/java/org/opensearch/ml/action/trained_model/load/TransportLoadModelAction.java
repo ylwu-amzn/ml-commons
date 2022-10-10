@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package org.opensearch.ml.action.custom_model.load;
+package org.opensearch.ml.action.trained_model.load;
 
 import static org.opensearch.ml.plugin.MachineLearningPlugin.TASK_THREAD_POOL;
 
@@ -29,6 +29,7 @@ import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.inject.Inject;
 import org.opensearch.common.util.concurrent.ThreadContext;
 import org.opensearch.common.xcontent.NamedXContentRegistry;
+import org.opensearch.ml.cluster.DiscoveryNodeHelper;
 import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.common.MLModel;
 import org.opensearch.ml.common.MLTask;
@@ -44,8 +45,10 @@ import org.opensearch.ml.common.transport.custom_model.load.LoadModelResponse;
 import org.opensearch.ml.common.transport.custom_model.load.MLLoadModelAction;
 import org.opensearch.ml.common.transport.custom_model.load.MLLoadModelOnNodeAction;
 import org.opensearch.ml.common.transport.custom_model.load.MLLoadModelRequest;
-import org.opensearch.ml.engine.algorithms.custom.CustomModelManager;
+import org.opensearch.ml.engine.ModelHelper;
 import org.opensearch.ml.model.MLModelManager;
+import org.opensearch.ml.stats.MLNodeLevelStat;
+import org.opensearch.ml.stats.MLStats;
 import org.opensearch.ml.task.MLTaskDispatcher;
 import org.opensearch.ml.task.MLTaskManager;
 import org.opensearch.tasks.Task;
@@ -57,27 +60,31 @@ import com.google.common.collect.ImmutableMap;
 @Log4j2
 public class TransportLoadModelAction extends HandledTransportAction<ActionRequest, LoadModelResponse> {
     TransportService transportService;
-    CustomModelManager customModelManager;
+    ModelHelper customModelManager;
     MLTaskManager mlTaskManager;
     ClusterService clusterService;
     ThreadPool threadPool;
     Client client;
     NamedXContentRegistry xContentRegistry;
+    DiscoveryNodeHelper nodeFilter;
     MLTaskDispatcher mlTaskDispatcher;
     MLModelManager mlModelManager;
+    MLStats mlStats;
 
     @Inject
     public TransportLoadModelAction(
         TransportService transportService,
         ActionFilters actionFilters,
-        CustomModelManager customModelManager,
+        ModelHelper customModelManager,
         MLTaskManager mlTaskManager,
         ClusterService clusterService,
         ThreadPool threadPool,
         Client client,
         NamedXContentRegistry xContentRegistry,
+        DiscoveryNodeHelper nodeFilter,
         MLTaskDispatcher mlTaskDispatcher,
-        MLModelManager mlModelManager
+        MLModelManager mlModelManager,
+        MLStats mlStats
     ) {
         super(MLLoadModelAction.NAME, transportService, actionFilters, MLLoadModelRequest::new);
         this.transportService = transportService;
@@ -87,8 +94,10 @@ public class TransportLoadModelAction extends HandledTransportAction<ActionReque
         this.threadPool = threadPool;
         this.client = client;
         this.xContentRegistry = xContentRegistry;
+        this.nodeFilter = nodeFilter;
         this.mlTaskDispatcher = mlTaskDispatcher;
         this.mlModelManager = mlModelManager;
+        this.mlStats = mlStats;
     }
 
     @Override
@@ -96,8 +105,10 @@ public class TransportLoadModelAction extends HandledTransportAction<ActionReque
         MLLoadModelRequest deployModelRequest = MLLoadModelRequest.fromActionRequest(request);
         String modelId = deployModelRequest.getModelId();
         String[] targetNodeIds = deployModelRequest.getModelNodeIds();
+        // mlStats.getStat(MLNodeLevelStat.ML_NODE_EXECUTING_TASK_COUNT).increment();
+        mlStats.getStat(MLNodeLevelStat.ML_NODE_TOTAL_REQUEST_COUNT).increment();
         try {
-            DiscoveryNode[] allEligibleNodes = mlTaskDispatcher.getEligibleNodes();
+            DiscoveryNode[] allEligibleNodes = nodeFilter.getEligibleNodes();
             Map<String, DiscoveryNode> nodeMapping = new HashMap();
             for (DiscoveryNode node : allEligibleNodes) {
                 nodeMapping.put(node.getId(), node);
@@ -107,7 +118,7 @@ public class TransportLoadModelAction extends HandledTransportAction<ActionReque
 
             List<DiscoveryNode> eligibleNodes = new ArrayList<>();
             List<String> nodeIds = new ArrayList<>();
-            if (targetNodeIds != null) {
+            if (targetNodeIds != null && targetNodeIds.length > 0) {
                 for (String nodeId : targetNodeIds) {
                     if (allEligibleNodeIds.contains(nodeId)) {
                         eligibleNodes.add(nodeMapping.get(nodeId));
@@ -133,6 +144,8 @@ public class TransportLoadModelAction extends HandledTransportAction<ActionReque
             try (ThreadContext.StoredContext context = client.threadPool().getThreadContext().stashContext()) {
                 mlModelManager.getModel(modelId, includes, null, ActionListener.wrap(mlModel -> {
                     FunctionName algorithm = mlModel.getAlgorithm();
+                    // TODO: Track load failure
+                    // mlStats.createCounterStatIfAbsent(algorithm, ActionName.LOAD, MLActionLevelStat.ML_ACTION_REQUEST_COUNT).increment();
                     MLTask mlTask = MLTask
                         .builder()
                         .async(true)
@@ -202,10 +215,14 @@ public class TransportLoadModelAction extends HandledTransportAction<ActionReque
                             });
                         } catch (Exception ex) {
                             log.error("Failed to load custom model", ex);
+                            // mlStats.createCounterStatIfAbsent(algorithm, ActionName.LOAD,
+                            // MLActionLevelStat.ML_ACTION_REQUEST_COUNT).increment();
                             mlTaskManager.remove(taskId);
                             listener.onFailure(ex);
                         }
                     }, exception -> {
+                        // mlStats.createCounterStatIfAbsent(algorithm, ActionName.LOAD,
+                        // MLActionLevelStat.ML_ACTION_REQUEST_COUNT).increment();
                         log.error("Failed to create upload model task for " + modelId, exception);
                         listener.onFailure(exception);
                     }));
@@ -220,6 +237,8 @@ public class TransportLoadModelAction extends HandledTransportAction<ActionReque
         } catch (Exception e) {
             log.error("Failed to download custom model " + modelId, e);
             listener.onFailure(e);
+        } finally {
+            // mlStats.getStat(MLNodeLevelStat.ML_NODE_EXECUTING_TASK_COUNT).decrement();
         }
     }
 

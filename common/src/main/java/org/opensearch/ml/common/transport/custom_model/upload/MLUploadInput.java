@@ -156,13 +156,12 @@ public class MLUploadInput implements ToXContentObject, Writeable {
         return new MLUploadInput(name, version, url, modelFormat, modelConfig, loadModel, modelNodeIds.toArray(new String[0]));
     }
 
-    public static MLUploadInput parse(XContentParser parser) throws IOException {
+    public static MLUploadInput parse(XContentParser parser, boolean loadModel) throws IOException {
         String name = null;
         Integer version = null;
         String url = null;
         MLModelFormat modelFormat = null;
         MLModelConfig modelConfig = null;
-        boolean loadModel = false;
         List<String> modelNodeIds = new ArrayList<>();
 
         ensureExpectedToken(XContentParser.Token.START_OBJECT, parser.currentToken(), parser);
@@ -185,9 +184,6 @@ public class MLUploadInput implements ToXContentObject, Writeable {
                     break;
                 case MODEL_CONFIG_FIELD:
                     modelConfig = TextEmbeddingModelConfig.parse(parser);
-                    break;
-                case LOAD_MODEL_FIELD:
-                    loadModel = parser.booleanValue();
                     break;
                 case MODEL_NODE_IDS_FIELD:
                     ensureExpectedToken(XContentParser.Token.START_ARRAY, parser.currentToken(), parser);

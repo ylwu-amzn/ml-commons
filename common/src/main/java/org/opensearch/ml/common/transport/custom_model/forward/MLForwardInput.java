@@ -11,9 +11,6 @@ import lombok.extern.log4j.Log4j2;
 import org.opensearch.common.io.stream.StreamInput;
 import org.opensearch.common.io.stream.StreamOutput;
 import org.opensearch.common.io.stream.Writeable;
-import org.opensearch.common.xcontent.ToXContentObject;
-import org.opensearch.common.xcontent.XContentBuilder;
-import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.common.MLTask;
 import org.opensearch.ml.common.input.MLInput;
 import org.opensearch.ml.common.transport.custom_model.upload.MLUploadInput;
@@ -22,23 +19,7 @@ import java.io.IOException;
 
 @Data
 @Log4j2
-public class MLForwardInput implements ToXContentObject, Writeable {
-
-    public static final String ALGORITHM_FIELD = "algorithm";
-    public static final String NAME_FIELD = "name";
-    public static final String VERSION_FIELD = "version";
-    public static final String TASK_ID_FIELD = "task_id";
-    public static final String MODEL_ID_FIELD = "model_id";
-    public static final String WORKER_NODE_ID_FIELD = "worker_node_id";
-    public static final String REQUEST_TYPE_FIELD = "request_type";
-    public static final String ML_TASK_FIELD = "ml_task";
-    public static final String URL_FIELD = "url";
-    public static final String PREDICT_INPUT_FIELD = "predict_input";
-    public static final String ERROR_FIELD = "error";
-    public static final String WORKER_NODES_FIELD = "worker_nodes";
-    public static final String UPLOAD_INPUT_FIELD = "upload_model_input";
-
-    private FunctionName algorithm = FunctionName.CUSTOM;
+public class MLForwardInput implements Writeable {
 
     private String taskId;
     private String modelId;
@@ -66,7 +47,6 @@ public class MLForwardInput implements ToXContentObject, Writeable {
     }
 
     public MLForwardInput(StreamInput in) throws IOException {
-        this.algorithm = in.readEnum(FunctionName.class);
         this.taskId = in.readOptionalString();
         this.modelId = in.readOptionalString();
         this.workerNodeId = in.readOptionalString();
@@ -86,7 +66,6 @@ public class MLForwardInput implements ToXContentObject, Writeable {
 
     @Override
     public void writeTo(StreamOutput out) throws IOException {
-        out.writeEnum(algorithm);
         out.writeOptionalString(taskId);
         out.writeOptionalString(modelId);
         out.writeOptionalString(workerNodeId);
@@ -111,30 +90,6 @@ public class MLForwardInput implements ToXContentObject, Writeable {
         } else {
             out.writeBoolean(false);
         }
-    }
-
-    @Override
-    public XContentBuilder toXContent(XContentBuilder builder, Params params) throws IOException {
-        builder.startObject();
-        builder.field(ALGORITHM_FIELD, algorithm.name());
-        builder.field(TASK_ID_FIELD, taskId);
-        builder.field(MODEL_ID_FIELD, modelId);
-        builder.field(WORKER_NODE_ID_FIELD, workerNodeId);
-        builder.field(REQUEST_TYPE_FIELD, requestType);
-        if (mlTask != null) {
-            mlTask.toXContent(builder, params);
-        }
-        if (error != null) {
-            builder.field(ERROR_FIELD, requestType);
-        }
-        if (workerNodes != null) {
-            builder.field(WORKER_NODES_FIELD, workerNodes);
-        }
-        if (uploadInput != null) {
-            builder.field(UPLOAD_INPUT_FIELD, uploadInput);
-        }
-        builder.endObject();
-        return builder;
     }
 
 }

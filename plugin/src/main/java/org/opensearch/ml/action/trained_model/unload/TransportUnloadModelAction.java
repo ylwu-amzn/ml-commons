@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package org.opensearch.ml.action.custom_model.unload;
+package org.opensearch.ml.action.trained_model.unload;
 
 import static org.opensearch.ml.common.CommonValue.DELETED;
 import static org.opensearch.ml.common.CommonValue.NOT_FOUND;
@@ -27,36 +27,43 @@ import org.opensearch.client.Client;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.inject.Inject;
 import org.opensearch.common.io.stream.StreamInput;
+import org.opensearch.ml.cluster.DiscoveryNodeHelper;
 import org.opensearch.ml.common.transport.custom_model.sync.MLSyncUpAction;
-import org.opensearch.ml.common.transport.custom_model.sync.MLSyncUpRequest;
+import org.opensearch.ml.common.transport.custom_model.sync.MLSyncUpInput;
+import org.opensearch.ml.common.transport.custom_model.sync.MLSyncUpNodesRequest;
 import org.opensearch.ml.common.transport.custom_model.unload.MLUnloadModelAction;
-import org.opensearch.ml.common.transport.custom_model.unload.UnloadModelInput;
 import org.opensearch.ml.common.transport.custom_model.unload.UnloadModelNodeRequest;
 import org.opensearch.ml.common.transport.custom_model.unload.UnloadModelNodeResponse;
 import org.opensearch.ml.common.transport.custom_model.unload.UnloadModelNodesRequest;
 import org.opensearch.ml.common.transport.custom_model.unload.UnloadModelNodesResponse;
-import org.opensearch.ml.engine.algorithms.custom.CustomModelManager;
+import org.opensearch.ml.engine.ModelHelper;
 import org.opensearch.ml.model.MLModelManager;
+import org.opensearch.ml.stats.MLNodeLevelStat;
+import org.opensearch.ml.stats.MLStats;
 import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.transport.TransportService;
 
 @Log4j2
 public class TransportUnloadModelAction extends
     TransportNodesAction<UnloadModelNodesRequest, UnloadModelNodesResponse, UnloadModelNodeRequest, UnloadModelNodeResponse> {
-    private final CustomModelManager customModelManager;
+    private final ModelHelper customModelManager;
     private final MLModelManager mlModelManager;
     private final ClusterService clusterService;
     private final Client client;
+    private DiscoveryNodeHelper nodeFilter;
+    private final MLStats mlStats;
 
     @Inject
     public TransportUnloadModelAction(
         TransportService transportService,
         ActionFilters actionFilters,
-        CustomModelManager customModelManager,
+        ModelHelper customModelManager,
         MLModelManager mlModelManager,
         ClusterService clusterService,
         ThreadPool threadPool,
-        Client client
+        Client client,
+        DiscoveryNodeHelper nodeFilter,
+        MLStats mlStats
     ) {
         super(
             MLUnloadModelAction.NAME,
@@ -73,6 +80,8 @@ public class TransportUnloadModelAction extends
         this.mlModelManager = mlModelManager;
         this.clusterService = clusterService;
         this.client = client;
+        this.nodeFilter = nodeFilter;
+        this.mlStats = mlStats;
     }
 
     @Override
@@ -84,6 +93,7 @@ public class TransportUnloadModelAction extends
         if (responses != null) {
             Map<String, List<String>> removedNodeMap = new HashMap<>();
             responses.stream().forEach(r -> {
+                Set<String> notFoundModels = new HashSet<>();
                 Map<String, String> modelUnloadStatus = r.getModelUnloadStatus();
                 for (Map.Entry<String, String> entry : modelUnloadStatus.entrySet()) {
                     String status = entry.getValue();
@@ -94,20 +104,32 @@ public class TransportUnloadModelAction extends
                         }
                         removedNodeMap.get(modelId).add(r.getNode().getId());
                     }
+                    if (NOT_FOUND.equals(status)) {
+                        notFoundModels.add(entry.getKey());
+                    }
                 }
+                notFoundModels.forEach(m -> modelUnloadStatus.remove(m));
             });
+            Map<String, String[]> removedNodes = new HashMap<>();
             for (Map.Entry<String, List<String>> entry : removedNodeMap.entrySet()) {
-                String modelId = entry.getKey();
-                List<String> removedNodes = entry.getValue();
-                MLSyncUpRequest syncUpRequest = new MLSyncUpRequest(modelId, null, removedNodes.toArray(new String[0]), false, true);
-                client
-                    .execute(
-                        MLSyncUpAction.INSTANCE,
-                        syncUpRequest,
-                        ActionListener
-                            .wrap(r -> { log.info("sync up removed nodes"); }, e -> { log.error("failed to sync up removed node", e); })
+                removedNodes.put(entry.getKey(), entry.getValue().toArray(new String[0]));
+                log
+                    .debug(
+                        "rrrrrrrrrrrrr removed node for model: {}, {}",
+                        entry.getKey(),
+                        Arrays.toString(entry.getValue().toArray(new String[0]))
                     );
             }
+            MLSyncUpInput syncUpInput = MLSyncUpInput.builder().removedWorkerNodes(removedNodes).build();
+
+            MLSyncUpNodesRequest syncUpRequest = new MLSyncUpNodesRequest(nodeFilter.getAllNodes(), syncUpInput);
+            client
+                .execute(
+                    MLSyncUpAction.INSTANCE,
+                    syncUpRequest,
+                    ActionListener
+                        .wrap(r -> { log.info("sync up removed nodes"); }, e -> { log.error("failed to sync up removed node", e); })
+                );
         }
         return new UnloadModelNodesResponse(clusterService.getClusterName(), responses, failures);
     }
@@ -128,25 +150,12 @@ public class TransportUnloadModelAction extends
     }
 
     private UnloadModelNodeResponse createUnloadModelNodeResponse(UnloadModelNodesRequest unloadModelNodesRequest) {
-        UnloadModelInput unloadModelInput = unloadModelNodesRequest.getUnloadModelInput();
-        String[] nodeIds = unloadModelInput.getNodeIds();
-        Map<String, String> modelUnloadStatus = new HashMap<>();
-        if (nodeIds != null && nodeIds.length > 0) {
-            Set<String> targetNodeIds = new HashSet<>(Arrays.asList(nodeIds));
-            String localNodeId = clusterService.localNode().getId();
-            if (!targetNodeIds.contains(localNodeId)) {
-                return new UnloadModelNodeResponse(clusterService.localNode(), modelUnloadStatus);
-            }
-        }
+        mlStats.getStat(MLNodeLevelStat.ML_NODE_EXECUTING_TASK_COUNT).increment();
+        mlStats.getStat(MLNodeLevelStat.ML_NODE_TOTAL_REQUEST_COUNT).increment();
 
-        Map<String, String> modelStatus = mlModelManager.unloadModel(unloadModelInput);
-        modelUnloadStatus.putAll(modelStatus);
-        Map<String, String> status = customModelManager.unloadModel(unloadModelInput);
-        status.entrySet().forEach(entry -> {
-            if (!NOT_FOUND.equals(entry.getValue())) {
-                modelUnloadStatus.put(entry.getKey(), entry.getValue());
-            }
-        });
+        String[] modelIds = unloadModelNodesRequest.getModelIds();
+        Map<String, String> modelUnloadStatus = mlModelManager.unloadModel(modelIds);
+        mlStats.getStat(MLNodeLevelStat.ML_NODE_EXECUTING_TASK_COUNT).decrement();
         return new UnloadModelNodeResponse(clusterService.localNode(), modelUnloadStatus);
     }
 }

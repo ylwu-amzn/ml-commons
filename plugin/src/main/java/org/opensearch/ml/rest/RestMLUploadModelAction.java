@@ -78,7 +78,7 @@ public class RestMLUploadModelAction extends BaseRestHandler {
         XContentParser parser = request.contentParser();
         ensureExpectedToken(XContentParser.Token.START_OBJECT, parser.nextToken(), parser);
         MLUploadInput mlInput = modelName == null
-            ? MLUploadInput.parse(parser)
+            ? MLUploadInput.parse(parser, loadModel)
             : MLUploadInput.parse(parser, modelName, version, loadModel);
         return new MLUploadModelRequest(mlInput);
     }

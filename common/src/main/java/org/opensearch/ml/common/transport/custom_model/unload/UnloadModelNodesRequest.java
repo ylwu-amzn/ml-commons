@@ -16,27 +16,26 @@ import java.io.IOException;
 public class UnloadModelNodesRequest extends BaseNodesRequest<UnloadModelNodesRequest> {
 
     @Getter
-    private UnloadModelInput unloadModelInput;
+    private String[] modelIds;
 
     public UnloadModelNodesRequest(StreamInput in) throws IOException {
         super(in);
-        unloadModelInput = new UnloadModelInput(in);
+        this.modelIds = in.readOptionalStringArray();
     }
 
-    public UnloadModelNodesRequest(String[] nodeIds, UnloadModelInput unloadModelInput) {
+    public UnloadModelNodesRequest(String[] nodeIds, String[] modelIds) {
         super(nodeIds);
-        this.unloadModelInput = unloadModelInput;
+        this.modelIds = modelIds;
     }
 
     public UnloadModelNodesRequest(DiscoveryNode... nodes) {
         super(nodes);
-        unloadModelInput = new UnloadModelInput();
     }
 
     @Override
     public void writeTo(StreamOutput out) throws IOException {
         super.writeTo(out);
-        unloadModelInput.writeTo(out);
+        out.writeOptionalStringArray(modelIds);
     }
 
 }

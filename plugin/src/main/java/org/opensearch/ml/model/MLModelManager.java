@@ -11,12 +11,15 @@ import static org.opensearch.ml.common.CommonValue.ML_MODEL_INDEX;
 import static org.opensearch.ml.common.CommonValue.NOT_FOUND;
 import static org.opensearch.ml.engine.MLEngine.getLoadModelChunkPath;
 import static org.opensearch.ml.engine.MLEngine.getLoadModelZipPath;
+import static org.opensearch.ml.engine.algorithms.text_embedding.TextEmbeddingModel.CUSTOM_MODEL_MANAGER;
+import static org.opensearch.ml.engine.algorithms.text_embedding.TextEmbeddingModel.MODEL_ZIP_FILE;
 import static org.opensearch.ml.plugin.MachineLearningPlugin.TASK_THREAD_POOL;
 import static org.opensearch.ml.settings.MLCommonsSettings.ML_COMMONS_MAX_MODELS_PER_NODE;
 import static org.opensearch.ml.utils.MLNodeUtils.createXContentParserFromRegistry;
 
 import java.io.File;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
@@ -25,6 +28,7 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Supplier;
 
 import lombok.extern.log4j.Log4j2;
 
@@ -43,13 +47,15 @@ import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.common.MLModel;
 import org.opensearch.ml.common.exception.MLException;
 import org.opensearch.ml.common.exception.MLResourceNotFoundException;
-import org.opensearch.ml.common.model.MLModelFormat;
 import org.opensearch.ml.common.model.MLModelState;
-import org.opensearch.ml.common.transport.custom_model.unload.UnloadModelInput;
 import org.opensearch.ml.engine.MLEngine;
+import org.opensearch.ml.engine.ModelHelper;
 import org.opensearch.ml.engine.Predictable;
-import org.opensearch.ml.engine.algorithms.custom.CustomModelManager;
 import org.opensearch.ml.engine.utils.MLFileUtils;
+import org.opensearch.ml.stats.ActionName;
+import org.opensearch.ml.stats.MLActionLevelStat;
+import org.opensearch.ml.stats.MLNodeLevelStat;
+import org.opensearch.ml.stats.MLStats;
 import org.opensearch.rest.RestStatus;
 import org.opensearch.search.fetch.subphase.FetchSourceContext;
 import org.opensearch.threadpool.ThreadPool;
@@ -62,29 +68,34 @@ public class MLModelManager {
     private final Client client;
     private ThreadPool threadPool;
     private NamedXContentRegistry xContentRegistry;
-    private CustomModelManager customModelManager;
+    private ModelHelper modelHelper;
 
     private final MLModelCache modelCache;
     private volatile Integer maxModelPerNode;
+
+    private final MLStats mlStats;
 
     public MLModelManager(
         ClusterService clusterService,
         Client client,
         ThreadPool threadPool,
         NamedXContentRegistry xContentRegistry,
-        CustomModelManager customModelManager,
-        Settings settings
+        ModelHelper modelHelper,
+        Settings settings,
+        MLStats mlStats
     ) {
         this.client = client;
         this.threadPool = threadPool;
         this.xContentRegistry = xContentRegistry;
-        this.customModelManager = customModelManager;
-        this.modelCache = new MLModelCache();
+        this.modelHelper = modelHelper;
+        this.modelCache = new MLModelCache(clusterService, settings);
+        this.mlStats = mlStats;
         this.maxModelPerNode = ML_COMMONS_MAX_MODELS_PER_NODE.get(settings);
         clusterService.getClusterSettings().addSettingsUpdateConsumer(ML_COMMONS_MAX_MODELS_PER_NODE, it -> maxModelPerNode = it);
     }
 
-    public void loadModel1(String modelId, ActionListener<String> listener) {
+    public void loadModel1(String modelId, FunctionName functionName, ActionListener<String> listener) {
+        mlStats.createCounterStatIfAbsent(functionName, ActionName.LOAD, MLActionLevelStat.ML_ACTION_REQUEST_COUNT).increment();
         if (modelCache.isModelLoaded(modelId)) {
             listener.onResponse("successful");
             return;
@@ -93,48 +104,49 @@ public class MLModelManager {
             listener.onFailure(new IllegalArgumentException("Exceed max model per node limit"));
             return;
         }
-        modelCache.initModelState(modelId, MLModelState.LOADING);
+        modelCache.initModelState(modelId, MLModelState.LOADING, functionName);
         try {
             threadPool.executor(TASK_THREAD_POOL).execute(() -> {
                 try (ThreadContext.StoredContext context = client.threadPool().getThreadContext().stashContext()) {
-                    this.getModel(modelId, ActionListener.wrap(mlModelMeta -> {
-                        if (mlModelMeta.getAlgorithm() != FunctionName.CUSTOM) {// load model trained by built-in algorithm like kmeans
-                            Predictable predictable = MLEngine.load(mlModelMeta);
+                    this.getModel(modelId, ActionListener.wrap(mlModel -> {
+                        if (mlModel.getAlgorithm() != FunctionName.TEXT_EMBEDDING) {// load model trained by built-in algorithm like kmeans
+                            Predictable predictable = MLEngine.load(mlModel, null);
                             modelCache.addPredictable(modelId, predictable);
+                            mlStats.getStat(MLNodeLevelStat.ML_NODE_TOTAL_MODEL_COUNT).increment();
                             modelCache.setModelState(modelId, MLModelState.LOADED);
                             listener.onResponse("successful");
                             return;
                         }
-                        String engine = mlModelMeta.getModelFormat() == MLModelFormat.TORCH_SCRIPT ? "PyTorch" : "OnnxRuntime";
-                        retrieveModelChunks(mlModelMeta, ActionListener.wrap(modelZipFile -> {
-                            customModelManager
-                                .loadModel(
-                                    modelZipFile,
-                                    modelId,
-                                    mlModelMeta.getName(),
-                                    mlModelMeta.getModelTaskType(),
-                                    mlModelMeta.getVersion(),
-                                    mlModelMeta.getModelConfig(),
-                                    engine
-                                );
+                        retrieveModelChunks(mlModel, ActionListener.wrap(modelZipFile -> {// load model trunks
+                            Predictable predictable = MLEngine
+                                .load(mlModel, ImmutableMap.of(MODEL_ZIP_FILE, modelZipFile, CUSTOM_MODEL_MANAGER, modelHelper));
+                            modelCache.addPredictable(modelId, predictable);
+                            mlStats.getStat(MLNodeLevelStat.ML_NODE_TOTAL_MODEL_COUNT).increment();
                             modelCache.setModelState(modelId, MLModelState.LOADED);
                             listener.onResponse("successful");
                         }, e -> {
-                            e.printStackTrace();
+                            mlStats
+                                .createCounterStatIfAbsent(functionName, ActionName.LOAD, MLActionLevelStat.ML_ACTION_FAILURE_COUNT)
+                                .increment();
                             log.error("Failed to retrieve model " + modelId, e);
                             modelCache.removeModelState(modelId);
                             listener.onFailure(e);
                         }));
                     }, e -> {
+                        mlStats
+                            .createCounterStatIfAbsent(functionName, ActionName.LOAD, MLActionLevelStat.ML_ACTION_FAILURE_COUNT)
+                            .increment();
                         modelCache.removeModelState(modelId);
                         listener.onFailure(new MLResourceNotFoundException("ML model not found"));
                     }));
                 } catch (Exception e) {
+                    mlStats.createCounterStatIfAbsent(functionName, ActionName.LOAD, MLActionLevelStat.ML_ACTION_FAILURE_COUNT).increment();
                     modelCache.removeModelState(modelId);
                     listener.onFailure(e);
                 }
             });
         } catch (Exception e) {
+            mlStats.createCounterStatIfAbsent(functionName, ActionName.LOAD, MLActionLevelStat.ML_ACTION_FAILURE_COUNT).increment();
             modelCache.removeModelState(modelId);
             listener.onFailure(e);
         }
@@ -260,7 +272,7 @@ public class MLModelManager {
     public void addModelWorkerNode(String modelId, String... nodeIds) {
         if (nodeIds != null) {
             for (String nodeId : nodeIds) {
-                modelCache.addModelWorkerNode(modelId, nodeId);
+                modelCache.addNodeToModelRoutingTable(modelId, nodeId);
             }
         }
     }
@@ -268,7 +280,7 @@ public class MLModelManager {
     public void removeModelWorkerNode(String modelId, String... nodeIds) {
         if (nodeIds != null) {
             for (String nodeId : nodeIds) {
-                modelCache.removeModelWorkerNode(modelId, nodeId);
+                modelCache.removeNodeFromModelRoutingTable(modelId, nodeId);
             }
         }
     }
@@ -277,18 +289,31 @@ public class MLModelManager {
         modelCache.removeWorkNodes(removedNodes);
     }
 
-    public synchronized Map<String, String> unloadModel(UnloadModelInput unloadModelInput) {
+    public synchronized Map<String, String> unloadModel(String[] modelIds) {
         Map<String, String> modelUnloadStatus = new HashMap<>();
-        String[] modelIds = unloadModelInput.getModelIds();
-        String[] nodeIds = unloadModelInput.getNodeIds();
         if (modelIds != null && modelIds.length > 0) {
+            log.debug("unload models {}", Arrays.toString(modelIds));
             for (String modelId : modelIds) {
                 if (modelCache.hasModel(modelId)) {
                     modelUnloadStatus.put(modelId, DELETED);
+                    mlStats.getStat(MLNodeLevelStat.ML_NODE_TOTAL_MODEL_COUNT).decrement();
                 } else {
                     modelUnloadStatus.put(modelId, NOT_FOUND);
                 }
-                modelCache.removeModel(modelId, nodeIds);
+                mlStats
+                    .createCounterStatIfAbsent(getModelFunctionName(modelId), ActionName.UNLOAD, MLActionLevelStat.ML_ACTION_REQUEST_COUNT)
+                    .increment();
+                modelCache.removeModel(modelId);// TODO remove this line before
+            }
+        } else {
+            log.debug("unload all models {}", Arrays.toString(getLocalLoadedModels()));
+            for (String modelId : getLocalLoadedModels()) {
+                modelUnloadStatus.put(modelId, DELETED);
+                mlStats.getStat(MLNodeLevelStat.ML_NODE_TOTAL_MODEL_COUNT).decrement();
+                mlStats
+                    .createCounterStatIfAbsent(getModelFunctionName(modelId), ActionName.UNLOAD, MLActionLevelStat.ML_ACTION_REQUEST_COUNT)
+                    .increment();
+                modelCache.removeModel(modelId);
             }
         }
         return modelUnloadStatus;
@@ -306,21 +331,36 @@ public class MLModelManager {
         return modelCache.getPredictable(modelId);
     }
 
+    public String[] getAllModelIds() {
+        return modelCache.getAllModelIds();
+    }
+
     public String[] getLocalLoadedModels() {
-        String[] loadedModels = modelCache.getLoadedModels();
-        String[] localLoadedModels = customModelManager.getLocalLoadedModels();
-        String[] result = new String[loadedModels.length + localLoadedModels.length];
-        int i = 0;
-        for (; i < loadedModels.length; i++) {
-            result[i] = loadedModels[i];
-        }
-        for (int j = 0; j < localLoadedModels.length; j++) {
-            result[i + j] = localLoadedModels[j];
-        }
-        return result;
+        return modelCache.getLoadedModels();
     }
 
     public synchronized void syncModelRouting(Map<String, Set<String>> modelRoutingTable) {
         modelCache.syncModelRouting(modelRoutingTable);
+    }
+
+    public void clearRoutingTable() {
+        modelCache.clearRoutingTable();
+    }
+
+    public MLModelProfile getModelProfile(String modelId) {
+        return modelCache.getModelProfile(modelId);
+    }
+
+    public <T> T trackPredictDuration(String modelId, Supplier<T> supplier) {
+        long start = System.nanoTime();
+        T t = supplier.get();
+        long end = System.nanoTime();
+        double durationInMs = (end - start) / 1e6;
+        modelCache.addInferenceDuration(modelId, durationInMs);
+        return t;
+    }
+
+    public FunctionName getModelFunctionName(String modelId) {
+        return modelCache.getModelFunctionName(modelId);
     }
 }

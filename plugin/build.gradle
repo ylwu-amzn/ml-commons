@@ -244,7 +244,7 @@ List<String> jacocoExclusions = [
         'org.opensearch.ml.rest.RestMLUnloadModelAction',
         'org.opensearch.ml.rest.RestMLLoadModelAction',
         'org.opensearch.ml.action.prediction.*',
-        'org.opensearch.ml.action.custom_model.*',
+        'org.opensearch.ml.action.trained_model.*',
         'org.opensearch.ml.model.MLModelCache',
         'org.opensearch.ml.model.MLModelManager',
         'org.opensearch.ml.task.*',
@@ -253,7 +253,12 @@ List<String> jacocoExclusions = [
         'org.opensearch.ml.cluster.MLCommonsClusterManagerEventListener',
         'org.opensearch.ml.cluster.SyncUpModelRoutingCron',
         'org.opensearch.ml.cluster.DiscoveryNodeFilterer',
-        'org.opensearch.ml.action.models.GetModelTransportAction'
+        'org.opensearch.ml.action.models.GetModelTransportAction',
+        'org.opensearch.ml.model.MLPredictRequestStats',
+        'org.opensearch.ml.model.MLModelProfile',
+        'org.opensearch.ml.cluster.MLSyncUpCron',
+        'org.opensearch.ml.cluster.*',
+        'org.opensearch.ml.action.profile.MLProfileTransportAction'
 ]
 
 jacocoTestCoverageVerification {
