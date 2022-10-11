@@ -20,12 +20,12 @@ import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.inject.Inject;
 import org.opensearch.common.io.stream.StreamInput;
 import org.opensearch.common.xcontent.NamedXContentRegistry;
-import org.opensearch.ml.common.transport.custom_model.sync.MLSyncUpAction;
-import org.opensearch.ml.common.transport.custom_model.sync.MLSyncUpInput;
-import org.opensearch.ml.common.transport.custom_model.sync.MLSyncUpNodeRequest;
-import org.opensearch.ml.common.transport.custom_model.sync.MLSyncUpNodeResponse;
-import org.opensearch.ml.common.transport.custom_model.sync.MLSyncUpNodesRequest;
-import org.opensearch.ml.common.transport.custom_model.sync.MLSyncUpNodesResponse;
+import org.opensearch.ml.common.transport.model.sync.MLSyncUpAction;
+import org.opensearch.ml.common.transport.model.sync.MLSyncUpInput;
+import org.opensearch.ml.common.transport.model.sync.MLSyncUpNodeRequest;
+import org.opensearch.ml.common.transport.model.sync.MLSyncUpNodeResponse;
+import org.opensearch.ml.common.transport.model.sync.MLSyncUpNodesRequest;
+import org.opensearch.ml.common.transport.model.sync.MLSyncUpNodesResponse;
 import org.opensearch.ml.engine.ModelHelper;
 import org.opensearch.ml.model.MLModelManager;
 import org.opensearch.ml.task.MLTaskManager;
@@ -36,7 +36,7 @@ import org.opensearch.transport.TransportService;
 public class TransportSyncUpOnNodeAction extends
     TransportNodesAction<MLSyncUpNodesRequest, MLSyncUpNodesResponse, MLSyncUpNodeRequest, MLSyncUpNodeResponse> {
     TransportService transportService;
-    ModelHelper customModelManager;
+    ModelHelper modelHelper;
     MLTaskManager mlTaskManager;
     MLModelManager mlModelManager;
     ClusterService clusterService;
@@ -48,7 +48,7 @@ public class TransportSyncUpOnNodeAction extends
     public TransportSyncUpOnNodeAction(
         TransportService transportService,
         ActionFilters actionFilters,
-        ModelHelper customModelManager,
+        ModelHelper modelHelper,
         MLTaskManager mlTaskManager,
         MLModelManager mlModelManager,
         ClusterService clusterService,
@@ -68,7 +68,7 @@ public class TransportSyncUpOnNodeAction extends
             MLSyncUpNodeResponse.class
         );
         this.transportService = transportService;
-        this.customModelManager = customModelManager;
+        this.modelHelper = modelHelper;
         this.mlTaskManager = mlTaskManager;
         this.mlModelManager = mlModelManager;
         this.clusterService = clusterService;

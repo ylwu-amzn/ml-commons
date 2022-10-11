@@ -233,11 +233,6 @@ List<String> jacocoExclusions = [
         'org.opensearch.ml.constant.CommonValue',
         'org.opensearch.ml.plugin.MachineLearningPlugin*',
         'org.opensearch.ml.indices.MLIndicesHandler',
-        'org.opensearch.ml.action.custom.*',
-        'org.opensearch.ml.rest.RestMLCustomModelUploadAction',
-        'org.opensearch.ml.rest.RestMLCustomModelLoadAction',
-        'org.opensearch.ml.rest.RestMLCustomModelUnloadAction',
-        'org.opensearch.ml.rest.RestMLCustomModelPredictAction',
         'org.opensearch.ml.rest.RestMLKNNSearchAction*',
         'org.opensearch.ml.rest.RestMLPredictionAction',
         'org.opensearch.ml.rest.RestMLUploadModelAction',
@@ -258,7 +253,8 @@ List<String> jacocoExclusions = [
         'org.opensearch.ml.model.MLModelProfile',
         'org.opensearch.ml.cluster.MLSyncUpCron',
         'org.opensearch.ml.cluster.*',
-        'org.opensearch.ml.action.profile.MLProfileTransportAction'
+        'org.opensearch.ml.action.profile.MLProfileTransportAction',
+        'org.opensearch.ml.rest.RestMLProfileAction'
 ]
 
 jacocoTestCoverageVerification {

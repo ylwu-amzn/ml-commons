@@ -29,17 +29,17 @@ import org.opensearch.common.xcontent.NamedXContentRegistry;
 import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.common.MLTask;
 import org.opensearch.ml.common.MLTaskState;
-import org.opensearch.ml.common.transport.custom_model.forward.MLForwardAction;
-import org.opensearch.ml.common.transport.custom_model.forward.MLForwardInput;
-import org.opensearch.ml.common.transport.custom_model.forward.MLForwardRequest;
-import org.opensearch.ml.common.transport.custom_model.forward.MLForwardRequestType;
-import org.opensearch.ml.common.transport.custom_model.forward.MLForwardResponse;
-import org.opensearch.ml.common.transport.custom_model.load.LoadModelInput;
-import org.opensearch.ml.common.transport.custom_model.load.LoadModelNodeRequest;
-import org.opensearch.ml.common.transport.custom_model.load.LoadModelNodeResponse;
-import org.opensearch.ml.common.transport.custom_model.load.LoadModelNodesRequest;
-import org.opensearch.ml.common.transport.custom_model.load.LoadModelNodesResponse;
-import org.opensearch.ml.common.transport.custom_model.load.MLLoadModelOnNodeAction;
+import org.opensearch.ml.common.transport.model.forward.MLForwardAction;
+import org.opensearch.ml.common.transport.model.forward.MLForwardInput;
+import org.opensearch.ml.common.transport.model.forward.MLForwardRequest;
+import org.opensearch.ml.common.transport.model.forward.MLForwardRequestType;
+import org.opensearch.ml.common.transport.model.forward.MLForwardResponse;
+import org.opensearch.ml.common.transport.model.load.LoadModelInput;
+import org.opensearch.ml.common.transport.model.load.LoadModelNodeRequest;
+import org.opensearch.ml.common.transport.model.load.LoadModelNodeResponse;
+import org.opensearch.ml.common.transport.model.load.LoadModelNodesRequest;
+import org.opensearch.ml.common.transport.model.load.LoadModelNodesResponse;
+import org.opensearch.ml.common.transport.model.load.MLLoadModelOnNodeAction;
 import org.opensearch.ml.engine.ModelHelper;
 import org.opensearch.ml.model.MLModelManager;
 import org.opensearch.ml.task.MLTaskManager;
@@ -52,7 +52,7 @@ import com.google.common.collect.ImmutableMap;
 public class TransportLoadModelOnNodeAction extends
     TransportNodesAction<LoadModelNodesRequest, LoadModelNodesResponse, LoadModelNodeRequest, LoadModelNodeResponse> {
     TransportService transportService;
-    ModelHelper customModelManager;
+    ModelHelper modelHelper;
     MLTaskManager mlTaskManager;
     MLModelManager mlModelManager;
     ClusterService clusterService;
@@ -64,7 +64,7 @@ public class TransportLoadModelOnNodeAction extends
     public TransportLoadModelOnNodeAction(
         TransportService transportService,
         ActionFilters actionFilters,
-        ModelHelper customModelManager,
+        ModelHelper modelHelper,
         MLTaskManager mlTaskManager,
         MLModelManager mlModelManager,
         ClusterService clusterService,
@@ -84,7 +84,7 @@ public class TransportLoadModelOnNodeAction extends
             LoadModelNodeResponse.class
         );
         this.transportService = transportService;
-        this.customModelManager = customModelManager;
+        this.modelHelper = modelHelper;
         this.mlTaskManager = mlTaskManager;
         this.mlModelManager = mlModelManager;
         this.clusterService = clusterService;
@@ -209,13 +209,13 @@ public class TransportLoadModelOnNodeAction extends
         ActionListener<String> listener
     ) {
         try {
-            log.debug("rrrrrrrrrr--- start loading model {}", modelId);
+            log.debug("start loading model {}", modelId);
             if (!coordinatingNodeId.equals(localNodeId)) {
                 mlTaskManager.add(mlTask);
             }
             mlModelManager.loadModel1(modelId, functionName, listener);
         } catch (Exception e) {
-            log.error("Failed to load custom model " + modelId, e);
+            log.error("Failed to load model " + modelId, e);
             listener.onFailure(e);
         }
     }

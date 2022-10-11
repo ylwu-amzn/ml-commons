@@ -11,7 +11,7 @@ import static org.opensearch.ml.common.CommonValue.ML_MODEL_INDEX;
 import static org.opensearch.ml.common.CommonValue.NOT_FOUND;
 import static org.opensearch.ml.engine.MLEngine.getLoadModelChunkPath;
 import static org.opensearch.ml.engine.MLEngine.getLoadModelZipPath;
-import static org.opensearch.ml.engine.algorithms.text_embedding.TextEmbeddingModel.CUSTOM_MODEL_MANAGER;
+import static org.opensearch.ml.engine.algorithms.text_embedding.TextEmbeddingModel.MODEL_HELPER;
 import static org.opensearch.ml.engine.algorithms.text_embedding.TextEmbeddingModel.MODEL_ZIP_FILE;
 import static org.opensearch.ml.plugin.MachineLearningPlugin.TASK_THREAD_POOL;
 import static org.opensearch.ml.settings.MLCommonsSettings.ML_COMMONS_MAX_MODELS_PER_NODE;
@@ -119,7 +119,7 @@ public class MLModelManager {
                         }
                         retrieveModelChunks(mlModel, ActionListener.wrap(modelZipFile -> {// load model trunks
                             Predictable predictable = MLEngine
-                                .load(mlModel, ImmutableMap.of(MODEL_ZIP_FILE, modelZipFile, CUSTOM_MODEL_MANAGER, modelHelper));
+                                .load(mlModel, ImmutableMap.of(MODEL_ZIP_FILE, modelZipFile, MODEL_HELPER, modelHelper));
                             modelCache.addPredictable(modelId, predictable);
                             mlStats.getStat(MLNodeLevelStat.ML_NODE_TOTAL_MODEL_COUNT).increment();
                             modelCache.setModelState(modelId, MLModelState.LOADED);
@@ -316,6 +316,7 @@ public class MLModelManager {
                 modelCache.removeModel(modelId);
             }
         }
+        modelHelper.cleanUpFileCache();
         return modelUnloadStatus;
     }
 

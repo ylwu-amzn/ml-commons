@@ -28,15 +28,14 @@ import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.inject.Inject;
 import org.opensearch.common.io.stream.StreamInput;
 import org.opensearch.ml.cluster.DiscoveryNodeHelper;
-import org.opensearch.ml.common.transport.custom_model.sync.MLSyncUpAction;
-import org.opensearch.ml.common.transport.custom_model.sync.MLSyncUpInput;
-import org.opensearch.ml.common.transport.custom_model.sync.MLSyncUpNodesRequest;
-import org.opensearch.ml.common.transport.custom_model.unload.MLUnloadModelAction;
-import org.opensearch.ml.common.transport.custom_model.unload.UnloadModelNodeRequest;
-import org.opensearch.ml.common.transport.custom_model.unload.UnloadModelNodeResponse;
-import org.opensearch.ml.common.transport.custom_model.unload.UnloadModelNodesRequest;
-import org.opensearch.ml.common.transport.custom_model.unload.UnloadModelNodesResponse;
-import org.opensearch.ml.engine.ModelHelper;
+import org.opensearch.ml.common.transport.model.sync.MLSyncUpAction;
+import org.opensearch.ml.common.transport.model.sync.MLSyncUpInput;
+import org.opensearch.ml.common.transport.model.sync.MLSyncUpNodesRequest;
+import org.opensearch.ml.common.transport.model.unload.MLUnloadModelAction;
+import org.opensearch.ml.common.transport.model.unload.UnloadModelNodeRequest;
+import org.opensearch.ml.common.transport.model.unload.UnloadModelNodeResponse;
+import org.opensearch.ml.common.transport.model.unload.UnloadModelNodesRequest;
+import org.opensearch.ml.common.transport.model.unload.UnloadModelNodesResponse;
 import org.opensearch.ml.model.MLModelManager;
 import org.opensearch.ml.stats.MLNodeLevelStat;
 import org.opensearch.ml.stats.MLStats;
@@ -46,7 +45,6 @@ import org.opensearch.transport.TransportService;
 @Log4j2
 public class TransportUnloadModelAction extends
     TransportNodesAction<UnloadModelNodesRequest, UnloadModelNodesResponse, UnloadModelNodeRequest, UnloadModelNodeResponse> {
-    private final ModelHelper customModelManager;
     private final MLModelManager mlModelManager;
     private final ClusterService clusterService;
     private final Client client;
@@ -57,7 +55,6 @@ public class TransportUnloadModelAction extends
     public TransportUnloadModelAction(
         TransportService transportService,
         ActionFilters actionFilters,
-        ModelHelper customModelManager,
         MLModelManager mlModelManager,
         ClusterService clusterService,
         ThreadPool threadPool,
@@ -76,7 +73,6 @@ public class TransportUnloadModelAction extends
             ThreadPool.Names.MANAGEMENT,
             UnloadModelNodeResponse.class
         );
-        this.customModelManager = customModelManager;
         this.mlModelManager = mlModelManager;
         this.clusterService = clusterService;
         this.client = client;
@@ -113,12 +109,7 @@ public class TransportUnloadModelAction extends
             Map<String, String[]> removedNodes = new HashMap<>();
             for (Map.Entry<String, List<String>> entry : removedNodeMap.entrySet()) {
                 removedNodes.put(entry.getKey(), entry.getValue().toArray(new String[0]));
-                log
-                    .debug(
-                        "rrrrrrrrrrrrr removed node for model: {}, {}",
-                        entry.getKey(),
-                        Arrays.toString(entry.getValue().toArray(new String[0]))
-                    );
+                log.debug("removed node for model: {}, {}", entry.getKey(), Arrays.toString(entry.getValue().toArray(new String[0])));
             }
             MLSyncUpInput syncUpInput = MLSyncUpInput.builder().removedWorkerNodes(removedNodes).build();
 

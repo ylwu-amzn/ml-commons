@@ -170,12 +170,16 @@ public class RestMLProfileActionTests extends OpenSearchTestCase {
         assertNotNull(routes);
         assertFalse(routes.isEmpty());
         RestHandler.Route modelRoute = routes.get(0);
-        RestHandler.Route taskRoute = routes.get(1);
-        RestHandler.Route route = routes.get(2);
+        RestHandler.Route modelsRoute = routes.get(1);
+        RestHandler.Route taskRoute = routes.get(2);
+        RestHandler.Route tasksRoute = routes.get(3);
+        RestHandler.Route route = routes.get(4);
         assertEquals(RestRequest.Method.GET, modelRoute.getMethod());
-        assertEquals("/_plugins/_ml/profile/model/{model_id}", modelRoute.getPath());
-        assertEquals("/_plugins/_ml/profile/task/{task_id}", taskRoute.getPath());
-        assertEquals("/_plugins/_ml/profile/", route.getPath());
+        assertEquals("/_plugins/_ml/profile/models/{model_id}", modelRoute.getPath());
+        assertEquals("/_plugins/_ml/profile/models", modelsRoute.getPath());
+        assertEquals("/_plugins/_ml/profile/tasks/{task_id}", taskRoute.getPath());
+        assertEquals("/_plugins/_ml/profile/tasks", tasksRoute.getPath());
+        assertEquals("/_plugins/_ml/profile", route.getPath());
     }
 
     public void test_PrepareRequest_TaskRequest() throws Exception {

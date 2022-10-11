@@ -23,15 +23,15 @@ import org.opensearch.ml.common.MLTask;
 import org.opensearch.ml.common.MLTaskState;
 import org.opensearch.ml.common.MLTaskType;
 import org.opensearch.ml.common.dataset.MLInputDataType;
-import org.opensearch.ml.common.transport.custom_model.forward.MLForwardAction;
-import org.opensearch.ml.common.transport.custom_model.forward.MLForwardInput;
-import org.opensearch.ml.common.transport.custom_model.forward.MLForwardRequest;
-import org.opensearch.ml.common.transport.custom_model.forward.MLForwardRequestType;
-import org.opensearch.ml.common.transport.custom_model.forward.MLForwardResponse;
-import org.opensearch.ml.common.transport.custom_model.upload.MLUploadInput;
-import org.opensearch.ml.common.transport.custom_model.upload.MLUploadModelAction;
-import org.opensearch.ml.common.transport.custom_model.upload.MLUploadModelRequest;
-import org.opensearch.ml.common.transport.custom_model.upload.UploadModelResponse;
+import org.opensearch.ml.common.transport.model.forward.MLForwardAction;
+import org.opensearch.ml.common.transport.model.forward.MLForwardInput;
+import org.opensearch.ml.common.transport.model.forward.MLForwardRequest;
+import org.opensearch.ml.common.transport.model.forward.MLForwardRequestType;
+import org.opensearch.ml.common.transport.model.forward.MLForwardResponse;
+import org.opensearch.ml.common.transport.model.upload.MLUploadInput;
+import org.opensearch.ml.common.transport.model.upload.MLUploadModelAction;
+import org.opensearch.ml.common.transport.model.upload.MLUploadModelRequest;
+import org.opensearch.ml.common.transport.model.upload.UploadModelResponse;
 import org.opensearch.ml.engine.ModelHelper;
 import org.opensearch.ml.indices.MLIndicesHandler;
 import org.opensearch.ml.stats.MLNodeLevelStat;
@@ -45,7 +45,7 @@ import org.opensearch.transport.TransportService;
 @Log4j2
 public class TransportUploadModelAction extends HandledTransportAction<ActionRequest, UploadModelResponse> {
     TransportService transportService;
-    ModelHelper customModelManager;
+    ModelHelper modelHelper;
     MLIndicesHandler mlIndicesHandler;
     MLTaskManager mlTaskManager;
     ClusterService clusterService;
@@ -60,7 +60,7 @@ public class TransportUploadModelAction extends HandledTransportAction<ActionReq
     public TransportUploadModelAction(
         TransportService transportService,
         ActionFilters actionFilters,
-        ModelHelper customModelManager,
+        ModelHelper modelHelper,
         MLIndicesHandler mlIndicesHandler,
         MLTaskManager mlTaskManager,
         ClusterService clusterService,
@@ -73,7 +73,7 @@ public class TransportUploadModelAction extends HandledTransportAction<ActionReq
     ) {
         super(MLUploadModelAction.NAME, transportService, actionFilters, MLUploadModelRequest::new);
         this.transportService = transportService;
-        this.customModelManager = customModelManager;
+        this.modelHelper = modelHelper;
         this.mlIndicesHandler = mlIndicesHandler;
         this.mlTaskManager = mlTaskManager;
         this.clusterService = clusterService;

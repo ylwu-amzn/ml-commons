@@ -69,16 +69,16 @@ import org.opensearch.ml.common.input.parameter.regression.LinearRegressionParam
 import org.opensearch.ml.common.input.parameter.regression.LogisticRegressionParams;
 import org.opensearch.ml.common.input.parameter.sample.SampleAlgoParams;
 import org.opensearch.ml.common.model.TextEmbeddingModelConfig;
-import org.opensearch.ml.common.transport.custom_model.forward.MLForwardAction;
-import org.opensearch.ml.common.transport.custom_model.load.MLLoadModelAction;
-import org.opensearch.ml.common.transport.custom_model.load.MLLoadModelOnNodeAction;
-import org.opensearch.ml.common.transport.custom_model.sync.MLSyncUpAction;
-import org.opensearch.ml.common.transport.custom_model.unload.MLUnloadModelAction;
-import org.opensearch.ml.common.transport.custom_model.upload.MLUploadModelAction;
 import org.opensearch.ml.common.transport.execute.MLExecuteTaskAction;
 import org.opensearch.ml.common.transport.model.MLModelDeleteAction;
 import org.opensearch.ml.common.transport.model.MLModelGetAction;
 import org.opensearch.ml.common.transport.model.MLModelSearchAction;
+import org.opensearch.ml.common.transport.model.forward.MLForwardAction;
+import org.opensearch.ml.common.transport.model.load.MLLoadModelAction;
+import org.opensearch.ml.common.transport.model.load.MLLoadModelOnNodeAction;
+import org.opensearch.ml.common.transport.model.sync.MLSyncUpAction;
+import org.opensearch.ml.common.transport.model.unload.MLUnloadModelAction;
+import org.opensearch.ml.common.transport.model.upload.MLUploadModelAction;
 import org.opensearch.ml.common.transport.prediction.MLPredictionTaskAction;
 import org.opensearch.ml.common.transport.task.MLTaskDeleteAction;
 import org.opensearch.ml.common.transport.task.MLTaskGetAction;
@@ -352,7 +352,7 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin {
         RestMLProfileAction restMLProfileAction = new RestMLProfileAction(clusterService);
         RestMLUploadModelAction restMLUploadModelAction = new RestMLUploadModelAction();
         RestMLLoadModelAction restMLLoadModelAction = new RestMLLoadModelAction();
-        RestMLUnloadModelAction restMLCustomModelUnloadAction = new RestMLUnloadModelAction(clusterService);
+        RestMLUnloadModelAction restMLUnloadModelAction = new RestMLUnloadModelAction(clusterService);
 
         return ImmutableList
             .of(
@@ -370,7 +370,7 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin {
                 restMLProfileAction,
                 restMLUploadModelAction,
                 restMLLoadModelAction,
-                restMLCustomModelUnloadAction
+                restMLUnloadModelAction
             );
     }
 

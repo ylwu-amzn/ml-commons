@@ -40,7 +40,7 @@ import org.opensearch.ml.common.output.model.ModelResultFilter;
 import org.opensearch.ml.common.output.model.ModelTensor;
 import org.opensearch.ml.common.output.model.ModelTensorOutput;
 import org.opensearch.ml.common.output.model.ModelTensors;
-import org.opensearch.ml.common.transport.custom_model.upload.MLUploadInput;
+import org.opensearch.ml.common.transport.model.upload.MLUploadInput;
 import org.opensearch.ml.engine.algorithms.text_embedding.MLTextEmbeddingTranslatorFactory;
 import org.opensearch.ml.engine.algorithms.text_embedding.ONNXSentenceTransformerTextEmbeddingTranslator;
 import org.opensearch.ml.engine.algorithms.text_embedding.SentenceTransformerTextEmbeddingTranslator;
@@ -66,10 +66,11 @@ import java.util.zip.ZipFile;
 
 import static org.opensearch.ml.common.model.TextEmbeddingModelConfig.FrameworkType.SENTENCE_TRANSFORMERS;
 import static org.opensearch.ml.engine.MLEngine.DJL_CACHE_PATH;
-import static org.opensearch.ml.engine.MLEngine.getCustomModelPath;
+import static org.opensearch.ml.engine.MLEngine.getModelCachePath;
 import static org.opensearch.ml.engine.MLEngine.getLoadModelPath;
 import static org.opensearch.ml.engine.MLEngine.getLocalPrebuiltModelConfigPath;
 import static org.opensearch.ml.engine.MLEngine.getLocalPrebuiltModelPath;
+import static org.opensearch.ml.engine.MLEngine.getModelCacheRootPath;
 import static org.opensearch.ml.engine.MLEngine.getUploadModelPath;
 import static org.opensearch.ml.engine.algorithms.text_embedding.MLTextEmbeddingServingTranslator.toFloats;
 import static org.opensearch.ml.engine.algorithms.text_embedding.SentenceTransformerTextEmbeddingTranslator.TEXT_FIELDS;
@@ -238,7 +239,7 @@ public class ModelHelper {
                     System.setProperty("java.library.path", DJL_CACHE_PATH.toAbsolutePath().toString());
                     Thread.currentThread().setContextClassLoader(ai.djl.Model.class.getClassLoader());
                     Engine.debugEnvironment();
-                    Path modelPath = getCustomModelPath(modelId, modelName, version);
+                    Path modelPath = getModelCachePath(modelId, modelName, version);
                     File pathFile = new File(modelPath.toUri());
                     if (pathFile.exists()) {
                         FileUtils.deleteDirectory(pathFile);
@@ -406,47 +407,15 @@ public class ModelHelper {
         }
     }
 
-//    private Map<String, String> unloadModel(String[] modelIds) {
-//        Map<String, String> modelUnloadStatus = new HashMap<>();
-////        String[] modelIds = unloadModelInput.getModelIds();
-//        if (modelIds != null && modelIds.length > 0) {
-//            log.debug("rrrrrrrrrr----- custom model: unload modes: {}", Arrays.toString(modelIds));
-//            for (String modelId : modelIds) {
-//                deleteFileQuietly(getCustomModelPath(modelId));
-//                deleteFileQuietly(getLoadModelPath(modelId));
-//                deleteFileQuietly(getUploadModelPath(modelId));
-//                if (predictors.containsKey(modelId)) {
-//                    modelUnloadStatus.put(modelId, DELETED);
-//                } else {
-//                    modelUnloadStatus.put(modelId, NOT_FOUND);
-//                }
-//                unloadModel(modelId);
-//                log.info("Unload model {}", modelId);
-//            }
-//        } else {
-//            log.debug("rrrrrrrrrr----- custom model: unload all predictors: {}", Arrays.toString(predictors.keySet().toArray(new String[0])));
-//            log.debug("rrrrrrrrrr----- custom model: unload all modes: {}", Arrays.toString(models.keySet().toArray(new String[0])));
-//            for (String modelId : predictors.keySet()) {
-//                modelUnloadStatus.put(modelId, DELETED);
-//            }
-//            for (String modelId : models.keySet()) {
-//                unloadModel(modelId);
-//            }
-//        }
-//        return modelUnloadStatus;
-//    }
-
     public void unloadModel(String modelId) {
-        deleteFileQuietly(getCustomModelPath(modelId));
-        deleteFileQuietly(getLoadModelPath(modelId));
-        deleteFileQuietly(getUploadModelPath(modelId));
+        deleteFileCache(modelId);
         if (predictors.containsKey(modelId)) {
-            log.debug("ylwudebug11111111111111----- unload mode: close and remove predictor {}", modelId);
+            log.debug("unload mode: close and remove predictor {}", modelId);
             predictors.get(modelId).close();
             predictors.remove(modelId);
         }
         if (models.containsKey(modelId)) {
-            log.debug("ylwudebug11111111111111----- unload mode: close and remove model {}", modelId);
+            log.debug("unload mode: close and remove model {}", modelId);
             models.get(modelId).close();
             models.remove(modelId);
         }
@@ -470,7 +439,20 @@ public class ModelHelper {
         }
     }
 
-//    public String[] getLoadedCustomModels() {
-//        return predictors.keySet().toArray(new String[0]);
-//    }
+    private void deleteFileCache(String modelId) {
+        deleteFileQuietly(getModelCachePath(modelId));
+        deleteFileQuietly(getLoadModelPath(modelId));
+        deleteFileQuietly(getUploadModelPath(modelId));
+    }
+
+    public void cleanUpFileCache() {//TODO: clean all files
+        Path path = getModelCacheRootPath();
+        File modelCacheFolder = new File(path.toUri());
+        for (File file: modelCacheFolder.listFiles()) {
+            String modelId = file.getName();
+            if (!predictors.containsKey(modelId)) {
+                FileUtils.deleteQuietly(file);
+            }
+        }
+    }
 }

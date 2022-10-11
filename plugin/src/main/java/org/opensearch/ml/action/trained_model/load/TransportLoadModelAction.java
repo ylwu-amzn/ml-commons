@@ -38,13 +38,13 @@ import org.opensearch.ml.common.MLTaskType;
 import org.opensearch.ml.common.dataset.MLInputDataType;
 import org.opensearch.ml.common.exception.MLResourceNotFoundException;
 import org.opensearch.ml.common.model.MLModelState;
-import org.opensearch.ml.common.transport.custom_model.load.LoadModelInput;
-import org.opensearch.ml.common.transport.custom_model.load.LoadModelNodesRequest;
-import org.opensearch.ml.common.transport.custom_model.load.LoadModelNodesResponse;
-import org.opensearch.ml.common.transport.custom_model.load.LoadModelResponse;
-import org.opensearch.ml.common.transport.custom_model.load.MLLoadModelAction;
-import org.opensearch.ml.common.transport.custom_model.load.MLLoadModelOnNodeAction;
-import org.opensearch.ml.common.transport.custom_model.load.MLLoadModelRequest;
+import org.opensearch.ml.common.transport.model.load.LoadModelInput;
+import org.opensearch.ml.common.transport.model.load.LoadModelNodesRequest;
+import org.opensearch.ml.common.transport.model.load.LoadModelNodesResponse;
+import org.opensearch.ml.common.transport.model.load.LoadModelResponse;
+import org.opensearch.ml.common.transport.model.load.MLLoadModelAction;
+import org.opensearch.ml.common.transport.model.load.MLLoadModelOnNodeAction;
+import org.opensearch.ml.common.transport.model.load.MLLoadModelRequest;
 import org.opensearch.ml.engine.ModelHelper;
 import org.opensearch.ml.model.MLModelManager;
 import org.opensearch.ml.stats.MLNodeLevelStat;
@@ -60,7 +60,7 @@ import com.google.common.collect.ImmutableMap;
 @Log4j2
 public class TransportLoadModelAction extends HandledTransportAction<ActionRequest, LoadModelResponse> {
     TransportService transportService;
-    ModelHelper customModelManager;
+    ModelHelper modelHelper;
     MLTaskManager mlTaskManager;
     ClusterService clusterService;
     ThreadPool threadPool;
@@ -75,7 +75,7 @@ public class TransportLoadModelAction extends HandledTransportAction<ActionReque
     public TransportLoadModelAction(
         TransportService transportService,
         ActionFilters actionFilters,
-        ModelHelper customModelManager,
+        ModelHelper modelHelper,
         MLTaskManager mlTaskManager,
         ClusterService clusterService,
         ThreadPool threadPool,
@@ -88,7 +88,7 @@ public class TransportLoadModelAction extends HandledTransportAction<ActionReque
     ) {
         super(MLLoadModelAction.NAME, transportService, actionFilters, MLLoadModelRequest::new);
         this.transportService = transportService;
-        this.customModelManager = customModelManager;
+        this.modelHelper = modelHelper;
         this.mlTaskManager = mlTaskManager;
         this.clusterService = clusterService;
         this.threadPool = threadPool;
@@ -214,7 +214,7 @@ public class TransportLoadModelAction extends HandledTransportAction<ActionReque
                                     );
                             });
                         } catch (Exception ex) {
-                            log.error("Failed to load custom model", ex);
+                            log.error("Failed to load model", ex);
                             // mlStats.createCounterStatIfAbsent(algorithm, ActionName.LOAD,
                             // MLActionLevelStat.ML_ACTION_REQUEST_COUNT).increment();
                             mlTaskManager.remove(taskId);
@@ -235,7 +235,7 @@ public class TransportLoadModelAction extends HandledTransportAction<ActionReque
                 listener.onFailure(e);
             }
         } catch (Exception e) {
-            log.error("Failed to download custom model " + modelId, e);
+            log.error("Failed to download model " + modelId, e);
             listener.onFailure(e);
         } finally {
             // mlStats.getStat(MLNodeLevelStat.ML_NODE_EXECUTING_TASK_COUNT).decrement();

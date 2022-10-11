@@ -16,10 +16,10 @@ import java.util.Map;
 @Function(FunctionName.TEXT_EMBEDDING)
 public class TextEmbeddingModel implements Predictable {
 
-    private ModelHelper customModelManager;
+    private ModelHelper modelHelper;
     private String modelId;
     public static final String MODEL_ZIP_FILE = "model_zip_file";
-    public static final String CUSTOM_MODEL_MANAGER = "custom_model_manager";
+    public static final String MODEL_HELPER = "model_helper";
 
     @Override
     public MLOutput predict(MLInputDataset inputDataset, MLModel model) {
@@ -28,19 +28,19 @@ public class TextEmbeddingModel implements Predictable {
 
     @Override
     public MLOutput predict(MLInputDataset inputDataset) {
-        if (customModelManager == null || modelId == null) {
+        if (modelHelper == null || modelId == null) {
             throw new MLException("model not loaded");
         }
-        return customModelManager.predictTextEmbedding(modelId, inputDataset);
+        return modelHelper.predictTextEmbedding(modelId, inputDataset);
     }
 
     @Override
     public void initModel(MLModel model, Map<String, Object> params) {
         String engine = model.getModelFormat() == MLModelFormat.TORCH_SCRIPT ? "PyTorch" : "OnnxRuntime";
         File modelZipFile = (File)params.get(MODEL_ZIP_FILE);
-        customModelManager = (ModelHelper)params.get(CUSTOM_MODEL_MANAGER);
+        modelHelper = (ModelHelper)params.get(MODEL_HELPER);
         modelId = model.getModelId();
-        customModelManager.loadModel(
+        modelHelper.loadModel(
                 modelZipFile,
                 modelId,
                 model.getName(),
@@ -53,8 +53,8 @@ public class TextEmbeddingModel implements Predictable {
 
     @Override
     public void close() {
-        if (customModelManager != null && modelId != null) {
-            customModelManager.unloadModel(modelId);
+        if (modelHelper != null && modelId != null) {
+            modelHelper.unloadModel(modelId);
         }
     }
 }

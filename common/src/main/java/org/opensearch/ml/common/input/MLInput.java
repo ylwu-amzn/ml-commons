@@ -43,7 +43,7 @@ public class MLInput implements Input {
     public static final String INPUT_INDEX_FIELD = "input_index";
     public static final String INPUT_QUERY_FIELD = "input_query";
     public static final String INPUT_DATA_FIELD = "input_data";
-    // For custom model
+    // For trained model
     public static final String MODEL_TASK_TYPE_FIELD = "model_task_type";
     public static final String RETURN_BYTES_FIELD = "return_bytes";
     public static final String RETURN_NUMBER_FIELD = "return_number";

@@ -24,11 +24,11 @@ import java.util.Map;
 public class MLEngine {
 
     public static Path DJL_CACHE_PATH;
-    public static Path DJL_CUSTOM_MODELS_PATH;
+    public static Path DJL_MODELS_CACHE_PATH;
     public static Path DJL_BUILT_IN_MODELS_PATH;
     public static void setDjlCachePath(Path opensearchDataFolder) {
         DJL_CACHE_PATH = opensearchDataFolder.resolve("djl");
-        DJL_CUSTOM_MODELS_PATH = DJL_CACHE_PATH.resolve("custom_models");
+        DJL_MODELS_CACHE_PATH = DJL_CACHE_PATH.resolve("models_cache");
     }
 
     public static Path getLocalPrebuiltModelConfigPath(String modelName, Integer version) {
@@ -44,19 +44,19 @@ public class MLEngine {
     }
 
     public static Path getUploadModelPath(String modelId, String modelName, Integer version) {
-        return DJL_CUSTOM_MODELS_PATH.resolve("upload").resolve(modelId).resolve(version + "").resolve(modelName);
+        return DJL_MODELS_CACHE_PATH.resolve("upload").resolve(modelId).resolve(version + "").resolve(modelName);
     }
 
     public static String getLoadModelZipPath(String modelName, Integer version) {
-        return DJL_CUSTOM_MODELS_PATH.resolve("load").resolve(version + "").resolve(modelName).resolve(modelName) + ".zip";
+        return DJL_MODELS_CACHE_PATH.resolve("load").resolve(version + "").resolve(modelName).resolve(modelName) + ".zip";
     }
 
     public static String getLoadModelZipPath(String modelId, String modelName) {
-        return DJL_CUSTOM_MODELS_PATH.resolve("load").resolve(modelId).resolve(modelName) + ".zip";
+        return DJL_MODELS_CACHE_PATH.resolve("load").resolve(modelId).resolve(modelName) + ".zip";
     }
 
     public static Path getLoadModelChunkPath(String modelName, Integer version, Integer chunkNumber) {
-        return DJL_CUSTOM_MODELS_PATH.resolve("load")
+        return DJL_MODELS_CACHE_PATH.resolve("load")
                 .resolve(version + "")
                 .resolve(modelName)
                 .resolve("chunks")
@@ -64,26 +64,30 @@ public class MLEngine {
     }
 
     public static Path getLoadModelChunkPath(String modelId, Integer chunkNumber) {
-        return DJL_CUSTOM_MODELS_PATH.resolve("load")
+        return DJL_MODELS_CACHE_PATH.resolve("load")
                 .resolve(modelId)
                 .resolve("chunks")
                 .resolve(chunkNumber + "");
     }
 
-    public static Path getCustomModelPath(String modelId, String modelName, Integer version) {
-        return DJL_CUSTOM_MODELS_PATH.resolve("models").resolve(modelId).resolve(version + "").resolve(modelName);
+    public static Path getModelCachePath(String modelId, String modelName, Integer version) {
+        return DJL_MODELS_CACHE_PATH.resolve("models").resolve(modelId).resolve(version + "").resolve(modelName);
     }
 
     public static Path getUploadModelPath(String modelId) {
-        return DJL_CUSTOM_MODELS_PATH.resolve("upload").resolve(modelId);
+        return DJL_MODELS_CACHE_PATH.resolve("upload").resolve(modelId);
     }
 
     public static Path getLoadModelPath(String modelId) {
-        return DJL_CUSTOM_MODELS_PATH.resolve("load").resolve(modelId);
+        return DJL_MODELS_CACHE_PATH.resolve("load").resolve(modelId);
     }
 
-    public static Path getCustomModelPath(String modelId) {
-        return DJL_CUSTOM_MODELS_PATH.resolve("models").resolve(modelId);
+    public static Path getModelCachePath(String modelId) {
+        return getModelCacheRootPath().resolve(modelId);
+    }
+
+    public static Path getModelCacheRootPath() {
+        return DJL_MODELS_CACHE_PATH.resolve("models");
     }
 
     public static MLModel train(Input input) {
