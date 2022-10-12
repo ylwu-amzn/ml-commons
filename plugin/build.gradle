@@ -254,7 +254,12 @@ List<String> jacocoExclusions = [
         'org.opensearch.ml.cluster.MLSyncUpCron',
         'org.opensearch.ml.cluster.*',
         'org.opensearch.ml.action.profile.MLProfileTransportAction',
-        'org.opensearch.ml.rest.RestMLProfileAction'
+        'org.opensearch.ml.rest.RestMLProfileAction',
+        'org.opensearch.ml.rest.RestMLUploadModelMetaAction',
+        'org.opensearch.ml.rest.RestMLUploadModelChunkAction',
+        'org.opensearch.ml.action.models.upload_chunk.TransportUploadModelMetaAction',
+        'org.opensearch.ml.action.models.upload_chunk.MLModelChunkUploader',
+        'org.opensearch.ml.action.models.upload_chunk.MLModelMetaUploader'
 ]
 
 jacocoTestCoverageVerification {
