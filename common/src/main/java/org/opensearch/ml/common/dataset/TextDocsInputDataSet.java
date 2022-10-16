@@ -28,6 +28,7 @@ public class TextDocsInputDataSet extends MLInputDataset{
 
     private List<String> docs;
 
+    @Builder(toBuilder = true)
     public TextDocsInputDataSet(List<String> docs, ModelResultFilter resultFilter) {
         super(MLInputDataType.TEXT_DOCS);
         this.resultFilter = resultFilter;
@@ -38,7 +39,6 @@ public class TextDocsInputDataSet extends MLInputDataset{
         this.docs = docs;
     }
 
-    @Builder(toBuilder = true)
     public TextDocsInputDataSet(StreamInput streamInput) throws IOException {
         super(MLInputDataType.TEXT_DOCS);
         docs = streamInput.readStringList();

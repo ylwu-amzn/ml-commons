@@ -238,7 +238,7 @@ public class MLModelManager {
                 e.printStackTrace();
                 stopNow.set(true);
                 semaphore.release();
-                listener.onFailure(new MLResourceNotFoundException("Fail to find model chunk"));
+                listener.onFailure(new MLResourceNotFoundException("Fail to find model chunk " + modelChunkId));
                 return;
             }));
         }

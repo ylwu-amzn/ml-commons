@@ -59,11 +59,7 @@ public class MLCommonsClusterManagerEventListener implements LocalNodeClusterMan
         clusterService.getClusterSettings().addSettingsUpdateConsumer(ML_COMMONS_SYNC_UP_JOB_INTERVAL_IN_SECONDS, it -> {
             jobInterval = it;
             cancel(syncModelRoutingCron);
-            if (jobInterval <= 0) {
-                log.debug("Stop ML syncup job as its interval is <=0");
-            } else {
-                startSyncModelRoutingCron();
-            }
+            startSyncModelRoutingCron();
         });
     }
 
@@ -75,8 +71,12 @@ public class MLCommonsClusterManagerEventListener implements LocalNodeClusterMan
     }
 
     private void startSyncModelRoutingCron() {
-        syncModelRoutingCron = threadPool
-            .scheduleWithFixedDelay(new MLSyncUpCron(client, nodeHelper), TimeValue.timeValueSeconds(jobInterval), TASK_THREAD_POOL);
+        if (jobInterval >0) {
+            syncModelRoutingCron = threadPool
+                    .scheduleWithFixedDelay(new MLSyncUpCron(client, nodeHelper), TimeValue.timeValueSeconds(jobInterval), TASK_THREAD_POOL);
+        } else {
+            log.debug("Stop ML syncup job as its interval is: {}", jobInterval);
+        }
         clusterService.addLifecycleListener(new LifecycleListener() {
             @Override
             public void beforeStop() {

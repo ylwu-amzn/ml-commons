@@ -152,6 +152,7 @@ public class MLModelUploader {
                     indexModelMetaRequest.setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE);
                     client.index(indexModelMetaRequest, ActionListener.wrap(modelMetaRes -> {
                         String modelId = modelMetaRes.getId();
+                        mlTask.setModelId(modelId);
                         log.info("create new model meta doc {} for upload task {}", modelId, taskId);
                         modelHelper.downloadAndSplit(modelId, modelName, version, mlUploadInput.getUrl(), ActionListener.wrap(result -> {
                             Long modelSizeInBytes = (Long) result.get(MODEL_SIZE_IN_BYTES);

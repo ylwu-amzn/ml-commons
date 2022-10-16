@@ -55,6 +55,9 @@ public class MLUploadModelMetaInput implements ToXContentObject, Writeable{
     public MLUploadModelMetaInput(String name, FunctionName functionName, Integer version, String description, MLModelFormat modelFormat, MLModelState modelState, Long modelContentSizeInBytes, String modelContentHash, MLModelConfig modelConfig, Integer totalChunks) {
         this.name = name;
         this.functionName = functionName;
+        if (functionName == null) {
+            this.functionName = FunctionName.TEXT_EMBEDDING;
+        }
         this.version = version;
         this.description = description;
         this.modelFormat = modelFormat;
