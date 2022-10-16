@@ -24,17 +24,17 @@ import org.opensearch.rest.action.RestToXContentListener;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 
-public class RestMLUploadModelMetaAction extends BaseRestHandler {
-    private static final String ML_UPLOAD_MODEL_META_ACTION = "ml_upload_model__meta_action";
+public class RestMLCreateModelMetaAction extends BaseRestHandler {
+    private static final String ML_CREATE_MODEL_META_ACTION = "ml_create_model__meta_action";
 
     /**
      * Constructor
      */
-    public RestMLUploadModelMetaAction() {}
+    public RestMLCreateModelMetaAction() {}
 
     @Override
     public String getName() {
-        return ML_UPLOAD_MODEL_META_ACTION;
+        return ML_CREATE_MODEL_META_ACTION;
     }
 
     @Override

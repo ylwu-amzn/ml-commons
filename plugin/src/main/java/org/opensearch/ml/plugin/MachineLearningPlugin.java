@@ -115,7 +115,7 @@ import org.opensearch.ml.rest.RestMLTrainingAction;
 import org.opensearch.ml.rest.RestMLUnloadModelAction;
 import org.opensearch.ml.rest.RestMLUploadModelAction;
 import org.opensearch.ml.rest.RestMLUploadModelChunkAction;
-import org.opensearch.ml.rest.RestMLUploadModelMetaAction;
+import org.opensearch.ml.rest.RestMLCreateModelMetaAction;
 import org.opensearch.ml.settings.MLCommonsSettings;
 import org.opensearch.ml.stats.MLClusterLevelStat;
 import org.opensearch.ml.stats.MLNodeLevelStat;
@@ -369,7 +369,7 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin {
         RestMLUploadModelAction restMLUploadModelAction = new RestMLUploadModelAction();
         RestMLLoadModelAction restMLLoadModelAction = new RestMLLoadModelAction();
         RestMLUnloadModelAction restMLUnloadModelAction = new RestMLUnloadModelAction(clusterService);
-        RestMLUploadModelMetaAction restMLUploadModelMetaAction = new RestMLUploadModelMetaAction();
+        RestMLCreateModelMetaAction restMLUploadModelMetaAction = new RestMLCreateModelMetaAction();
         RestMLUploadModelChunkAction restMLCustomModelUploadChunkAction = new RestMLUploadModelChunkAction();
 
         return ImmutableList
