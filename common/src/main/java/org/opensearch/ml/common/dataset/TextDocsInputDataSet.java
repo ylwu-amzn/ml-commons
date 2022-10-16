@@ -6,6 +6,7 @@
 package org.opensearch.ml.common.dataset;
 
 import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.experimental.FieldDefaults;
 import org.opensearch.common.io.stream.StreamInput;
@@ -37,6 +38,7 @@ public class TextDocsInputDataSet extends MLInputDataset{
         this.docs = docs;
     }
 
+    @Builder(toBuilder = true)
     public TextDocsInputDataSet(StreamInput streamInput) throws IOException {
         super(MLInputDataType.TEXT_DOCS);
         docs = streamInput.readStringList();

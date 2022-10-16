@@ -7,6 +7,7 @@ package org.opensearch.ml.engine.algorithms.text_embedding;
 
 import ai.djl.Model;
 import ai.djl.huggingface.tokenizers.HuggingFaceTokenizer;
+import ai.djl.huggingface.translator.TextEmbeddingTranslator;
 import ai.djl.modality.Input;
 import ai.djl.modality.Output;
 import ai.djl.translate.TranslateException;
@@ -21,7 +22,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
-public class MLTextEmbeddingTranslatorFactory implements TranslatorFactory {
+public class HuggingfaceTextEmbeddingTranslatorFactory implements TranslatorFactory {
 
     private static final Set<Pair<Type, Type>> SUPPORTED_TYPES = new HashSet<>();
 
@@ -49,12 +50,12 @@ public class MLTextEmbeddingTranslatorFactory implements TranslatorFactory {
                             .optTokenizerPath(modelPath)
                             .optManager(model.getNDManager())
                             .build();
-            MLTextEmbeddingTranslator translator =
-                    MLTextEmbeddingTranslator.builder(tokenizer, arguments).build();
+            TextEmbeddingTranslator translator =
+                    TextEmbeddingTranslator.builder(tokenizer, arguments).build();
             if (input == String.class && output == float[].class) {
                 return (Translator<I, O>) translator;
             } else if (input == Input.class && output == Output.class) {
-                return (Translator<I, O>) new MLTextEmbeddingServingTranslator(translator);
+                return (Translator<I, O>) new HuggingfaceTextEmbeddingServingTranslator(translator);
             }
             throw new IllegalArgumentException("Unsupported input/output types.");
         } catch (IOException e) {

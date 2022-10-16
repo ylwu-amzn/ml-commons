@@ -37,7 +37,7 @@ public class TextEmbeddingModelConfig extends MLModelConfig {
     private Integer embeddingDimension;
     private FrameworkType frameworkType;
 
-    @Builder
+    @Builder(toBuilder = true)
     public TextEmbeddingModelConfig(String modelType, Integer embeddingDimension, FrameworkType frameworkType, String allConfig) {
         super(modelType, allConfig);
         if (embeddingDimension == null) {

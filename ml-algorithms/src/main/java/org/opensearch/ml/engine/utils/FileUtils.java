@@ -6,7 +6,6 @@
 package org.opensearch.ml.engine.utils;
 
 import lombok.extern.log4j.Log4j2;
-import org.apache.commons.io.FileUtils;
 import org.opensearch.ml.common.exception.MLException;
 
 import java.io.BufferedInputStream;
@@ -23,7 +22,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 @Log4j2
-public class MLFileUtils {
+public class FileUtils {
 
     public static ArrayList<String> readAndFragment(File file, Path outputPath, int chunkSize) throws IOException {
         int fileSize = (int) file.length();
@@ -57,7 +56,7 @@ public class MLFileUtils {
     }
 
     public static void write(byte[] data, File destinationFile, boolean append) throws IOException {
-        FileUtils.createParentDirectories(destinationFile);
+        org.apache.commons.io.FileUtils.createParentDirectories(destinationFile);
         try (OutputStream output = new BufferedOutputStream(new FileOutputStream(destinationFile, append))){
             output.write(data);
         }
@@ -75,9 +74,9 @@ public class MLFileUtils {
 
                     write(fileContent, mergedFile, true);
                 }
-                FileUtils.deleteQuietly(f);
+                org.apache.commons.io.FileUtils.deleteQuietly(f);
                 if (i == files.length - 1) {
-                    FileUtils.deleteQuietly(f.getParentFile());
+                    org.apache.commons.io.FileUtils.deleteQuietly(f.getParentFile());
                 }
             } catch (IOException e) {
                 log.error("Failed to merge file " + f.getAbsolutePath() + " to " + mergedFile.getAbsolutePath());
@@ -85,7 +84,7 @@ public class MLFileUtils {
             }
         }
         if (failed) {
-            FileUtils.deleteQuietly(mergedFile);
+            org.apache.commons.io.FileUtils.deleteQuietly(mergedFile);
             throw new MLException("Failed to merge model chunks");
         }
     }
@@ -93,7 +92,7 @@ public class MLFileUtils {
     public static void deleteFileQuietly(Path path) {
         File file = new File(path.toUri());
         if (file.exists()) {
-            FileUtils.deleteQuietly(file);
+            org.apache.commons.io.FileUtils.deleteQuietly(file);
         }
     }
 

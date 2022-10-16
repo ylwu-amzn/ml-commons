@@ -5,16 +5,10 @@
 
 package org.opensearch.ml.engine;
 
-import ai.djl.Application;
-import ai.djl.engine.Engine;
 import ai.djl.inference.Predictor;
-import ai.djl.modality.Input;
-import ai.djl.modality.Output;
-import ai.djl.repository.zoo.Criteria;
 import ai.djl.repository.zoo.ZooModel;
 import ai.djl.training.util.DownloadUtils;
 import ai.djl.training.util.ProgressBar;
-import ai.djl.util.ZipUtils;
 import com.google.common.hash.HashCode;
 import com.google.common.hash.Hashing;
 import com.google.common.io.ByteSource;
@@ -23,23 +17,17 @@ import com.google.gson.stream.JsonReader;
 import lombok.extern.log4j.Log4j2;
 import org.apache.commons.io.FileUtils;
 import org.opensearch.action.ActionListener;
-import org.opensearch.ml.common.FunctionName;
-import org.opensearch.ml.common.exception.MLException;
 import org.opensearch.ml.common.model.MLModelConfig;
 import org.opensearch.ml.common.model.MLModelFormat;
 import org.opensearch.ml.common.model.TextEmbeddingModelConfig;
 import org.opensearch.ml.common.transport.model.upload.MLUploadInput;
 import org.opensearch.ml.engine.algorithms.text_embedding.MLTextEmbeddingTranslatorFactory;
-import org.opensearch.ml.engine.algorithms.text_embedding.ONNXSentenceTransformerTextEmbeddingTranslator;
-import org.opensearch.ml.engine.algorithms.text_embedding.SentenceTransformerTextEmbeddingTranslator;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileReader;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.security.AccessController;
-import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.Enumeration;
@@ -49,16 +37,13 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
-import static org.opensearch.ml.common.model.TextEmbeddingModelConfig.FrameworkType.SENTENCE_TRANSFORMERS;
-import static org.opensearch.ml.engine.MLEngine.DJL_CACHE_PATH;
 import static org.opensearch.ml.engine.MLEngine.getModelCachePath;
 import static org.opensearch.ml.engine.MLEngine.getLoadModelPath;
 import static org.opensearch.ml.engine.MLEngine.getLocalPrebuiltModelConfigPath;
 import static org.opensearch.ml.engine.MLEngine.getLocalPrebuiltModelPath;
-import static org.opensearch.ml.engine.MLEngine.getModelCacheRootPath;
 import static org.opensearch.ml.engine.MLEngine.getUploadModelPath;
-import static org.opensearch.ml.engine.utils.MLFileUtils.deleteFileQuietly;
-import static org.opensearch.ml.engine.utils.MLFileUtils.readAndFragment;
+import static org.opensearch.ml.engine.utils.FileUtils.deleteFileQuietly;
+import static org.opensearch.ml.engine.utils.FileUtils.readAndFragment;
 
 @Log4j2
 public class ModelHelper {
@@ -66,6 +51,10 @@ public class ModelHelper {
     public static final String MODEL_SIZE_IN_BYTES = "model_size_in_bytes";
     public static final String MODEL_FILE_HASH = "model_file_hash";
     private static final int CHUNK_SIZE = 10_000_000; // 10MB
+    public static final String PT = ".pt";
+    public static final String ONNX = ".onnx";
+    public static final String PYTORCH_ENGINE = "PyTorch";
+    public static final String ONNX_ENGINE = "OnnxRuntime";
 
     private Map<String, Predictor> predictors;
     private Map<String, TextEmbeddingModelConfig.FrameworkType> modelTransformersTypes;
@@ -213,88 +202,6 @@ public class ModelHelper {
         }
     }
 
-    public void loadModel(File modelZipFile, String modelId, String modelName, FunctionName functionName, Integer version,
-                          MLModelConfig modelConfig,
-                          String engine) {
-        try {
-            AccessController.doPrivileged((PrivilegedExceptionAction<Void>) () -> {
-                ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
-                try {
-                    System.setProperty("PYTORCH_PRECXX11", "true");
-                    System.setProperty("DJL_CACHE_DIR", DJL_CACHE_PATH.toAbsolutePath().toString());
-                    System.setProperty("java.library.path", DJL_CACHE_PATH.toAbsolutePath().toString());
-                    Thread.currentThread().setContextClassLoader(ai.djl.Model.class.getClassLoader());
-                    Engine.debugEnvironment();
-                    Path modelPath = getModelCachePath(modelId, modelName, version);
-                    File pathFile = new File(modelPath.toUri());
-                    if (pathFile.exists()) {
-                        FileUtils.deleteDirectory(pathFile);
-                    }
-                    ZipUtils.unzip(new FileInputStream(modelZipFile), modelPath);
-                    boolean findModelFile = false;
-                    for (File file : pathFile.listFiles()) {
-                        String name = file.getName();
-                        if (name.endsWith(".pt") || name.endsWith(".onnx")) {
-                            if (findModelFile) {
-                                throw new IllegalArgumentException("found multiple models");
-                            }
-                            findModelFile = true;
-                            String suffix = name.substring(name.lastIndexOf("."));
-                            file.renameTo(new File(modelPath.resolve(modelName + suffix).toUri()));
-                        }
-                    }
-                    try {
-                        Map<String, Object> arguments = new HashMap<>();
-                        arguments.put("engine", engine);
-                        Criteria.Builder<Input, Output> criteriaBuilder = Criteria.builder()
-                                .setTypes(Input.class, Output.class)
-                                .optApplication(Application.UNDEFINED)
-                                .optArguments(arguments)
-                                .optModelPath(modelPath);
-                        if (functionName == FunctionName.TEXT_EMBEDDING) {
-                            TextEmbeddingModelConfig textEmbeddingModelConfig = (TextEmbeddingModelConfig) modelConfig;
-                            TextEmbeddingModelConfig.FrameworkType transformersType = textEmbeddingModelConfig.getFrameworkType();
-                            if ("OnnxRuntime".equals(engine)) {
-                                criteriaBuilder.optTranslator(new ONNXSentenceTransformerTextEmbeddingTranslator());
-                            } else {
-                                if (transformersType == SENTENCE_TRANSFORMERS) {
-                                    criteriaBuilder.optTranslator(new SentenceTransformerTextEmbeddingTranslator());
-                                } else {
-                                    criteriaBuilder.optTranslatorFactory(new MLTextEmbeddingTranslatorFactory());
-                                }
-                            }
-                            modelTransformersTypes.put(modelId, transformersType);
-                        }
-                        Criteria<Input, Output> criteria = criteriaBuilder.build();
-                        ZooModel<Input, Output> model = criteria.loadModel();
-                        Predictor<Input, Output> predictor = model.newPredictor();
-                        predictors.put(modelId, predictor);
-                        models.put(modelId, model);
-                    } catch (Exception e) {
-                        String errorMessage = "Failed to load model " + modelName + ", version: " + version;
-                        log.error(errorMessage, e);
-                        removeModel(modelId);
-                        throw new MLException(errorMessage);
-                    } finally {
-                        deleteFileQuietly(getLoadModelPath(modelId));
-                    }
-                    return null;
-                } finally {
-                    Thread.currentThread().setContextClassLoader(contextClassLoader);
-                }
-            });
-        } catch (PrivilegedActionException e) {
-            String errorMsg = "Failed to load model";
-            log.error(errorMsg, e);
-            throw new MLException(errorMsg, e);
-        }
-    }
-
-    private void removeModel(String modelId) {
-        predictors.remove(modelId);
-        models.remove(modelId);
-        modelTransformersTypes.remove(modelId);
-    }
 
     public void unloadModel(String modelId) {
         deleteFileCache(modelId);
@@ -310,28 +217,10 @@ public class ModelHelper {
         }
     }
 
-    private void deleteFileCache(String modelId) {
+    public void deleteFileCache(String modelId) {
         deleteFileQuietly(getModelCachePath(modelId));
         deleteFileQuietly(getLoadModelPath(modelId));
         deleteFileQuietly(getUploadModelPath(modelId));
     }
 
-    public void cleanUpFileCache() {//TODO: clean all files
-        Path path = getModelCacheRootPath();
-        File modelCacheFolder = new File(path.toUri());
-        for (File file: modelCacheFolder.listFiles()) {
-            String modelId = file.getName();
-            if (!predictors.containsKey(modelId)) {
-                FileUtils.deleteQuietly(file);
-            }
-        }
-    }
-
-    public Predictor getPredictor(String modelId) {
-        return predictors.get(modelId);
-    }
-
-    public TextEmbeddingModelConfig.FrameworkType getFrameworkType(String modelId) {
-        return modelTransformersTypes.get(modelId);
-    }
 }

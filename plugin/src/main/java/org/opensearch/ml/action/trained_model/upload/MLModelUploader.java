@@ -10,7 +10,7 @@ import static org.opensearch.ml.engine.MLEngine.getUploadModelPath;
 import static org.opensearch.ml.engine.ModelHelper.CHUNK_FILES;
 import static org.opensearch.ml.engine.ModelHelper.MODEL_FILE_HASH;
 import static org.opensearch.ml.engine.ModelHelper.MODEL_SIZE_IN_BYTES;
-import static org.opensearch.ml.engine.utils.MLFileUtils.deleteFileQuietly;
+import static org.opensearch.ml.engine.utils.FileUtils.deleteFileQuietly;
 import static org.opensearch.ml.plugin.MachineLearningPlugin.TASK_THREAD_POOL;
 
 import java.io.File;
@@ -196,7 +196,7 @@ public class MLModelUploader {
                                                         Instant.now().toEpochMilli(),
                                                         MLModel.TOTAL_CHUNKS_FIELD,
                                                         chunkFiles.size(),
-                                                        MLModel.MODEL_CONTENT_HASH_FIELD,
+                                                        MLModel.MODEL_CONTENT_HASH_VALUE_FIELD,
                                                         hashValue,
                                                         MLModel.MODEL_CONTENT_SIZE_IN_BYTES_FIELD,
                                                         modelSizeInBytes

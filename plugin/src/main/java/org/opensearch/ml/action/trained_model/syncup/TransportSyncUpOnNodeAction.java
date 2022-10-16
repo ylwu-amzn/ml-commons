@@ -8,7 +8,7 @@ package org.opensearch.ml.action.trained_model.syncup;
 import static org.opensearch.ml.engine.MLEngine.getLoadModelPath;
 import static org.opensearch.ml.engine.MLEngine.getModelCachePath;
 import static org.opensearch.ml.engine.MLEngine.getUploadModelPath;
-import static org.opensearch.ml.engine.utils.MLFileUtils.deleteFileQuietly;
+import static org.opensearch.ml.engine.utils.FileUtils.deleteFileQuietly;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -35,7 +35,7 @@ import org.opensearch.ml.common.transport.model.sync.MLSyncUpNodesRequest;
 import org.opensearch.ml.common.transport.model.sync.MLSyncUpNodesResponse;
 import org.opensearch.ml.engine.MLEngine;
 import org.opensearch.ml.engine.ModelHelper;
-import org.opensearch.ml.engine.utils.MLFileUtils;
+import org.opensearch.ml.engine.utils.FileUtils;
 import org.opensearch.ml.model.MLModelManager;
 import org.opensearch.ml.task.MLTaskManager;
 import org.opensearch.threadpool.ThreadPool;
@@ -150,7 +150,7 @@ public class TransportSyncUpOnNodeAction extends
         Path uploadModelRootPath = MLEngine.getUploadModelRootPath();
         Path loadModelRootPath = MLEngine.getLoadModelRootPath();
         Path modelCacheRootPath = MLEngine.getModelCacheRootPath();
-        Set<String> modelsInCacheFolder = MLFileUtils.getFileNames(uploadModelRootPath, loadModelRootPath, modelCacheRootPath);
+        Set<String> modelsInCacheFolder = FileUtils.getFileNames(uploadModelRootPath, loadModelRootPath, modelCacheRootPath);
         if (modelsInCacheFolder.size() > 0) {
             log
                 .debug(

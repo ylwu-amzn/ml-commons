@@ -16,16 +16,14 @@ import ai.djl.ndarray.types.DataType;
 import ai.djl.translate.Batchifier;
 import ai.djl.translate.ServingTranslator;
 import ai.djl.translate.TranslatorContext;
-import org.opensearch.common.io.stream.BytesStreamOutput;
-import org.opensearch.ml.common.exception.MLException;
-import org.opensearch.ml.common.output.model.ModelTensors;
-import org.opensearch.ml.common.model.MLResultDataType;
+import org.opensearch.ml.common.output.model.MLResultDataType;
 import org.opensearch.ml.common.output.model.ModelTensor;
+import org.opensearch.ml.common.output.model.ModelTensors;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.file.Path;
-import  java.util.ArrayList;
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -81,14 +79,7 @@ public class SentenceTransformerTextEmbeddingTranslator implements ServingTransl
         }
 
         ModelTensors modelTensorOutput = new ModelTensors(outputs);
-
-        try (BytesStreamOutput bytesStreamOutput = new BytesStreamOutput()) {
-            modelTensorOutput.writeTo(bytesStreamOutput);
-            byte[] bytes = bytesStreamOutput.bytes().toBytesRef().bytes;
-            output.add(bytes);
-        } catch (Exception e) {
-            throw new MLException("Failed to parse result", e);
-        }
+        output.add(modelTensorOutput.toBytes());
         return output;
     }
 

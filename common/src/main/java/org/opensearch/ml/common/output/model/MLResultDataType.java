@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package org.opensearch.ml.common.model;
+package org.opensearch.ml.common.output.model;
 
 public enum MLResultDataType {
     FLOAT32(Format.FLOATING, 4),

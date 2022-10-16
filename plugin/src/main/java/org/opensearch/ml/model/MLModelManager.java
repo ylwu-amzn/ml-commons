@@ -51,7 +51,7 @@ import org.opensearch.ml.common.model.MLModelState;
 import org.opensearch.ml.engine.MLEngine;
 import org.opensearch.ml.engine.ModelHelper;
 import org.opensearch.ml.engine.Predictable;
-import org.opensearch.ml.engine.utils.MLFileUtils;
+import org.opensearch.ml.engine.utils.FileUtils;
 import org.opensearch.ml.stats.ActionName;
 import org.opensearch.ml.stats.MLActionLevelStat;
 import org.opensearch.ml.stats.MLNodeLevelStat;
@@ -225,13 +225,13 @@ public class MLModelManager {
             int currentChunk = i;
             this.getModel(modelChunkId, ActionListener.wrap(model -> {
                 Path chunkPath = getLoadModelChunkPath(modelId, currentChunk);
-                MLFileUtils.write(Base64.getDecoder().decode(model.getContent()), chunkPath.toString());
+                FileUtils.write(Base64.getDecoder().decode(model.getContent()), chunkPath.toString());
                 chunkFiles[currentChunk] = new File(chunkPath.toUri());
                 semaphore.release();
                 retrievedChunks.getAndIncrement();
                 if (retrievedChunks.get() == totalChunks) {
                     File modelZipFile = new File(modelZip);
-                    MLFileUtils.mergeFiles(chunkFiles, modelZipFile);
+                    FileUtils.mergeFiles(chunkFiles, modelZipFile);
                     listener.onResponse(modelZipFile);
                 }
             }, e -> {
@@ -325,7 +325,7 @@ public class MLModelManager {
                 modelCache.removeModel(modelId);
             }
         }
-        modelHelper.cleanUpFileCache();
+//        modelHelper.cleanUpFileCache();
         return modelUnloadStatus;
     }
 

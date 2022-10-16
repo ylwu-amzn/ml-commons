@@ -15,17 +15,18 @@ import ai.djl.ndarray.NDManager;
 import ai.djl.translate.Batchifier;
 import ai.djl.translate.ServingTranslator;
 import ai.djl.translate.TranslatorContext;
-import org.opensearch.common.bytes.BytesReference;
-import org.opensearch.common.io.stream.BytesStreamOutput;
-import org.opensearch.common.io.stream.StreamInput;
-import org.opensearch.ml.common.exception.MLException;
+import org.opensearch.ml.common.output.model.MLResultDataType;
+import org.opensearch.ml.common.output.model.ModelTensor;
+import org.opensearch.ml.common.output.model.ModelTensors;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
-//TODO: tune this class
+import static org.opensearch.ml.engine.algorithms.text_embedding.TextEmbeddingModel.SENTENCE_EMBEDDING;
+
 public class ONNXSentenceTransformerTextEmbeddingTranslator implements ServingTranslator {
     private static final int[] AXIS = {0};
     private HuggingFaceTokenizer tokenizer;
@@ -85,35 +86,16 @@ public class ONNXSentenceTransformerTextEmbeddingTranslator implements ServingTr
         NDArray sum = prod.sum(AXIS);
         embeddings = sum.div(clamp).normalize(2, 0);
 
+        List<ModelTensor> outputs = new ArrayList<>();
+        Number[] data = embeddings.toArray();
+        outputs.add(new ModelTensor(SENTENCE_EMBEDDING, data, shape, MLResultDataType.FLOAT32, null));
+
         Output output = new Output();
-        output.add(toBytes(embeddings.toFloatArray()));
+        ModelTensors modelTensorOutput = new ModelTensors(outputs);
+        output.add(modelTensorOutput.toBytes());
         return output;
     }
 
-    public static byte[] toBytes(float[] floats) {
-        try (BytesStreamOutput bytesStreamOutput = new BytesStreamOutput()) {
-            bytesStreamOutput.writeFloatArray(floats);
-            bytesStreamOutput.flush();
-            return bytesStreamOutput.bytes().toBytesRef().bytes;
-        } catch (Exception e) {
-            throw new MLException("Failed to parse result");
-        }
-    }
-
-    public static Number[] toFloats(byte[] bytes) {
-        ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
-        try (StreamInput streamInput = BytesReference.fromByteBuffer(byteBuffer).streamInput()) {
-            float[] floats = streamInput.readFloatArray();
-            Number[] result = new Number[floats.length];
-            for (int i =0;i<floats.length;i++) {
-                float f = floats[i];
-                result[i] = f;
-            }
-            return result;
-        } catch (Exception e) {
-            throw new MLException("Failed to parse result");
-        }
-    }
 
     @Override
     public void setArguments(Map<String, ?> arguments) {
