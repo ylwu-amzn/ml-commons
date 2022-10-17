@@ -80,7 +80,7 @@ public class MLCircuitBreakerServiceTests {
 
     @Test
     public void testInit() {
-        Assert.assertNotNull(mlCircuitBreakerService.init());
+        Assert.assertNotNull(mlCircuitBreakerService.init(null));
     }
 
     @Test

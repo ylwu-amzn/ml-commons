@@ -8,6 +8,7 @@ package org.opensearch.ml.common.breaker;
 import lombok.extern.log4j.Log4j2;
 import org.opensearch.monitor.jvm.JvmService;
 
+import java.nio.file.Path;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
@@ -57,11 +58,14 @@ public class MLCircuitBreakerService {
      * Register memory breaker by default.
      *
      * @return MLCircuitBreakerService
+     * @param path
      */
-    public MLCircuitBreakerService init() {
+    public MLCircuitBreakerService init(Path path) {
         // Register memory circuit breaker
         registerBreaker(BreakerName.MEMORY, new MemoryCircuitBreaker(this.jvmService));
         log.info("Registered ML memory breaker.");
+        registerBreaker(BreakerName.DISK, new DiskCircuitBreaker(path));
+        log.info("Registered ML disk breaker.");
 
         return this;
     }

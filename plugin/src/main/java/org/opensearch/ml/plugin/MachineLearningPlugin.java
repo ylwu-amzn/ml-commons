@@ -222,7 +222,7 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin {
         MLEngine.setDjlCachePath(environment.dataFiles()[0]);
 
         JvmService jvmService = new JvmService(environment.settings());
-        MLCircuitBreakerService mlCircuitBreakerService = new MLCircuitBreakerService(jvmService).init();
+        MLCircuitBreakerService mlCircuitBreakerService = new MLCircuitBreakerService(jvmService).init(environment.dataFiles()[0]);
 
         Map<Enum, MLStat<?>> stats = new ConcurrentHashMap<>();
 
@@ -242,9 +242,27 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin {
         mlIndicesHandler = new MLIndicesHandler(clusterService, client);
         mlTaskManager = new MLTaskManager(client, mlIndicesHandler);
         modelHelper = new ModelHelper();
-        mlModelManager = new MLModelManager(clusterService, client, threadPool, xContentRegistry, modelHelper, settings, mlStats);
+        mlModelManager = new MLModelManager(
+            clusterService,
+            client,
+            threadPool,
+            xContentRegistry,
+            modelHelper,
+            settings,
+            mlStats,
+            mlCircuitBreakerService
+        );
         mlInputDatasetHandler = new MLInputDatasetHandler(client);
-        mlModelUploader = new MLModelUploader(modelHelper, mlIndicesHandler, mlTaskManager, mlModelManager, threadPool, client, mlStats);
+        mlModelUploader = new MLModelUploader(
+            modelHelper,
+            mlIndicesHandler,
+            mlTaskManager,
+            mlModelManager,
+            threadPool,
+            client,
+            mlStats,
+            mlCircuitBreakerService
+        );
         mlModelMetaUploader = new MLModelMetaUploader(mlIndicesHandler, threadPool, client);
         mlModelChunkUploader = new MLModelChunkUploader(mlIndicesHandler, client, xContentRegistry);
 
