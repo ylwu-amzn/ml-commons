@@ -78,7 +78,7 @@ public class MLTaskManager {
             throw new IllegalArgumentException("Duplicate taskId");
         }
         taskCaches.put(taskId, new MLTaskCache(mlTask, workerNodes));
-        log.info("add ML task to cache " + taskId);
+        log.debug("add ML task to cache " + taskId);
     }
 
     /**
@@ -138,7 +138,7 @@ public class MLTaskManager {
     public void remove(String taskId) {
         if (contains(taskId)) {
             taskCaches.remove(taskId);
-            log.info("remove ML task from cache " + taskId);
+            log.debug("remove ML task from cache " + taskId);
         }
     }
 

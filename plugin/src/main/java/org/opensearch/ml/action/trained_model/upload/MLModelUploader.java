@@ -294,11 +294,15 @@ public class MLModelUploader {
     }
 
     private void handleException(String taskId, Exception e) {
-        mlTaskManager.remove(taskId);
         mlTaskManager
             .updateMLTask(
                 taskId,
                 ImmutableMap.of(MLTask.ERROR_FIELD, ExceptionUtils.getStackTrace(e), MLTask.STATE_FIELD, MLTaskState.FAILED),
+                ActionListener.runAfter(ActionListener.wrap(r -> {
+                    log.debug("updated task successfully {}", taskId);
+                }, ex->{
+                    log.error("failed to update ML task " + taskId, ex);
+                }), ()-> mlTaskManager.remove(taskId)),
                 TIMEOUT_IN_MILLIS
             );
     }
