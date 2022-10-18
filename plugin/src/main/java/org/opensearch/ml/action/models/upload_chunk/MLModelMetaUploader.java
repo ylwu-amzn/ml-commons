@@ -44,7 +44,7 @@ public class MLModelMetaUploader {
         threadPool.executor(TASK_THREAD_POOL).execute(() -> {
             try {
                 String modelName = mlUploadModelMetaInput.getName();
-                Integer version = mlUploadModelMetaInput.getVersion();
+                String version = mlUploadModelMetaInput.getVersion();
                 FunctionName functionName = mlUploadModelMetaInput.getFunctionName();
                 try (ThreadContext.StoredContext context = client.threadPool().getThreadContext().stashContext()) {
                     mlIndicesHandler.initModelIndexIfAbsent(ActionListener.wrap(res -> {

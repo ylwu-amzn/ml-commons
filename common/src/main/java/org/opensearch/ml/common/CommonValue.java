@@ -52,8 +52,11 @@ public class CommonValue {
             + MLModel.MODEL_NAME_FIELD
             + "\" : {\"type\":\"text\",\"fields\":{\"keyword\":{\"type\":\"keyword\",\"ignore_above\":256}}},\n"
             + "      \""
-            + MLModel.MODEL_VERSION_FIELD
+            + MLModel.OLD_MODEL_VERSION_FIELD
             + "\" : {\"type\": \"long\"},\n"
+            + "      \""
+            + MLModel.MODEL_VERSION_FIELD
+            + "\" : {\"type\": \"keyword\"},\n"
             + "      \""
             + MLModel.MODEL_CONTENT_FIELD
             + "\" : {\"type\": \"binary\"},\n"

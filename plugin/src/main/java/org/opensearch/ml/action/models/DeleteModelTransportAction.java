@@ -8,7 +8,6 @@ package org.opensearch.ml.action.models;
 import static org.opensearch.ml.common.CommonValue.ML_MODEL_INDEX;
 import static org.opensearch.ml.common.MLModel.MODEL_ID_FIELD;
 
-import com.google.common.annotations.VisibleForTesting;
 import lombok.AccessLevel;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.log4j.Log4j2;
@@ -32,6 +31,8 @@ import org.opensearch.ml.common.transport.model.MLModelDeleteRequest;
 import org.opensearch.rest.RestStatus;
 import org.opensearch.tasks.Task;
 import org.opensearch.transport.TransportService;
+
+import com.google.common.annotations.VisibleForTesting;
 
 @Log4j2
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -83,7 +84,7 @@ public class DeleteModelTransportAction extends HandledTransportAction<ActionReq
 
         client.execute(DeleteByQueryAction.INSTANCE, deleteModelsRequest, ActionListener.wrap(r -> {
             if ((r.getBulkFailures() == null || r.getBulkFailures().size() == 0)
-                    && (r.getSearchFailures() == null || r.getSearchFailures().size() == 0)) {
+                && (r.getSearchFailures() == null || r.getSearchFailures().size() == 0)) {
                 log.info("All model chunks are deleted for model {}", modelId);
                 actionListener.onResponse(deleteResponse);
             } else {

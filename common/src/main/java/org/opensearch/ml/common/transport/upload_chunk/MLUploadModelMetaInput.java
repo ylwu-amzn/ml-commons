@@ -39,7 +39,7 @@ public class MLUploadModelMetaInput implements ToXContentObject, Writeable{
 
     private FunctionName functionName;
     private String name;
-    private Integer version;
+    private String version;
     private String description;
 
     private MLModelFormat modelFormat;
@@ -52,7 +52,7 @@ public class MLUploadModelMetaInput implements ToXContentObject, Writeable{
     private Integer totalChunks;
 
     @Builder(toBuilder = true)
-    public MLUploadModelMetaInput(String name, FunctionName functionName, Integer version, String description, MLModelFormat modelFormat, MLModelState modelState, Long modelContentSizeInBytes, String modelContentHash, MLModelConfig modelConfig, Integer totalChunks) {
+    public MLUploadModelMetaInput(String name, FunctionName functionName, String version, String description, MLModelFormat modelFormat, MLModelState modelState, Long modelContentSizeInBytes, String modelContentHash, MLModelConfig modelConfig, Integer totalChunks) {
         this.name = name;
         this.functionName = functionName;
         if (functionName == null) {
@@ -71,7 +71,7 @@ public class MLUploadModelMetaInput implements ToXContentObject, Writeable{
     public MLUploadModelMetaInput(StreamInput in) throws IOException{
         this.name = in.readString();
         this.functionName = in.readEnum(FunctionName.class);
-        this.version = in.readInt();
+        this.version = in.readString();
         this.totalChunks = in.readInt();
         this.description = in.readOptionalString();
         if (in.readBoolean()) {
@@ -92,7 +92,7 @@ public class MLUploadModelMetaInput implements ToXContentObject, Writeable{
     public void writeTo(StreamOutput out) throws IOException {
         out.writeString(name);
         out.writeEnum(functionName);
-        out.writeInt(version);
+        out.writeString(version);
         out.writeOptionalString(description);
         if (modelFormat != null) {
             out.writeBoolean(true);
@@ -157,7 +157,7 @@ public class MLUploadModelMetaInput implements ToXContentObject, Writeable{
     public static MLUploadModelMetaInput parse(XContentParser parser) throws IOException {
         String name = null;
         FunctionName functionName = null;
-        Integer version = null;
+        String version = null;
         String description = null;;
         MLModelFormat modelFormat = null;
         MLModelState modelState = null;
@@ -178,7 +178,7 @@ public class MLUploadModelMetaInput implements ToXContentObject, Writeable{
                     functionName = FunctionName.from(parser.text());
                     break;
                 case MODEL_VERSION_FIELD:
-                    version = parser.intValue(false);
+                    version = parser.text();
                     break;
                 case DESCRIPTION_FIELD:
                     description = parser.text();

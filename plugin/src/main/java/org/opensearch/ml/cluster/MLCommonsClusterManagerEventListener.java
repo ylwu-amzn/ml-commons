@@ -71,9 +71,9 @@ public class MLCommonsClusterManagerEventListener implements LocalNodeClusterMan
     }
 
     private void startSyncModelRoutingCron() {
-        if (jobInterval >0) {
+        if (jobInterval > 0) {
             syncModelRoutingCron = threadPool
-                    .scheduleWithFixedDelay(new MLSyncUpCron(client, nodeHelper), TimeValue.timeValueSeconds(jobInterval), TASK_THREAD_POOL);
+                .scheduleWithFixedDelay(new MLSyncUpCron(client, nodeHelper), TimeValue.timeValueSeconds(jobInterval), TASK_THREAD_POOL);
         } else {
             log.debug("Stop ML syncup job as its interval is: {}", jobInterval);
         }

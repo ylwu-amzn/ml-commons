@@ -31,7 +31,7 @@ public class MLModelGetResponseTest {
         mlModel = MLModel.builder()
                 .name("model")
                 .algorithm(FunctionName.KMEANS)
-                .version(1)
+                .version("1.0.0")
                 .content("content")
                 .user(new User())
                 .build();

@@ -69,7 +69,7 @@ public class ModelHelper {
 
     public void downloadPrebuiltModelConfig(String taskId, MLUploadInput uploadInput, ActionListener<MLUploadInput> listener) {
         String modelName = uploadInput.getModelName();
-        Integer version = uploadInput.getVersion();
+        String version = uploadInput.getVersion();
         boolean loadModel = uploadInput.isLoadModel();
         String[] modelNodeIds = uploadInput.getModelNodeIds();
         try {
@@ -140,7 +140,7 @@ public class ModelHelper {
         }
     }
 
-    public void downloadAndSplit(String modelId, String modelName, Integer version, String url, ActionListener<Map<String, Object>> listener) {
+    public void downloadAndSplit(String modelId, String modelName, String version, String url, ActionListener<Map<String, Object>> listener) {
         try {
             AccessController.doPrivileged((PrivilegedExceptionAction<Void>) () -> {
                 Path modelUploadPath = getUploadModelPath(modelId, modelName, version);

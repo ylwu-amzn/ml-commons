@@ -179,10 +179,10 @@ public class DeleteModelTransportActionTests extends OpenSearchTestCase {
 
     public void test_FailToDeleteAllModelChunks_SearchFailure() {
         ScrollableHitSource.SearchFailure searchFailure = new ScrollableHitSource.SearchFailure(
-                new RuntimeException("error"),
-                ML_MODEL_INDEX,
-                123,
-                "node_id"
+            new RuntimeException("error"),
+            ML_MODEL_INDEX,
+            123,
+            "node_id"
         );
         when(bulkByScrollResponse.getBulkFailures()).thenReturn(new ArrayList<>());
         when(bulkByScrollResponse.isTimedOut()).thenReturn(false);

@@ -100,25 +100,33 @@ public class MLModelUploader {
         this.mlCircuitBreakerService = mlCircuitBreakerService;
 
         maxUploadTasksPerNode = ML_COMMONS_MAX_UPLOAD_TASKS_PER_NODE.get(settings);
-        clusterService.getClusterSettings().addSettingsUpdateConsumer(ML_COMMONS_MAX_UPLOAD_TASKS_PER_NODE, it -> maxUploadTasksPerNode = it);
+        clusterService
+            .getClusterSettings()
+            .addSettingsUpdateConsumer(ML_COMMONS_MAX_UPLOAD_TASKS_PER_NODE, it -> maxUploadTasksPerNode = it);
     }
 
     public void uploadMLModel(MLUploadInput uploadInput, MLTask mlTask) {
-//        if (mlTaskManager.getRunningTaskCount(MLTaskType.UPLOAD_MODEL) >= maxUploadTasksPerNode) {
-//            String errorMsg = "exceed max upload task limit";
-//            mlTaskManager.updateMLTaskDirectly(mlTask.getTaskId(), ImmutableMap.of(MLTask.STATE_FIELD, MLTaskState.FAILED, MLTask.ERROR_FIELD, errorMsg));
-//            throw new MLLimitExceededException(errorMsg);
-//        }
-//        if (mlCircuitBreakerService.isOpen()) {
-//            mlStats.getStat(MLNodeLevelStat.ML_NODE_TOTAL_CIRCUIT_BREAKER_TRIGGER_COUNT).increment();
-//            String errorMsg = "Circuit breaker is open, please check your memory and disk usage!";
-//            mlTaskManager.updateMLTaskDirectly(mlTask.getTaskId(), ImmutableMap.of(MLTask.STATE_FIELD, MLTaskState.FAILED, MLTask.ERROR_FIELD, errorMsg));
-//            throw new MLLimitExceededException(errorMsg);
-//        }
+        // if (mlTaskManager.getRunningTaskCount(MLTaskType.UPLOAD_MODEL) >= maxUploadTasksPerNode) {
+        // String errorMsg = "exceed max upload task limit";
+        // mlTaskManager.updateMLTaskDirectly(mlTask.getTaskId(), ImmutableMap.of(MLTask.STATE_FIELD, MLTaskState.FAILED,
+        // MLTask.ERROR_FIELD, errorMsg));
+        // throw new MLLimitExceededException(errorMsg);
+        // }
+        // if (mlCircuitBreakerService.isOpen()) {
+        // mlStats.getStat(MLNodeLevelStat.ML_NODE_TOTAL_CIRCUIT_BREAKER_TRIGGER_COUNT).increment();
+        // String errorMsg = "Circuit breaker is open, please check your memory and disk usage!";
+        // mlTaskManager.updateMLTaskDirectly(mlTask.getTaskId(), ImmutableMap.of(MLTask.STATE_FIELD, MLTaskState.FAILED,
+        // MLTask.ERROR_FIELD, errorMsg));
+        // throw new MLLimitExceededException(errorMsg);
+        // }
         mlStats.getStat(MLNodeLevelStat.ML_NODE_TOTAL_REQUEST_COUNT).increment();
         String errorMsg = checkResourceLimit();
         if (errorMsg != null) {
-            mlTaskManager.updateMLTaskDirectly(mlTask.getTaskId(), ImmutableMap.of(MLTask.STATE_FIELD, MLTaskState.FAILED, MLTask.ERROR_FIELD, errorMsg));
+            mlTaskManager
+                .updateMLTaskDirectly(
+                    mlTask.getTaskId(),
+                    ImmutableMap.of(MLTask.STATE_FIELD, MLTaskState.FAILED, MLTask.ERROR_FIELD, errorMsg)
+                );
             throw new MLLimitExceededException(errorMsg);
         }
         mlTaskManager.add(mlTask);
@@ -155,9 +163,9 @@ public class MLModelUploader {
     public void uploadPrebuiltModel(MLUploadInput uploadInput, MLTask mlTask) {
         String modelName = uploadInput.getModelName();
         String taskId = mlTask.getTaskId();
-        Integer version = uploadInput.getVersion();
+        String version = uploadInput.getVersion();
         boolean loadModel = uploadInput.isLoadModel();
-//        mlTaskManager.add(mlTask);
+        // mlTaskManager.add(mlTask);
         modelHelper.downloadPrebuiltModelConfig(taskId, uploadInput, ActionListener.wrap(response -> {
             mlTaskManager.remove(taskId);
             uploadModel(response, mlTask);
@@ -170,12 +178,12 @@ public class MLModelUploader {
     public void uploadModel(MLUploadInput mlUploadInput, MLTask mlTask) {
         Semaphore semaphore = new Semaphore(1);
         String taskId = mlTask.getTaskId();
-//        mlTaskManager.add(mlTask);
+        // mlTaskManager.add(mlTask);
 
         AtomicInteger uploaded = new AtomicInteger(0);
         threadPool.executor(TASK_THREAD_POOL).execute(() -> {
             String modelName = mlUploadInput.getModelName();
-            Integer version = mlUploadInput.getVersion();
+            String version = mlUploadInput.getVersion();
 
             try (ThreadContext.StoredContext context = client.threadPool().getThreadContext().stashContext()) {
                 mlIndicesHandler.initModelIndexIfAbsent(ActionListener.wrap(res -> {
@@ -341,11 +349,15 @@ public class MLModelUploader {
             .updateMLTask(
                 taskId,
                 ImmutableMap.of(MLTask.ERROR_FIELD, ExceptionUtils.getStackTrace(e), MLTask.STATE_FIELD, MLTaskState.FAILED),
-                ActionListener.runAfter(ActionListener.wrap(r -> {
-                    log.debug("updated task successfully {}", taskId);
-                }, ex->{
-                    log.error("failed to update ML task " + taskId, ex);
-                }), ()-> mlTaskManager.remove(taskId)),
+                ActionListener
+                    .runAfter(
+                        ActionListener
+                            .wrap(
+                                r -> { log.debug("updated task successfully {}", taskId); },
+                                ex -> { log.error("failed to update ML task " + taskId, ex); }
+                            ),
+                        () -> mlTaskManager.remove(taskId)
+                    ),
                 TIMEOUT_IN_MILLIS
             );
     }

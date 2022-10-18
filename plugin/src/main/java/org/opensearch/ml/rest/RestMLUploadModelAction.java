@@ -67,9 +67,8 @@ public class RestMLUploadModelAction extends BaseRestHandler {
     @VisibleForTesting
     MLUploadModelRequest getRequest(RestRequest request) throws IOException {
         String modelName = request.param(PARAMETER_MODEL_ID);
-        String versionStr = request.param(PARAMETER_VERSION);
+        String version = request.param(PARAMETER_VERSION);
         boolean loadModel = request.paramAsBoolean(PARAMETER_LOAD_MODEL, false);
-        Integer version = versionStr == null ? null : Integer.valueOf(versionStr);
         if (modelName != null && !request.hasContent()) {
             MLUploadInput mlInput = MLUploadInput.builder().loadModel(loadModel).modelName(modelName).version(version).build();
             return new MLUploadModelRequest(mlInput);

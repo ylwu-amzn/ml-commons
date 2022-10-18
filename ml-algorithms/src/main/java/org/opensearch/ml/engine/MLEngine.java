@@ -31,20 +31,20 @@ public class MLEngine {
         DJL_MODELS_CACHE_PATH = DJL_CACHE_PATH.resolve("models_cache");
     }
 
-    public static Path getLocalPrebuiltModelConfigPath(String modelName, Integer version) {
+    public static Path getLocalPrebuiltModelConfigPath(String modelName, String version) {
         //TODO: change to public opensearch repo URL
         // /home/ylwu/Downloads/os2.3/opensearch-2.3.0/data/djl/models/all-MiniLM-L6-v2/all-MiniLM-L6-v2.zip
-        return DJL_CACHE_PATH.resolve("models").resolve(version + "").resolve(modelName).resolve("config.json");
+        return DJL_CACHE_PATH.resolve("models").resolve(version).resolve(modelName).resolve("config.json");
     }
 
-    public static Path getLocalPrebuiltModelPath(String modelName, Integer version) {
+    public static Path getLocalPrebuiltModelPath(String modelName, String version) {
         //TODO: change to public opensearch repo URL
         // /home/ylwu/Downloads/os2.3/opensearch-2.3.0/data/djl/models/all-MiniLM-L6-v2/all-MiniLM-L6-v2.zip
-        return DJL_CACHE_PATH.resolve("models").resolve(version + "").resolve(modelName).resolve(modelName + ".zip");
+        return DJL_CACHE_PATH.resolve("models").resolve(version).resolve(modelName).resolve(modelName + ".zip");
     }
 
-    public static Path getUploadModelPath(String modelId, String modelName, Integer version) {
-        return getUploadModelPath(modelId).resolve(version + "").resolve(modelName);
+    public static Path getUploadModelPath(String modelId, String modelName, String version) {
+        return getUploadModelPath(modelId).resolve(version).resolve(modelName);
     }
 
     public static Path getUploadModelPath(String modelId) {
@@ -74,8 +74,8 @@ public class MLEngine {
                 .resolve(chunkNumber + "");
     }
 
-    public static Path getModelCachePath(String modelId, String modelName, Integer version) {
-        return getModelCachePath(modelId).resolve(version + "").resolve(modelName);
+    public static Path getModelCachePath(String modelId, String modelName, String version) {
+        return getModelCachePath(modelId).resolve(version).resolve(modelName);
     }
 
     public static Path getModelCachePath(String modelId) {

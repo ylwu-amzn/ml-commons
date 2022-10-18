@@ -5,6 +5,8 @@
 
 package org.opensearch.ml.action.load;
 
+import static org.opensearch.ml.settings.MLCommonsSettings.ML_COMMONS_MAX_LOAD_MODEL_TASKS_PER_NODE;
+
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -53,8 +55,6 @@ import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.transport.TransportService;
 
 import com.google.common.collect.ImmutableMap;
-
-import static org.opensearch.ml.settings.MLCommonsSettings.ML_COMMONS_MAX_LOAD_MODEL_TASKS_PER_NODE;
 
 @Log4j2
 public class TransportLoadModelOnNodeAction extends
@@ -108,7 +108,9 @@ public class TransportLoadModelOnNodeAction extends
         this.mlCircuitBreakerService = mlCircuitBreakerService;
         this.mlStats = mlStats;
         maxLoadTasksPerNode = ML_COMMONS_MAX_LOAD_MODEL_TASKS_PER_NODE.get(settings);
-        clusterService.getClusterSettings().addSettingsUpdateConsumer(ML_COMMONS_MAX_LOAD_MODEL_TASKS_PER_NODE, it -> maxLoadTasksPerNode = it);
+        clusterService
+            .getClusterSettings()
+            .addSettingsUpdateConsumer(ML_COMMONS_MAX_LOAD_MODEL_TASKS_PER_NODE, it -> maxLoadTasksPerNode = it);
     }
 
     @Override
@@ -175,14 +177,18 @@ public class TransportLoadModelOnNodeAction extends
         }, e -> {
             log.error("Failed to load model " + modelId, e);
             if (e instanceof MLLimitExceededException) {
-                mlTaskManager.updateMLTaskDirectly(mlTask.getTaskId(), ImmutableMap.of(MLTask.STATE_FIELD, MLTaskState.FAILED, MLTask.ERROR_FIELD, e.getMessage()));
+                mlTaskManager
+                    .updateMLTaskDirectly(
+                        mlTask.getTaskId(),
+                        ImmutableMap.of(MLTask.STATE_FIELD, MLTaskState.FAILED, MLTask.ERROR_FIELD, e.getMessage())
+                    );
             } else {
                 mlTaskManager
-                        .updateMLTask(
-                                taskId,
-                                ImmutableMap.of(MLTask.ERROR_FIELD, ExceptionUtils.getStackTrace(e), MLTask.STATE_FIELD, MLTaskState.FAILED),
-                                5000
-                        );
+                    .updateMLTask(
+                        taskId,
+                        ImmutableMap.of(MLTask.ERROR_FIELD, ExceptionUtils.getStackTrace(e), MLTask.STATE_FIELD, MLTaskState.FAILED),
+                        5000
+                    );
             }
 
             if (!coordinatingNodeId.equals(localNodeId)) {

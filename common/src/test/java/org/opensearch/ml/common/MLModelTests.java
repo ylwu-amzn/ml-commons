@@ -28,15 +28,20 @@ public class MLModelTests {
         mlModel = MLModel.builder()
                 .name("some model")
                 .algorithm(algorithm)
-                .version(1)
+                .version("1.0.0")
                 .content("some content")
                 .user(user)
                 .build();
     }
 
     @Test
+    public void test() {
+        System.out.println(CommonValue.ML_MODEL_INDEX_MAPPING);
+    }
+
+    @Test
     public void toXContent() throws IOException {
-        MLModel mlModel = MLModel.builder().algorithm(FunctionName.KMEANS).name("model_name").version(1).content("test_content").build();
+        MLModel mlModel = MLModel.builder().algorithm(FunctionName.KMEANS).name("model_name").version("1.0.0").content("test_content").build();
         XContentBuilder builder = XContentBuilder.builder(XContentType.JSON.xContent());
         mlModel.toXContent(builder, EMPTY_PARAMS);
         String mlModelContent = TestHelper.xContentBuilderToString(builder);

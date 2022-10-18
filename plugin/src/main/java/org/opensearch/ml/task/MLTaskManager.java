@@ -318,12 +318,17 @@ public class MLTaskManager {
     }
 
     public void updateMLTaskDirectly(String taskId, Map<String, Object> updatedFields) {
-        updateMLTaskDirectly(taskId, updatedFields, ActionListener.wrap(r -> {
-            log.debug("updated ML task directly: {}", taskId);
-        }, e-> {
-            log.error("Failed to update ML task " + taskId, e);
-        }));
+        updateMLTaskDirectly(
+            taskId,
+            updatedFields,
+            ActionListener
+                .wrap(
+                    r -> { log.debug("updated ML task directly: {}", taskId); },
+                    e -> { log.error("Failed to update ML task " + taskId, e); }
+                )
+        );
     }
+
     public void updateMLTaskDirectly(String taskId, Map<String, Object> updatedFields, ActionListener<UpdateResponse> listener) {
         try {
             if (updatedFields == null || updatedFields.size() == 0) {
