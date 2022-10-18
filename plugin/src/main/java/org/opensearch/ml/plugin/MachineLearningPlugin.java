@@ -44,6 +44,8 @@ import org.opensearch.ml.action.tasks.GetTaskTransportAction;
 import org.opensearch.ml.action.tasks.SearchTaskTransportAction;
 import org.opensearch.ml.action.training.TransportTrainingTaskAction;
 import org.opensearch.ml.action.trainpredict.TransportTrainAndPredictionTaskAction;
+import org.opensearch.ml.action.upload.TransportUploadModelAction;
+import org.opensearch.ml.cluster.DiscoveryNodeHelper;
 import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.common.breaker.MLCircuitBreakerService;
 import org.opensearch.ml.common.input.execute.anomalylocalization.AnomalyLocalizationInput;
@@ -66,6 +68,7 @@ import org.opensearch.ml.common.transport.task.MLTaskGetAction;
 import org.opensearch.ml.common.transport.task.MLTaskSearchAction;
 import org.opensearch.ml.common.transport.training.MLTrainingTaskAction;
 import org.opensearch.ml.common.transport.trainpredict.MLTrainAndPredictionTaskAction;
+import org.opensearch.ml.common.transport.upload.MLUploadModelAction;
 import org.opensearch.ml.engine.MLEngine;
 import org.opensearch.ml.engine.MLEngineClassLoader;
 import org.opensearch.ml.engine.algorithms.anomalylocalization.AnomalyLocalizerImpl;
@@ -113,6 +116,7 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin {
     private MLTrainAndPredictTaskRunner mlTrainAndPredictTaskRunner;
     private MLExecuteTaskRunner mlExecuteTaskRunner;
     private IndexUtils indexUtils;
+    private DiscoveryNodeHelper nodeHelper;
 
     private Client client;
     private ClusterService clusterService;
@@ -135,7 +139,8 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin {
                 new ActionHandler<>(MLTaskGetAction.INSTANCE, GetTaskTransportAction.class),
                 new ActionHandler<>(MLTaskDeleteAction.INSTANCE, DeleteTaskTransportAction.class),
                 new ActionHandler<>(MLTaskSearchAction.INSTANCE, SearchTaskTransportAction.class),
-                new ActionHandler<>(MLProfileAction.INSTANCE, MLProfileTransportAction.class)
+                new ActionHandler<>(MLProfileAction.INSTANCE, MLProfileTransportAction.class),
+                new ActionHandler<>(MLUploadModelAction.INSTANCE, TransportUploadModelAction.class)
             );
     }
 
@@ -162,6 +167,7 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin {
 
         JvmService jvmService = new JvmService(environment.settings());
         MLCircuitBreakerService mlCircuitBreakerService = new MLCircuitBreakerService(jvmService).init();
+        nodeHelper = new DiscoveryNodeHelper(clusterService);
 
         Map<Enum, MLStat<?>> stats = new ConcurrentHashMap<>();
         // cluster level stats
@@ -180,7 +186,7 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin {
         mlTaskManager = new MLTaskManager(client, mlIndicesHandler);
         mlInputDatasetHandler = new MLInputDatasetHandler(client);
 
-        MLTaskDispatcher mlTaskDispatcher = new MLTaskDispatcher(clusterService, client);
+        MLTaskDispatcher mlTaskDispatcher = new MLTaskDispatcher(clusterService, client, settings, nodeHelper);
         mlTrainingTaskRunner = new MLTrainingTaskRunner(
             threadPool,
             clusterService,
@@ -269,6 +275,7 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin {
         RestMLDeleteTaskAction restMLDeleteTaskAction = new RestMLDeleteTaskAction();
         RestMLSearchTaskAction restMLSearchTaskAction = new RestMLSearchTaskAction();
         RestMLProfileAction restMLProfileAction = new RestMLProfileAction(clusterService);
+        RestMLUploadModelAction restMLUploadModelAction = new RestMLUploadModelAction();
 
         return ImmutableList
             .of(
@@ -283,7 +290,8 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin {
                 restMLGetTaskAction,
                 restMLDeleteTaskAction,
                 restMLSearchTaskAction,
-                restMLProfileAction
+                restMLProfileAction,
+                restMLUploadModelAction
             );
     }
 

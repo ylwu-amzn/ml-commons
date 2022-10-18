@@ -17,6 +17,12 @@ public class CommonValue {
     public static final String META = "_meta";
     public static final String SCHEMA_VERSION_FIELD = "schema_version";
 
+    public static final String BOX_TYPE_KEY = "box_type";
+    //hot node
+    public static String HOT_BOX_TYPE = "hot";
+    // warm node
+    public static String WARM_BOX_TYPE = "warm";
+
     public static final String ML_MODEL_INDEX = ".plugins-ml-model";
     public static final String ML_TASK_INDEX = ".plugins-ml-task";
     public static final Integer ML_MODEL_INDEX_SCHEMA_VERSION = 2;
