@@ -14,9 +14,9 @@ import java.util.Locale;
 
 import org.opensearch.client.node.NodeClient;
 import org.opensearch.common.xcontent.XContentParser;
-import org.opensearch.ml.common.transport.model.upload_chunk.MLUploadModelMetaAction;
-import org.opensearch.ml.common.transport.model.upload_chunk.MLUploadModelMetaInput;
-import org.opensearch.ml.common.transport.model.upload_chunk.MLUploadModelMetaRequest;
+import org.opensearch.ml.common.transport.upload_chunk.MLUploadModelMetaAction;
+import org.opensearch.ml.common.transport.upload_chunk.MLUploadModelMetaInput;
+import org.opensearch.ml.common.transport.upload_chunk.MLUploadModelMetaRequest;
 import org.opensearch.rest.BaseRestHandler;
 import org.opensearch.rest.RestRequest;
 import org.opensearch.rest.action.RestToXContentListener;

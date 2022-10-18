@@ -16,10 +16,10 @@ import lombok.extern.log4j.Log4j2;
 import org.opensearch.action.ActionListener;
 import org.opensearch.client.Client;
 import org.opensearch.cluster.node.DiscoveryNode;
-import org.opensearch.ml.common.transport.model.sync.MLSyncUpAction;
-import org.opensearch.ml.common.transport.model.sync.MLSyncUpInput;
-import org.opensearch.ml.common.transport.model.sync.MLSyncUpNodeResponse;
-import org.opensearch.ml.common.transport.model.sync.MLSyncUpNodesRequest;
+import org.opensearch.ml.common.transport.sync.MLSyncUpAction;
+import org.opensearch.ml.common.transport.sync.MLSyncUpInput;
+import org.opensearch.ml.common.transport.sync.MLSyncUpNodeResponse;
+import org.opensearch.ml.common.transport.sync.MLSyncUpNodesRequest;
 
 @Log4j2
 public class MLSyncUpCron implements Runnable {

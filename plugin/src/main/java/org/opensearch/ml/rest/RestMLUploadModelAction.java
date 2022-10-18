@@ -17,9 +17,9 @@ import java.util.Locale;
 
 import org.opensearch.client.node.NodeClient;
 import org.opensearch.common.xcontent.XContentParser;
-import org.opensearch.ml.common.transport.model.upload.MLUploadInput;
-import org.opensearch.ml.common.transport.model.upload.MLUploadModelAction;
-import org.opensearch.ml.common.transport.model.upload.MLUploadModelRequest;
+import org.opensearch.ml.common.transport.upload.MLUploadInput;
+import org.opensearch.ml.common.transport.upload.MLUploadModelAction;
+import org.opensearch.ml.common.transport.upload.MLUploadModelRequest;
 import org.opensearch.rest.BaseRestHandler;
 import org.opensearch.rest.RestRequest;
 import org.opensearch.rest.action.RestToXContentListener;

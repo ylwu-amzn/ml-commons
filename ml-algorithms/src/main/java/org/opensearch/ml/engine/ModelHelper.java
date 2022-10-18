@@ -20,7 +20,7 @@ import org.opensearch.action.ActionListener;
 import org.opensearch.ml.common.model.MLModelConfig;
 import org.opensearch.ml.common.model.MLModelFormat;
 import org.opensearch.ml.common.model.TextEmbeddingModelConfig;
-import org.opensearch.ml.common.transport.model.upload.MLUploadInput;
+import org.opensearch.ml.common.transport.upload.MLUploadInput;
 
 import java.io.File;
 import java.io.FileReader;

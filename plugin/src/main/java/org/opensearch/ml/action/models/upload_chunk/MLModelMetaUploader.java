@@ -23,7 +23,7 @@ import org.opensearch.common.xcontent.XContentType;
 import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.common.MLModel;
 import org.opensearch.ml.common.model.MLModelState;
-import org.opensearch.ml.common.transport.model.upload_chunk.MLUploadModelMetaInput;
+import org.opensearch.ml.common.transport.upload_chunk.MLUploadModelMetaInput;
 import org.opensearch.ml.indices.MLIndicesHandler;
 import org.opensearch.threadpool.ThreadPool;
 

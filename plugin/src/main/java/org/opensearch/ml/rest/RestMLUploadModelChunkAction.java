@@ -12,9 +12,9 @@ import java.util.List;
 import java.util.Locale;
 
 import org.opensearch.client.node.NodeClient;
-import org.opensearch.ml.common.transport.model.upload_chunk.MLUploadChunkInput;
-import org.opensearch.ml.common.transport.model.upload_chunk.MLUploadModelChunkAction;
-import org.opensearch.ml.common.transport.model.upload_chunk.MLUploadModelChunkRequest;
+import org.opensearch.ml.common.transport.upload_chunk.MLUploadChunkInput;
+import org.opensearch.ml.common.transport.upload_chunk.MLUploadModelChunkAction;
+import org.opensearch.ml.common.transport.upload_chunk.MLUploadModelChunkRequest;
 import org.opensearch.rest.BaseRestHandler;
 import org.opensearch.rest.RestRequest;
 import org.opensearch.rest.action.RestToXContentListener;

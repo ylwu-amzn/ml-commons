@@ -28,8 +28,8 @@ import org.opensearch.index.IndexNotFoundException;
 import org.opensearch.ml.common.MLModel;
 import org.opensearch.ml.common.exception.MLResourceNotFoundException;
 import org.opensearch.ml.common.model.MLModelState;
-import org.opensearch.ml.common.transport.model.upload_chunk.MLUploadChunkInput;
-import org.opensearch.ml.common.transport.model.upload_chunk.MLUploadModelChunkResponse;
+import org.opensearch.ml.common.transport.upload_chunk.MLUploadChunkInput;
+import org.opensearch.ml.common.transport.upload_chunk.MLUploadModelChunkResponse;
 import org.opensearch.ml.indices.MLIndicesHandler;
 
 @Log4j2
