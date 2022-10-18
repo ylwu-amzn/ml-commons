@@ -25,10 +25,14 @@ import org.opensearch.cluster.node.DiscoveryNodes;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.inject.Inject;
 import org.opensearch.common.io.stream.StreamInput;
+import org.opensearch.common.settings.Settings;
 import org.opensearch.common.xcontent.NamedXContentRegistry;
 import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.common.MLTask;
 import org.opensearch.ml.common.MLTaskState;
+import org.opensearch.ml.common.MLTaskType;
+import org.opensearch.ml.common.breaker.MLCircuitBreakerService;
+import org.opensearch.ml.common.exception.MLLimitExceededException;
 import org.opensearch.ml.common.transport.model.forward.MLForwardAction;
 import org.opensearch.ml.common.transport.model.forward.MLForwardInput;
 import org.opensearch.ml.common.transport.model.forward.MLForwardRequest;
@@ -42,11 +46,16 @@ import org.opensearch.ml.common.transport.model.load.LoadModelNodesResponse;
 import org.opensearch.ml.common.transport.model.load.MLLoadModelOnNodeAction;
 import org.opensearch.ml.engine.ModelHelper;
 import org.opensearch.ml.model.MLModelManager;
+import org.opensearch.ml.stats.MLNodeLevelStat;
+import org.opensearch.ml.stats.MLStats;
 import org.opensearch.ml.task.MLTaskManager;
 import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.transport.TransportService;
 
 import com.google.common.collect.ImmutableMap;
+
+import static org.opensearch.ml.settings.MLCommonsSettings.ML_COMMONS_MAX_LOAD_MODEL_TASKS_PER_NODE;
+import static org.opensearch.ml.settings.MLCommonsSettings.ML_COMMONS_MAX_UPLOAD_TASKS_PER_NODE;
 
 @Log4j2
 public class TransportLoadModelOnNodeAction extends
@@ -59,6 +68,9 @@ public class TransportLoadModelOnNodeAction extends
     ThreadPool threadPool;
     Client client;
     NamedXContentRegistry xContentRegistry;
+    MLCircuitBreakerService mlCircuitBreakerService;
+    MLStats mlStats;
+    volatile Integer maxLoadTasksPerNode;
 
     @Inject
     public TransportLoadModelOnNodeAction(
@@ -70,7 +82,10 @@ public class TransportLoadModelOnNodeAction extends
         ClusterService clusterService,
         ThreadPool threadPool,
         Client client,
-        NamedXContentRegistry xContentRegistry
+        NamedXContentRegistry xContentRegistry,
+        MLCircuitBreakerService mlCircuitBreakerService,
+        MLStats mlStats,
+        Settings settings
     ) {
         super(
             MLLoadModelOnNodeAction.NAME,
@@ -91,6 +106,10 @@ public class TransportLoadModelOnNodeAction extends
         this.threadPool = threadPool;
         this.client = client;
         this.xContentRegistry = xContentRegistry;
+        this.mlCircuitBreakerService = mlCircuitBreakerService;
+        this.mlStats = mlStats;
+        maxLoadTasksPerNode = ML_COMMONS_MAX_LOAD_MODEL_TASKS_PER_NODE.get(settings);
+        clusterService.getClusterSettings().addSettingsUpdateConsumer(ML_COMMONS_MAX_LOAD_MODEL_TASKS_PER_NODE, it -> maxLoadTasksPerNode = it);
     }
 
     @Override
@@ -134,7 +153,6 @@ public class TransportLoadModelOnNodeAction extends
         ActionListener<MLForwardResponse> taskDoneListener = ActionListener
             .wrap(res -> { log.info("load model done " + res); }, ex -> { log.error(ex); });
 
-        //
         loadModel(modelId, modelContentHash, mlTask.getFunctionName(), localNodeId, coordinatingNodeId, mlTask, ActionListener.wrap(r -> {
             if (!coordinatingNodeId.equals(localNodeId)) {
                 mlTaskManager.remove(taskId);
@@ -157,12 +175,16 @@ public class TransportLoadModelOnNodeAction extends
                 );
         }, e -> {
             log.error("Failed to load model " + modelId, e);
-            mlTaskManager
-                .updateMLTask(
-                    taskId,
-                    ImmutableMap.of(MLTask.ERROR_FIELD, ExceptionUtils.getStackTrace(e), MLTask.STATE_FIELD, MLTaskState.FAILED),
-                    5000
-                );
+            if (e instanceof MLLimitExceededException) {
+                mlTaskManager.updateMLTaskDirectly(mlTask.getTaskId(), ImmutableMap.of(MLTask.STATE_FIELD, MLTaskState.FAILED, MLTask.ERROR_FIELD, e.getMessage()));
+            } else {
+                mlTaskManager
+                        .updateMLTask(
+                                taskId,
+                                ImmutableMap.of(MLTask.ERROR_FIELD, ExceptionUtils.getStackTrace(e), MLTask.STATE_FIELD, MLTaskState.FAILED),
+                                5000
+                        );
+            }
 
             if (!coordinatingNodeId.equals(localNodeId)) {
                 // remove task cache on worker node
@@ -212,6 +234,10 @@ public class TransportLoadModelOnNodeAction extends
         ActionListener<String> listener
     ) {
         try {
+            String errorMsg = checkResourceLimit();
+            if (errorMsg != null) {
+                throw new MLLimitExceededException(errorMsg);
+            }
             log.debug("start loading model {}", modelId);
             if (!coordinatingNodeId.equals(localNodeId)) {
                 mlTaskManager.add(mlTask);
@@ -221,5 +247,16 @@ public class TransportLoadModelOnNodeAction extends
             log.error("Failed to load model " + modelId, e);
             listener.onFailure(e);
         }
+    }
+
+    private String checkResourceLimit() {
+        if (mlTaskManager.getRunningTaskCount(MLTaskType.LOAD_MODEL) >= maxLoadTasksPerNode) {
+            return "exceed max load task limit";
+        }
+        if (mlCircuitBreakerService.isOpen()) {
+            mlStats.getStat(MLNodeLevelStat.ML_NODE_TOTAL_CIRCUIT_BREAKER_TRIGGER_COUNT).increment();
+            return "Circuit breaker is open, please check your memory and disk usage!";
+        }
+        return null;
     }
 }

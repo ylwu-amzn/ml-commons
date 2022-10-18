@@ -17,8 +17,12 @@ import lombok.extern.log4j.Log4j2;
 import org.opensearch.cluster.ClusterState;
 import org.opensearch.cluster.node.DiscoveryNode;
 import org.opensearch.cluster.service.ClusterService;
+import org.opensearch.common.settings.Settings;
 import org.opensearch.ml.common.CommonValue;
 import org.opensearch.ml.utils.MLNodeUtils;
+
+import static org.opensearch.ml.settings.MLCommonsSettings.ML_COMMONS_MAX_UPLOAD_TASKS_PER_NODE;
+import static org.opensearch.ml.settings.MLCommonsSettings.ML_COMMONS_ONLY_RUN_ON_ML_NODE;
 
 /**
  * Util class to filter nodes
@@ -27,10 +31,13 @@ import org.opensearch.ml.utils.MLNodeUtils;
 public class DiscoveryNodeHelper {
     private final ClusterService clusterService;
     private final HotDataNodePredicate eligibleNodeFilter;
+    private volatile Boolean onlyRunOnMLNode;
 
-    public DiscoveryNodeHelper(ClusterService clusterService) {
+    public DiscoveryNodeHelper(ClusterService clusterService, Settings settings) {
         this.clusterService = clusterService;
         eligibleNodeFilter = new HotDataNodePredicate();
+        onlyRunOnMLNode = ML_COMMONS_ONLY_RUN_ON_ML_NODE.get(settings);
+        clusterService.getClusterSettings().addSettingsUpdateConsumer(ML_COMMONS_ONLY_RUN_ON_ML_NODE, it -> onlyRunOnMLNode = it);
     }
 
     public String[] getEligibleNodeIds() {
@@ -50,7 +57,7 @@ public class DiscoveryNodeHelper {
             if (MLNodeUtils.isMLNode(node)) {
                 eligibleMLNodes.add(node);
             }
-            if (node.isDataNode() && isEligibleDataNode(node)) {
+            if (!onlyRunOnMLNode && node.isDataNode() && isEligibleDataNode(node)) {
                 eligibleDataNodes.add(node);
             }
         }

@@ -153,6 +153,7 @@ public class TransportForwardAction extends HandledTransportAction<ActionRequest
 
                         if (!mlTaskCache.allNodeFailed()) {
                             MLModelState modelState = mlTaskCache.hasError() ? MLModelState.PARTIALLY_LOADED : MLModelState.LOADED;
+                            log.debug("load model done with state: {}, model id: {}", modelState, modelId);
                             mlModelManager
                                 .updateModel(
                                     modelId,
@@ -164,6 +165,8 @@ public class TransportForwardAction extends HandledTransportAction<ActionRequest
                                             Instant.now().toEpochMilli()
                                         )
                                 );
+                        } else {
+                            log.debug("load model failed on all nodes, model id: {}", modelId);
                         }
 
                         mlTaskManager.remove(taskId);

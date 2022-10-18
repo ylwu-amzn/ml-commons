@@ -226,7 +226,7 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin {
 
         Map<Enum, MLStat<?>> stats = new ConcurrentHashMap<>();
 
-        nodeHelper = new DiscoveryNodeHelper(clusterService);
+        nodeHelper = new DiscoveryNodeHelper(clusterService, settings);
         // cluster level stats
         stats.put(MLClusterLevelStat.ML_MODEL_INDEX_STATUS, new MLStat<>(true, new IndexStatusSupplier(indexUtils, ML_MODEL_INDEX)));
         stats.put(MLClusterLevelStat.ML_TASK_INDEX_STATUS, new MLStat<>(true, new IndexStatusSupplier(indexUtils, ML_TASK_INDEX)));
@@ -261,7 +261,9 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin {
             threadPool,
             client,
             mlStats,
-            mlCircuitBreakerService
+            mlCircuitBreakerService,
+            clusterService,
+            settings
         );
         mlModelMetaUploader = new MLModelMetaUploader(mlIndicesHandler, threadPool, client);
         mlModelChunkUploader = new MLModelChunkUploader(mlIndicesHandler, client, xContentRegistry);
@@ -358,7 +360,8 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin {
                 mlModelMetaUploader,
                 mlModelChunkUploader,
                 mlCommonsClusterEventListener,
-                clusterManagerEventListener
+                clusterManagerEventListener,
+                mlCircuitBreakerService
             );
     }
 
@@ -445,7 +448,9 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin {
                 MLCommonsSettings.ML_COMMONS_MAX_MODELS_PER_NODE,
                 MLCommonsSettings.ML_COMMONS_ONLY_RUN_ON_ML_NODE,
                 MLCommonsSettings.ML_COMMONS_SYNC_UP_JOB_INTERVAL_IN_SECONDS,
-                MLCommonsSettings.ML_COMMONS_MONITORING_REQUEST_COUNT
+                MLCommonsSettings.ML_COMMONS_MONITORING_REQUEST_COUNT,
+                MLCommonsSettings.ML_COMMONS_MAX_UPLOAD_TASKS_PER_NODE,
+                MLCommonsSettings.ML_COMMONS_MAX_LOAD_MODEL_TASKS_PER_NODE
             );
         return settings;
     }

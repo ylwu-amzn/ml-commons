@@ -32,6 +32,7 @@ import org.opensearch.common.xcontent.XContentBuilder;
 import org.opensearch.common.xcontent.XContentFactory;
 import org.opensearch.ml.common.MLTask;
 import org.opensearch.ml.common.MLTaskState;
+import org.opensearch.ml.common.MLTaskType;
 import org.opensearch.ml.common.exception.MLException;
 import org.opensearch.ml.common.exception.MLResourceNotFoundException;
 import org.opensearch.ml.indices.MLIndicesHandler;
@@ -73,6 +74,7 @@ public class MLTaskManager {
     }
 
     public synchronized void add(MLTask mlTask, List<String> workerNodes) {
+        mlTask.setState(MLTaskState.RUNNING);
         String taskId = mlTask.getTaskId();
         if (contains(taskId)) {
             throw new IllegalArgumentException("Duplicate taskId");
@@ -199,6 +201,17 @@ public class MLTaskManager {
         return res;
     }
 
+    public int getRunningTaskCount(MLTaskType taskType) {
+        int res = 0;
+        for (Map.Entry<String, MLTaskCache> entry : taskCaches.entrySet()) {
+            MLTask mlTask = entry.getValue().getMlTask();
+            if (mlTask.getState() != null && mlTask.getState() == MLTaskState.RUNNING && mlTask.getTaskType() == taskType) {
+                res++;
+            }
+        }
+        return res;
+    }
+
     /**
      * Clear all tasks.
      */
@@ -299,6 +312,36 @@ public class MLTaskManager {
             }
         } catch (Exception e) {
             semaphore.release();
+            log.error("Failed to update ML task " + taskId, e);
+            listener.onFailure(e);
+        }
+    }
+
+    public void updateMLTaskDirectly(String taskId, Map<String, Object> updatedFields) {
+        updateMLTaskDirectly(taskId, updatedFields, ActionListener.wrap(r -> {
+            log.debug("updated ML task directly: {}", taskId);
+        }, e-> {
+            log.error("Failed to update ML task " + taskId, e);
+        }));
+    }
+    public void updateMLTaskDirectly(String taskId, Map<String, Object> updatedFields, ActionListener<UpdateResponse> listener) {
+        try {
+            if (updatedFields == null || updatedFields.size() == 0) {
+                listener.onFailure(new IllegalArgumentException("Updated fields is null or empty"));
+                return;
+            }
+            UpdateRequest updateRequest = new UpdateRequest(ML_TASK_INDEX, taskId);
+            Map<String, Object> updatedContent = new HashMap<>();
+            updatedContent.putAll(updatedFields);
+            updatedContent.put(LAST_UPDATE_TIME_FIELD, Instant.now().toEpochMilli());
+            updateRequest.doc(updatedContent);
+            updateRequest.setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE);
+            try (ThreadContext.StoredContext context = client.threadPool().getThreadContext().stashContext()) {
+                client.update(updateRequest, ActionListener.runBefore(listener, () -> context.restore()));
+            } catch (Exception e) {
+                listener.onFailure(e);
+            }
+        } catch (Exception e) {
             log.error("Failed to update ML task " + taskId, e);
             listener.onFailure(e);
         }
