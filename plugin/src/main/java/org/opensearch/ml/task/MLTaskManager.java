@@ -34,6 +34,7 @@ import org.opensearch.ml.common.MLTask;
 import org.opensearch.ml.common.MLTaskState;
 import org.opensearch.ml.common.MLTaskType;
 import org.opensearch.ml.common.exception.MLException;
+import org.opensearch.ml.common.exception.MLLimitExceededException;
 import org.opensearch.ml.common.exception.MLResourceNotFoundException;
 import org.opensearch.ml.indices.MLIndicesHandler;
 import org.opensearch.rest.RestStatus;
@@ -67,22 +68,33 @@ public class MLTaskManager {
      *
      * @param mlTask ML task
      */
-    public synchronized void add(MLTask mlTask) {
+    public void addRunningTask(MLTask mlTask) {
         // todo: once circuit break is in place, we need to add those checks
         // to make sure we have some limitation while adding new tasks.
+        mlTask.setState(MLTaskState.RUNNING);
+        log.info("-----------aaaaaaaaaaaaaaaaaaaa set tasks as running as {}, {}", mlTask.getTaskId(), mlTask.getState());
         add(mlTask, null);
     }
 
     public synchronized void add(MLTask mlTask, List<String> workerNodes) {
-        if (mlTask.getState() == MLTaskState.CREATED) {
-            mlTask.setState(MLTaskState.RUNNING);
-        }
+//        if (mlTask.getState() == MLTaskState.CREATED) {
+//            mlTask.setState(MLTaskState.RUNNING);
+//        }
+        log.info("-----------aaaaaaaaaaaaaaaaaaaa tasks tate as {}, {}", mlTask.getTaskId(), mlTask.getState());
         String taskId = mlTask.getTaskId();
         if (contains(taskId)) {
             throw new IllegalArgumentException("Duplicate taskId");
         }
         taskCaches.put(taskId, new MLTaskCache(mlTask, workerNodes));
         log.debug("add ML task to cache " + taskId);
+    }
+
+    public void setTaskState(String taskId, MLTaskState state) {
+        MLTask mlTask = getMLTask(taskId);
+        if (mlTask != null) {
+            mlTask.setState(state);
+            log.info("-----------aaaaaaaaaaaaaaaaaaaa set task state as {}, {}", state, taskId);
+        }
     }
 
     /**
@@ -203,11 +215,14 @@ public class MLTaskManager {
         return res;
     }
 
-    public int getRunningTaskCount(MLTaskType taskType) {
+    public synchronized int getRunningTaskCount(MLTaskType taskType) {
         int res = 0;
         for (Map.Entry<String, MLTaskCache> entry : taskCaches.entrySet()) {
-            MLTask mlTask = entry.getValue().getMlTask();
-            if (mlTask.getState() != null && mlTask.getState() == MLTaskState.RUNNING && mlTask.getTaskType() == taskType) {
+            MLTaskCache taskCache = entry.getValue();
+            MLTask mlTask = taskCache.getMlTask();
+//            if (taskCache.getWorkerNodeSize() == null && mlTask.getState() == MLTaskState.RUNNING && mlTask.getTaskType() == taskType) {
+            log.info("+++++++++++aaaaaaaaaaaaaaaa mltasktype: {}, state: {}", mlTask.getTaskType(), mlTask.getState());
+            if (mlTask.getTaskType() == taskType && mlTask.getState() == MLTaskState.RUNNING) {
                 res++;
             }
         }
@@ -361,5 +376,17 @@ public class MLTaskManager {
             }
         }
         return false;
+    }
+
+    public synchronized String checkAndAddRunningTask(Integer maxLoadTasksPerNode, MLTask mlTask) {
+        if(getRunningTaskCount() > maxLoadTasksPerNode) {
+            return "exceed max load task per not";
+        }
+        if (contains(mlTask.getTaskId())) {
+            setTaskState(mlTask.getTaskId(), MLTaskState.RUNNING);
+        } else {
+            addRunningTask(mlTask);
+        }
+        return null;
     }
 }

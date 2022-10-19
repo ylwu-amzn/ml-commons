@@ -66,7 +66,6 @@ import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.common.MLModel;
 import org.opensearch.ml.common.MLTask;
 import org.opensearch.ml.common.MLTaskState;
-import org.opensearch.ml.common.MLTaskType;
 import org.opensearch.ml.common.breaker.MLCircuitBreakerService;
 import org.opensearch.ml.common.exception.MLException;
 import org.opensearch.ml.common.exception.MLLimitExceededException;
@@ -154,7 +153,7 @@ public class MLModelManager {
      */
     public void uploadMLModel(MLUploadInput uploadInput, MLTask mlTask) {
         mlStats.getStat(MLNodeLevelStat.ML_NODE_TOTAL_REQUEST_COUNT).increment();
-        String errorMsg = checkUploadResourceLimit();
+        String errorMsg = addRunningTaskByCheckingLimit(maxUploadTasksPerNode, mlTask);
         if (errorMsg != null) {
             mlTaskManager
                 .updateMLTaskDirectly(
@@ -163,7 +162,6 @@ public class MLModelManager {
                 );
             throw new MLLimitExceededException(errorMsg);
         }
-        mlTaskManager.add(mlTask);
         mlStats.getStat(MLNodeLevelStat.ML_NODE_EXECUTING_TASK_COUNT).increment();
         mlStats
             .createCounterStatIfAbsent(mlTask.getFunctionName(), ActionName.UPLOAD, MLActionLevelStat.ML_ACTION_REQUEST_COUNT)
@@ -184,13 +182,14 @@ public class MLModelManager {
         }
     }
 
-    private String checkUploadResourceLimit() {
-        if (mlTaskManager.getRunningTaskCount(MLTaskType.UPLOAD_MODEL) >= maxUploadTasksPerNode) {
-            return "exceed max upload task limit";
-        }
+    public String addRunningTaskByCheckingLimit(Integer limit, MLTask mlTask) {
         if (mlCircuitBreakerService.isOpen()) {
             mlStats.getStat(MLNodeLevelStat.ML_NODE_TOTAL_CIRCUIT_BREAKER_TRIGGER_COUNT).increment();
             return "Circuit breaker is open, please check your memory and disk usage!";
+        }
+        String errorMsg = mlTaskManager.checkAndAddRunningTask(limit, mlTask);
+        if (errorMsg != null) {
+            return errorMsg;
         }
         return null;
     }
@@ -394,6 +393,11 @@ public class MLModelManager {
             listener.onFailure(new IllegalArgumentException("Exceed max model per node limit"));
             return;
         }
+//        try {
+//            Thread.sleep(30_000);
+//        } catch (InterruptedException e) {
+//            e.printStackTrace();
+//        }
         modelCache.initModelState(modelId, MLModelState.LOADING, functionName);
         try {
             threadPool.executor(TASK_THREAD_POOL).execute(() -> {

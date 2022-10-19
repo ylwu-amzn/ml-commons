@@ -194,7 +194,7 @@ public class MLPredictTaskRunner extends MLTaskRunner<MLPredictionTaskRequest, M
         mlStats
             .createCounterStatIfAbsent(mlTask.getFunctionName(), ActionName.PREDICT, MLActionLevelStat.ML_ACTION_REQUEST_COUNT)
             .increment();
-        mlTaskManager.add(mlTask);
+        mlTaskManager.addRunningTask(mlTask);
 
         FunctionName algorithm = mlInput.getAlgorithm();
         MLInputDataset inputDataset = mlInput.getInputDataset();

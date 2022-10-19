@@ -146,7 +146,7 @@ public class MLTrainingTaskRunner extends MLTaskRunner<MLTrainingTaskRequest, ML
         mlStats
             .createCounterStatIfAbsent(mlTask.getFunctionName(), ActionName.TRAIN, MLActionLevelStat.ML_ACTION_REQUEST_COUNT)
             .increment();
-        mlTaskManager.add(mlTask);
+        mlTaskManager.addRunningTask(mlTask);
         try {
             if (mlInput.getInputDataset().getInputDataType().equals(MLInputDataType.SEARCH_QUERY)) {
                 ActionListener<MLInputDataset> dataFrameActionListener = ActionListener

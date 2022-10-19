@@ -32,7 +32,6 @@ import org.opensearch.common.xcontent.NamedXContentRegistry;
 import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.common.MLTask;
 import org.opensearch.ml.common.MLTaskState;
-import org.opensearch.ml.common.MLTaskType;
 import org.opensearch.ml.common.breaker.MLCircuitBreakerService;
 import org.opensearch.ml.common.exception.MLLimitExceededException;
 import org.opensearch.ml.common.transport.forward.MLForwardAction;
@@ -48,7 +47,6 @@ import org.opensearch.ml.common.transport.load.LoadModelNodesResponse;
 import org.opensearch.ml.common.transport.load.MLLoadModelOnNodeAction;
 import org.opensearch.ml.engine.ModelHelper;
 import org.opensearch.ml.model.MLModelManager;
-import org.opensearch.ml.stats.MLNodeLevelStat;
 import org.opensearch.ml.stats.MLStats;
 import org.opensearch.ml.task.MLTaskManager;
 import org.opensearch.threadpool.ThreadPool;
@@ -154,7 +152,7 @@ public class TransportLoadModelOnNodeAction extends
         ActionListener<MLForwardResponse> taskDoneListener = ActionListener
             .wrap(res -> { log.info("load model done " + res); }, ex -> { log.error(ex); });
 
-        loadModel(modelId, modelContentHash, mlTask.getFunctionName(), localNodeId, coordinatingNodeId, mlTask, ActionListener.wrap(r -> {
+        loadModel(modelId, modelContentHash, mlTask.getFunctionName(), mlTask, ActionListener.wrap(r -> {
             if (!coordinatingNodeId.equals(localNodeId)) {
                 mlTaskManager.remove(taskId);
             }
@@ -230,23 +228,19 @@ public class TransportLoadModelOnNodeAction extends
     }
 
     private void loadModel(
-        String modelId,
-        String modelContentHash,
-        FunctionName functionName,
-        String localNodeId,
-        String coordinatingNodeId,
-        MLTask mlTask,
-        ActionListener<String> listener
+            String modelId,
+            String modelContentHash,
+            FunctionName functionName,
+            MLTask mlTask,
+            ActionListener<String> listener
     ) {
         try {
-            String errorMsg = checkResourceLimit();
+            String errorMsg = mlModelManager.addRunningTaskByCheckingLimit(maxLoadTasksPerNode, mlTask);
             if (errorMsg != null) {
                 throw new MLLimitExceededException(errorMsg);
             }
             log.debug("start loading model {}", modelId);
-            if (!coordinatingNodeId.equals(localNodeId)) {
-                mlTaskManager.add(mlTask);
-            }
+//            mlTaskManager.checkAndAddRunningTask(maxLoadTasksPerNode, mlTask);
             mlModelManager.loadModel(modelId, modelContentHash, functionName, listener);
         } catch (Exception e) {
             log.error("Failed to load model " + modelId, e);
@@ -254,14 +248,4 @@ public class TransportLoadModelOnNodeAction extends
         }
     }
 
-    private String checkResourceLimit() {
-        if (mlTaskManager.getRunningTaskCount(MLTaskType.LOAD_MODEL) >= maxLoadTasksPerNode) {
-            return "exceed max load task limit";
-        }
-        if (mlCircuitBreakerService.isOpen()) {
-            mlStats.getStat(MLNodeLevelStat.ML_NODE_TOTAL_CIRCUIT_BREAKER_TRIGGER_COUNT).increment();
-            return "Circuit breaker is open, please check your memory and disk usage!";
-        }
-        return null;
-    }
 }
