@@ -5,7 +5,17 @@
 
 package org.opensearch.ml.task;
 
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyLong;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.time.Instant;
 import java.util.HashMap;
@@ -78,7 +88,7 @@ public class MLTaskManagerTests extends OpenSearchTestCase {
         expectedEx.expectMessage("Task not found");
         mlTaskManager.add(mlTask);
         mlTaskManager.updateTaskState(mlTask.getTaskId(), MLTaskState.RUNNING, true);
-        Assert.assertSame(mlTaskManager.get(mlTask.getTaskId()).getState(), MLTaskState.RUNNING);
+        Assert.assertSame(mlTaskManager.getMLTask(mlTask.getTaskId()).getState(), MLTaskState.RUNNING);
         mlTaskManager.updateTaskState("not exist", MLTaskState.RUNNING, true);
     }
 
@@ -87,7 +97,7 @@ public class MLTaskManagerTests extends OpenSearchTestCase {
         expectedEx.expectMessage("Task not found");
         mlTaskManager.add(mlTask);
         mlTaskManager.updateTaskError(mlTask.getTaskId(), "error message", true);
-        Assert.assertEquals("error message", mlTaskManager.get(mlTask.getTaskId()).getError());
+        Assert.assertEquals("error message", mlTaskManager.getMLTask(mlTask.getTaskId()).getError());
         mlTaskManager.updateTaskError("not exist", "error message", true);
     }
 
@@ -205,13 +215,13 @@ public class MLTaskManagerTests extends OpenSearchTestCase {
     public void testGetTask() {
         mlTaskManager.add(mlTask);
         Assert.assertTrue(mlTaskManager.contains(mlTask.getTaskId()));
-        MLTask task = mlTaskManager.get(this.mlTask.getTaskId());
+        MLTask task = mlTaskManager.getMLTask(this.mlTask.getTaskId());
         Assert.assertEquals(mlTask, task);
     }
 
     public void testGetTask_NonExisting() {
         Assert.assertFalse(mlTaskManager.contains(mlTask.getTaskId()));
-        MLTask task = mlTaskManager.get(this.mlTask.getTaskId());
+        MLTask task = mlTaskManager.getMLTask(this.mlTask.getTaskId());
         Assert.assertNull(task);
     }
 
@@ -226,7 +236,7 @@ public class MLTaskManagerTests extends OpenSearchTestCase {
         mlTaskManager.add(task3);
         mlTaskManager.add(task4);
         mlTaskManager.add(task5);
-        Assert.assertEquals(mlTaskManager.getRunningTaskCount(), 1);
+        Assert.assertEquals(2, mlTaskManager.getRunningTaskCount());
     }
 
     public void testClear() {

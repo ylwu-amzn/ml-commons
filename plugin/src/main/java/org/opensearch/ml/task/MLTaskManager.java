@@ -10,6 +10,7 @@ import static org.opensearch.ml.common.MLTask.LAST_UPDATE_TIME_FIELD;
 
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
@@ -31,6 +32,9 @@ import org.opensearch.common.xcontent.XContentBuilder;
 import org.opensearch.common.xcontent.XContentFactory;
 import org.opensearch.ml.common.MLTask;
 import org.opensearch.ml.common.MLTaskState;
+import org.opensearch.ml.common.MLTaskType;
+import org.opensearch.ml.common.exception.MLException;
+import org.opensearch.ml.common.exception.MLResourceNotFoundException;
 import org.opensearch.ml.indices.MLIndicesHandler;
 import org.opensearch.rest.RestStatus;
 
@@ -66,12 +70,19 @@ public class MLTaskManager {
     public synchronized void add(MLTask mlTask) {
         // todo: once circuit break is in place, we need to add those checks
         // to make sure we have some limitation while adding new tasks.
+        add(mlTask, null);
+    }
+
+    public synchronized void add(MLTask mlTask, List<String> workerNodes) {
+        if (mlTask.getState() == MLTaskState.CREATED) {
+            mlTask.setState(MLTaskState.RUNNING);
+        }
         String taskId = mlTask.getTaskId();
         if (contains(taskId)) {
             throw new IllegalArgumentException("Duplicate taskId");
         }
-        taskCaches.put(taskId, new MLTaskCache(mlTask));
-        log.info("add ML task to cache " + taskId);
+        taskCaches.put(taskId, new MLTaskCache(mlTask, workerNodes));
+        log.debug("add ML task to cache " + taskId);
     }
 
     /**
@@ -98,7 +109,7 @@ public class MLTaskManager {
         if (!contains(taskId)) {
             throw new IllegalArgumentException("Task not found");
         }
-        MLTask task = get(taskId);
+        MLTask task = getMLTask(taskId);
         task.setState(state);
         task.setError(error);
         if (isAsyncTask) {
@@ -131,7 +142,7 @@ public class MLTaskManager {
     public void remove(String taskId) {
         if (contains(taskId)) {
             taskCaches.remove(taskId);
-            log.info("remove ML task from cache " + taskId);
+            log.debug("remove ML task from cache " + taskId);
         }
     }
 
@@ -141,11 +152,31 @@ public class MLTaskManager {
      * @param taskId ML task id
      * @return ML task
      */
-    public MLTask get(String taskId) {
+    public MLTask getMLTask(String taskId) {
         if (contains(taskId)) {
             return taskCaches.get(taskId).getMlTask();
         }
         return null;
+    }
+
+    public MLTaskCache getMLTaskCache(String taskId) {
+        if (contains(taskId)) {
+            return taskCaches.get(taskId);
+        }
+        return null;
+    }
+
+    public List<String> getWorkNodes(String taskId) {
+        if (taskCaches.containsKey(taskId)) {
+            return taskCaches.get(taskId).getWorkerNodes();
+        }
+        return null;
+    }
+
+    public void addNodeError(String taskId, String workerNodeId, String error) {
+        if (taskCaches.containsKey(taskId)) {
+            taskCaches.get(taskId).addError(workerNodeId, error);
+        }
     }
 
     /**
@@ -166,6 +197,17 @@ public class MLTaskManager {
         for (Map.Entry<String, MLTaskCache> entry : taskCaches.entrySet()) {
             MLTask mlTask = entry.getValue().getMlTask();
             if (mlTask.getState() != null && mlTask.getState() == MLTaskState.RUNNING) {
+                res++;
+            }
+        }
+        return res;
+    }
+
+    public int getRunningTaskCount(MLTaskType taskType) {
+        int res = 0;
+        for (Map.Entry<String, MLTaskCache> entry : taskCaches.entrySet()) {
+            MLTask mlTask = entry.getValue().getMlTask();
+            if (mlTask.getState() != null && mlTask.getState() == MLTaskState.RUNNING && mlTask.getTaskType() == taskType) {
                 res++;
             }
         }
@@ -237,13 +279,13 @@ public class MLTaskManager {
         long timeoutInMillis
     ) {
         if (!taskCaches.containsKey(taskId)) {
-            listener.onFailure(new RuntimeException("Can't find task"));
+            listener.onFailure(new MLResourceNotFoundException("Can't find task"));
             return;
         }
         Semaphore semaphore = taskCaches.get(taskId).getUpdateTaskIndexSemaphore();
         try {
             if (semaphore != null && !semaphore.tryAcquire(timeoutInMillis, TimeUnit.MILLISECONDS)) {
-                listener.onFailure(new RuntimeException("Other updating request not finished yet"));
+                listener.onFailure(new MLException("Other updating request not finished yet"));
                 return;
             }
         } catch (InterruptedException e) {
@@ -275,5 +317,49 @@ public class MLTaskManager {
             log.error("Failed to update ML task " + taskId, e);
             listener.onFailure(e);
         }
+    }
+
+    public void updateMLTaskDirectly(String taskId, Map<String, Object> updatedFields) {
+        updateMLTaskDirectly(
+            taskId,
+            updatedFields,
+            ActionListener
+                .wrap(
+                    r -> { log.debug("updated ML task directly: {}", taskId); },
+                    e -> { log.error("Failed to update ML task " + taskId, e); }
+                )
+        );
+    }
+
+    public void updateMLTaskDirectly(String taskId, Map<String, Object> updatedFields, ActionListener<UpdateResponse> listener) {
+        try {
+            if (updatedFields == null || updatedFields.size() == 0) {
+                listener.onFailure(new IllegalArgumentException("Updated fields is null or empty"));
+                return;
+            }
+            UpdateRequest updateRequest = new UpdateRequest(ML_TASK_INDEX, taskId);
+            Map<String, Object> updatedContent = new HashMap<>();
+            updatedContent.putAll(updatedFields);
+            updatedContent.put(LAST_UPDATE_TIME_FIELD, Instant.now().toEpochMilli());
+            updateRequest.doc(updatedContent);
+            updateRequest.setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE);
+            try (ThreadContext.StoredContext context = client.threadPool().getThreadContext().stashContext()) {
+                client.update(updateRequest, ActionListener.runBefore(listener, () -> context.restore()));
+            } catch (Exception e) {
+                listener.onFailure(e);
+            }
+        } catch (Exception e) {
+            log.error("Failed to update ML task " + taskId, e);
+            listener.onFailure(e);
+        }
+    }
+
+    public boolean containsModel(String modelId) {
+        for (Map.Entry<String, MLTaskCache> entry : taskCaches.entrySet()) {
+            if (modelId.equals(entry.getValue().mlTask.getModelId())) {
+                return true;
+            }
+        }
+        return false;
     }
 }
