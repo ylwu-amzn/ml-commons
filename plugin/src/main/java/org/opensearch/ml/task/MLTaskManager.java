@@ -15,6 +15,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import lombok.extern.log4j.Log4j2;
 
@@ -34,7 +35,6 @@ import org.opensearch.ml.common.MLTask;
 import org.opensearch.ml.common.MLTaskState;
 import org.opensearch.ml.common.MLTaskType;
 import org.opensearch.ml.common.exception.MLException;
-import org.opensearch.ml.common.exception.MLLimitExceededException;
 import org.opensearch.ml.common.exception.MLResourceNotFoundException;
 import org.opensearch.ml.indices.MLIndicesHandler;
 import org.opensearch.rest.RestStatus;
@@ -49,6 +49,7 @@ public class MLTaskManager {
     public final static int MAX_ML_TASK_PER_NODE = 10;
     private final Client client;
     private final MLIndicesHandler mlIndicesHandler;
+    private final Map<MLTaskType, AtomicInteger> runningTasksCount;
 
     /**
      * Constructor to create ML task manager.
@@ -60,6 +61,28 @@ public class MLTaskManager {
         this.client = client;
         this.mlIndicesHandler = mlIndicesHandler;
         taskCaches = new ConcurrentHashMap<>();
+        runningTasksCount = new ConcurrentHashMap<>();
+    }
+
+    public synchronized String checkLimitAndAddRunningTask(MLTask mlTask, Integer limit) {
+        AtomicInteger runningTaskCount = runningTasksCount.computeIfAbsent(mlTask.getTaskType(), it -> new AtomicInteger(0));
+        if (runningTaskCount.get() < 0) {
+            runningTaskCount.set(0);
+        }
+        log.debug("Task id: {}, current running task {}: {}", mlTask.getTaskId(), mlTask.getTaskType(), runningTaskCount.get());
+        if (runningTaskCount.get() >= limit) {
+            String error = "exceed max running task limit";
+            log.info(error + " for task " + mlTask.getTaskId());
+            return error;
+        }
+        if (contains(mlTask.getTaskId())) {
+            getMLTask(mlTask.getTaskId()).setState(MLTaskState.RUNNING);
+        } else {
+            mlTask.setState(MLTaskState.RUNNING);
+            add(mlTask);
+        }
+        runningTaskCount.incrementAndGet();
+        return null;
     }
 
     /**
@@ -68,33 +91,19 @@ public class MLTaskManager {
      *
      * @param mlTask ML task
      */
-    public void addRunningTask(MLTask mlTask) {
+    public synchronized void add(MLTask mlTask) {
         // todo: once circuit break is in place, we need to add those checks
         // to make sure we have some limitation while adding new tasks.
-        mlTask.setState(MLTaskState.RUNNING);
-        log.info("-----------aaaaaaaaaaaaaaaaaaaa set tasks as running as {}, {}", mlTask.getTaskId(), mlTask.getState());
         add(mlTask, null);
     }
 
     public synchronized void add(MLTask mlTask, List<String> workerNodes) {
-//        if (mlTask.getState() == MLTaskState.CREATED) {
-//            mlTask.setState(MLTaskState.RUNNING);
-//        }
-        log.info("-----------aaaaaaaaaaaaaaaaaaaa tasks tate as {}, {}", mlTask.getTaskId(), mlTask.getState());
         String taskId = mlTask.getTaskId();
         if (contains(taskId)) {
             throw new IllegalArgumentException("Duplicate taskId");
         }
         taskCaches.put(taskId, new MLTaskCache(mlTask, workerNodes));
         log.debug("add ML task to cache " + taskId);
-    }
-
-    public void setTaskState(String taskId, MLTaskState state) {
-        MLTask mlTask = getMLTask(taskId);
-        if (mlTask != null) {
-            mlTask.setState(state);
-            log.info("-----------aaaaaaaaaaaaaaaaaaaa set task state as {}, {}", state, taskId);
-        }
     }
 
     /**
@@ -153,7 +162,19 @@ public class MLTaskManager {
      */
     public void remove(String taskId) {
         if (contains(taskId)) {
-            taskCaches.remove(taskId);
+            MLTaskCache taskCache = taskCaches.remove(taskId);
+            MLTask mlTask = taskCache.getMlTask();
+
+            if (mlTask.getState() != MLTaskState.CREATED) {
+                // Task initial state is CREATED. It will move forward to RUNNING state once it starts on worker node.
+                // When finished or failed, it's possible to move to COMPLETED/FAILED state.
+                // So if its state is not CREATED when remove it, the task already started on worker node, we should
+                // decrement running task count.
+                AtomicInteger runningTaskCount = runningTasksCount.get(mlTask.getTaskType());
+                if (runningTaskCount != null) {
+                    runningTaskCount.decrementAndGet();
+                }
+            }
             log.debug("remove ML task from cache " + taskId);
         }
     }
@@ -209,20 +230,6 @@ public class MLTaskManager {
         for (Map.Entry<String, MLTaskCache> entry : taskCaches.entrySet()) {
             MLTask mlTask = entry.getValue().getMlTask();
             if (mlTask.getState() != null && mlTask.getState() == MLTaskState.RUNNING) {
-                res++;
-            }
-        }
-        return res;
-    }
-
-    public synchronized int getRunningTaskCount(MLTaskType taskType) {
-        int res = 0;
-        for (Map.Entry<String, MLTaskCache> entry : taskCaches.entrySet()) {
-            MLTaskCache taskCache = entry.getValue();
-            MLTask mlTask = taskCache.getMlTask();
-//            if (taskCache.getWorkerNodeSize() == null && mlTask.getState() == MLTaskState.RUNNING && mlTask.getTaskType() == taskType) {
-            log.info("+++++++++++aaaaaaaaaaaaaaaa mltasktype: {}, state: {}", mlTask.getTaskType(), mlTask.getState());
-            if (mlTask.getTaskType() == taskType && mlTask.getState() == MLTaskState.RUNNING) {
                 res++;
             }
         }
@@ -376,17 +383,5 @@ public class MLTaskManager {
             }
         }
         return false;
-    }
-
-    public synchronized String checkAndAddRunningTask(Integer maxLoadTasksPerNode, MLTask mlTask) {
-        if(getRunningTaskCount() > maxLoadTasksPerNode) {
-            return "exceed max load task per not";
-        }
-        if (contains(mlTask.getTaskId())) {
-            setTaskState(mlTask.getTaskId(), MLTaskState.RUNNING);
-        } else {
-            addRunningTask(mlTask);
-        }
-        return null;
     }
 }

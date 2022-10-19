@@ -194,7 +194,8 @@ public class MLPredictTaskRunner extends MLTaskRunner<MLPredictionTaskRequest, M
         mlStats
             .createCounterStatIfAbsent(mlTask.getFunctionName(), ActionName.PREDICT, MLActionLevelStat.ML_ACTION_REQUEST_COUNT)
             .increment();
-        mlTaskManager.addRunningTask(mlTask);
+        mlTask.setState(MLTaskState.RUNNING);
+        mlTaskManager.add(mlTask);
 
         FunctionName algorithm = mlInput.getAlgorithm();
         MLInputDataset inputDataset = mlInput.getInputDataset();
@@ -217,7 +218,6 @@ public class MLPredictTaskRunner extends MLTaskRunner<MLPredictionTaskRequest, M
                     throw new MLException("model not loaded");
                 }
             } catch (Exception e) {
-                e.printStackTrace();
                 handlePredictFailure(mlTask, internalListener, e, false);
             }
 

@@ -78,15 +78,15 @@ public class MLTaskManagerTests extends OpenSearchTestCase {
     public void testAdd() {
         expectedEx.expect(IllegalArgumentException.class);
         expectedEx.expectMessage("Duplicate taskId");
-        mlTaskManager.addRunningTask(mlTask);
+        mlTaskManager.add(mlTask);
         Assert.assertTrue(mlTaskManager.contains(mlTask.getTaskId()));
-        mlTaskManager.addRunningTask(mlTask);
+        mlTaskManager.add(mlTask);
     }
 
     public void testUpdateTaskState() {
         expectedEx.expect(RuntimeException.class);
         expectedEx.expectMessage("Task not found");
-        mlTaskManager.addRunningTask(mlTask);
+        mlTaskManager.add(mlTask);
         mlTaskManager.updateTaskState(mlTask.getTaskId(), MLTaskState.RUNNING, true);
         Assert.assertSame(mlTaskManager.getMLTask(mlTask.getTaskId()).getState(), MLTaskState.RUNNING);
         mlTaskManager.updateTaskState("not exist", MLTaskState.RUNNING, true);
@@ -95,14 +95,14 @@ public class MLTaskManagerTests extends OpenSearchTestCase {
     public void testUpdateTaskError() {
         expectedEx.expect(RuntimeException.class);
         expectedEx.expectMessage("Task not found");
-        mlTaskManager.addRunningTask(mlTask);
+        mlTaskManager.add(mlTask);
         mlTaskManager.updateTaskError(mlTask.getTaskId(), "error message", true);
         Assert.assertEquals("error message", mlTaskManager.getMLTask(mlTask.getTaskId()).getError());
         mlTaskManager.updateTaskError("not exist", "error message", true);
     }
 
     public void testUpdateTaskStateAndError() {
-        mlTaskManager.addRunningTask(mlTask);
+        mlTaskManager.add(mlTask);
         String error = "error message";
         mlTaskManager.updateTaskStateAndError(mlTask.getTaskId(), MLTaskState.FAILED, error, true);
         ArgumentCaptor<Map> updatedFields = ArgumentCaptor.forClass(Map.class);
@@ -117,13 +117,13 @@ public class MLTaskManagerTests extends OpenSearchTestCase {
     }
 
     public void testUpdateTaskStateAndError_SyncTask() {
-        mlTaskManager.addRunningTask(mlTask);
+        mlTaskManager.add(mlTask);
         mlTaskManager.updateTaskStateAndError(mlTask.getTaskId(), MLTaskState.FAILED, "test error", false);
         verify(mlTaskManager, never()).updateMLTask(eq(mlTask.getTaskId()), any(), anyLong());
     }
 
     public void testUpdateMLTaskWithNullOrEmptyMap() {
-        mlTaskManager.addRunningTask(mlTask);
+        mlTaskManager.add(mlTask);
         ActionListener<UpdateResponse> listener = mock(ActionListener.class);
         mlTaskManager.updateMLTask(mlTask.getTaskId(), null, listener, 0);
         verify(client, never()).update(any(), any());
@@ -145,7 +145,7 @@ public class MLTaskManagerTests extends OpenSearchTestCase {
 
     public void testUpdateMLTask_NoSemaphore() {
         MLTask asyncMlTask = mlTask.toBuilder().async(true).build();
-        mlTaskManager.addRunningTask(asyncMlTask);
+        mlTaskManager.add(asyncMlTask);
 
         doAnswer(invocation -> {
             ActionListener<UpdateResponse> actionListener = invocation.getArgument(1);
@@ -167,7 +167,7 @@ public class MLTaskManagerTests extends OpenSearchTestCase {
 
     public void testUpdateMLTask_FailedToUpdate() {
         MLTask asyncMlTask = mlTask.toBuilder().async(true).build();
-        mlTaskManager.addRunningTask(asyncMlTask);
+        mlTaskManager.add(asyncMlTask);
 
         String errorMessage = "test error message";
         doAnswer(invocation -> {
@@ -186,7 +186,7 @@ public class MLTaskManagerTests extends OpenSearchTestCase {
 
     public void testUpdateMLTask_ThrowException() {
         MLTask asyncMlTask = mlTask.toBuilder().async(true).build();
-        mlTaskManager.addRunningTask(asyncMlTask);
+        mlTaskManager.add(asyncMlTask);
 
         String errorMessage = "test error message";
         doThrow(new RuntimeException(errorMessage)).when(client).update(any(UpdateRequest.class), any());
@@ -200,7 +200,7 @@ public class MLTaskManagerTests extends OpenSearchTestCase {
     }
 
     public void testRemove() {
-        mlTaskManager.addRunningTask(mlTask);
+        mlTaskManager.add(mlTask);
         Assert.assertTrue(mlTaskManager.contains(mlTask.getTaskId()));
         mlTaskManager.remove(mlTask.getTaskId());
         Assert.assertFalse(mlTaskManager.contains(mlTask.getTaskId()));
@@ -213,7 +213,7 @@ public class MLTaskManagerTests extends OpenSearchTestCase {
     }
 
     public void testGetTask() {
-        mlTaskManager.addRunningTask(mlTask);
+        mlTaskManager.add(mlTask);
         Assert.assertTrue(mlTaskManager.contains(mlTask.getTaskId()));
         MLTask task = mlTaskManager.getMLTask(this.mlTask.getTaskId());
         Assert.assertEquals(mlTask, task);
@@ -231,12 +231,12 @@ public class MLTaskManagerTests extends OpenSearchTestCase {
         MLTask task3 = MLTask.builder().taskId("3").state(MLTaskState.FAILED).build();
         MLTask task4 = MLTask.builder().taskId("4").state(MLTaskState.COMPLETED).build();
         MLTask task5 = MLTask.builder().taskId("5").state(null).build();
-        mlTaskManager.addRunningTask(task1);
-        mlTaskManager.addRunningTask(task2);
-        mlTaskManager.addRunningTask(task3);
-        mlTaskManager.addRunningTask(task4);
-        mlTaskManager.addRunningTask(task5);
-        Assert.assertEquals(2, mlTaskManager.getRunningTaskCount());
+        mlTaskManager.add(task1);
+        mlTaskManager.add(task2);
+        mlTaskManager.add(task3);
+        mlTaskManager.add(task4);
+        mlTaskManager.add(task5);
+        Assert.assertEquals(1, mlTaskManager.getRunningTaskCount());
     }
 
     public void testClear() {
@@ -244,10 +244,10 @@ public class MLTaskManagerTests extends OpenSearchTestCase {
         MLTask task2 = MLTask.builder().taskId("2").state(MLTaskState.RUNNING).build();
         MLTask task3 = MLTask.builder().taskId("3").state(MLTaskState.FAILED).build();
         MLTask task4 = MLTask.builder().taskId("4").state(MLTaskState.COMPLETED).build();
-        mlTaskManager.addRunningTask(task1);
-        mlTaskManager.addRunningTask(task2);
-        mlTaskManager.addRunningTask(task3);
-        mlTaskManager.addRunningTask(task4);
+        mlTaskManager.add(task1);
+        mlTaskManager.add(task2);
+        mlTaskManager.add(task3);
+        mlTaskManager.add(task4);
         mlTaskManager.clear();
         Assert.assertFalse(mlTaskManager.contains(task1.getTaskId()));
         Assert.assertFalse(mlTaskManager.contains(task2.getTaskId()));
@@ -302,8 +302,8 @@ public class MLTaskManagerTests extends OpenSearchTestCase {
     public void testGetAllTaskIds() {
         MLTask task1 = MLTask.builder().taskId("1").state(MLTaskState.CREATED).build();
         MLTask task2 = MLTask.builder().taskId("2").state(MLTaskState.CREATED).build();
-        mlTaskManager.addRunningTask(task1);
-        mlTaskManager.addRunningTask(task2);
+        mlTaskManager.add(task1);
+        mlTaskManager.add(task2);
 
         String[] taskIds = mlTaskManager.getAllTaskIds();
         assertEquals(taskIds.length, 2);

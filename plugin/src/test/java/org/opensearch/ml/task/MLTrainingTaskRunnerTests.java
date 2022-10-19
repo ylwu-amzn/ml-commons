@@ -176,7 +176,7 @@ public class MLTrainingTaskRunnerTests extends OpenSearchTestCase {
         taskRunner.dispatchTask(requestWithDataFrame, transportService, listener);
         verify(listener).onResponse(any());
         verify(mlTaskManager, never()).createMLTask(any(MLTask.class), any());
-        verify(mlTaskManager).addRunningTask(any(MLTask.class));
+        verify(mlTaskManager).add(any(MLTask.class));
         verify(mlTaskManager).remove(anyString());
         verify(mlIndicesHandler).initModelIndexIfAbsent(any());
         verify(client).index(any(), any());
@@ -188,7 +188,7 @@ public class MLTrainingTaskRunnerTests extends OpenSearchTestCase {
         taskRunner.dispatchTask(requestWithQuery, transportService, listener);
         verify(listener).onResponse(any());
         verify(mlTaskManager, never()).createMLTask(any(MLTask.class), any());
-        verify(mlTaskManager).addRunningTask(any(MLTask.class));
+        verify(mlTaskManager).add(any(MLTask.class));
         verify(mlTaskManager).remove(anyString());
         verify(mlIndicesHandler).initModelIndexIfAbsent(any());
         verify(client).index(any(), any());
@@ -200,7 +200,7 @@ public class MLTrainingTaskRunnerTests extends OpenSearchTestCase {
         taskRunner.dispatchTask(asyncRequestWithQuery, transportService, listener);
         verify(listener).onResponse(any());
         verify(mlTaskManager).createMLTask(any(MLTask.class), any());
-        verify(mlTaskManager).addRunningTask(any(MLTask.class));
+        verify(mlTaskManager).add(any(MLTask.class));
         verify(mlTaskManager).remove(anyString());
         verify(mlIndicesHandler, never()).initModelIndexIfAbsent(any());
         verify(client, never()).index(any(), any());
@@ -213,7 +213,7 @@ public class MLTrainingTaskRunnerTests extends OpenSearchTestCase {
         taskRunner.dispatchTask(asyncRequestWithDataFrame, transportService, listener);
         verify(listener).onResponse(any());
         verify(mlTaskManager).createMLTask(any(MLTask.class), any());
-        verify(mlTaskManager).addRunningTask(any(MLTask.class));
+        verify(mlTaskManager).add(any(MLTask.class));
         verify(mlTaskManager).remove(anyString());
         verify(mlIndicesHandler).initModelIndexIfAbsent(any());
         verify(client).index(any(), any());
@@ -228,7 +228,7 @@ public class MLTrainingTaskRunnerTests extends OpenSearchTestCase {
         verify(listener).onFailure(argumentCaptor.capture());
         assertEquals(errorMessage, argumentCaptor.getValue().getMessage());
         verify(mlTaskManager).createMLTask(any(MLTask.class), any());
-        verify(mlTaskManager, never()).addRunningTask(any(MLTask.class));
+        verify(mlTaskManager, never()).add(any(MLTask.class));
         verify(mlTaskManager, never()).remove(anyString());
         verify(mlIndicesHandler, never()).initModelIndexIfAbsent(any());
         verify(client, never()).index(any(), any());
@@ -245,7 +245,7 @@ public class MLTrainingTaskRunnerTests extends OpenSearchTestCase {
         verify(listener).onFailure(argumentCaptor.capture());
         assertEquals(errorMessage, argumentCaptor.getValue().getMessage());
         verify(mlTaskManager).createMLTask(any(MLTask.class), any());
-        verify(mlTaskManager, never()).addRunningTask(any(MLTask.class));
+        verify(mlTaskManager, never()).add(any(MLTask.class));
         verify(mlTaskManager, never()).remove(anyString());
         verify(mlIndicesHandler, never()).initModelIndexIfAbsent(any());
         verify(client, never()).index(any(), any());

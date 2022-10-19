@@ -152,7 +152,7 @@ public class TransportLoadModelOnNodeAction extends
         ActionListener<MLForwardResponse> taskDoneListener = ActionListener
             .wrap(res -> { log.info("load model done " + res); }, ex -> { log.error(ex); });
 
-        loadModel(modelId, modelContentHash, mlTask.getFunctionName(), mlTask, ActionListener.wrap(r -> {
+        loadModel(modelId, modelContentHash, mlTask.getFunctionName(), localNodeId, coordinatingNodeId, mlTask, ActionListener.wrap(r -> {
             if (!coordinatingNodeId.equals(localNodeId)) {
                 mlTaskManager.remove(taskId);
             }
@@ -173,7 +173,6 @@ public class TransportLoadModelOnNodeAction extends
                     new ActionListenerResponseHandler<MLForwardResponse>(taskDoneListener, MLForwardResponse::new)
                 );
         }, e -> {
-            log.error("Failed to load model " + modelId, e);
             if (e instanceof MLLimitExceededException) {
                 mlTaskManager
                     .updateMLTaskDirectly(
@@ -228,19 +227,21 @@ public class TransportLoadModelOnNodeAction extends
     }
 
     private void loadModel(
-            String modelId,
-            String modelContentHash,
-            FunctionName functionName,
-            MLTask mlTask,
-            ActionListener<String> listener
+        String modelId,
+        String modelContentHash,
+        FunctionName functionName,
+        String localNodeId,
+        String coordinatingNodeId,
+        MLTask mlTask,
+        ActionListener<String> listener
     ) {
         try {
-            String errorMsg = mlModelManager.addRunningTaskByCheckingLimit(maxLoadTasksPerNode, mlTask);
+            String errorMsg = mlModelManager.checkAndAddRunningTask(mlTask, maxLoadTasksPerNode);
             if (errorMsg != null) {
-                throw new MLLimitExceededException(errorMsg);
+                listener.onFailure(new MLLimitExceededException(errorMsg));
+                return;
             }
             log.debug("start loading model {}", modelId);
-//            mlTaskManager.checkAndAddRunningTask(maxLoadTasksPerNode, mlTask);
             mlModelManager.loadModel(modelId, modelContentHash, functionName, listener);
         } catch (Exception e) {
             log.error("Failed to load model " + modelId, e);

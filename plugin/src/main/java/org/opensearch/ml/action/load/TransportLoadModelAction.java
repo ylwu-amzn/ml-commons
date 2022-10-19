@@ -196,7 +196,6 @@ public class TransportLoadModelAction extends HandledTransportAction<ActionReque
                                         );
                                     mlTaskManager.remove(taskId);
                                 });
-                                log.info("------------aaaaaa start update model");
                                 mlModelManager
                                     .updateModel(
                                         modelId,
@@ -204,12 +203,9 @@ public class TransportLoadModelAction extends HandledTransportAction<ActionReque
                                         ActionListener
                                             .wrap(
                                                 r -> {
-                                                    log.info("------------aaaaaa finsh update model, start send load model");
                                                     client.execute(MLLoadModelOnNodeAction.INSTANCE, loadModelRequest, actionListener);
                                                 },
-                                                e -> {
-                                                    actionListener.onFailure(e);
-                                                }
+                                                e -> { actionListener.onFailure(e); }
                                             )
                                     );
                             });

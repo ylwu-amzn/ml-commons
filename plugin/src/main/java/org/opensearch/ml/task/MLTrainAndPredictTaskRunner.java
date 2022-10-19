@@ -128,7 +128,8 @@ public class MLTrainAndPredictTaskRunner extends MLTaskRunner<MLTrainingTaskRequ
         mlStats
             .createCounterStatIfAbsent(mlTask.getFunctionName(), ActionName.TRAIN_PREDICT, MLActionLevelStat.ML_ACTION_REQUEST_COUNT)
             .increment();
-        mlTaskManager.addRunningTask(mlTask);
+        mlTask.setState(MLTaskState.RUNNING);
+        mlTaskManager.add(mlTask);
 
         // run train and predict
         try {

@@ -153,7 +153,7 @@ public class MLModelManager {
      */
     public void uploadMLModel(MLUploadInput uploadInput, MLTask mlTask) {
         mlStats.getStat(MLNodeLevelStat.ML_NODE_TOTAL_REQUEST_COUNT).increment();
-        String errorMsg = addRunningTaskByCheckingLimit(maxUploadTasksPerNode, mlTask);
+        String errorMsg = checkAndAddRunningTask(mlTask, maxUploadTasksPerNode);
         if (errorMsg != null) {
             mlTaskManager
                 .updateMLTaskDirectly(
@@ -182,14 +182,14 @@ public class MLModelManager {
         }
     }
 
-    public String addRunningTaskByCheckingLimit(Integer limit, MLTask mlTask) {
+    public String checkAndAddRunningTask(MLTask mlTask, Integer limit) {
+        String error = mlTaskManager.checkLimitAndAddRunningTask(mlTask, limit);
+        if (error != null) {
+            return error;
+        }
         if (mlCircuitBreakerService.isOpen()) {
             mlStats.getStat(MLNodeLevelStat.ML_NODE_TOTAL_CIRCUIT_BREAKER_TRIGGER_COUNT).increment();
             return "Circuit breaker is open, please check your memory and disk usage!";
-        }
-        String errorMsg = mlTaskManager.checkAndAddRunningTask(limit, mlTask);
-        if (errorMsg != null) {
-            return errorMsg;
         }
         return null;
     }
@@ -393,11 +393,6 @@ public class MLModelManager {
             listener.onFailure(new IllegalArgumentException("Exceed max model per node limit"));
             return;
         }
-//        try {
-//            Thread.sleep(30_000);
-//        } catch (InterruptedException e) {
-//            e.printStackTrace();
-//        }
         modelCache.initModelState(modelId, MLModelState.LOADING, functionName);
         try {
             threadPool.executor(TASK_THREAD_POOL).execute(() -> {
@@ -532,7 +527,6 @@ public class MLModelManager {
                     listener.onResponse(modelZipFile);
                 }
             }, e -> {
-                e.printStackTrace();
                 stopNow.set(true);
                 semaphore.release();
                 listener.onFailure(new MLResourceNotFoundException("Fail to find model chunk " + modelChunkId));
