@@ -20,7 +20,6 @@ import org.opensearch.cluster.node.DiscoveryNode;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.inject.Inject;
 import org.opensearch.common.xcontent.NamedXContentRegistry;
-import org.opensearch.ml.action.upload.MLModelUploader;
 import org.opensearch.ml.cluster.DiscoveryNodeHelper;
 import org.opensearch.ml.common.MLModel;
 import org.opensearch.ml.common.MLTask;
@@ -58,7 +57,6 @@ public class TransportForwardAction extends HandledTransportAction<ActionRequest
     NamedXContentRegistry xContentRegistry;
     MLTaskDispatcher mlTaskDispatcher;
     MLIndicesHandler mlIndicesHandler;
-    MLModelUploader mlModelUploader;
     MLModelManager mlModelManager;
     private DiscoveryNodeHelper nodeFilter;
 
@@ -74,7 +72,6 @@ public class TransportForwardAction extends HandledTransportAction<ActionRequest
         NamedXContentRegistry xContentRegistry,
         MLTaskDispatcher mlTaskDispatcher,
         MLIndicesHandler mlIndicesHandler,
-        MLModelUploader mlModelUploader,
         MLModelManager mlModelManager,
         DiscoveryNodeHelper nodeFilter
     ) {
@@ -88,7 +85,6 @@ public class TransportForwardAction extends HandledTransportAction<ActionRequest
         this.xContentRegistry = xContentRegistry;
         this.mlTaskDispatcher = mlTaskDispatcher;
         this.mlIndicesHandler = mlIndicesHandler;
-        this.mlModelUploader = mlModelUploader;
         this.mlModelManager = mlModelManager;
         this.nodeFilter = nodeFilter;
     }
@@ -174,7 +170,7 @@ public class TransportForwardAction extends HandledTransportAction<ActionRequest
                     listener.onResponse(new MLForwardResponse("ok", null));
                     break;
                 case UPLOAD_MODEL:
-                    mlModelUploader.uploadMLModel(uploadInput, mlTask);
+                    mlModelManager.uploadMLModel(uploadInput, mlTask);
                     listener.onResponse(new MLForwardResponse("ok", null));
                     break;
                 default:

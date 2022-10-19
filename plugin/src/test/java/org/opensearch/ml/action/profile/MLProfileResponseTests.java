@@ -29,8 +29,8 @@ import org.opensearch.ml.common.MLTaskState;
 import org.opensearch.ml.common.MLTaskType;
 import org.opensearch.ml.common.dataset.MLInputDataType;
 import org.opensearch.ml.common.model.MLModelState;
-import org.opensearch.ml.model.MLModelProfile;
-import org.opensearch.ml.model.MLPredictRequestStats;
+import org.opensearch.ml.profile.MLModelProfile;
+import org.opensearch.ml.profile.MLPredictRequestStats;
 import org.opensearch.ml.utils.TestHelper;
 import org.opensearch.test.OpenSearchTestCase;
 

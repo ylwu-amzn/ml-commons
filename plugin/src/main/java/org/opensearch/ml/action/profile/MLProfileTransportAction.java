@@ -23,7 +23,7 @@ import org.opensearch.common.io.stream.StreamInput;
 import org.opensearch.env.Environment;
 import org.opensearch.ml.common.MLTask;
 import org.opensearch.ml.model.MLModelManager;
-import org.opensearch.ml.model.MLModelProfile;
+import org.opensearch.ml.profile.MLModelProfile;
 import org.opensearch.ml.profile.MLProfileInput;
 import org.opensearch.ml.task.MLTaskManager;
 import org.opensearch.monitor.jvm.JvmService;

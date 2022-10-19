@@ -17,7 +17,7 @@ import org.opensearch.common.io.stream.StreamOutput;
 import org.opensearch.common.xcontent.ToXContentFragment;
 import org.opensearch.common.xcontent.XContentBuilder;
 import org.opensearch.ml.common.MLTask;
-import org.opensearch.ml.model.MLModelProfile;
+import org.opensearch.ml.profile.MLModelProfile;
 
 @Getter
 public class MLProfileNodeResponse extends BaseNodeResponse implements ToXContentFragment {

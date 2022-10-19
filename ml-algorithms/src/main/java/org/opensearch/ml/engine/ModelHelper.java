@@ -5,8 +5,6 @@
 
 package org.opensearch.ml.engine;
 
-import ai.djl.inference.Predictor;
-import ai.djl.repository.zoo.ZooModel;
 import ai.djl.training.util.DownloadUtils;
 import ai.djl.training.util.ProgressBar;
 import com.google.common.hash.HashCode;
@@ -32,7 +30,6 @@ import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
@@ -42,7 +39,7 @@ import static org.opensearch.ml.engine.MLEngine.getLocalPrebuiltModelConfigPath;
 import static org.opensearch.ml.engine.MLEngine.getLocalPrebuiltModelPath;
 import static org.opensearch.ml.engine.MLEngine.getUploadModelPath;
 import static org.opensearch.ml.engine.utils.FileUtils.deleteFileQuietly;
-import static org.opensearch.ml.engine.utils.FileUtils.readAndFragment;
+import static org.opensearch.ml.engine.utils.FileUtils.splitFileIntoChunks;
 
 @Log4j2
 public class ModelHelper {
@@ -55,15 +52,9 @@ public class ModelHelper {
     public static final String PYTORCH_ENGINE = "PyTorch";
     public static final String ONNX_ENGINE = "OnnxRuntime";
 
-    private Map<String, Predictor> predictors;
-    private Map<String, TextEmbeddingModelConfig.FrameworkType> modelTransformersTypes;
-    private Map<String, ZooModel> models;
     private Gson gson;
 
     public ModelHelper() {
-        modelTransformersTypes = new ConcurrentHashMap<>();
-        predictors = new ConcurrentHashMap<>();
-        models = new ConcurrentHashMap<>();
         gson = new Gson();
     }
 
@@ -150,7 +141,7 @@ public class ModelHelper {
                 DownloadUtils.download(url, modelPath, new ProgressBar());
                 verifyModelZipFile(modelPath);
 
-                ArrayList<String> chunkFiles = readAndFragment(modelZipFile, modelPartsPath, CHUNK_SIZE);
+                ArrayList<String> chunkFiles = splitFileIntoChunks(modelZipFile, modelPartsPath, CHUNK_SIZE);
                 Map<String, Object> result = new HashMap<>();
                 result.put(CHUNK_FILES, chunkFiles);
                 result.put(MODEL_SIZE_IN_BYTES, modelZipFile.length());
@@ -202,19 +193,19 @@ public class ModelHelper {
     }
 
 
-    public void unloadModel(String modelId) {
-        deleteFileCache(modelId);
-        if (predictors.containsKey(modelId)) {
-            log.debug("unload mode: close and remove predictor {}", modelId);
-            predictors.get(modelId).close();
-            predictors.remove(modelId);
-        }
-        if (models.containsKey(modelId)) {
-            log.debug("unload mode: close and remove model {}", modelId);
-            models.get(modelId).close();
-            models.remove(modelId);
-        }
-    }
+//    public void unloadModel(String modelId) {
+//        deleteFileCache(modelId);
+//        if (predictors.containsKey(modelId)) {
+//            log.debug("unload mode: close and remove predictor {}", modelId);
+//            predictors.get(modelId).close();
+//            predictors.remove(modelId);
+//        }
+//        if (models.containsKey(modelId)) {
+//            log.debug("unload mode: close and remove model {}", modelId);
+//            models.get(modelId).close();
+//            models.remove(modelId);
+//        }
+//    }
 
     public void deleteFileCache(String modelId) {
         deleteFileQuietly(getModelCachePath(modelId));

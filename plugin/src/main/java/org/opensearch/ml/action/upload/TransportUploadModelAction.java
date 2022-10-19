@@ -32,6 +32,7 @@ import org.opensearch.ml.common.transport.upload.MLUploadModelRequest;
 import org.opensearch.ml.common.transport.upload.UploadModelResponse;
 import org.opensearch.ml.engine.ModelHelper;
 import org.opensearch.ml.indices.MLIndicesHandler;
+import org.opensearch.ml.model.MLModelManager;
 import org.opensearch.ml.stats.MLNodeLevelStat;
 import org.opensearch.ml.stats.MLStats;
 import org.opensearch.ml.task.MLTaskDispatcher;
@@ -45,13 +46,13 @@ public class TransportUploadModelAction extends HandledTransportAction<ActionReq
     TransportService transportService;
     ModelHelper modelHelper;
     MLIndicesHandler mlIndicesHandler;
+    MLModelManager mlModelManager;
     MLTaskManager mlTaskManager;
     ClusterService clusterService;
     ThreadPool threadPool;
     Client client;
     DiscoveryNodeHelper nodeFilter;
     MLTaskDispatcher mlTaskDispatcher;
-    MLModelUploader mlModelUploader;
     MLStats mlStats;
 
     @Inject
@@ -60,26 +61,26 @@ public class TransportUploadModelAction extends HandledTransportAction<ActionReq
         ActionFilters actionFilters,
         ModelHelper modelHelper,
         MLIndicesHandler mlIndicesHandler,
+        MLModelManager mlModelManager,
         MLTaskManager mlTaskManager,
         ClusterService clusterService,
         ThreadPool threadPool,
         Client client,
         DiscoveryNodeHelper nodeFilter,
         MLTaskDispatcher mlTaskDispatcher,
-        MLModelUploader mlModelUploader,
         MLStats mlStats
     ) {
         super(MLUploadModelAction.NAME, transportService, actionFilters, MLUploadModelRequest::new);
         this.transportService = transportService;
         this.modelHelper = modelHelper;
         this.mlIndicesHandler = mlIndicesHandler;
+        this.mlModelManager = mlModelManager;
         this.mlTaskManager = mlTaskManager;
         this.clusterService = clusterService;
         this.threadPool = threadPool;
         this.client = client;
         this.nodeFilter = nodeFilter;
         this.mlTaskDispatcher = mlTaskDispatcher;
-        this.mlModelUploader = mlModelUploader;
         this.mlStats = mlStats;
     }
 
@@ -112,7 +113,7 @@ public class TransportUploadModelAction extends HandledTransportAction<ActionReq
                 listener.onResponse(new UploadModelResponse(taskId, MLTaskState.CREATED.name()));
 
                 if (clusterService.localNode().getId().equals(nodeId)) {
-                    mlModelUploader.uploadMLModel(mlUploadInput, mlTask);
+                    mlModelManager.uploadMLModel(mlUploadInput, mlTask);
                 } else {
                     MLForwardInput forwardInput = MLForwardInput
                         .builder()

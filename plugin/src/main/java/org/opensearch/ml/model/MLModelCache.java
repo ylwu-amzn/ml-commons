@@ -25,6 +25,8 @@ import org.opensearch.ml.common.model.MLModelState;
 import org.opensearch.ml.engine.Predictable;
 
 import com.google.common.math.Quantiles;
+import org.opensearch.ml.profile.MLModelProfile;
+import org.opensearch.ml.profile.MLPredictRequestStats;
 
 @Log4j2
 public class MLModelCache {

@@ -85,7 +85,7 @@ public class CommonValue {
             + MLModel.MODEL_CONFIG_FIELD
             + "\" : {\"properties\":{\""
             + MODEL_TYPE_FIELD + "\":{\"type\":\"keyword\"},\""
-            + EMBEDDING_DIMENSION_FIELD + "\":{\"type\":\"long\"},\""
+            + EMBEDDING_DIMENSION_FIELD + "\":{\"type\":\"integer\"},\""
             + FRAMEWORK_TYPE_FIELD + "\":{\"type\":\"keyword\"},\""
             + ALL_CONFIG_FIELD + "\":{\"type\":\"text\"}}},\n"
             + "      \""

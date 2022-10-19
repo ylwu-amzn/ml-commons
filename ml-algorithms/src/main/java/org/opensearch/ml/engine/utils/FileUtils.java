@@ -24,7 +24,7 @@ import java.util.Set;
 @Log4j2
 public class FileUtils {
 
-    public static ArrayList<String> readAndFragment(File file, Path outputPath, int chunkSize) throws IOException {
+    public static ArrayList<String> splitFileIntoChunks(File file, Path outputPath, int chunkSize) throws IOException {
         int fileSize = (int) file.length();
         ArrayList<String> nameList = new ArrayList<>();
         try (InputStream inStream = new BufferedInputStream(new FileInputStream(file))){

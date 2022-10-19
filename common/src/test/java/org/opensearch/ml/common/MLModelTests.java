@@ -35,11 +35,6 @@ public class MLModelTests {
     }
 
     @Test
-    public void test() {
-        System.out.println(CommonValue.ML_MODEL_INDEX_MAPPING);
-    }
-
-    @Test
     public void toXContent() throws IOException {
         MLModel mlModel = MLModel.builder().algorithm(FunctionName.KMEANS).name("model_name").version("1.0.0").content("test_content").build();
         XContentBuilder builder = XContentBuilder.builder(XContentType.JSON.xContent());
