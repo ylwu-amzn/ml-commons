@@ -171,7 +171,7 @@ public class MLModelCacheHelper {
             builder.predictor(modelCache.getPredictor().toString());
         }
         String[] workerNodes = modelCache.getWorkerNodes();
-        if (workerNodes != null && workerNodes.length > 0) {
+        if (workerNodes.length > 0) {
             builder.workerNodes(workerNodes);
         }
         MLPredictRequestStats stats = modelCache.getInferenceStats();
@@ -184,7 +184,7 @@ public class MLModelCacheHelper {
         modelCache.addInferenceDuration(duration, maxRequestCount);
     }
 
-    public FunctionName getModelFunctionName(String modelId) {
+    public FunctionName getFunctionName(String modelId) {
         MLModelCache modelCache = getExistingModelCache(modelId);
         return modelCache.getFunctionName();
     }

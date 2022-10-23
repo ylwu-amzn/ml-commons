@@ -737,7 +737,7 @@ public class MLModelManager {
     }
 
     public FunctionName getModelFunctionName(String modelId) {
-        return modelCacheHelper.getModelFunctionName(modelId);
+        return modelCacheHelper.getFunctionName(modelId);
     }
 
     public void initModelState(String modelId, MLModelState state, FunctionName functionName) {

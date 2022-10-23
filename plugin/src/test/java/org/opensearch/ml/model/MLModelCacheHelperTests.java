@@ -65,6 +65,7 @@ public class MLModelCacheHelperTests extends OpenSearchTestCase {
         assertFalse(cacheHelper.isModelLoaded(modelId));
         cacheHelper.setModelState(modelId, MLModelState.LOADED);
         assertTrue(cacheHelper.isModelLoaded(modelId));
+        assertEquals(FunctionName.TEXT_EMBEDDING, cacheHelper.getFunctionName(modelId));
     }
 
     public void testModelState_DuplicateError() {
@@ -102,6 +103,12 @@ public class MLModelCacheHelperTests extends OpenSearchTestCase {
         cacheHelper.removeModel(modelId);
         loadedModels = cacheHelper.getLoadedModels();
         assertEquals(0, loadedModels.length);
+    }
+
+    public void testRemoveModel_WrongModelId() {
+        cacheHelper.initModelState(modelId, MLModelState.LOADING, FunctionName.TEXT_EMBEDDING);
+        cacheHelper.removeModel("wrong_model_id");
+        assertArrayEquals(new String[] { modelId }, cacheHelper.getAllModels());
     }
 
     public void testModelLoaded() {
@@ -220,5 +227,15 @@ public class MLModelCacheHelperTests extends OpenSearchTestCase {
         assertEquals(maxMonitoringRequests * 2, predictStats.getMax(), 1e-5);
         assertEquals((maxMonitoringRequests + 1 + maxMonitoringRequests * 2) / 2.0, predictStats.getAverage(), 1e-5);
         assertEquals(maxMonitoringRequests, predictStats.getCount().longValue());
+    }
+
+    public void testGetModelProfile_Loading() {
+        cacheHelper.initModelState(modelId, MLModelState.LOADING, FunctionName.TEXT_EMBEDDING);
+        MLModelProfile modelProfile = cacheHelper.getModelProfile(modelId);
+        assertNotNull(modelProfile);
+        assertEquals(MLModelState.LOADING, modelProfile.getModelState());
+        assertNull(modelProfile.getPredictor());
+        assertNull(modelProfile.getWorkerNodes());
+        assertNull(modelProfile.getPredictStats());
     }
 }
