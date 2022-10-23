@@ -19,7 +19,6 @@ import java.util.Set;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.rules.ExpectedException;
-import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.settings.ClusterSettings;
@@ -44,7 +43,6 @@ public class MLModelCacheHelperTests extends OpenSearchTestCase {
 
     private String modelId;
     private String nodeId;
-    @Mock
     private TextEmbeddingModel predictor;
     private int maxMonitoringRequests;
 
@@ -61,6 +59,7 @@ public class MLModelCacheHelperTests extends OpenSearchTestCase {
 
         modelId = "model_id1";
         nodeId = "node_id1";
+        predictor = spy(new TextEmbeddingModel());
     }
 
     public void testModelState() {
@@ -93,12 +92,12 @@ public class MLModelCacheHelperTests extends OpenSearchTestCase {
     }
 
     public void testGetAndRemoveModel() {
-        assertFalse(cacheHelper.containsModel(modelId));
+        assertFalse(cacheHelper.isModelRunningOnNode(modelId));
         cacheHelper.initModelState(modelId, MLModelState.LOADING, FunctionName.TEXT_EMBEDDING);
         String[] loadedModels = cacheHelper.getLoadedModels();
         assertEquals(0, loadedModels.length);
 
-        assertTrue(cacheHelper.containsModel(modelId));
+        assertTrue(cacheHelper.isModelRunningOnNode(modelId));
 
         cacheHelper.setModelState(modelId, MLModelState.LOADED);
         loadedModels = cacheHelper.getLoadedModels();
@@ -156,10 +155,10 @@ public class MLModelCacheHelperTests extends OpenSearchTestCase {
         cacheHelper.setModelState(modelId, MLModelState.LOADING);
         cacheHelper.removeWorkerNodes(ImmutableSet.of(nodeId));
         assertEquals(0, cacheHelper.getWorkerNodes(modelId).length);
-        assertTrue(cacheHelper.containsModel(modelId));
+        assertTrue(cacheHelper.isModelRunningOnNode(modelId));
 
         cacheHelper.removeModel(modelId);
-        assertFalse(cacheHelper.containsModel(modelId));
+        assertFalse(cacheHelper.isModelRunningOnNode(modelId));
     }
 
     public void testRemoveModel_Loaded() {
@@ -219,6 +218,24 @@ public class MLModelCacheHelperTests extends OpenSearchTestCase {
         assertArrayEquals(new String[] { newNodeId }, cacheHelper.getWorkerNodes(modelId));
     }
 
+    public void testSyncWorkerNodes_ModelState_NoModelLoaded() {
+        cacheHelper.addWorkerNode(modelId, nodeId);
+
+        String newModelId = "new_model_id";
+        String newNodeId = "new_node_id";
+        Map<String, Set<String>> modelWorkerNodes = new HashMap<>();
+        modelWorkerNodes.put(newModelId, ImmutableSet.of(newNodeId));
+        cacheHelper.syncWorkerNodes(modelWorkerNodes);
+        assertArrayEquals(new String[] { newModelId }, cacheHelper.getAllModels());
+        assertArrayEquals(new String[] { newNodeId }, cacheHelper.getWorkerNodes(newModelId));
+        assertNull(cacheHelper.getWorkerNodes(modelId));
+
+        cacheHelper.syncWorkerNodes(modelWorkerNodes);
+        assertArrayEquals(new String[] { newModelId }, cacheHelper.getAllModels());
+        assertArrayEquals(new String[] { newNodeId }, cacheHelper.getWorkerNodes(newModelId));
+        assertNull(cacheHelper.getWorkerNodes(modelId));
+    }
+
     public void testGetModelProfile_WrongModelId() {
         MLModelProfile modelProfile = cacheHelper.getModelProfile(modelId);
         assertNull(modelProfile);
@@ -231,7 +248,7 @@ public class MLModelCacheHelperTests extends OpenSearchTestCase {
         cacheHelper.addWorkerNode(modelId, nodeId);
         MLModelProfile modelProfile = cacheHelper.getModelProfile(modelId);
         assertNotNull(modelProfile);
-        assertTrue(modelProfile.getPredictor().startsWith("org.opensearch.ml.engine.algorithms.text_embedding.TextEmbeddingModel@"));
+        assertTrue(modelProfile.getPredictor().contains("TextEmbeddingModel"));
         assertEquals(MLModelState.LOADED, modelProfile.getModelState());
         assertArrayEquals(new String[] { nodeId }, modelProfile.getWorkerNodes());
         assertNull(modelProfile.getPredictStats());

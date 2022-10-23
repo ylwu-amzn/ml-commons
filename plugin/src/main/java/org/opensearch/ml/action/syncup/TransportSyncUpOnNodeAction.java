@@ -166,7 +166,9 @@ public class TransportSyncUpOnNodeAction extends
                     Arrays.toString(modelsInCacheFolder.toArray(new String[0]))
                 );
             for (String modelId : modelsInCacheFolder) {
-                if (!mlTaskManager.contains(modelId) && !mlTaskManager.containsModel(modelId) && !mlModelManager.containsModel(modelId)) {
+                if (!mlTaskManager.contains(modelId)
+                    && !mlTaskManager.containsModel(modelId)
+                    && !mlModelManager.isModelRunningOnNode(modelId)) {
                     log.info("ML model not in cache. Remove all of its cache files. model id: {}", modelId);
                     deleteFileCache(modelId);
                 }

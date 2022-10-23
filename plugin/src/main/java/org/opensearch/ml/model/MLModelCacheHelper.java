@@ -35,6 +35,12 @@ public class MLModelCacheHelper {
         clusterService.getClusterSettings().addSettingsUpdateConsumer(ML_COMMONS_MONITORING_REQUEST_COUNT, it -> maxRequestCount = it);
     }
 
+    /**
+     * Initialize model state.
+     * @param modelId model id
+     * @param state model state
+     * @param functionName function name
+     */
     public synchronized void initModelState(String modelId, MLModelState state, FunctionName functionName) {
         if (modelCaches.containsKey(modelId)) {
             throw new IllegalArgumentException("Duplicate model task");
@@ -45,37 +51,29 @@ public class MLModelCacheHelper {
         modelCaches.put(modelId, modelCache);
     }
 
+    /**
+     * Set model state
+     * @param modelId model id
+     * @param state model state
+     */
     public synchronized void setModelState(String modelId, MLModelState state) {
         getExistingModelCache(modelId).setModelState(state);
     }
 
+    /**
+     * Check if model loaded on node.
+     * @param modelId model id
+     * @return true if model loaded
+     */
     public synchronized boolean isModelLoaded(String modelId) {
         MLModelCache modelCache = modelCaches.get(modelId);
         return modelCache != null && modelCache.getModelState() == MLModelState.LOADED;
     }
 
-    public synchronized void setPredictor(String modelId, Predictable predictable) {
-        MLModelCache modelCache = getExistingModelCache(modelId);
-        modelCache.setPredictor(predictable);
-    }
-
-    public Predictable getPredictor(String modelId) {
-        MLModelCache modelCache = modelCaches.get(modelId);
-        if (modelCache == null) {
-            return null;
-        }
-        return modelCache.getPredictor();
-    }
-
-    public void removeModel(String modelId) {
-        MLModelCache modelCache = modelCaches.get(modelId);
-        if (modelCache != null) {
-            log.debug("remove model from cache: {}", modelId);
-            modelCache.clear();
-            modelCaches.remove(modelId);
-        }
-    }
-
+    /**
+     * Get loaded models on node.
+     * @return array of model id
+     */
     public String[] getLoadedModels() {
         return modelCaches
             .entrySet()
@@ -86,10 +84,65 @@ public class MLModelCacheHelper {
             .toArray(new String[0]);
     }
 
+    /**
+     * Check if model is running on node.
+     * @param modelId model id
+     * @return true if model is running on node.
+     */
+    public boolean isModelRunningOnNode(String modelId) {
+        MLModelCache modelCache = modelCaches.get(modelId);
+        return modelCache != null && modelCache.getModelState() != null;
+    }
+
+    /**
+     * Set predictor of model.
+     * @param modelId model id
+     * @param predictor predictor
+     */
+    public synchronized void setPredictor(String modelId, Predictable predictor) {
+        MLModelCache modelCache = getExistingModelCache(modelId);
+        modelCache.setPredictor(predictor);
+    }
+
+    /**
+     * Get predictor of model.
+     * @param modelId model id
+     * @return predictor
+     */
+    public Predictable getPredictor(String modelId) {
+        MLModelCache modelCache = modelCaches.get(modelId);
+        if (modelCache == null) {
+            return null;
+        }
+        return modelCache.getPredictor();
+    }
+
+    /**
+     * Remove model.
+     * @param modelId model id
+     */
+    public void removeModel(String modelId) {
+        MLModelCache modelCache = modelCaches.get(modelId);
+        if (modelCache != null) {
+            log.debug("remove model from cache: {}", modelId);
+            modelCache.clear();
+            modelCaches.remove(modelId);
+        }
+    }
+
+    /**
+     * Get all model IDs in model cache.
+     * @return array of model id
+     */
     public String[] getAllModels() {
         return modelCaches.keySet().toArray(new String[0]);
     }
 
+    /**
+     * Get worker nodes of model.
+     * @param modelId model id
+     * @return array of node id; return null if model not exists in cache
+     */
     public String[] getWorkerNodes(String modelId) {
         MLModelCache modelCache = modelCaches.get(modelId);
         if (modelCache == null) {
@@ -98,12 +151,21 @@ public class MLModelCacheHelper {
         return modelCache.getWorkerNodes();
     }
 
+    /**
+     * Add worker node of model.
+     * @param modelId model id
+     * @param nodeId node id
+     */
     public synchronized void addWorkerNode(String modelId, String nodeId) {
         log.debug("add node {} to model routing table for model: {}", nodeId, modelId);
         MLModelCache modelCache = getOrCreateModelCache(modelId);
         modelCache.addWorkerNode(nodeId);
     }
 
+    /**
+     * Remove worker nodes for all models.
+     * @param removedNodes removed nodes
+     */
     public void removeWorkerNodes(Set<String> removedNodes) {
         Set<String> modelIds = modelCaches.keySet();
         for (String modelId : modelIds) {
@@ -116,6 +178,11 @@ public class MLModelCacheHelper {
         }
     }
 
+    /**
+     * Remove worker node of model.
+     * @param modelId model id
+     * @param nodeId node id
+     */
     public void removeWorkerNode(String modelId, String nodeId) {
         MLModelCache modelCache = modelCaches.get(modelId);
         if (modelCache != null) {
@@ -128,26 +195,35 @@ public class MLModelCacheHelper {
         }
     }
 
+    /**
+     * Sync worker nodes for all models.
+     * @param modelWorkerNodes worker nodes of all models
+     */
     public void syncWorkerNodes(Map<String, Set<String>> modelWorkerNodes) {
         log.debug("sync model worker nodes");
         Set<String> currentModels = new HashSet(this.modelCaches.keySet());
         currentModels.removeAll(modelWorkerNodes.keySet());
         if (currentModels.size() > 0) {
-            currentModels.forEach(modelId -> { clearWorkerNodes(modelId); });
+            currentModels.forEach(modelId -> clearWorkerNodes(modelId));
         }
         modelWorkerNodes.entrySet().forEach(entry -> {
-            MLModelCache modelCache = modelCaches.get(entry.getKey());
-            if (modelCache != null) {
-                modelCache.syncWorkerNode(entry.getValue());
-            }
+            MLModelCache modelCache = getOrCreateModelCache(entry.getKey());
+            modelCache.syncWorkerNode(entry.getValue());
         });
     }
 
+    /**
+     * Clear worker nodes for all models.
+     */
     public void clearWorkerNodes() {
         log.debug("clear all model worker nodes");
-        modelCaches.entrySet().forEach(entry -> { clearWorkerNodes(entry.getKey()); });
+        modelCaches.entrySet().forEach(entry -> clearWorkerNodes(entry.getKey()));
     }
 
+    /**
+     * Clear worker node of model.
+     * @param modelId model id
+     */
     public void clearWorkerNodes(String modelId) {
         MLModelCache modelCache = modelCaches.get(modelId);
         if (modelCache != null) {
@@ -159,6 +235,11 @@ public class MLModelCacheHelper {
         }
     }
 
+    /**
+     * Get model profile.
+     * @param modelId model id
+     * @return model profile
+     */
     public MLModelProfile getModelProfile(String modelId) {
         MLModelCache modelCache = modelCaches.get(modelId);
         if (modelCache == null) {
@@ -179,19 +260,24 @@ public class MLModelCacheHelper {
         return builder.build();
     }
 
+    /**
+     * Add model inference duration.
+     * @param modelId model id
+     * @param duration time in milliseconds used to run inference.
+     */
     public void addInferenceDuration(String modelId, double duration) {
         MLModelCache modelCache = getOrCreateModelCache(modelId);
         modelCache.addInferenceDuration(duration, maxRequestCount);
     }
 
+    /**
+     * Get function name of model
+     * @param modelId model id
+     * @return function name
+     */
     public FunctionName getFunctionName(String modelId) {
         MLModelCache modelCache = getExistingModelCache(modelId);
         return modelCache.getFunctionName();
-    }
-
-    public boolean containsModel(String modelId) {
-        MLModelCache modelCache = modelCaches.get(modelId);
-        return modelCache != null && modelCache.getModelState() != null;
     }
 
     private MLModelCache getExistingModelCache(String modelId) {

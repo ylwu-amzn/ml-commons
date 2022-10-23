@@ -744,7 +744,7 @@ public class MLModelManager {
         modelCacheHelper.initModelState(modelId, state, functionName);
     }
 
-    public boolean containsModel(String modelId) {
-        return modelCacheHelper.containsModel(modelId);
+    public boolean isModelRunningOnNode(String modelId) {
+        return modelCacheHelper.isModelRunningOnNode(modelId);
     }
 }
