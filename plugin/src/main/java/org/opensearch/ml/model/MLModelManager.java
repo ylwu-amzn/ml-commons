@@ -400,7 +400,7 @@ public class MLModelManager {
                     this.getModel(modelId, ActionListener.wrap(mlModel -> {
                         if (mlModel.getAlgorithm() != FunctionName.TEXT_EMBEDDING) {// load model trained by built-in algorithm like kmeans
                             Predictable predictable = MLEngine.load(mlModel, null);
-                            modelCacheHelper.addPredictor(modelId, predictable);
+                            modelCacheHelper.setPredictor(modelId, predictable);
                             mlStats.getStat(MLNodeLevelStat.ML_NODE_TOTAL_MODEL_COUNT).increment();
                             modelCacheHelper.setModelState(modelId, MLModelState.LOADED);
                             listener.onResponse("successful");
@@ -423,7 +423,7 @@ public class MLModelManager {
                             log.debug("Model content matches original hash value, continue loading");
                             Predictable predictable = MLEngine
                                 .load(mlModel, ImmutableMap.of(MODEL_ZIP_FILE, modelZipFile, MODEL_HELPER, modelHelper));
-                            modelCacheHelper.addPredictor(modelId, predictable);
+                            modelCacheHelper.setPredictor(modelId, predictable);
                             mlStats.getStat(MLNodeLevelStat.ML_NODE_TOTAL_MODEL_COUNT).increment();
                             modelCacheHelper.setModelState(modelId, MLModelState.LOADED);
                             listener.onResponse("successful");
@@ -676,7 +676,7 @@ public class MLModelManager {
      * @param predictable predictable instance
      */
     public void addPredictable(String modelId, Predictable predictable) {
-        modelCacheHelper.addPredictor(modelId, predictable);
+        modelCacheHelper.setPredictor(modelId, predictable);
     }
 
     /**

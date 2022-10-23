@@ -54,7 +54,7 @@ public class MLModelCacheHelper {
         return modelCache != null && modelCache.getModelState() == MLModelState.LOADED;
     }
 
-    public synchronized void addPredictor(String modelId, Predictable predictable) {
+    public synchronized void setPredictor(String modelId, Predictable predictable) {
         MLModelCache modelCache = getExistingModelCache(modelId);
         modelCache.setPredictor(predictable);
     }
