@@ -402,7 +402,7 @@ public class MLTaskManager {
     }
 
     public void syncRunningLoadModelTasks(Map<String, Set<String>> runningLoadModelTasks) {
-        Instant ttlEndTime = Instant.now().minus(120, ChronoUnit.SECONDS);
+        Instant ttlEndTime = Instant.now().minus(10, ChronoUnit.MINUTES);
         Set<String> staleTasks = new HashSet<>();
 
         boolean noRunningTask = runningLoadModelTasks == null || runningLoadModelTasks.size() == 0;

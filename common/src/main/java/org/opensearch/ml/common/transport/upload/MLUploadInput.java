@@ -61,6 +61,12 @@ public class MLUploadInput implements ToXContentObject, Writeable {
         if (version == null) {
             throw new IllegalArgumentException("model version is null");
         }
+        if (modelFormat == null) {
+            throw new IllegalArgumentException("model format is null");
+        }
+        if (modelConfig == null) {
+            throw new IllegalArgumentException("model config is null");
+        }
         this.modelName = modelName;
         this.version = version;
         this.url = url;

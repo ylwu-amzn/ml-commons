@@ -141,7 +141,7 @@ public class TransportSyncUpOnNodeAction extends
             for (Map.Entry<String, Set<String>> entry : modelRoutingTable.entrySet()) {
                 log.debug("latest routing table for model: {}:  {}", entry.getKey(), entry.getValue().toArray(new String[0]));
             }
-            mlModelManager.syncModelRouting(modelRoutingTable);
+            mlModelManager.syncModelWorkerNodes(modelRoutingTable);
         }
 
         if (syncUpInput.isSyncRunningLoadModelTasks()) {
