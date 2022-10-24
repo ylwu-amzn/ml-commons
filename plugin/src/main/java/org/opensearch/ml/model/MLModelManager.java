@@ -567,7 +567,6 @@ public class MLModelManager {
                             + Thread.currentThread().getId()
                     );
                 semaphore.release();
-                semaphore.release();
                 log.error("ffff", e);
                 listener.onFailure(new MLResourceNotFoundException("Fail to find model chunk " + modelChunkId));
                 return;
