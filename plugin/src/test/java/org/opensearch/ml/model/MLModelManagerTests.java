@@ -14,7 +14,7 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.opensearch.ml.plugin.MachineLearningPlugin.TASK_THREAD_POOL;
+import static org.opensearch.ml.plugin.MachineLearningPlugin.UPLOAD_THREAD_POOL;
 import static org.opensearch.ml.settings.MLCommonsSettings.ML_COMMONS_MAX_MODELS_PER_NODE;
 import static org.opensearch.ml.settings.MLCommonsSettings.ML_COMMONS_MAX_UPLOAD_TASKS_PER_NODE;
 import static org.opensearch.ml.settings.MLCommonsSettings.ML_COMMONS_MONITORING_REQUEST_COUNT;
@@ -196,7 +196,7 @@ public class MLModelManagerTests extends OpenSearchTestCase {
     public void testUploadMLModel_InitModelIndexFailure() {
         when(mlTaskManager.checkLimitAndAddRunningTask(any(), any())).thenReturn(null);
         when(mlCircuitBreakerService.isOpen()).thenReturn(false);
-        when(threadPool.executor(TASK_THREAD_POOL)).thenReturn(taskExecutorService);
+        when(threadPool.executor(UPLOAD_THREAD_POOL)).thenReturn(taskExecutorService);
         setUpMock_InitModelIndexFailure();
 
         modelManager.uploadMLModel(uploadInput, mlTask);

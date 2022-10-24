@@ -212,6 +212,7 @@ public class TextEmbeddingModel implements Predictable {
         try {
             return AccessController.doPrivileged((PrivilegedExceptionAction<ModelTensorOutput>) () -> {
                 Thread.currentThread().setContextClassLoader(getClass().getClassLoader());
+                log.info("ylwudebug200 ---2 thread: " + Thread.currentThread().getName() + ", " + Thread.currentThread().getId());
                 if (predictor == null) {
                     throw new MLException("model not loaded.");
                 }

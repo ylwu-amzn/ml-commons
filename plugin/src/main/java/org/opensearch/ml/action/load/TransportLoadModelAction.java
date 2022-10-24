@@ -5,8 +5,6 @@
 
 package org.opensearch.ml.action.load;
 
-import static org.opensearch.ml.plugin.MachineLearningPlugin.TASK_THREAD_POOL;
-
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -163,56 +161,53 @@ public class TransportLoadModelAction extends HandledTransportAction<ActionReque
                         try {
                             mlTaskManager.add(mlTask, nodeIds);
                             listener.onResponse(new LoadModelResponse(taskId, MLTaskState.CREATED.name()));
-                            threadPool.executor(TASK_THREAD_POOL).execute(() -> {
-                                LoadModelInput loadModelInput = new LoadModelInput(
-                                    modelId,
-                                    taskId,
-                                    mlModel.getModelContentHash(),
-                                    eligibleNodes.size(),
-                                    localNodeId,
-                                    mlTask
-                                );
-                                LoadModelNodesRequest loadModelRequest = new LoadModelNodesRequest(
-                                    eligibleNodes.toArray(new DiscoveryNode[0]),
-                                    loadModelInput
-                                );
-                                ActionListener<LoadModelNodesResponse> actionListener = ActionListener.wrap(r -> {
-                                    if (mlTaskManager.contains(taskId)) {
-                                        mlTaskManager.updateMLTask(taskId, ImmutableMap.of(MLTask.STATE_FIELD, MLTaskState.RUNNING), 5000);
-                                    }
-                                }, e -> {
-                                    log.error("Failed to load model " + modelId, e);
-                                    mlTaskManager
-                                        .updateMLTask(
-                                            taskId,
-                                            ImmutableMap
-                                                .of(
-                                                    MLTask.ERROR_FIELD,
-                                                    ExceptionUtils.getStackTrace(e),
-                                                    MLTask.STATE_FIELD,
-                                                    MLTaskState.FAILED
-                                                ),
-                                            5000
-                                        );
-                                    MLModelState state = algorithm == FunctionName.TEXT_EMBEDDING
-                                        ? MLModelState.UPLOADED
-                                        : MLModelState.TRAINED;
-                                    mlModelManager.updateModel(modelId, ImmutableMap.of(MLModel.MODEL_STATE_FIELD, state));
-                                    mlTaskManager.remove(taskId);
-                                });
-                                mlModelManager
-                                    .updateModel(
-                                        modelId,
-                                        ImmutableMap.of(MLModel.MODEL_STATE_FIELD, MLModelState.LOADING),
-                                        ActionListener
-                                            .wrap(
-                                                r -> {
-                                                    client.execute(MLLoadModelOnNodeAction.INSTANCE, loadModelRequest, actionListener);
-                                                },
-                                                e -> { actionListener.onFailure(e); }
-                                            )
+
+                            LoadModelInput loadModelInput = new LoadModelInput(
+                                modelId,
+                                taskId,
+                                mlModel.getModelContentHash(),
+                                eligibleNodes.size(),
+                                localNodeId,
+                                mlTask
+                            );
+                            LoadModelNodesRequest loadModelRequest = new LoadModelNodesRequest(
+                                eligibleNodes.toArray(new DiscoveryNode[0]),
+                                loadModelInput
+                            );
+                            ActionListener<LoadModelNodesResponse> actionListener = ActionListener.wrap(r -> {
+                                if (mlTaskManager.contains(taskId)) {
+                                    mlTaskManager.updateMLTask(taskId, ImmutableMap.of(MLTask.STATE_FIELD, MLTaskState.RUNNING), 5000);
+                                }
+                            }, e -> {
+                                log.error("Failed to load model " + modelId, e);
+                                mlTaskManager
+                                    .updateMLTask(
+                                        taskId,
+                                        ImmutableMap
+                                            .of(
+                                                MLTask.ERROR_FIELD,
+                                                ExceptionUtils.getStackTrace(e),
+                                                MLTask.STATE_FIELD,
+                                                MLTaskState.FAILED
+                                            ),
+                                        5000
                                     );
+                                MLModelState state = algorithm == FunctionName.TEXT_EMBEDDING
+                                    ? MLModelState.UPLOADED
+                                    : MLModelState.TRAINED;
+                                mlModelManager.updateModel(modelId, ImmutableMap.of(MLModel.MODEL_STATE_FIELD, state));
+                                mlTaskManager.remove(taskId);
                             });
+                            mlModelManager
+                                .updateModel(
+                                    modelId,
+                                    ImmutableMap.of(MLModel.MODEL_STATE_FIELD, MLModelState.LOADING),
+                                    ActionListener
+                                        .wrap(
+                                            r -> { client.execute(MLLoadModelOnNodeAction.INSTANCE, loadModelRequest, actionListener); },
+                                            e -> { actionListener.onFailure(e); }
+                                        )
+                                );
                         } catch (Exception ex) {
                             log.error("Failed to load model", ex);
                             mlTaskManager.remove(taskId);

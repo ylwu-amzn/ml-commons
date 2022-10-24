@@ -25,8 +25,8 @@ import static org.opensearch.ml.engine.ModelHelper.MODEL_SIZE_IN_BYTES;
 import static org.opensearch.ml.engine.algorithms.text_embedding.TextEmbeddingModel.MODEL_HELPER;
 import static org.opensearch.ml.engine.algorithms.text_embedding.TextEmbeddingModel.MODEL_ZIP_FILE;
 import static org.opensearch.ml.engine.utils.FileUtils.deleteFileQuietly;
-import static org.opensearch.ml.plugin.MachineLearningPlugin.LOAD_TASK_THREAD_POOL;
-import static org.opensearch.ml.plugin.MachineLearningPlugin.UPLOAD_TASK_THREAD_POOL;
+import static org.opensearch.ml.plugin.MachineLearningPlugin.LOAD_THREAD_POOL;
+import static org.opensearch.ml.plugin.MachineLearningPlugin.UPLOAD_THREAD_POOL;
 import static org.opensearch.ml.settings.MLCommonsSettings.ML_COMMONS_MAX_MODELS_PER_NODE;
 import static org.opensearch.ml.settings.MLCommonsSettings.ML_COMMONS_MAX_UPLOAD_TASKS_PER_NODE;
 import static org.opensearch.ml.stats.ActionName.UPLOAD;
@@ -273,7 +273,7 @@ public class MLModelManager {
                         handleException(taskId, e);
                     });
 
-                    client.index(indexModelMetaRequest, threadedActionListener(UPLOAD_TASK_THREAD_POOL, listener));
+                    client.index(indexModelMetaRequest, threadedActionListener(UPLOAD_THREAD_POOL, listener));
                 }, e -> {
                     log.error("Failed to init model index", e);
                     handleException(taskId, e);
@@ -401,7 +401,7 @@ public class MLModelManager {
         try {
             try (ThreadContext.StoredContext context = client.threadPool().getThreadContext().stashContext()) {
                 log.info("ylwudebug1 ---10 thread: " + Thread.currentThread().getName() + ", " + Thread.currentThread().getId());
-                this.getModel(modelId, threadedActionListener(LOAD_TASK_THREAD_POOL, ActionListener.wrap(mlModel -> {
+                this.getModel(modelId, threadedActionListener(LOAD_THREAD_POOL, ActionListener.wrap(mlModel -> {
                     log.info("ylwudebug1 ---10-1 thread: " + Thread.currentThread().getName() + ", " + Thread.currentThread().getId());
                     if (mlModel.getAlgorithm() != FunctionName.TEXT_EMBEDDING) {// load model trained by built-in algorithm like kmeans
                         Predictable predictable = MLEngine.load(mlModel, null);
@@ -527,7 +527,7 @@ public class MLModelManager {
             log.info("ylwudebug1 ---11-2 got a semaphore: " + Thread.currentThread().getName() + ", " + Thread.currentThread().getId());
             String modelChunkId = this.getModelChunkId(modelId, i);
             int currentChunk = i;
-            this.getModel(modelChunkId, threadedActionListener(LOAD_TASK_THREAD_POOL, ActionListener.wrap(model -> {
+            this.getModel(modelChunkId, threadedActionListener(LOAD_THREAD_POOL, ActionListener.wrap(model -> {
                 Path chunkPath = getLoadModelChunkPath(modelId, currentChunk);
                 log
                     .info(

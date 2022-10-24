@@ -5,6 +5,7 @@
 
 package org.opensearch.ml.engine.algorithms.clustering;
 
+import lombok.extern.log4j.Log4j2;
 import org.opensearch.ml.common.MLModel;
 import org.opensearch.ml.common.dataframe.DataFrame;
 import org.opensearch.ml.common.dataframe.DataFrameBuilder;
@@ -35,6 +36,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+@Log4j2
 @Function(FunctionName.KMEANS)
 public class KMeans implements TrainAndPredictable {
     public static final String VERSION = "1.0.0";
@@ -115,12 +117,14 @@ public class KMeans implements TrainAndPredictable {
         if (model == null) {
             throw new IllegalArgumentException("No model found for KMeans prediction.");
         }
+        log.info("ylwudebug200 ---2 predict thread: " + Thread.currentThread().getName() + ", " + Thread.currentThread().getId());
         this.kMeansModel = (KMeansModel) ModelSerDeSer.deserialize(model);
         return predict(mlInput);
     }
 
     @Override
     public MLModel train(MLInput mlInput) {
+        log.info("ylwudebug200 ---2 train thread: " + Thread.currentThread().getName() + ", " + Thread.currentThread().getId());
         DataFrame dataFrame = ((DataFrameInputDataset)mlInput.getInputDataset()).getDataFrame();
         MutableDataset<ClusterID> trainDataset = TribuoUtil.generateDataset(dataFrame, new ClusteringFactory(),
                 "KMeans training data from opensearch", TribuoOutputType.CLUSTERID);
@@ -141,6 +145,7 @@ public class KMeans implements TrainAndPredictable {
 
     @Override
     public MLOutput trainAndPredict(MLInput mlInput) {
+        log.info("ylwudebug200 ---2 trainAndPredict thread: " + Thread.currentThread().getName() + ", " + Thread.currentThread().getId());
         DataFrame dataFrame = ((DataFrameInputDataset)mlInput.getInputDataset()).getDataFrame();
         MutableDataset<ClusterID> trainDataset = TribuoUtil.generateDataset(dataFrame, new ClusteringFactory(),
                 "KMeans training and predicting data from opensearch", TribuoOutputType.CLUSTERID);
