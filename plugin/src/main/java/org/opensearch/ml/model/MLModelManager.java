@@ -44,6 +44,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
@@ -214,8 +215,8 @@ public class MLModelManager {
                                 if (failedToUploadChunk.get()) {
                                     throw new MLException("Failed to save model chunk");
                                 }
-                                semaphore.acquire();
-                                // semaphore.tryAcquire(10, TimeUnit.SECONDS);
+                                // semaphore.acquire();
+                                semaphore.tryAcquire(10, TimeUnit.SECONDS);
                                 File file = new File(name);
                                 byte[] bytes = Files.toByteArray(file);
                                 int chunkNum = Integer.parseInt(file.getName());
@@ -521,9 +522,9 @@ public class MLModelManager {
                 listener.onFailure(new MLException("Failed to load model"));
                 return;
             }
-            // semaphore.tryAcquire(10, TimeUnit.SECONDS);
             log.info("ylwudebug1 ---11-1 start get semaphore: " + Thread.currentThread().getName() + ", " + Thread.currentThread().getId());
-            semaphore.acquire();
+            semaphore.tryAcquire(10, TimeUnit.SECONDS);
+            // semaphore.acquire();
             log.info("ylwudebug1 ---11-2 got a semaphore: " + Thread.currentThread().getName() + ", " + Thread.currentThread().getId());
             String modelChunkId = this.getModelChunkId(modelId, i);
             int currentChunk = i;
