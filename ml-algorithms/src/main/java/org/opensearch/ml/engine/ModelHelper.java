@@ -55,8 +55,12 @@ public class ModelHelper {
     public void downloadAndSplit(String modelId, String modelName, String version, String url, ActionListener<Map<String, Object>> listener) {
         try {
             AccessController.doPrivileged((PrivilegedExceptionAction<Void>) () -> {
+                log.info("ylwudebug1 ---2 thread: " + Thread.currentThread().getName() + ", " + Thread.currentThread().getId());
                 Path modelUploadPath = getUploadModelPath(modelId, modelName, version);
                 String modelPath = modelUploadPath +".zip";
+                System.out.println("aaaaaabbbbbb");
+                System.out.println(modelPath);
+                System.out.println("aaaaaabbbbbb");
                 Path modelPartsPath = modelUploadPath.resolve("chunks");
                 File modelZipFile = new File(modelPath);
                 DownloadUtils.download(url, modelPath, new ProgressBar());

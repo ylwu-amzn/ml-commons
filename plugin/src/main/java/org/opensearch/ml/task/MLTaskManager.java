@@ -43,6 +43,7 @@ import org.opensearch.ml.common.exception.MLException;
 import org.opensearch.ml.common.exception.MLResourceNotFoundException;
 import org.opensearch.ml.indices.MLIndicesHandler;
 import org.opensearch.rest.RestStatus;
+import org.opensearch.threadpool.ThreadPool;
 
 /**
  * MLTaskManager is responsible for managing MLTask.
@@ -50,9 +51,11 @@ import org.opensearch.rest.RestStatus;
 @Log4j2
 public class MLTaskManager {
     private final Map<String, MLTaskCache> taskCaches;
+    // private final Map<String, MLTaskCache> modelTaskCaches;
     // TODO: make this value configurable as cluster setting
     public final static int MAX_ML_TASK_PER_NODE = 10;
     private final Client client;
+    private final ThreadPool threadPool;
     private final MLIndicesHandler mlIndicesHandler;
     private final Map<MLTaskType, AtomicInteger> runningTasksCount;
 
@@ -62,10 +65,12 @@ public class MLTaskManager {
      * @param client client
      * @param mlIndicesHandler ML indices handler
      */
-    public MLTaskManager(Client client, MLIndicesHandler mlIndicesHandler) {
+    public MLTaskManager(Client client, ThreadPool threadPool, MLIndicesHandler mlIndicesHandler) {
         this.client = client;
+        this.threadPool = threadPool;
         this.mlIndicesHandler = mlIndicesHandler;
         taskCaches = new ConcurrentHashMap<>();
+        // modelTaskCaches = new ConcurrentHashMap<>();
         runningTasksCount = new ConcurrentHashMap<>();
     }
 
@@ -90,6 +95,15 @@ public class MLTaskManager {
         return null;
     }
 
+    // public void resetTask(MLTask mlTask) {
+    // String taskId = mlTask.getTaskId();
+    // MLTaskCache taskCache = taskCaches.get(taskId);
+    // if (taskCache != null) {
+    // taskCaches.put(taskId, new MLTaskCache(mlTask, taskCache.getWorkerNodes()));
+    // log.info("ylwu --- reset ML task with model id : {}", mlTask.getModelId());
+    // }
+    // }
+
     /**
      * Put ML task into cache.
      * If ML task is already in cache, will throw {@link IllegalArgumentException}
@@ -107,8 +121,13 @@ public class MLTaskManager {
         if (contains(taskId)) {
             throw new IllegalArgumentException("Duplicate taskId");
         }
-        taskCaches.put(taskId, new MLTaskCache(mlTask, workerNodes));
-        log.debug("add ML task to cache " + taskId);
+        MLTaskCache taskCache = new MLTaskCache(mlTask, workerNodes);
+        taskCaches.put(taskId, taskCache);
+        // String modelId = mlTask.getModelId();
+        // if (modelId != null) {
+        // modelTaskCaches.put(modelId, taskCache);
+        // }
+        log.info("ylwu --- add ML task to cache " + taskId);
     }
 
     /**
@@ -204,7 +223,7 @@ public class MLTaskManager {
         return null;
     }
 
-    public List<String> getWorkNodes(String taskId) {
+    public Set<String> getWorkNodes(String taskId) {
         if (taskCaches.containsKey(taskId)) {
             return taskCaches.get(taskId).getWorkerNodes();
         }
@@ -305,6 +324,47 @@ public class MLTaskManager {
         ActionListener<UpdateResponse> listener,
         long timeoutInMillis
     ) {
+        // threadPool.executor(TASK_THREAD_POOL).execute(() -> {
+        // if (!taskCaches.containsKey(taskId)) {
+        // listener.onFailure(new MLResourceNotFoundException("Can't find task"));
+        // return;
+        // }
+        // Semaphore semaphore = taskCaches.get(taskId).getUpdateTaskIndexSemaphore();
+        // try {
+        // if (semaphore != null && !semaphore.tryAcquire(timeoutInMillis, TimeUnit.MILLISECONDS)) {
+        // listener.onFailure(new MLException("Other updating request not finished yet"));
+        // return;
+        // }
+        // } catch (InterruptedException e) {
+        // log.error("Failed to acquire semaphore for ML task " + taskId, e);
+        // listener.onFailure(e);
+        // return; // return directly if can't get semaphore
+        // }
+        // try {
+        // if (updatedFields == null || updatedFields.size() == 0) {
+        // listener.onFailure(new IllegalArgumentException("Updated fields is null or empty"));
+        // return;
+        // }
+        // UpdateRequest updateRequest = new UpdateRequest(ML_TASK_INDEX, taskId);
+        // Map<String, Object> updatedContent = new HashMap<>();
+        // updatedContent.putAll(updatedFields);
+        // updatedContent.put(LAST_UPDATE_TIME_FIELD, Instant.now().toEpochMilli());
+        // updateRequest.doc(updatedContent);
+        // updateRequest.setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE);
+        // ActionListener<UpdateResponse> actionListener = semaphore == null
+        // ? listener
+        // : ActionListener.runAfter(listener, () -> semaphore.release());
+        // try (ThreadContext.StoredContext context = client.threadPool().getThreadContext().stashContext()) {
+        // client.update(updateRequest, ActionListener.runBefore(actionListener, () -> context.restore()));
+        // } catch (Exception e) {
+        // actionListener.onFailure(e);
+        // }
+        // } catch (Exception e) {
+        // semaphore.release();
+        // log.error("Failed to update ML task " + taskId, e);
+        // listener.onFailure(e);
+        // }
+        // });
         if (!taskCaches.containsKey(taskId)) {
             listener.onFailure(new MLResourceNotFoundException("Can't find task"));
             return;
@@ -382,7 +442,15 @@ public class MLTaskManager {
     }
 
     public boolean containsModel(String modelId) {
+        // return modelTaskCaches.containsKey(modelId);
         for (Map.Entry<String, MLTaskCache> entry : taskCaches.entrySet()) {
+            log
+                .info(
+                    "ylwu --- getModelId: {}, input modelId: {}, final : {}",
+                    entry.getValue().mlTask.getModelId(),
+                    modelId,
+                    modelId.equals(entry.getValue().mlTask.getModelId())
+                );
             if (modelId.equals(entry.getValue().mlTask.getModelId())) {
                 return true;
             }
@@ -424,4 +492,13 @@ public class MLTaskManager {
             }
         }
     }
+
+    // public void addModelTaskCache(MLTask mlTask) {
+    // String taskId = mlTask.getTaskId();
+    // MLTaskCache taskCache = taskCaches.get(taskId);
+    // log.info("ylwudebug1 --- mlTask id {} : {}", taskId, taskCache);
+    // if (taskCache != null) {
+    // modelTaskCaches.put(mlTask.getModelId(), taskCache);
+    // }
+    // }
 }

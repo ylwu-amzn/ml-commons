@@ -169,7 +169,10 @@ public class TransportSyncUpOnNodeAction extends
                 if (!mlTaskManager.contains(modelId)
                     && !mlTaskManager.containsModel(modelId)
                     && !mlModelManager.isModelRunningOnNode(modelId)) {
-                    log.info("ML model not in cache. Remove all of its cache files. model id: {}", modelId);
+                    log.info("ylwu --- mlTaskManager.contains(modelId): {}", mlTaskManager.contains(modelId));
+                    log.info("ylwu --- mlTaskManager.containsModel(modelId): {}", mlTaskManager.containsModel(modelId));
+                    log.info("ylwu --- mlModelManager.isModelRunningOnNode(modelId): {}", mlModelManager.isModelRunningOnNode(modelId));
+                    log.info("ylwu --- ML model not in cache. Remove all of its cache files. model id: {}", modelId);
                     deleteFileCache(modelId);
                 }
             }

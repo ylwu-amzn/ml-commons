@@ -81,6 +81,7 @@ public class TextEmbeddingModel implements Predictable {
 
     @Override
     public void initModel(MLModel model, Map<String, Object> params) {
+        log.info("ylwudebug1 ---13-2 thread: " + Thread.currentThread().getName() + ", " + Thread.currentThread().getId());
         String engine = model.getModelFormat() == MLModelFormat.TORCH_SCRIPT ? PYTORCH_ENGINE : ONNX_ENGINE;
         File modelZipFile = (File)params.get(MODEL_ZIP_FILE);
         modelHelper = (ModelHelper)params.get(MODEL_HELPER);
@@ -146,6 +147,7 @@ public class TextEmbeddingModel implements Predictable {
                     if (pathFile.exists()) {
                         FileUtils.deleteDirectory(pathFile);
                     }
+                    log.info("ylwudebug1 ---11-4 start unzip model file: " + modelZipFile.getAbsolutePath() + "  " + Thread.currentThread().getName() + ", " + Thread.currentThread().getId());
                     ZipUtils.unzip(new FileInputStream(modelZipFile), modelPath);
                     boolean findModelFile = false;
                     for (File file : pathFile.listFiles()) {

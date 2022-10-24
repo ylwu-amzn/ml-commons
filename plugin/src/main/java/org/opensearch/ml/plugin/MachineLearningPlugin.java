@@ -9,7 +9,6 @@ import static org.opensearch.ml.common.CommonValue.ML_MODEL_INDEX;
 import static org.opensearch.ml.common.CommonValue.ML_TASK_INDEX;
 
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -28,6 +27,7 @@ import org.opensearch.common.settings.IndexScopedSettings;
 import org.opensearch.common.settings.Setting;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.common.settings.SettingsFilter;
+import org.opensearch.common.util.concurrent.OpenSearchExecutors;
 import org.opensearch.common.xcontent.NamedXContentRegistry;
 import org.opensearch.env.Environment;
 import org.opensearch.env.NodeEnvironment;
@@ -136,7 +136,10 @@ import org.opensearch.watcher.ResourceWatcherService;
 import com.google.common.collect.ImmutableList;
 
 public class MachineLearningPlugin extends Plugin implements ActionPlugin {
-    public static final String TASK_THREAD_POOL = "OPENSEARCH_ML_TASK_THREAD_POOL";
+    public static final String ML_THREAD_POOL_PREFIX = "thread_pool.ml_commons.";
+    public static final String TASK_THREAD_POOL = "opensearch_ml_task";
+    public static final String UPLOAD_TASK_THREAD_POOL = "opensearch_ml_upload_task";
+    public static final String LOAD_TASK_THREAD_POOL = "opensearch_ml_load_task";
     public static final String ML_BASE_URI = "/_plugins/_ml";
 
     private MLStats mlStats;
@@ -225,7 +228,7 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin {
         this.mlStats = new MLStats(stats);
 
         mlIndicesHandler = new MLIndicesHandler(clusterService, client);
-        mlTaskManager = new MLTaskManager(client, mlIndicesHandler);
+        mlTaskManager = new MLTaskManager(client, threadPool, mlIndicesHandler);
         modelHelper = new ModelHelper();
         mlModelManager = new MLModelManager(
             clusterService,
@@ -381,9 +384,35 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin {
 
     @Override
     public List<ExecutorBuilder<?>> getExecutorBuilders(Settings settings) {
-        FixedExecutorBuilder ml = new FixedExecutorBuilder(settings, TASK_THREAD_POOL, 4, 4, "ml.task_thread_pool", false);
+        FixedExecutorBuilder taskThreadPool = new FixedExecutorBuilder(
+            settings,
+            TASK_THREAD_POOL,
+            // 2,
+            Math.max(1, OpenSearchExecutors.allocatedProcessors(settings) - 1),
+            2,
+            ML_THREAD_POOL_PREFIX + TASK_THREAD_POOL,
+            false
+        );
+        FixedExecutorBuilder uploadThreadPool = new FixedExecutorBuilder(
+            settings,
+            UPLOAD_TASK_THREAD_POOL,
+            // 2,
+            Math.max(2, OpenSearchExecutors.allocatedProcessors(settings) - 1),
+            10,
+            ML_THREAD_POOL_PREFIX + UPLOAD_TASK_THREAD_POOL,
+            false
+        );
+        FixedExecutorBuilder loadThreadPool = new FixedExecutorBuilder(
+            settings,
+            LOAD_TASK_THREAD_POOL,
+            // 2,
+            Math.max(2, OpenSearchExecutors.allocatedProcessors(settings) - 1),
+            10,
+            ML_THREAD_POOL_PREFIX + LOAD_TASK_THREAD_POOL,
+            false
+        );
 
-        return Collections.singletonList(ml);
+        return ImmutableList.of(taskThreadPool, uploadThreadPool, loadThreadPool);
     }
 
     @Override

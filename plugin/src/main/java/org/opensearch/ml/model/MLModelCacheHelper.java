@@ -45,6 +45,7 @@ public class MLModelCacheHelper {
         if (modelCaches.containsKey(modelId)) {
             throw new IllegalArgumentException("Duplicate model task");
         }
+        log.info("ylwu ---- init model state for model {}, state: {}", modelId, state);
         MLModelCache modelCache = new MLModelCache();
         modelCache.setModelState(state);
         modelCache.setFunctionName(functionName);
@@ -57,6 +58,7 @@ public class MLModelCacheHelper {
      * @param state model state
      */
     public synchronized void setModelState(String modelId, MLModelState state) {
+        log.info("ylwudebug1 --- 11-5 update model {}  to state {}", modelId, state);
         getExistingModelCache(modelId).setModelState(state);
     }
 
@@ -91,6 +93,12 @@ public class MLModelCacheHelper {
      */
     public boolean isModelRunningOnNode(String modelId) {
         MLModelCache modelCache = modelCaches.get(modelId);
+        // log
+        // .info(
+        // "ylwu --- model running on node modelCache != null: {}, modelCache.getModelState() != null: {}",
+        // modelCache != null,
+        // modelCache.getModelState() != null
+        // );
         return modelCache != null && modelCache.getModelState() != null;
     }
 
@@ -124,7 +132,7 @@ public class MLModelCacheHelper {
     public void removeModel(String modelId) {
         MLModelCache modelCache = modelCaches.get(modelId);
         if (modelCache != null) {
-            log.debug("remove model from cache: {}", modelId);
+            log.info("remove model from cache: {}", modelId);
             modelCache.clear();
             modelCaches.remove(modelId);
         }
@@ -170,9 +178,10 @@ public class MLModelCacheHelper {
         Set<String> modelIds = modelCaches.keySet();
         for (String modelId : modelIds) {
             MLModelCache modelCache = modelCaches.get(modelId);
-            log.debug("remove worker nodes of model {} : {}", modelId, removedNodes.toArray(new String[0]));
+            log.info("remove worker nodes of model {} : {}", modelId, removedNodes.toArray(new String[0]));
             modelCache.removeWorkerNodes(removedNodes);
             if (!modelCache.isValidCache()) {
+                log.info("ylwu ---- remove moodel {}", modelId);
                 modelCaches.remove(modelId);
             }
         }

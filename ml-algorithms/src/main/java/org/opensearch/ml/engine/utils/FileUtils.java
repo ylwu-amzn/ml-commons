@@ -23,6 +23,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Queue;
 import java.util.Set;
 
 /**
@@ -87,6 +88,11 @@ public class FileUtils {
         org.apache.commons.io.FileUtils.createParentDirectories(destinationFile);
         try (OutputStream output = new BufferedOutputStream(new FileOutputStream(destinationFile, append))){
             output.write(data);
+            output.flush();
+            output.close();
+            log.info("ylwudebug3 {} {}--- finished writing to file {}", data.length, append, destinationFile.getAbsolutePath());
+        } catch (Exception e) {
+            log.error("ylwudebug3 --- Failed to write file " + destinationFile.getAbsolutePath(), e);
         }
     }
 
@@ -95,10 +101,37 @@ public class FileUtils {
      * @param files array of files
      * @param mergedFile merged file
      */
-    public static void mergeFiles(File[] files, File mergedFile) {
+//    public static void mergeFiles(File[] files, File mergedFile) {
+//        boolean failed = false;
+//        for (int i = 0; i< files.length ; i++) {
+//            File f = files[i];
+//            try (InputStream inStream = new BufferedInputStream(new FileInputStream(f))) {
+//                if (!failed) {
+//                    int fileLength = (int) f.length();
+//                    byte fileContent[] = new byte[fileLength];
+//                    inStream.read(fileContent, 0, fileLength);
+//
+//                    write(fileContent, mergedFile, true);
+//                }
+//                org.apache.commons.io.FileUtils.deleteQuietly(f);
+//                if (i == files.length - 1) {
+//                    org.apache.commons.io.FileUtils.deleteQuietly(f.getParentFile());
+//                }
+//            } catch (IOException e) {
+//                log.error("Failed to merge file " + f.getAbsolutePath() + " to " + mergedFile.getAbsolutePath(), e);
+//                failed = true;
+//            }
+//        }
+//        if (failed) {
+//            org.apache.commons.io.FileUtils.deleteQuietly(mergedFile);
+//            throw new MLException("Failed to merge model chunks");
+//        }
+//    }
+
+    public static void mergeFiles(Queue<File> files, File mergedFile) {
         boolean failed = false;
-        for (int i = 0; i< files.length ; i++) {
-            File f = files[i];
+        while (!files.isEmpty()) {
+            File f = files.poll();
             try (InputStream inStream = new BufferedInputStream(new FileInputStream(f))) {
                 if (!failed) {
                     int fileLength = (int) f.length();
@@ -107,17 +140,17 @@ public class FileUtils {
 
                     write(fileContent, mergedFile, true);
                 }
-                org.apache.commons.io.FileUtils.deleteQuietly(f);
-                if (i == files.length - 1) {
-                    org.apache.commons.io.FileUtils.deleteQuietly(f.getParentFile());
-                }
+//                org.apache.commons.io.FileUtils.deleteQuietly(f);
+//                if (files.isEmpty()) {
+//                    org.apache.commons.io.FileUtils.deleteQuietly(f.getParentFile());
+//                }
             } catch (IOException e) {
-                log.error("Failed to merge file " + f.getAbsolutePath() + " to " + mergedFile.getAbsolutePath());
+                log.error("Failed to merge file " + f.getAbsolutePath() + " to " + mergedFile.getAbsolutePath(), e);
                 failed = true;
             }
         }
         if (failed) {
-            org.apache.commons.io.FileUtils.deleteQuietly(mergedFile);
+//            org.apache.commons.io.FileUtils.deleteQuietly(mergedFile);
             throw new MLException("Failed to merge model chunks");
         }
     }

@@ -34,7 +34,7 @@ public class MLSyncUpCron implements Runnable {
 
     @Override
     public void run() {
-        log.debug("ML sync job starts");
+        log.info("ylwu --- ML sync job starts");
         DiscoveryNode[] allNodes = nodeFilter.getAllNodes();
         MLSyncUpInput syncUpInput = MLSyncUpInput.builder().getLoadedModels(true).build();
         MLSyncUpNodesRequest syncUpRequest = new MLSyncUpNodesRequest(allNodes, syncUpInput);
