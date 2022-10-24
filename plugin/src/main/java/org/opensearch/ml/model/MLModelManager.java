@@ -164,8 +164,8 @@ public class MLModelManager {
      * @param mlTask      ML task
      */
     public void uploadMLModel(MLUploadInput uploadInput, MLTask mlTask) {
-        DiscoveryNode node = clusterService.localNode();
-        log.info("ylwudebug100 --- start uploading model on {} {}", node.getId(), node.getName());
+        // DiscoveryNode node = clusterService.localNode();
+        // log.info("ylwudebug100 --- start uploading model on {} {}", node.getId(), node.getName());
         mlStats.getStat(MLNodeLevelStat.ML_NODE_TOTAL_REQUEST_COUNT).increment();
         String errorMsg = checkAndAddRunningTask(mlTask, maxUploadTasksPerNode);
         if (errorMsg != null) {

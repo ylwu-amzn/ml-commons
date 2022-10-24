@@ -388,8 +388,8 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin {
             settings,
             TASK_THREAD_POOL,
             // 2,
-            Math.max(1, OpenSearchExecutors.allocatedProcessors(settings) - 1),
-            2,
+            Math.max(2, OpenSearchExecutors.allocatedProcessors(settings) - 1),
+            10,
             ML_THREAD_POOL_PREFIX + TASK_THREAD_POOL,
             false
         );
@@ -397,7 +397,7 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin {
             settings,
             UPLOAD_TASK_THREAD_POOL,
             // 2,
-            Math.max(2, OpenSearchExecutors.allocatedProcessors(settings) - 1),
+            Math.max(4, OpenSearchExecutors.allocatedProcessors(settings) - 1),
             10,
             ML_THREAD_POOL_PREFIX + UPLOAD_TASK_THREAD_POOL,
             false
@@ -406,7 +406,7 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin {
             settings,
             LOAD_TASK_THREAD_POOL,
             // 2,
-            Math.max(2, OpenSearchExecutors.allocatedProcessors(settings) - 1),
+            Math.max(4, OpenSearchExecutors.allocatedProcessors(settings) - 1),
             10,
             ML_THREAD_POOL_PREFIX + LOAD_TASK_THREAD_POOL,
             false

@@ -5,7 +5,6 @@
 
 package org.opensearch.ml.action.upload;
 
-import java.net.URISyntaxException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -27,7 +26,7 @@ import org.opensearch.ml.common.output.model.ModelTensorOutput;
 import org.opensearch.ml.common.transport.MLTaskResponse;
 import org.opensearch.test.OpenSearchIntegTestCase;
 
-@OpenSearchIntegTestCase.ClusterScope(scope = OpenSearchIntegTestCase.Scope.SUITE, numDataNodes = 2)
+@OpenSearchIntegTestCase.ClusterScope(scope = OpenSearchIntegTestCase.Scope.SUITE, numDataNodes = 1)
 public class CustomModelITTests extends MLCommonsIntegTestCase {
 
     @Before
@@ -35,7 +34,7 @@ public class CustomModelITTests extends MLCommonsIntegTestCase {
         super.setUp();
     }
 
-    public void testCustomModelWorkflow() throws InterruptedException, URISyntaxException {
+    public void testCustomModelWorkflow() throws InterruptedException {
         FunctionName functionName = FunctionName.TEXT_EMBEDDING;
         String modelName = "test_model";
         String version = "1.0.0";
@@ -90,8 +89,6 @@ public class CustomModelITTests extends MLCommonsIntegTestCase {
             AtomicBoolean modelChunksReady = new AtomicBoolean(false);
             if (response != null) {
                 long totalHits = response.getHits().getTotalHits().value;
-                System.out.println("777777777777777777777777777777777777777777777777777777");
-                System.out.println(totalHits);
                 if (totalHits == 9) {
                     modelChunksReady.set(true);
                 }
