@@ -66,6 +66,9 @@ import org.opensearch.ml.common.transport.task.MLTaskGetResponse;
 import org.opensearch.ml.common.transport.training.MLTrainingTaskAction;
 import org.opensearch.ml.common.transport.training.MLTrainingTaskRequest;
 import org.opensearch.ml.common.transport.trainpredict.MLTrainAndPredictionTaskAction;
+import org.opensearch.ml.common.transport.unload.MLUnloadModelAction;
+import org.opensearch.ml.common.transport.unload.UnloadModelNodesRequest;
+import org.opensearch.ml.common.transport.unload.UnloadModelNodesResponse;
 import org.opensearch.ml.common.transport.upload.MLUploadInput;
 import org.opensearch.ml.common.transport.upload.MLUploadModelAction;
 import org.opensearch.ml.common.transport.upload.MLUploadModelRequest;
@@ -325,6 +328,13 @@ public class MLCommonsIntegTestCase extends OpenSearchIntegTestCase {
         ActionFuture<MLTaskResponse> predictionFuture = client().execute(MLPredictionTaskAction.INSTANCE, predictionRequest);
         MLTaskResponse predictionResponse = predictionFuture.actionGet();
         return predictionResponse;
+    }
+
+    public UnloadModelNodesResponse unload(String modelId) {
+        String[] allNodes = getAllNodes(clusterService());
+        UnloadModelNodesRequest unloadRequest = new UnloadModelNodesRequest(allNodes, new String[] { modelId });
+        UnloadModelNodesResponse response = client().execute(MLUnloadModelAction.INSTANCE, unloadRequest).actionGet();
+        return response;
     }
 
     public MLTask getTask(String taskId) {

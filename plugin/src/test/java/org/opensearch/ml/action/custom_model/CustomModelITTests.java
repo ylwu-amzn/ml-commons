@@ -3,10 +3,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package org.opensearch.ml.action.upload;
+package org.opensearch.ml.action.custom_model;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -24,6 +25,7 @@ import org.opensearch.ml.common.model.MLModelState;
 import org.opensearch.ml.common.model.TextEmbeddingModelConfig;
 import org.opensearch.ml.common.output.model.ModelTensorOutput;
 import org.opensearch.ml.common.transport.MLTaskResponse;
+import org.opensearch.ml.common.transport.unload.UnloadModelNodesResponse;
 import org.opensearch.test.OpenSearchIntegTestCase;
 
 @OpenSearchIntegTestCase.ClusterScope(scope = OpenSearchIntegTestCase.Scope.SUITE, numDataNodes = 1)
@@ -134,6 +136,7 @@ public class CustomModelITTests extends MLCommonsIntegTestCase {
         assertTrue(loaded.get());
         // assertFalse(notLoaded.get());
 
+        // Predict
         MLTaskResponse response = predict(
             modelId.get(),
             functionName,
@@ -144,5 +147,12 @@ public class CustomModelITTests extends MLCommonsIntegTestCase {
         assertEquals(1, output.getMlModelOutputs().size());
         assertEquals(1, output.getMlModelOutputs().get(0).getMlModelTensors().size());
         assertEquals(dimension, output.getMlModelOutputs().get(0).getMlModelTensors().get(0).getData().length);
+
+        // Unload
+        UnloadModelNodesResponse unloadModelResponse = unload(modelId.get());
+        assertEquals(1, unloadModelResponse.getNodes().size());
+        Map<String, String> unloadStatus = unloadModelResponse.getNodes().get(0).getModelUnloadStatus();
+        assertEquals(1, unloadStatus.size());
+        assertEquals("unloaded", unloadStatus.get(modelId.get()));
     }
 }
