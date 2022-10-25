@@ -31,6 +31,7 @@ public class RestMLCustomModelActionIT extends MLCommonsRestTestCase {
     }
 
     public void testUnloadModelAPI_Success() throws IOException, InterruptedException {
+        // upload model
         String taskId = uploadModel(TestHelper.toJsonString(uploadInput));
         waitForTask(taskId, MLTaskState.COMPLETED);
         getTask(client(), taskId, response -> {
@@ -40,8 +41,9 @@ public class RestMLCustomModelActionIT extends MLCommonsRestTestCase {
             assertEquals(MLTaskState.COMPLETED.name(), response.get(STATE_FIELD));
             String modelId = (String) response.get(MODEL_ID_FIELD);
             try {
+                // load model
                 String loadTaskId = loadModel(modelId);
-                waitForTask(taskId, MLTaskState.COMPLETED);
+                waitForTask(loadTaskId, MLTaskState.COMPLETED);
                 getTask(client(), loadTaskId, loadTaskResponse -> {
                     assertEquals(modelId, loadTaskResponse.get(MODEL_ID_FIELD));
                     assertEquals(MLTaskState.COMPLETED.name(), response.get(STATE_FIELD));

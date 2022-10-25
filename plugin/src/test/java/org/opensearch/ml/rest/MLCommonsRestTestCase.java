@@ -623,6 +623,7 @@ public abstract class MLCommonsRestTestCase extends OpenSearchRestTestCase {
         HttpEntity entity = response.getEntity();
         assertNotNull(response);
         String entityString = TestHelper.httpEntityToString(entity);
+        System.out.println(entityString);
         return gson.fromJson(entityString, Map.class);
     }
 
