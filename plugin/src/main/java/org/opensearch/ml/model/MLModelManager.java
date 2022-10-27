@@ -175,104 +175,10 @@ public class MLModelManager {
         mlStats.getStat(MLNodeLevelStat.ML_NODE_EXECUTING_TASK_COUNT).increment();
         try {
             mlStats.createCounterStatIfAbsent(mlTask.getFunctionName(), UPLOAD, ML_ACTION_REQUEST_COUNT).increment();
-            String taskId = mlTask.getTaskId();
-
-            try (ThreadContext.StoredContext context = client.threadPool().getThreadContext().stashContext()) {
-                String modelName = uploadInput.getModelName();
-                String version = uploadInput.getVersion();
-                mlIndicesHandler.initModelIndexIfAbsent(ActionListener.wrap(res -> {
-                    MLModel mlModelMeta = MLModel
-                        .builder()
-                        .name(modelName)
-                        .algorithm(mlTask.getFunctionName())
-                        .version(version)
-                        .modelFormat(uploadInput.getModelFormat())
-                        .modelState(MLModelState.UPLOADING)
-                        .modelConfig(uploadInput.getModelConfig())
-                        .createdTime(Instant.now())
-                        .build();
-                    IndexRequest indexModelMetaRequest = new IndexRequest(ML_MODEL_INDEX);
-                    indexModelMetaRequest.source(mlModelMeta.toXContent(XContentBuilder.builder(JSON.xContent()), EMPTY_PARAMS));
-                    indexModelMetaRequest.setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE);
-                    // create model meta doc
-                    ActionListener<IndexResponse> listener = ActionListener.wrap(modelMetaRes -> {
-                        String modelId = modelMetaRes.getId();
-                        mlTask.setModelId(modelId);
-                        log.info("create new model meta doc {} for upload task {}", modelId, taskId);
-                        modelHelper.downloadAndSplit(modelId, modelName, version, uploadInput.getUrl(), ActionListener.wrap(result -> {
-                            Long modelSizeInBytes = (Long) result.get(MODEL_SIZE_IN_BYTES);
-                            if (modelSizeInBytes / 1024 / 1024 / 1024 >= 4L) {
-                                throw new MLException("Failed to save oversize model");
-                            }
-                            List<String> chunkFiles = (List<String>) result.get(CHUNK_FILES);
-                            String hashValue = (String) result.get(MODEL_FILE_HASH);
-                            Semaphore semaphore = new Semaphore(1);
-                            AtomicInteger uploaded = new AtomicInteger(0);
-                            AtomicBoolean failedToUploadChunk = new AtomicBoolean(false);
-                            // upload chunks
-                            for (String name : chunkFiles) {
-                                if (failedToUploadChunk.get()) {
-                                    throw new MLException("Failed to save model chunk");
-                                }
-                                semaphore.tryAcquire(10, TimeUnit.SECONDS);
-                                File file = new File(name);
-                                byte[] bytes = Files.toByteArray(file);
-                                int chunkNum = Integer.parseInt(file.getName());
-                                MLModel mlModel = MLModel
-                                    .builder()
-                                    .modelId(modelId)
-                                    .name(modelName)
-                                    .algorithm(mlTask.getFunctionName())
-                                    .version(version)
-                                    .modelFormat(uploadInput.getModelFormat())
-                                    .chunkNumber(chunkNum)
-                                    .totalChunks(chunkFiles.size())
-                                    .content(Base64.getEncoder().encodeToString(bytes))
-                                    .createdTime(Instant.now())
-                                    .build();
-                                IndexRequest indexRequest = new IndexRequest(ML_MODEL_INDEX);
-                                String chunkId = getModelChunkId(modelId, chunkNum);
-                                indexRequest.id(chunkId);
-                                indexRequest.source(mlModel.toXContent(XContentBuilder.builder(JSON.xContent()), EMPTY_PARAMS));
-                                indexRequest.setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE);
-                                client.index(indexRequest, ActionListener.wrap(r -> {
-                                    uploaded.getAndIncrement();
-                                    if (uploaded.get() == chunkFiles.size()) {
-                                        updateModelUploadStateAsDone(uploadInput, taskId, modelId, modelSizeInBytes, chunkFiles, hashValue);
-                                    } else {
-                                        file.delete();
-                                    }
-                                    semaphore.release();
-                                }, e -> {
-                                    log.error("Failed to index model chunk " + chunkId, e);
-                                    failedToUploadChunk.set(true);
-                                    handleException(taskId, e);
-                                    file.delete();
-                                    // remove model doc as failed to upload model
-                                    deleteModel(modelId);
-                                    semaphore.release();
-                                    deleteFileQuietly(getUploadModelPath(modelId));
-                                }));
-                            }
-                        }, e -> {
-                            log.error("Failed to index chunk file", e);
-                            deleteFileQuietly(getUploadModelPath(modelId));
-                            deleteModel(modelId);
-                            handleException(taskId, e);
-                        }));
-                    }, e -> {
-                        log.error("Failed to index model meta doc", e);
-                        handleException(taskId, e);
-                    });
-
-                    client.index(indexModelMetaRequest, threadedActionListener(UPLOAD_THREAD_POOL, listener));
-                }, e -> {
-                    log.error("Failed to init model index", e);
-                    handleException(taskId, e);
-                }));
-            } catch (Exception e) {
-                log.error("Failed to upload model", e);
-                handleException(taskId, e);
+            if (uploadInput.getUrl() != null) {
+                uploadModelFromUrl(uploadInput, mlTask);
+            } else {
+                uploadPrebuiltModel(uploadInput, mlTask);
             }
         } catch (Exception e) {
             mlStats.createCounterStatIfAbsent(mlTask.getFunctionName(), UPLOAD, MLActionLevelStat.ML_ACTION_FAILURE_COUNT).increment();
@@ -280,6 +186,123 @@ public class MLModelManager {
         } finally {
             mlStats.getStat(MLNodeLevelStat.ML_NODE_EXECUTING_TASK_COUNT).increment();
         }
+    }
+
+    private void uploadModelFromUrl(MLUploadInput uploadInput, MLTask mlTask) {
+        String taskId = mlTask.getTaskId();
+
+        try (ThreadContext.StoredContext context = client.threadPool().getThreadContext().stashContext()) {
+            String modelName = uploadInput.getModelName();
+            String version = uploadInput.getVersion();
+            mlIndicesHandler.initModelIndexIfAbsent(ActionListener.wrap(res -> {
+                MLModel mlModelMeta = MLModel
+                    .builder()
+                    .name(modelName)
+                    .algorithm(mlTask.getFunctionName())
+                    .version(version)
+                    .modelFormat(uploadInput.getModelFormat())
+                    .modelState(MLModelState.UPLOADING)
+                    .modelConfig(uploadInput.getModelConfig())
+                    .createdTime(Instant.now())
+                    .build();
+                IndexRequest indexModelMetaRequest = new IndexRequest(ML_MODEL_INDEX);
+                indexModelMetaRequest.source(mlModelMeta.toXContent(XContentBuilder.builder(JSON.xContent()), EMPTY_PARAMS));
+                indexModelMetaRequest.setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE);
+                // create model meta doc
+                ActionListener<IndexResponse> listener = ActionListener.wrap(modelMetaRes -> {
+                    String modelId = modelMetaRes.getId();
+                    mlTask.setModelId(modelId);
+                    log.info("create new model meta doc {} for upload task {}", modelId, taskId);
+                    modelHelper.downloadAndSplit(modelId, modelName, version, uploadInput.getUrl(), ActionListener.wrap(result -> {
+                        Long modelSizeInBytes = (Long) result.get(MODEL_SIZE_IN_BYTES);
+                        if (modelSizeInBytes / 1024 / 1024 / 1024 >= 4L) {
+                            throw new MLException("Failed to save oversize model");
+                        }
+                        List<String> chunkFiles = (List<String>) result.get(CHUNK_FILES);
+                        String hashValue = (String) result.get(MODEL_FILE_HASH);
+                        Semaphore semaphore = new Semaphore(1);
+                        AtomicInteger uploaded = new AtomicInteger(0);
+                        AtomicBoolean failedToUploadChunk = new AtomicBoolean(false);
+                        // upload chunks
+                        for (String name : chunkFiles) {
+                            if (failedToUploadChunk.get()) {
+                                throw new MLException("Failed to save model chunk");
+                            }
+                            semaphore.tryAcquire(10, TimeUnit.SECONDS);
+                            File file = new File(name);
+                            byte[] bytes = Files.toByteArray(file);
+                            int chunkNum = Integer.parseInt(file.getName());
+                            MLModel mlModel = MLModel
+                                .builder()
+                                .modelId(modelId)
+                                .name(modelName)
+                                .algorithm(mlTask.getFunctionName())
+                                .version(version)
+                                .modelFormat(uploadInput.getModelFormat())
+                                .chunkNumber(chunkNum)
+                                .totalChunks(chunkFiles.size())
+                                .content(Base64.getEncoder().encodeToString(bytes))
+                                .createdTime(Instant.now())
+                                .build();
+                            IndexRequest indexRequest = new IndexRequest(ML_MODEL_INDEX);
+                            String chunkId = getModelChunkId(modelId, chunkNum);
+                            indexRequest.id(chunkId);
+                            indexRequest.source(mlModel.toXContent(XContentBuilder.builder(JSON.xContent()), EMPTY_PARAMS));
+                            indexRequest.setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE);
+                            client.index(indexRequest, ActionListener.wrap(r -> {
+                                uploaded.getAndIncrement();
+                                if (uploaded.get() == chunkFiles.size()) {
+                                    updateModelUploadStateAsDone(uploadInput, taskId, modelId, modelSizeInBytes, chunkFiles, hashValue);
+                                } else {
+                                    file.delete();
+                                }
+                                semaphore.release();
+                            }, e -> {
+                                log.error("Failed to index model chunk " + chunkId, e);
+                                failedToUploadChunk.set(true);
+                                handleException(taskId, e);
+                                file.delete();
+                                // remove model doc as failed to upload model
+                                deleteModel(modelId);
+                                semaphore.release();
+                                deleteFileQuietly(getUploadModelPath(modelId));
+                            }));
+                        }
+                    }, e -> {
+                        log.error("Failed to index chunk file", e);
+                        deleteFileQuietly(getUploadModelPath(modelId));
+                        deleteModel(modelId);
+                        handleException(taskId, e);
+                    }));
+                }, e -> {
+                    log.error("Failed to index model meta doc", e);
+                    handleException(taskId, e);
+                });
+
+                client.index(indexModelMetaRequest, threadedActionListener(UPLOAD_THREAD_POOL, listener));
+            }, e -> {
+                log.error("Failed to init model index", e);
+                handleException(taskId, e);
+            }));
+        } catch (Exception e) {
+            log.error("Failed to upload model", e);
+            handleException(taskId, e);
+        }
+    }
+
+    private void uploadPrebuiltModel(MLUploadInput uploadInput, MLTask mlTask) {
+        String modelName = uploadInput.getModelName();
+        String taskId = mlTask.getTaskId();
+        String version = uploadInput.getVersion();
+        boolean loadModel = uploadInput.isLoadModel();
+        // mlTaskManager.add(mlTask);
+        modelHelper.downloadPrebuiltModelConfig(taskId, uploadInput, ActionListener.wrap(mlUploadInput -> {
+            //mlTaskManager.remove(taskId);
+            uploadModelFromUrl(mlUploadInput, mlTask);
+        }, e -> {
+            log.error("Failed to upload pre built model", e);
+            handleException(taskId, e);
+        }));
     }
 
     private <T> ThreadedActionListener<T> threadedActionListener(String threadPoolName, ActionListener<T> listener) {
@@ -326,6 +349,7 @@ public class MLModelManager {
                 MLModel.MODEL_CONTENT_SIZE_IN_BYTES_FIELD,
                 modelSizeInBytes
             );
+        log.info("Model uploaded successfully, model id: {}, task id: {}", modelId, taskId);
         updateModel(modelId, updatedFields, ActionListener.wrap(updateResponse -> {
             mlTaskManager.updateMLTask(taskId, ImmutableMap.of(STATE_FIELD, COMPLETED, MODEL_ID_FIELD, modelId), TIMEOUT_IN_MILLIS, true);
             if (uploadInput.isLoadModel()) {

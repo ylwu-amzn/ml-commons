@@ -7,12 +7,19 @@ package org.opensearch.ml.engine;
 
 import ai.djl.training.util.DownloadUtils;
 import ai.djl.training.util.ProgressBar;
+import com.google.gson.Gson;
+import com.google.gson.stream.JsonReader;
 import lombok.NoArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.apache.commons.io.FileUtils;
 import org.opensearch.action.ActionListener;
+import org.opensearch.ml.common.model.MLModelConfig;
+import org.opensearch.ml.common.model.MLModelFormat;
+import org.opensearch.ml.common.model.TextEmbeddingModelConfig;
+import org.opensearch.ml.common.transport.upload.MLUploadInput;
 
 import java.io.File;
+import java.io.FileReader;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.security.AccessController;
@@ -24,6 +31,8 @@ import java.util.Map;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
+import static org.opensearch.ml.engine.MLEngine.getLocalPrebuiltModelConfigPath;
+import static org.opensearch.ml.engine.MLEngine.getLocalPrebuiltModelPath;
 import static org.opensearch.ml.engine.MLEngine.getModelCachePath;
 import static org.opensearch.ml.engine.MLEngine.getLoadModelPath;
 import static org.opensearch.ml.engine.MLEngine.getUploadModelPath;
@@ -31,7 +40,6 @@ import static org.opensearch.ml.engine.utils.FileUtils.calculateFileHash;
 import static org.opensearch.ml.engine.utils.FileUtils.deleteFileQuietly;
 import static org.opensearch.ml.engine.utils.FileUtils.splitFileIntoChunks;
 
-@NoArgsConstructor
 @Log4j2
 public class ModelHelper {
     public static final String CHUNK_FILES = "chunk_files";
@@ -43,6 +51,84 @@ public class ModelHelper {
     public static final String TOKENIZER_FILE_NAME = "tokenizer.json";
     public static final String PYTORCH_ENGINE = "PyTorch";
     public static final String ONNX_ENGINE = "OnnxRuntime";
+
+    private Gson gson;
+    public ModelHelper() {
+        gson = new Gson();
+    }
+
+    public void downloadPrebuiltModelConfig(String taskId, MLUploadInput uploadInput, ActionListener<MLUploadInput> listener) {
+        String modelName = uploadInput.getModelName();
+        String version = uploadInput.getVersion();
+        boolean loadModel = uploadInput.isLoadModel();
+        String[] modelNodeIds = uploadInput.getModelNodeIds();
+        try {
+            AccessController.doPrivileged((PrivilegedExceptionAction<Void>) () -> {
+
+                Path modelUploadPath = getUploadModelPath(taskId, modelName, version);
+                String configCacheFilePath = modelUploadPath.resolve("config.json").toString();
+
+                String localConfigFile = getLocalPrebuiltModelConfigPath(modelName, version).toString();
+                String configFileUrl = "file://" + localConfigFile;
+                String modelZipFileUrl = "file://" + getLocalPrebuiltModelPath(modelName, version);
+                DownloadUtils.download(configFileUrl, configCacheFilePath, new ProgressBar());
+
+
+                Map<?, ?> config = null;
+                try (JsonReader reader = new JsonReader(new FileReader(localConfigFile))) {
+                    config = gson.fromJson(reader, Map.class);
+                }
+
+                if (config == null) {
+                    listener.onFailure(new IllegalArgumentException("model config not found"));
+                    return null;
+                }
+
+                MLUploadInput.MLUploadInputBuilder builder = MLUploadInput.builder();
+
+                builder.modelName(modelName).version(version).url(modelZipFileUrl).loadModel(loadModel).modelNodeIds(modelNodeIds);
+                config.entrySet().forEach(entry -> {
+                    switch (entry.getKey().toString()) {
+                        case MLUploadInput.MODEL_FORMAT_FIELD:
+                            builder.modelFormat(MLModelFormat.from(entry.getValue().toString()));
+                            break;
+                        case MLUploadInput.MODEL_CONFIG_FIELD:
+                            TextEmbeddingModelConfig.TextEmbeddingModelConfigBuilder configBuilder = TextEmbeddingModelConfig.builder();
+                            Map<?, ?> configMap = (Map<?, ?>) entry.getValue();
+                            for (Map.Entry<?, ?> configEntry : configMap.entrySet()) {
+                                switch (configEntry.getKey().toString()) {
+                                    case MLModelConfig.MODEL_TYPE_FIELD:
+                                        configBuilder.modelType(configEntry.getValue().toString());
+                                        break;
+                                    case MLModelConfig.ALL_CONFIG_FIELD:
+                                        configBuilder.allConfig(configEntry.getValue().toString());
+                                        break;
+                                    case TextEmbeddingModelConfig.EMBEDDING_DIMENSION_FIELD:
+                                        configBuilder.embeddingDimension(((Double)configEntry.getValue()).intValue());
+                                        break;
+                                    case TextEmbeddingModelConfig.FRAMEWORK_TYPE_FIELD:
+                                        configBuilder.frameworkType(TextEmbeddingModelConfig.FrameworkType.from(configEntry.getValue().toString()));
+                                        break;
+                                    default:
+                                        break;
+                                }
+                            }
+                            builder.modelConfig(configBuilder.build());
+                            break;
+                        default:
+                            break;
+                    }
+                });
+                MLUploadInput mlUploadInput = builder.build();
+                listener.onResponse(mlUploadInput);
+                return null;
+            });
+        } catch (Exception e) {
+            listener.onFailure(e);
+        } finally {
+            deleteFileQuietly(getUploadModelPath(taskId));
+        }
+    }
 
     /**
      * Download model from URL and split it into smaller chunks.
