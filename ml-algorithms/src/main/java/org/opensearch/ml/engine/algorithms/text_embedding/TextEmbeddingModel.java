@@ -144,8 +144,8 @@ public class TextEmbeddingModel implements Predictable {
                     // DJL will read "/usr/java/packages/lib" if don't set "java.library.path". That will throw
                     // access denied exception
                     System.setProperty("java.library.path", mlEngine.getDjlCachePath().toAbsolutePath().toString());
-                    System.setProperty("ai.djl.pytorch.num_interop_threads", "1");
-                    System.setProperty("ai.djl.pytorch.num_threads", "1");
+                    System.setProperty("ai.djl.pytorch.num_interop_threads", "1");// comment out this one not help on latency
+//                    System.setProperty("ai.djl.pytorch.num_threads", "1");// Number of inter-op threads is 1, Number of intra-op threads is 8, can help reduce latency
                     Thread.currentThread().setContextClassLoader(ai.djl.Model.class.getClassLoader());
                     Path modelPath = mlEngine.getModelCachePath(modelId, modelName, version);
                     File pathFile = new File(modelPath.toUri());

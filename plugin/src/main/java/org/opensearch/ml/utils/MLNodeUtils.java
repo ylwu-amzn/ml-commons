@@ -14,6 +14,7 @@ import java.util.function.Function;
 
 import lombok.experimental.UtilityClass;
 
+import lombok.extern.log4j.Log4j2;
 import org.opensearch.cluster.node.DiscoveryNode;
 import org.opensearch.common.bytes.BytesReference;
 import org.opensearch.common.xcontent.*;
@@ -22,6 +23,7 @@ import org.opensearch.ml.common.exception.MLLimitExceededException;
 import org.opensearch.ml.stats.MLNodeLevelStat;
 import org.opensearch.ml.stats.MLStats;
 
+@Log4j2
 @UtilityClass
 public class MLNodeUtils {
     public boolean isMLNode(DiscoveryNode node) {
@@ -52,7 +54,11 @@ public class MLNodeUtils {
     }
 
     public static void checkOpenCircuitBreaker(MLCircuitBreakerService mlCircuitBreakerService, MLStats mlStats) {
+        long startTime = System.nanoTime();
         String openCircuitBreaker = mlCircuitBreakerService.checkOpenCB();
+        long endTime = System.nanoTime();
+        double durationInMs = (endTime - startTime) / 1e6;
+        log.info("circuit breaker check time: {}", durationInMs);
         if (openCircuitBreaker != null) {
             mlStats.getStat(MLNodeLevelStat.ML_NODE_TOTAL_CIRCUIT_BREAKER_TRIGGER_COUNT).increment();
             throw new MLLimitExceededException(openCircuitBreaker + " is open, please check your resources!");

@@ -695,6 +695,7 @@ public class MLModelManager {
         long end = System.nanoTime();
         double durationInMs = (end - start) / 1e6;
         modelCacheHelper.addModelInferenceDuration(modelId, durationInMs);
+        log.info("predict time: {}", durationInMs);
         return t;
     }
 

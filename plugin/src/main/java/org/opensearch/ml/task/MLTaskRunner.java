@@ -87,7 +87,11 @@ public abstract class MLTaskRunner<Request extends MLTaskRequest, Response exten
         checkOpenCircuitBreaker(mlCircuitBreakerService, mlStats);
         if (!request.isDispatchTask()) {
             log.info("Run ML request {} locally", request.getRequestID());
+            long startTime = System.nanoTime();
             executeTask(request, listener);
+            long endTime = System.nanoTime();
+            double durationInMs = (endTime - startTime) / 1e6;
+            log.info("execute task time: {}", durationInMs);
             return;
         }
         dispatchTask(request, transportService, listener);
@@ -102,7 +106,11 @@ public abstract class MLTaskRunner<Request extends MLTaskRequest, Response exten
     }
 
     public void dispatchTask(Request request, TransportService transportService, ActionListener<Response> listener) {
+        long startTime = System.nanoTime();
         mlTaskDispatcher.dispatch(ActionListener.wrap(node -> {
+            long endTime = System.nanoTime();
+            double durationInMs = (endTime - startTime) / 1e6;
+            log.info("dispatch task time: {}", durationInMs);
             String nodeId = node.getId();
             if (clusterService.localNode().getId().equals(nodeId)) {
                 // Execute ML task locally

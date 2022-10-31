@@ -48,13 +48,13 @@ public class TransportPredictionTaskAction extends HandledTransportAction<Action
         MLPredictionTaskRequest mlPredictionTaskRequest = MLPredictionTaskRequest.fromActionRequest(request);
         String modelId = mlPredictionTaskRequest.getModelId();
         String requestId = mlPredictionTaskRequest.getRequestID();
-        log.debug("receive predict request " + requestId + " for model " + mlPredictionTaskRequest.getModelId());
+        log.debug("receive predict request {} for model {}", requestId, modelId);
         long startTime = System.nanoTime();
         mlPredictTaskRunner.run(mlPredictionTaskRequest, transportService, ActionListener.runAfter(listener, () -> {
             long endTime = System.nanoTime();
             double durationInMs = (endTime - startTime) / 1e6;
             modelCacheHelper.addPredictRequestDuration(modelId, durationInMs);
-            log.debug("completed predict request " + requestId + " for model " + modelId);
+            log.debug("completed predict request {} for model {}, duration: {}", requestId, modelId, durationInMs);
         }));
     }
 }
