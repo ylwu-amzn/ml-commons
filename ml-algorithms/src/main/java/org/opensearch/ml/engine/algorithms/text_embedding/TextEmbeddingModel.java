@@ -21,6 +21,7 @@ import org.opensearch.ml.common.MLModel;
 import org.opensearch.ml.common.dataset.MLInputDataset;
 import org.opensearch.ml.common.dataset.TextDocsInputDataSet;
 import org.opensearch.ml.common.exception.MLException;
+import org.opensearch.ml.common.exception.MLResourceNotFoundException;
 import org.opensearch.ml.common.input.MLInput;
 import org.opensearch.ml.common.model.MLModelConfig;
 import org.opensearch.ml.common.model.MLModelFormat;
@@ -33,7 +34,6 @@ import org.opensearch.ml.engine.MLEngine;
 import org.opensearch.ml.engine.ModelHelper;
 import org.opensearch.ml.engine.Predictable;
 import org.opensearch.ml.engine.annotation.Function;
-import org.opensearch.ml.engine.utils.RoundRobinLoadBalancer;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -45,6 +45,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.opensearch.ml.common.model.TextEmbeddingModelConfig.FrameworkType.SENTENCE_TRANSFORMERS;
 import static org.opensearch.ml.engine.ModelHelper.ONNX_FILE_EXTENSION;
@@ -69,7 +70,7 @@ public class TextEmbeddingModel implements Predictable {
     private Predictor<Input, Output>[] predictors;
     private ZooModel[] models;
     private Device[] devices;
-    private RoundRobinLoadBalancer roundRobinLoadBalancer;
+    private AtomicInteger nextDevice = new AtomicInteger(-1);
 
     @Override
     public MLOutput predict(MLInput mlInput, MLModel model) {
@@ -217,7 +218,6 @@ public class TextEmbeddingModel implements Predictable {
                         this.models = modelList.toArray(new ZooModel[0]);
                         modelList.clear();
                     }
-                    roundRobinLoadBalancer = new RoundRobinLoadBalancer(this.predictors.length);
                     log.info("Load model {} successfully on {} devices", modelId, devices.length);
                     return null;
                 } catch (Exception e) {
@@ -263,10 +263,15 @@ public class TextEmbeddingModel implements Predictable {
         try {
             return AccessController.doPrivileged((PrivilegedExceptionAction<ModelTensorOutput>) () -> {
                 Thread.currentThread().setContextClassLoader(getClass().getClassLoader());
+                int currentDevice = nextDevice.incrementAndGet();
+                if (currentDevice > devices.length - 1) {
+                    int recalculatedCurrentDevice = currentDevice % devices.length;
+//                    nextDevice.set(currentDevice + 1);
+                    nextDevice.compareAndSet(currentDevice, recalculatedCurrentDevice % devices.length);
+                }
                 if (predictors == null) {
                     throw new MLException("model not loaded.");
                 }
-                int currentDevice = roundRobinLoadBalancer.getNext();
                 List<ModelTensors> tensorOutputs = new ArrayList<>();
                 Output output;
                 TextDocsInputDataSet textDocsInput = (TextDocsInputDataSet) inputDataSet;
