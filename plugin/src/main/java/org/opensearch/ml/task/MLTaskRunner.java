@@ -86,7 +86,7 @@ public abstract class MLTaskRunner<Request extends MLTaskRequest, Response exten
     public void run(Request request, TransportService transportService, ActionListener<Response> listener) {
         checkOpenCircuitBreaker(mlCircuitBreakerService, mlStats);
         if (!request.isDispatchTask()) {
-            log.info("Run ML request {} locally", request.getRequestID());
+            log.debug("Run ML request {} locally", request.getRequestID());
             executeTask(request, listener);
             return;
         }

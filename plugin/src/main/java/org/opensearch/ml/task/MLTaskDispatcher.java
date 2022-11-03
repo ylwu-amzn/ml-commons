@@ -25,6 +25,7 @@ import org.opensearch.ml.action.stats.MLStatsNodeResponse;
 import org.opensearch.ml.action.stats.MLStatsNodesAction;
 import org.opensearch.ml.action.stats.MLStatsNodesRequest;
 import org.opensearch.ml.cluster.DiscoveryNodeHelper;
+import org.opensearch.ml.engine.utils.RoundRobinLoadBalancer;
 import org.opensearch.ml.stats.MLNodeLevelStat;
 
 import com.google.common.collect.ImmutableSet;
@@ -45,6 +46,7 @@ public class MLTaskDispatcher {
     private volatile Integer maxMLBatchTaskPerNode;
     private volatile String dispatchPolicy;
     private DiscoveryNodeHelper nodeHelper;
+    private RoundRobinLoadBalancer roundRobinLoadBalancer;
 
     public MLTaskDispatcher(ClusterService clusterService, Client client, Settings settings, DiscoveryNodeHelper nodeHelper) {
         this.clusterService = clusterService;
@@ -92,6 +94,7 @@ public class MLTaskDispatcher {
             currentNode = 0;
             nextNode.set(currentNode + 1);
         }
+
         listener.onResponse(nodes[currentNode]);
     }
 
