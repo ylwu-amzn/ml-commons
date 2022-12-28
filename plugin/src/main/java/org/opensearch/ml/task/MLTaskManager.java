@@ -42,7 +42,7 @@ import org.opensearch.ml.common.MLTask;
 import org.opensearch.ml.common.MLTaskState;
 import org.opensearch.ml.common.MLTaskType;
 import org.opensearch.ml.common.exception.MLException;
-import org.opensearch.ml.common.exception.MLResourceNotFoundException;
+import org.opensearch.ml.common.exception.MLLimitExceededException;
 import org.opensearch.ml.indices.MLIndicesHandler;
 import org.opensearch.rest.RestStatus;
 import org.opensearch.threadpool.ThreadPool;
@@ -75,25 +75,25 @@ public class MLTaskManager {
         runningTasksCount = new ConcurrentHashMap<>();
     }
 
-    public synchronized String checkLimitAndAddRunningTask(MLTask mlTask, Integer limit) {
+    public synchronized void checkLimitAndAddRunningTask(MLTask mlTask, Integer limit) {
         AtomicInteger runningTaskCount = runningTasksCount.computeIfAbsent(mlTask.getTaskType(), it -> new AtomicInteger(0));
         if (runningTaskCount.get() < 0) {
             runningTaskCount.set(0);
         }
         log.debug("Task id: {}, current running task {}: {}", mlTask.getTaskId(), mlTask.getTaskType(), runningTaskCount.get());
+        if (runningTaskCount.get() >= limit) {
+            String error = "exceed max running task limit";
+            log.warn(error + " for task " + mlTask.getTaskId());
+            throw new MLLimitExceededException(error);
+        }
         if (contains(mlTask.getTaskId())) {
+            // Move coordinating task state from CREATED to RUNNING
             getMLTask(mlTask.getTaskId()).setState(MLTaskState.RUNNING);
         } else {
-            if (runningTaskCount.get() >= limit) {
-                String error = "exceed max running task limit";
-                log.info(error + " for task " + mlTask.getTaskId());
-                return error;
-            }
             mlTask.setState(MLTaskState.RUNNING);
             add(mlTask);
-            runningTaskCount.incrementAndGet();
         }
-        return null;
+        runningTaskCount.incrementAndGet();
     }
 
     /**
@@ -293,7 +293,7 @@ public class MLTaskManager {
             remove(taskId);
         }
         if (taskCache == null) {
-            listener.onFailure(new MLResourceNotFoundException("Can't find task"));
+            updateMLTaskDirectly(taskId, updatedFields, listener);
             return;
         }
         threadPool.executor(GENERAL_THREAD_POOL).execute(() -> {

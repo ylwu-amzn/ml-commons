@@ -99,9 +99,12 @@ public class TransportUploadModelAction extends HandledTransportAction<ActionReq
         MLUploadModelRequest uploadModelRequest = MLUploadModelRequest.fromActionRequest(request);
         MLUploadInput mlUploadInput = uploadModelRequest.getMlUploadInput();
         Pattern pattern = Pattern.compile(trustedUrlRegex);
-        boolean validUrl = pattern.matcher(mlUploadInput.getUrl()).find();
-        if (!validUrl) {
-            throw new IllegalArgumentException("URL can't match trusted url regex");
+        String url = mlUploadInput.getUrl();
+        if (url != null) {
+            boolean validUrl = pattern.matcher(url).find();
+            if (!validUrl) {
+                throw new IllegalArgumentException("URL can't match trusted url regex");
+            }
         }
         // mlStats.getStat(MLNodeLevelStat.ML_NODE_EXECUTING_TASK_COUNT).increment();
         mlStats.getStat(MLNodeLevelStat.ML_NODE_TOTAL_REQUEST_COUNT).increment();
