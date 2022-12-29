@@ -6,6 +6,7 @@
 package org.opensearch.ml.action.load;
 
 import static org.opensearch.ml.task.MLTaskManager.TASK_SEMAPHORE_TIMEOUT;
+import static org.opensearch.ml.utils.RestActionUtils.handleException;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -50,6 +51,7 @@ import org.opensearch.ml.engine.ModelHelper;
 import org.opensearch.ml.model.MLModelManager;
 import org.opensearch.ml.stats.MLStats;
 import org.opensearch.ml.task.MLTaskManager;
+import org.opensearch.ml.utils.MLExceptionUtils;
 import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.transport.TransportService;
 
@@ -146,7 +148,7 @@ public class TransportLoadModelOnNodeAction extends
         String localNodeId = clusterService.localNode().getId();
 
         ActionListener<MLForwardResponse> taskDoneListener = ActionListener
-            .wrap(res -> { log.info("load model done " + res); }, ex -> { log.error(ex); });
+            .wrap(res -> { log.info("load model task done " + taskId); }, ex -> { log.error(ex); });
 
         loadModel(modelId, modelContentHash, mlTask.getFunctionName(), localNodeId, coordinatingNodeId, mlTask, ActionListener.wrap(r -> {
             if (!coordinatingNodeId.equals(localNodeId)) {
@@ -170,22 +172,27 @@ public class TransportLoadModelOnNodeAction extends
                 );
         }, e -> {
             boolean removeTaskCache = !coordinatingNodeId.equals(localNodeId);// remove task cache on worker node
-            mlTaskManager
-                .updateMLTask(
-                    taskId,
-                    ImmutableMap.of(MLTask.ERROR_FIELD, ExceptionUtils.getStackTrace(e), MLTask.STATE_FIELD, MLTaskState.FAILED),
-                    TASK_SEMAPHORE_TIMEOUT,
-                    removeTaskCache
-                );
-            MLModelState state = mlTask.getFunctionName() == FunctionName.TEXT_EMBEDDING ? MLModelState.UPLOADED : MLModelState.TRAINED;
-            mlModelManager.updateModel(modelId, ImmutableMap.of(MLModel.MODEL_STATE_FIELD, state));
+            if (removeTaskCache) {
+                mlTaskManager.remove(taskId);
+            }
+//            mlTaskManager
+//                .updateMLTask(
+//                    taskId,
+//                    ImmutableMap.of(MLTask.ERROR_FIELD, ExceptionUtils.getRootCauseMessage(e), MLTask.STATE_FIELD, MLTaskState.FAILED),
+//                    TASK_SEMAPHORE_TIMEOUT,
+//                    removeTaskCache
+//                );
+
+
+            //MLModelState state = mlTask.getFunctionName() == FunctionName.TEXT_EMBEDDING ? MLModelState.UPLOADED : MLModelState.TRAINED;
+            //mlModelManager.updateModel(modelId, ImmutableMap.of(MLModel.MODEL_STATE_FIELD, state));
             MLForwardInput mlForwardInput = MLForwardInput
                 .builder()
                 .requestType(MLForwardRequestType.LOAD_MODEL_DONE)
                 .taskId(taskId)
                 .modelId(modelId)
                 .workerNodeId(clusterService.localNode().getId())
-                .error(ExceptionUtils.getStackTrace(e))
+                .error(MLExceptionUtils.getRootCauseMessage(e))
                 .build();
             MLForwardRequest loadModelDoneMessage = new MLForwardRequest(mlForwardInput);
 
@@ -226,8 +233,9 @@ public class TransportLoadModelOnNodeAction extends
             log.debug("start loading model {}", modelId);
             mlModelManager.loadModel(modelId, modelContentHash, functionName, mlTask, listener);
         } catch (Exception e) {
-            log.error("Failed to load model " + modelId, e);
-            listener.onFailure(e);
+//            log.error("Failed to load model " + modelId, e);
+//            listener.onFailure(e);
+            handleException(listener, e, "Failed to load model " + modelId);
         }
     }
 

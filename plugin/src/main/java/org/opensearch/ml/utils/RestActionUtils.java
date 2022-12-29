@@ -14,10 +14,13 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 
+import lombok.extern.log4j.Log4j2;
 import org.apache.commons.lang3.ArrayUtils;
+import org.opensearch.action.ActionListener;
 import org.opensearch.cluster.node.DiscoveryNode;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.Strings;
+import org.opensearch.ml.common.exception.MLLimitExceededException;
 import org.opensearch.rest.BytesRestResponse;
 import org.opensearch.rest.RestChannel;
 import org.opensearch.rest.RestRequest;
@@ -27,6 +30,7 @@ import org.opensearch.search.fetch.subphase.FetchSourceContext;
 
 import com.google.common.annotations.VisibleForTesting;
 
+@Log4j2
 public class RestActionUtils {
 
     public static final String PARAMETER_ALGORITHM = "algorithm";
@@ -156,5 +160,14 @@ public class RestActionUtils {
     @VisibleForTesting
     public static Optional<String[]> splitCommaSeparatedParam(RestRequest request, String paramName) {
         return Optional.ofNullable(request.param(paramName)).map(s -> s.split(","));
+    }
+
+    public static void handleException(ActionListener<?> listener, Exception e, String errorMessage) {
+        if (e instanceof MLLimitExceededException) {
+            log.warn(e.getMessage());
+        } else {
+            log.error(errorMessage, e);
+        }
+        listener.onFailure(e);
     }
 }

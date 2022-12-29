@@ -5,13 +5,20 @@
 
 package org.opensearch.ml.action.upload;
 
+import static org.opensearch.ml.common.MLTask.STATE_FIELD;
+import static org.opensearch.ml.common.MLTaskState.FAILED;
 import static org.opensearch.ml.settings.MLCommonsSettings.ML_COMMONS_TRUSTED_URL_REGEX;
+import static org.opensearch.ml.task.MLTaskManager.TASK_SEMAPHORE_TIMEOUT;
+import static org.opensearch.ml.utils.RestActionUtils.handleException;
 
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.regex.Pattern;
 
+import com.google.common.collect.ImmutableMap;
 import lombok.extern.log4j.Log4j2;
 
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.opensearch.action.ActionListener;
 import org.opensearch.action.ActionListenerResponseHandler;
 import org.opensearch.action.ActionRequest;
@@ -26,6 +33,7 @@ import org.opensearch.ml.cluster.DiscoveryNodeHelper;
 import org.opensearch.ml.common.MLTask;
 import org.opensearch.ml.common.MLTaskState;
 import org.opensearch.ml.common.MLTaskType;
+import org.opensearch.ml.common.exception.MLLimitExceededException;
 import org.opensearch.ml.common.transport.forward.MLForwardAction;
 import org.opensearch.ml.common.transport.forward.MLForwardInput;
 import org.opensearch.ml.common.transport.forward.MLForwardRequest;
@@ -42,6 +50,7 @@ import org.opensearch.ml.stats.MLNodeLevelStat;
 import org.opensearch.ml.stats.MLStats;
 import org.opensearch.ml.task.MLTaskDispatcher;
 import org.opensearch.ml.task.MLTaskManager;
+import org.opensearch.ml.utils.MLExceptionUtils;
 import org.opensearch.tasks.Task;
 import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.transport.TransportService;
@@ -131,40 +140,87 @@ public class TransportUploadModelAction extends HandledTransportAction<ActionReq
                 mlTask.setTaskId(taskId);
                 listener.onResponse(new UploadModelResponse(taskId, MLTaskState.CREATED.name()));
 
-                if (clusterService.localNode().getId().equals(nodeId)) {
-                    mlModelManager.uploadMLModel(mlUploadInput, mlTask);
-                } else {
-                    MLForwardInput forwardInput = MLForwardInput
-                        .builder()
-                        .requestType(MLForwardRequestType.UPLOAD_MODEL)
-                        .uploadInput(mlUploadInput)
-                        .mlTask(mlTask)
-                        .build();
-                    MLForwardRequest forwardRequest = new MLForwardRequest(forwardInput);
-                    ActionListener<MLForwardResponse> myListener = ActionListener
+                ActionListener<MLForwardResponse> forwardActionListener = ActionListener
                         .wrap(
-                            res -> { log.debug("Response from model node: " + res); },
-                            ex -> { log.error("Failure from model node", ex); }
+                                res -> {
+                                    log.info("---------- Upload model response: " + res);
+                                    boolean removeTaskCache = !clusterService.localNode().getId().equals(nodeId);
+                                    if (removeTaskCache) {
+                                        log.info("----------------------------- remove task from cache " + taskId);
+                                        mlTaskManager.remove(taskId);
+                                    }
+                                    },
+                                ex -> {
+                                    log.error("---------- Failed to upload model", ex);
+                                    mlTaskManager
+                                            .updateMLTask(
+                                                    taskId,
+                                                    ImmutableMap.of(MLTask.ERROR_FIELD, MLExceptionUtils.getRootCauseMessage(ex), STATE_FIELD, FAILED),
+                                                    TASK_SEMAPHORE_TIMEOUT,
+                                                    true
+                                            );
+                                }
                         );
-                    try (ThreadContext.StoredContext context = client.threadPool().getThreadContext().stashContext()) {
-                        transportService
+                try (ThreadContext.StoredContext context = client.threadPool().getThreadContext().stashContext()) {
+                    mlTaskManager.add(mlTask, Arrays.asList(nodeId));
+                    MLForwardInput forwardInput = MLForwardInput
+                            .builder()
+                            .requestType(MLForwardRequestType.UPLOAD_MODEL)
+                            .uploadInput(mlUploadInput)
+                            .mlTask(mlTask)
+                            .build();
+                    MLForwardRequest forwardRequest = new MLForwardRequest(forwardInput);
+                    transportService
                             .sendRequest(
-                                node,
-                                MLForwardAction.NAME,
-                                forwardRequest,
-                                new ActionListenerResponseHandler<>(myListener, MLForwardResponse::new)
+                                    node,
+                                    MLForwardAction.NAME,
+                                    forwardRequest,
+                                    new ActionListenerResponseHandler<>(forwardActionListener, MLForwardResponse::new)
                             );
-                    }
-
+                } catch (Exception e) {
+                    forwardActionListener.onFailure(e);
                 }
-            }, exception -> {
-                log.error("Failed to create upload model task", exception);
-                listener.onFailure(exception);
+
+//                if (clusterService.localNode().getId().equals(nodeId)) {
+//                    mlModelManager.uploadMLModel(mlUploadInput, mlTask);
+//                } else {
+//                    MLForwardInput forwardInput = MLForwardInput
+//                        .builder()
+//                        .requestType(MLForwardRequestType.UPLOAD_MODEL)
+//                        .uploadInput(mlUploadInput)
+//                        .mlTask(mlTask)
+//                        .build();
+//                    MLForwardRequest forwardRequest = new MLForwardRequest(forwardInput);
+//                    ActionListener<MLForwardResponse> myListener = ActionListener
+//                        .wrap(
+//                            res -> { log.debug("Response from model node: " + res); },
+//                            ex -> { log.error("Failure from model node", ex); }
+//                        );
+//                    try (ThreadContext.StoredContext context = client.threadPool().getThreadContext().stashContext()) {
+//                        transportService
+//                            .sendRequest(
+//                                node,
+//                                MLForwardAction.NAME,
+//                                forwardRequest,
+//                                new ActionListenerResponseHandler<>(myListener, MLForwardResponse::new)
+//                            );
+//                    }
+//                }
+            }, e -> {
+                handleException(listener, e, "Failed to upload model");
             }));
         }, e -> {
-            log.error("Failed to dispatch upload model task ", e);
-            listener.onFailure(e);
+            handleException(listener, e, "Failed to upload model");
         }));
 
     }
+
+//    private static void handleException(ActionListener<?> listener, Exception e) {
+//        if (e instanceof MLLimitExceededException) {
+//            log.warn(e.getMessage());
+//        } else {
+//            log.error("Failed to upload model ", e);
+//        }
+//        listener.onFailure(e);
+//    }
 }

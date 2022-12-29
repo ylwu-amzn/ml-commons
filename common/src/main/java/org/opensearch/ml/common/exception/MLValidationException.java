@@ -5,11 +5,18 @@
 
 package org.opensearch.ml.common.exception;
 
+import org.opensearch.common.io.stream.StreamInput;
+
+import java.io.IOException;
+
 /**
  * This exception is thrown when validation failed.
  */
 public class MLValidationException extends MLException {
 
+    public MLValidationException(StreamInput in) throws IOException {
+        super(in);
+    }
     /**
      * Constructor with error message.
      * @param message message of the exception

@@ -6,11 +6,13 @@
 package org.opensearch.ml.action.forward;
 
 import static org.opensearch.ml.task.MLTaskManager.TASK_SEMAPHORE_TIMEOUT;
+import static org.opensearch.ml.utils.MLExceptionUtils.toJsonString;
 
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Set;
 
+import com.google.gson.Gson;
 import lombok.AccessLevel;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.log4j.Log4j2;
@@ -80,7 +82,7 @@ public class TransportForwardAction extends HandledTransportAction<ActionRequest
         MLForwardRequestType requestType = forwardInput.getRequestType();
 
         String error = forwardInput.getError();
-        log.debug("receive forward request: {}", forwardInput.getRequestType());
+        log.info("---------- receive forward request: {}", forwardInput.getRequestType());
         try {
             switch (requestType) {
                 case LOAD_MODEL_DONE:
@@ -107,27 +109,30 @@ public class TransportForwardAction extends HandledTransportAction<ActionRequest
                         ImmutableMap.Builder<String, Object> builder = ImmutableMap.builder();
                         builder.put(MLTask.STATE_FIELD, taskState);
                         if (mlTaskCache.hasError()) {
-                            builder.put(MLTask.ERROR_FIELD, mlTaskCache.getErrors().toString());
+                            builder.put(MLTask.ERROR_FIELD, toJsonString(mlTaskCache.getErrors()));
                         }
+                        log.info("---------- start update task " + taskId);
                         mlTaskManager.updateMLTask(taskId, builder.build(), TASK_SEMAPHORE_TIMEOUT, true);
 
+                        MLModelState modelState;
                         if (!mlTaskCache.allNodeFailed()) {
-                            MLModelState modelState = mlTaskCache.hasError() ? MLModelState.PARTIALLY_LOADED : MLModelState.LOADED;
-                            log.info("load model done with state: {}, model id: {}", modelState, modelId);
-                            mlModelManager
-                                .updateModel(
-                                    modelId,
-                                    ImmutableMap
-                                        .of(
-                                            MLModel.MODEL_STATE_FIELD,
-                                            modelState,
-                                            MLModel.LAST_LOADED_TIME_FIELD,
-                                            Instant.now().toEpochMilli()
-                                        )
-                                );
+                            modelState = mlTaskCache.hasError() ? MLModelState.PARTIALLY_LOADED : MLModelState.LOADED;
                         } else {
+                            modelState = MLModelState.LOAD_FAILED;
                             log.error("load model failed on all nodes, model id: {}", modelId);
                         }
+                        log.info("load model done with state: {}, model id: {}", modelState, modelId);
+                        mlModelManager
+                                .updateModel(
+                                        modelId,
+                                        ImmutableMap
+                                                .of(
+                                                        MLModel.MODEL_STATE_FIELD,
+                                                        modelState,
+                                                        MLModel.LAST_LOADED_TIME_FIELD,
+                                                        Instant.now().toEpochMilli()
+                                                )
+                                );
                     }
                     listener.onResponse(new MLForwardResponse("ok", null));
                     break;
@@ -139,7 +144,7 @@ public class TransportForwardAction extends HandledTransportAction<ActionRequest
                     throw new IllegalArgumentException("unsupported request type");
             }
         } catch (Exception e) {
-            log.error("Failed to execute forward action", e);
+            log.error("Failed to execute forward action " + forwardInput.getRequestType(), e);
             listener.onFailure(e);
         }
     }
@@ -147,7 +152,7 @@ public class TransportForwardAction extends HandledTransportAction<ActionRequest
     private void syncModelWorkerNodes(String modelId) {
         DiscoveryNode[] allNodes = nodeHelper.getAllNodes();
         String[] workerNodes = mlModelManager.getWorkerNodes(modelId);
-        if (allNodes.length > 1 && workerNodes.length > 0) {
+        if (allNodes.length > 1 && workerNodes != null && workerNodes.length > 0) {
             log.debug("Sync to other nodes about worker nodes of model {}: {}", modelId, Arrays.toString(workerNodes));
             MLSyncUpInput syncUpInput = MLSyncUpInput.builder().addedWorkerNodes(ImmutableMap.of(modelId, workerNodes)).build();
             MLSyncUpNodesRequest syncUpRequest = new MLSyncUpNodesRequest(allNodes, syncUpInput);

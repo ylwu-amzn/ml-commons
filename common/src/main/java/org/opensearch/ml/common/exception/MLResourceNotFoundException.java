@@ -5,12 +5,19 @@
 
 package org.opensearch.ml.common.exception;
 
+import org.opensearch.common.io.stream.StreamInput;
+
+import java.io.IOException;
+
 /**
  * This exception is thrown when a resource is not found.
  * Won't count this exception in stats.
  */
 public class MLResourceNotFoundException extends MLException {
 
+    public MLResourceNotFoundException(StreamInput in) throws IOException {
+        super(in);
+    }
     /**
      * Constructor with error message.
      * @param message message of the exception

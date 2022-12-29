@@ -95,6 +95,7 @@ import org.opensearch.ml.stats.MLActionLevelStat;
 import org.opensearch.ml.stats.MLNodeLevelStat;
 import org.opensearch.ml.stats.MLStats;
 import org.opensearch.ml.task.MLTaskManager;
+import org.opensearch.ml.utils.MLExceptionUtils;
 import org.opensearch.rest.RestStatus;
 import org.opensearch.search.fetch.subphase.FetchSourceContext;
 import org.opensearch.threadpool.ThreadPool;
@@ -174,9 +175,9 @@ public class MLModelManager {
      * @param mlTask      ML task
      */
     public void uploadMLModel(MLUploadInput uploadInput, MLTask mlTask) {
+        mlStats.getStat(MLNodeLevelStat.ML_NODE_TOTAL_REQUEST_COUNT).increment();
+        checkAndAddRunningTask(mlTask, maxUploadTasksPerNode);
         try {
-            mlStats.getStat(MLNodeLevelStat.ML_NODE_TOTAL_REQUEST_COUNT).increment();
-            checkAndAddRunningTask(mlTask, maxUploadTasksPerNode);
             mlStats.getStat(MLNodeLevelStat.ML_NODE_EXECUTING_TASK_COUNT).increment();
             mlStats.createCounterStatIfAbsent(mlTask.getFunctionName(), UPLOAD, ML_ACTION_REQUEST_COUNT).increment();
             if (uploadInput.getUrl() != null) {
@@ -187,10 +188,10 @@ public class MLModelManager {
         } catch (Exception e) {
             mlStats.createCounterStatIfAbsent(mlTask.getFunctionName(), UPLOAD, MLActionLevelStat.ML_ACTION_FAILURE_COUNT).increment();
             handleException(uploadInput.getFunctionName(), mlTask.getTaskId(), e);
-            if (e instanceof MLException) {
-                throw e;
-            }
-            throw new MLException("Failed to upload model", e);
+//            if (e instanceof MLException) {
+//                throw e;
+//            }
+//            throw new MLException("Failed to upload model", e);
         } finally {
             mlStats.getStat(MLNodeLevelStat.ML_NODE_EXECUTING_TASK_COUNT).increment();
         }
@@ -402,7 +403,7 @@ public class MLModelManager {
 
     private void handleException(FunctionName functionName, String taskId, Exception e) {
         mlStats.createCounterStatIfAbsent(functionName, UPLOAD, MLActionLevelStat.ML_ACTION_FAILURE_COUNT).increment();
-        Map<String, Object> updated = ImmutableMap.of(ERROR_FIELD, ExceptionUtils.getStackTrace(e), STATE_FIELD, FAILED);
+        Map<String, Object> updated = ImmutableMap.of(ERROR_FIELD, MLExceptionUtils.getRootCauseMessage(e), STATE_FIELD, FAILED);
         mlTaskManager.updateMLTask(taskId, updated, TIMEOUT_IN_MILLIS, true);
     }
 
@@ -431,7 +432,7 @@ public class MLModelManager {
             listener.onFailure(new IllegalArgumentException("Exceed max model per node limit"));
             return;
         }
-        modelCacheHelper.initModelState(modelId, MLModelState.LOADING, functionName);
+        modelCacheHelper.initModelState(mlTask.getTaskId(), modelId, MLModelState.LOADING, functionName);
         try (ThreadContext.StoredContext context = client.threadPool().getThreadContext().stashContext()) {
             checkAndAddRunningTask(mlTask, maxLoadTasksPerNode);
             this.getModel(modelId, threadedActionListener(LOAD_THREAD_POOL, ActionListener.wrap(mlModel -> {

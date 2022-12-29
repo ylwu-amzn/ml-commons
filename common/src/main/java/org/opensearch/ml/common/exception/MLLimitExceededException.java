@@ -5,12 +5,19 @@
 
 package org.opensearch.ml.common.exception;
 
+import org.opensearch.common.io.stream.StreamInput;
+
+import java.io.IOException;
+
 /**
  * This exception is thrown when a some limit is exceeded.
  * Won't count this exception in stats.
  */
 public class MLLimitExceededException extends MLException{
 
+    public MLLimitExceededException(StreamInput in) throws IOException {
+        super(in);
+    }
     /**
      * Constructor with error message.
      * @param message message of the exception

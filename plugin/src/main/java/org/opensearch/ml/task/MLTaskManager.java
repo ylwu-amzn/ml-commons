@@ -43,6 +43,7 @@ import org.opensearch.ml.common.MLTaskState;
 import org.opensearch.ml.common.MLTaskType;
 import org.opensearch.ml.common.exception.MLException;
 import org.opensearch.ml.common.exception.MLLimitExceededException;
+import org.opensearch.ml.common.exception.MLResourceNotFoundException;
 import org.opensearch.ml.indices.MLIndicesHandler;
 import org.opensearch.rest.RestStatus;
 import org.opensearch.threadpool.ThreadPool;
@@ -263,13 +264,20 @@ public class MLTaskManager {
      * @param removeFromCache remove ML task from cache
      */
     public void updateMLTask(String taskId, Map<String, Object> updatedFields, long timeoutInMillis, boolean removeFromCache) {
+        log.info("++++++++++ start update ML task {}",taskId);
         ActionListener<UpdateResponse> internalListener = ActionListener.wrap(response -> {
             if (response.status() == RestStatus.OK) {
-                log.debug("Updated ML task successfully: {}, task id: {}", response.status(), taskId);
+                log.info("Updated ML task successfully: {}, task id: {}: {}", response.status(), taskId, updatedFields);
             } else {
-                log.error("Failed to update ML task {}, status: {}", taskId, response.status());
+                log.error("Failed to update ML task {}, status: {}: {}", taskId, response.status(), updatedFields);
             }
-        }, e -> log.error("Failed to update ML task: " + taskId, e));
+        }, e -> {
+            if (e instanceof MLResourceNotFoundException) {
+                log.warn(e.getMessage());
+            } else {
+                log.error("---------- Failed to update ML task: " + taskId, e);
+            }
+        });
         updateMLTask(taskId, updatedFields, internalListener, timeoutInMillis, removeFromCache);
     }
 
@@ -293,7 +301,7 @@ public class MLTaskManager {
             remove(taskId);
         }
         if (taskCache == null) {
-            updateMLTaskDirectly(taskId, updatedFields, listener);
+            listener.onFailure(new MLResourceNotFoundException("Can't find task in cache: " + taskId));
             return;
         }
         threadPool.executor(GENERAL_THREAD_POOL).execute(() -> {
@@ -323,6 +331,7 @@ public class MLTaskManager {
                     ? listener
                     : ActionListener.runAfter(listener, () -> semaphore.release());
                 try (ThreadContext.StoredContext context = client.threadPool().getThreadContext().stashContext()) {
+                    //log.info("------------------------ update ML task {}, {}",taskId, updatedFields);
                     client.update(updateRequest, ActionListener.runBefore(actionListener, () -> context.restore()));
                 } catch (Exception e) {
                     actionListener.onFailure(e);

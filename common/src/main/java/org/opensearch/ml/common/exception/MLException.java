@@ -5,11 +5,20 @@
 
 package org.opensearch.ml.common.exception;
 
+import org.opensearch.OpenSearchException;
+import org.opensearch.common.io.stream.StreamInput;
+import org.opensearch.transport.TransportException;
+
+import java.io.IOException;
+
 /**
  * Base exception thrown from MLCommons.
  */
-public class MLException extends RuntimeException {
+public class MLException extends OpenSearchException {
 
+    public MLException(StreamInput in) throws IOException {
+        super(in);
+    }
     /**
      * Should count this exception in stats or not.
      */
