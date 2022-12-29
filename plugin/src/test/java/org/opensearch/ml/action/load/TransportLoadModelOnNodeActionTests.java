@@ -199,7 +199,7 @@ public class TransportLoadModelOnNodeActionTests extends OpenSearchTestCase {
             ActionListener<String> listener = invocation.getArgument(3);
             listener.onResponse("successful");
             return null;
-        }).when(mlModelManager).loadModel(any(), any(), any(), any());
+        }).when(mlModelManager).loadModel(any(), any(), any(), any(), any());
         MLForwardResponse forwardResponse = Mockito.mock(MLForwardResponse.class);
         doAnswer(invocation -> {
             ActionListenerResponseHandler<MLForwardResponse> handler = invocation.getArgument(3);
@@ -280,7 +280,7 @@ public class TransportLoadModelOnNodeActionTests extends OpenSearchTestCase {
     }
 
     public void testNodeOperation_LoadModelException() {
-        when(mlModelManager.checkAndAddRunningTask(any(), any())).thenThrow(NullPointerException.class);
+        doThrow(new MLLimitExceededException("exceed max running task limit")).when(mlModelManager).checkAndAddRunningTask(any(), any());
         final LoadModelNodesRequest nodesRequest = prepareRequest();
         final LoadModelNodeRequest request = action.newNodeRequest(nodesRequest);
         final LoadModelNodeResponse response = action.nodeOperation(request);
@@ -292,7 +292,7 @@ public class TransportLoadModelOnNodeActionTests extends OpenSearchTestCase {
             ActionListener<String> listener = invocation.getArgument(3);
             listener.onFailure(new RuntimeException("Something went wrong"));
             return null;
-        }).when(mlModelManager).loadModel(any(), any(), any(), any());
+        }).when(mlModelManager).loadModel(any(), any(), any(), any(), any());
         final LoadModelNodesRequest nodesRequest = prepareRequest();
         final LoadModelNodeRequest request = action.newNodeRequest(nodesRequest);
         final LoadModelNodeResponse response = action.nodeOperation(request);
@@ -304,7 +304,7 @@ public class TransportLoadModelOnNodeActionTests extends OpenSearchTestCase {
             ActionListener<String> listener = invocation.getArgument(3);
             listener.onFailure(new MLLimitExceededException("Limit exceeded exception"));
             return null;
-        }).when(mlModelManager).loadModel(any(), any(), any(), any());
+        }).when(mlModelManager).loadModel(any(), any(), any(), any(), any());
         final LoadModelNodesRequest nodesRequest = prepareRequest();
         final LoadModelNodeRequest request = action.newNodeRequest(nodesRequest);
         final LoadModelNodeResponse response = action.nodeOperation(request);
@@ -312,7 +312,7 @@ public class TransportLoadModelOnNodeActionTests extends OpenSearchTestCase {
     }
 
     public void testNodeOperation_ErrorMessageNotNull() {
-        when(mlModelManager.checkAndAddRunningTask(any(), any())).thenReturn("Error message");
+        doThrow(new MLLimitExceededException("exceed max running task limit")).when(mlModelManager).checkAndAddRunningTask(any(), any());
         final LoadModelNodesRequest nodesRequest = prepareRequest();
         final LoadModelNodeRequest request = action.newNodeRequest(nodesRequest);
         final LoadModelNodeResponse response = action.nodeOperation(request);

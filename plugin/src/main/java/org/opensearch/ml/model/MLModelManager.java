@@ -187,6 +187,9 @@ public class MLModelManager {
         } catch (Exception e) {
             mlStats.createCounterStatIfAbsent(mlTask.getFunctionName(), UPLOAD, MLActionLevelStat.ML_ACTION_FAILURE_COUNT).increment();
             handleException(uploadInput.getFunctionName(), mlTask.getTaskId(), e);
+            if (e instanceof MLException) {
+                throw e;
+            }
             throw new MLException("Failed to upload model", e);
         } finally {
             mlStats.getStat(MLNodeLevelStat.ML_NODE_EXECUTING_TASK_COUNT).increment();
