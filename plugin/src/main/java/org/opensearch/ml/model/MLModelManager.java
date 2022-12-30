@@ -33,6 +33,7 @@ import static org.opensearch.ml.stats.ActionName.UPLOAD;
 import static org.opensearch.ml.stats.MLActionLevelStat.ML_ACTION_REQUEST_COUNT;
 import static org.opensearch.ml.utils.MLNodeUtils.checkOpenCircuitBreaker;
 import static org.opensearch.ml.utils.MLNodeUtils.createXContentParserFromRegistry;
+import static org.opensearch.ml.utils.MLExceptionUtils.logException;
 
 import java.io.File;
 import java.nio.file.Path;
@@ -109,7 +110,7 @@ import com.google.common.io.Files;
 public class MLModelManager {
 
     public static final int TIMEOUT_IN_MILLIS = 5000;
-    public static final int MODEL_FILE_SIZE_LIMIT = 4 * 1024 * 1024 * 1024;// 4GB
+    public static final long MODEL_FILE_SIZE_LIMIT = 4l * 1024 * 1024 * 1024;// 4GB
 
     private final Client client;
     private final ClusterService clusterService;
@@ -236,7 +237,7 @@ public class MLModelManager {
                 handleException(functionName, taskId, e);
             }));
         } catch (Exception e) {
-            log.error("Failed to upload model", e);
+            logException("Failed to upload model", e, log);
             handleException(functionName, taskId, e);
         } finally {
             mlStats.getStat(MLNodeLevelStat.ML_NODE_EXECUTING_TASK_COUNT).increment();
@@ -254,7 +255,7 @@ public class MLModelManager {
         modelHelper.downloadAndSplit(modelId, modelName, version, uploadInput.getUrl(), ActionListener.wrap(result -> {
             Long modelSizeInBytes = (Long) result.get(MODEL_SIZE_IN_BYTES);
             if (modelSizeInBytes >= MODEL_FILE_SIZE_LIMIT) {
-                throw new MLException("Model file size exceeds the limit of 4GB");
+                throw new MLException("Model file size exceeds the limit of 4GB: " + modelSizeInBytes);
             }
             List<String> chunkFiles = (List<String>) result.get(CHUNK_FILES);
             String hashValue = (String) result.get(MODEL_FILE_HASH);

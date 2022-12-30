@@ -5,7 +5,7 @@
 
 package org.opensearch.ml.action.load;
 
-import static org.opensearch.ml.utils.RestActionUtils.logException;
+import static org.opensearch.ml.utils.MLExceptionUtils.logException;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -142,7 +142,7 @@ public class TransportLoadModelOnNodeAction extends
         String localNodeId = clusterService.localNode().getId();
 
         ActionListener<MLForwardResponse> taskDoneListener = ActionListener
-            .wrap(res -> { log.info("load model task done " + taskId); }, ex -> { log.error(ex); });
+            .wrap(res -> { log.info("load model task done " + taskId); }, ex -> { logException("Load model task failed: " + taskId, ex, log); });
 
         loadModel(modelId, modelContentHash, mlTask.getFunctionName(), localNodeId, coordinatingNodeId, mlTask, ActionListener.wrap(r -> {
             if (!coordinatingNodeId.equals(localNodeId)) {
@@ -165,8 +165,7 @@ public class TransportLoadModelOnNodeAction extends
                     new ActionListenerResponseHandler<MLForwardResponse>(taskDoneListener, MLForwardResponse::new)
                 );
         }, e -> {
-            boolean removeTaskCache = !coordinatingNodeId.equals(localNodeId);// remove task cache on worker node
-            if (removeTaskCache) {
+            if (!coordinatingNodeId.equals(localNodeId)) {
                 mlTaskManager.remove(taskId);
             }
             MLForwardInput mlForwardInput = MLForwardInput
@@ -216,7 +215,7 @@ public class TransportLoadModelOnNodeAction extends
             log.debug("start loading model {}", modelId);
             mlModelManager.loadModel(modelId, modelContentHash, functionName, mlTask, listener);
         } catch (Exception e) {
-            logException(e, "Failed to load model " + modelId);
+            logException("Failed to load model " + modelId, e, log);
             listener.onFailure(e);
         }
     }

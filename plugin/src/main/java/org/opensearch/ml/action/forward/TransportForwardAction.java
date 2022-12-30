@@ -7,6 +7,7 @@ package org.opensearch.ml.action.forward;
 
 import static org.opensearch.ml.task.MLTaskManager.TASK_SEMAPHORE_TIMEOUT;
 import static org.opensearch.ml.utils.MLExceptionUtils.toJsonString;
+import static org.opensearch.ml.utils.MLExceptionUtils.logException;
 
 import java.time.Instant;
 import java.util.Arrays;
@@ -142,7 +143,7 @@ public class TransportForwardAction extends HandledTransportAction<ActionRequest
                     throw new IllegalArgumentException("unsupported request type");
             }
         } catch (Exception e) {
-            log.error("Failed to execute forward action " + forwardInput.getRequestType(), e);
+            logException("Failed to execute forward action " + forwardInput.getRequestType(), e, log);
             listener.onFailure(e);
         }
     }

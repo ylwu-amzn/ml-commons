@@ -9,6 +9,7 @@ import static org.opensearch.ml.common.CommonValue.ML_TASK_INDEX;
 import static org.opensearch.ml.common.MLTask.LAST_UPDATE_TIME_FIELD;
 import static org.opensearch.ml.common.MLTask.STATE_FIELD;
 import static org.opensearch.ml.plugin.MachineLearningPlugin.GENERAL_THREAD_POOL;
+import static org.opensearch.ml.utils.MLExceptionUtils.logException;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -270,11 +271,7 @@ public class MLTaskManager {
                 log.error("Failed to update ML task {}, status: {}, updatedFields: {}", taskId, response.status(), updatedFields);
             }
         }, e -> {
-            if (e instanceof MLResourceNotFoundException) {
-                log.warn(e.getMessage());
-            } else {
-                log.error("Failed to update ML task: " + taskId, e);
-            }
+            logException("Failed to update ML task: " + taskId, e, log);
         });
         updateMLTask(taskId, updatedFields, internalListener, timeoutInMillis, removeFromCache);
     }

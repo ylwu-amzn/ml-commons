@@ -9,7 +9,7 @@ import static org.opensearch.ml.common.MLTask.STATE_FIELD;
 import static org.opensearch.ml.common.MLTaskState.FAILED;
 import static org.opensearch.ml.settings.MLCommonsSettings.ML_COMMONS_TRUSTED_URL_REGEX;
 import static org.opensearch.ml.task.MLTaskManager.TASK_SEMAPHORE_TIMEOUT;
-import static org.opensearch.ml.utils.RestActionUtils.logException;
+import static org.opensearch.ml.utils.MLExceptionUtils.logException;
 
 import java.time.Instant;
 import java.util.Arrays;
@@ -147,7 +147,7 @@ public class TransportUploadModelAction extends HandledTransportAction<ActionReq
                                     }
                                     },
                                 ex -> {
-                                    log.error("Failed to upload model", ex);
+                                    logException("Failed to upload model", ex, log);
                                     mlTaskManager
                                             .updateMLTask(
                                                     taskId,
@@ -177,11 +177,11 @@ public class TransportUploadModelAction extends HandledTransportAction<ActionReq
                     forwardActionListener.onFailure(e);
                 }
             }, e -> {
-                logException(e, "Failed to upload model");
+                logException("Failed to upload model", e, log);
                 listener.onFailure(e);
             }));
         }, e -> {
-            logException(e, "Failed to upload model");
+            logException("Failed to upload model", e, log);
             listener.onFailure(e);
         }));
 
