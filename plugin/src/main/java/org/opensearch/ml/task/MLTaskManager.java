@@ -42,6 +42,7 @@ import org.opensearch.ml.common.MLTask;
 import org.opensearch.ml.common.MLTaskState;
 import org.opensearch.ml.common.MLTaskType;
 import org.opensearch.ml.common.exception.MLException;
+import org.opensearch.ml.common.exception.MLLimitExceededException;
 import org.opensearch.ml.common.exception.MLResourceNotFoundException;
 import org.opensearch.ml.indices.MLIndicesHandler;
 import org.opensearch.rest.RestStatus;
@@ -75,25 +76,24 @@ public class MLTaskManager {
         runningTasksCount = new ConcurrentHashMap<>();
     }
 
-    public synchronized String checkLimitAndAddRunningTask(MLTask mlTask, Integer limit) {
+    public synchronized void checkLimitAndAddRunningTask(MLTask mlTask, Integer limit) {
         AtomicInteger runningTaskCount = runningTasksCount.computeIfAbsent(mlTask.getTaskType(), it -> new AtomicInteger(0));
         if (runningTaskCount.get() < 0) {
             runningTaskCount.set(0);
         }
         log.debug("Task id: {}, current running task {}: {}", mlTask.getTaskId(), mlTask.getTaskType(), runningTaskCount.get());
+        if (runningTaskCount.get() >= limit) {
+            String error = "exceed max running task limit";
+            log.warn(error + " for task " + mlTask.getTaskId());
+            throw new MLLimitExceededException(error);
+        }
         if (contains(mlTask.getTaskId())) {
             getMLTask(mlTask.getTaskId()).setState(MLTaskState.RUNNING);
         } else {
-            if (runningTaskCount.get() >= limit) {
-                String error = "exceed max running task limit";
-                log.info(error + " for task " + mlTask.getTaskId());
-                return error;
-            }
             mlTask.setState(MLTaskState.RUNNING);
             add(mlTask);
-            runningTaskCount.incrementAndGet();
         }
-        return null;
+        runningTaskCount.incrementAndGet();
     }
 
     /**
@@ -265,11 +265,17 @@ public class MLTaskManager {
     public void updateMLTask(String taskId, Map<String, Object> updatedFields, long timeoutInMillis, boolean removeFromCache) {
         ActionListener<UpdateResponse> internalListener = ActionListener.wrap(response -> {
             if (response.status() == RestStatus.OK) {
-                log.debug("Updated ML task successfully: {}, task id: {}", response.status(), taskId);
+                log.debug("Updated ML task successfully: {}, taskId: {}, updatedFields: {}", response.status(), taskId, updatedFields);
             } else {
-                log.error("Failed to update ML task {}, status: {}", taskId, response.status());
+                log.error("Failed to update ML task {}, status: {}, updatedFields: {}", taskId, response.status(), updatedFields);
             }
-        }, e -> log.error("Failed to update ML task: " + taskId, e));
+        }, e -> {
+            if (e instanceof MLResourceNotFoundException) {
+                log.warn(e.getMessage());
+            } else {
+                log.error("Failed to update ML task: " + taskId, e);
+            }
+        });
         updateMLTask(taskId, updatedFields, internalListener, timeoutInMillis, removeFromCache);
     }
 
@@ -293,7 +299,7 @@ public class MLTaskManager {
             remove(taskId);
         }
         if (taskCache == null) {
-            listener.onFailure(new MLResourceNotFoundException("Can't find task"));
+            listener.onFailure(new MLResourceNotFoundException("Can't find task in cache: " + taskId));
             return;
         }
         threadPool.executor(GENERAL_THREAD_POOL).execute(() -> {
