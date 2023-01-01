@@ -22,7 +22,6 @@ import ai.djl.translate.ArgumentsUtil;
 import ai.djl.translate.Batchifier;
 import ai.djl.translate.Translator;
 import ai.djl.translate.TranslatorContext;
-import org.opensearch.ml.common.model.TextEmbeddingModelConfig;
 
 import java.io.IOException;
 import java.util.Map;
@@ -34,18 +33,21 @@ public class HuggingfaceTextEmbeddingTranslator implements Translator<String, fl
 
     private HuggingFaceTokenizer tokenizer;
     private Batchifier batchifier;
-    private TextEmbeddingModelConfig.PoolingMethod poolingMethod;
-    private boolean normalizeResult;
-    private String modelType;
-    private boolean neuron;
+    private boolean normalize;
+    private String pooling;
+    private boolean withTokenTypeIdsInput;
 
-    HuggingfaceTextEmbeddingTranslator(HuggingFaceTokenizer tokenizer, Batchifier batchifier, TextEmbeddingModelConfig.PoolingMethod poolingMethod, boolean normalizeResult, String modelType, boolean neuron) {
+    HuggingfaceTextEmbeddingTranslator(
+            HuggingFaceTokenizer tokenizer,
+            Batchifier batchifier,
+            String pooling,
+            boolean normalize,
+            boolean withTokenTypeIdsInput) {
         this.tokenizer = tokenizer;
         this.batchifier = batchifier;
-        this.poolingMethod = poolingMethod;
-        this.normalizeResult = normalizeResult;
-        this.modelType = modelType;
-        this.neuron = neuron;
+        this.pooling = pooling;
+        this.normalize = normalize;
+        this.withTokenTypeIdsInput = withTokenTypeIdsInput;
     }
 
     /** {@inheritDoc} */
@@ -65,7 +67,11 @@ public class HuggingfaceTextEmbeddingTranslator implements Translator<String, fl
         NDList ndList = new NDList(2);
         ndList.add(manager.create(indices));
         ndList.add(manager.create(attentionMask));
-        if (neuron && ("bert".equalsIgnoreCase(modelType) || "albert".equalsIgnoreCase(modelType))) {
+//        if (neuron && ("bert".equalsIgnoreCase(modelType) || "albert".equalsIgnoreCase(modelType))) {
+//            long[] tokenTypeIds = encoding.getTypeIds();
+//            ndList.add(manager.create(tokenTypeIds));
+//        }
+        if (withTokenTypeIdsInput) {
             long[] tokenTypeIds = encoding.getTypeIds();
             ndList.add(manager.create(tokenTypeIds));
         }
@@ -75,42 +81,77 @@ public class HuggingfaceTextEmbeddingTranslator implements Translator<String, fl
     /** {@inheritDoc} */
     @Override
     public float[] processOutput(TranslatorContext ctx, NDList list) {
-        NDArray embeddings = null;
-        switch (this.poolingMethod) {
-            case MEAN:
-                embeddings = meanPooling(ctx, list);
-                break;
-            case CLS:
-                embeddings = list.get(0).get(0);
-                break;
-            default:
-                throw new IllegalArgumentException("Unsupported pooling method");
-        }
-
-        if (normalizeResult) {
-            embeddings = embeddings.normalize(2, 0);
-        }
-        return embeddings.toFloatArray();
-    }
-
-    private static NDArray meanPooling(TranslatorContext ctx, NDList list) {
         NDArray embeddings = list.get("last_hidden_state");
-        if (embeddings == null) {
-            embeddings = list.get(0);
-        }
         Encoding encoding = (Encoding) ctx.getAttachment("encoding");
         long[] attentionMask = encoding.getAttentionMask();
         NDManager manager = ctx.getNDManager();
         NDArray inputAttentionMask = manager.create(attentionMask).toType(DataType.FLOAT32, true);
+        switch (pooling) {
+            //TODO: confirm with Frank
+            // 0. set normalize default value as false, as bool value default value is false
+            // 1. If we can remove _tokens from pooling method, just mean, max
+            // 2. Which model are using mean_sqrt_len, weightedmean_tokens
+            // 3. Neuron model needs type token id as input
+            // 4. Why DJL 0.20 can't support neuron model
+            case "mean":
+                embeddings = meanPool(embeddings, inputAttentionMask, false);
+                break;
+            case "mean_sqrt_len":
+                embeddings = meanPool(embeddings, inputAttentionMask, true);
+                break;
+            case "max":
+                embeddings = maxPool(embeddings, inputAttentionMask);
+                break;
+            case "weightedmean":
+                embeddings = weightedMeanPool(embeddings, inputAttentionMask);
+                break;
+            case "cls":
+                embeddings = embeddings.get(0);
+                break;
+            default:
+                throw new AssertionError("Unexpected pooling model: " + pooling);
+        }
+        if (normalize) {
+            embeddings = embeddings.normalize(2, 0);
+        }
+
+        return embeddings.toFloatArray();
+    }
+
+    private NDArray meanPool(NDArray embeddings, NDArray attentionMask, boolean sqrt) {
+        long[] shape = embeddings.getShape().getShape();
+        attentionMask = attentionMask.expandDims(-1).broadcast(shape);
+        NDArray inputAttentionMaskSum = attentionMask.sum(AXIS);
+        NDArray clamp = inputAttentionMaskSum.clip(1e-9, 1e12);
+        NDArray prod = embeddings.mul(attentionMask);
+        NDArray sum = prod.sum(AXIS);
+        if (sqrt) {
+            return sum.div(clamp.sqrt());
+        }
+        return sum.div(clamp);
+    }
+
+    private NDArray maxPool(NDArray embeddings, NDArray inputAttentionMask) {
         long[] shape = embeddings.getShape().getShape();
         inputAttentionMask = inputAttentionMask.expandDims(-1).broadcast(shape);
-        NDArray inputAttentionMaskSum = inputAttentionMask.sum(AXIS);
-        NDArray clamp = inputAttentionMaskSum.clip(1e-9, 1e12);
-        NDArray prod = embeddings.mul(inputAttentionMask);
-        NDArray sum = prod.sum(AXIS);
-        embeddings = sum.div(clamp);
-        return embeddings;
+        inputAttentionMask = inputAttentionMask.eq(0);
+        embeddings = embeddings.duplicate();
+        embeddings.set(inputAttentionMask, -1e9); // Set padding tokens to large negative value
+
+        return embeddings.max(AXIS, true);
     }
+
+    private NDArray weightedMeanPool(NDArray embeddings, NDArray attentionMask) {
+        long[] shape = embeddings.getShape().getShape();
+        NDArray weight = embeddings.getManager().arange(1, shape[0] + 1);
+        weight = weight.expandDims(-1).broadcast(shape);
+
+        attentionMask = attentionMask.expandDims(-1).broadcast(shape).mul(weight);
+        NDArray maskSum = attentionMask.sum(AXIS);
+        NDArray embeddingSum = embeddings.mul(attentionMask).sum(AXIS);
+        return embeddingSum.div(maskSum);
+    }
+
     /**
      * Creates a builder to build a {@code TextEmbeddingTranslator}.
      *
@@ -140,10 +181,9 @@ public class HuggingfaceTextEmbeddingTranslator implements Translator<String, fl
 
         private HuggingFaceTokenizer tokenizer;
         private Batchifier batchifier = Batchifier.STACK;
-        private TextEmbeddingModelConfig.PoolingMethod poolingMethod;
-        private boolean normalizeResult;
-        private String modelType;
-        private boolean neuron;
+        private boolean normalize = false;
+        private boolean withTokenTypeIdsInput = false;
+        private String pooling = "mean";
 
         Builder(HuggingFaceTokenizer tokenizer) {
             this.tokenizer = tokenizer;
@@ -161,6 +201,43 @@ public class HuggingfaceTextEmbeddingTranslator implements Translator<String, fl
         }
 
         /**
+         * Sets the normalize for the {@link Translator}.
+         *
+         * @param normalize true to normalize the embeddings
+         * @return this builder
+         */
+        public Builder optNormalize(boolean normalize) {
+            this.normalize = normalize;
+            return this;
+        }
+
+        public Builder optWithTokenTypeIdsInput(boolean withTokenTypeIdsInput) {
+            this.withTokenTypeIdsInput = withTokenTypeIdsInput;
+            return this;
+        }
+
+
+        /**
+         * Sets the pooling for the {@link Translator}.
+         *
+         * @param poolingMethod the pooling model, one of mean_pool, max_pool and cls
+         * @return this builder
+         */
+        public Builder optPoolingMethod(String poolingMethod) {
+            if (!"mean".equals(poolingMethod)
+                    && !"max".equals(poolingMethod)
+                    && !"cls".equals(poolingMethod)
+                    && !"mean_sqrt_len".equals(poolingMethod)
+                    && !"weightedmean".equals(poolingMethod)) {
+                throw new IllegalArgumentException(
+                        "Invalid pooling model, must be one of [mean, max,"
+                                + " cls, mean_sqrt_len, weightedmean].");
+            }
+            this.pooling = poolingMethod;
+            return this;
+        }
+
+        /**
          * Configures the builder with the model arguments.
          *
          * @param arguments the model arguments
@@ -168,6 +245,8 @@ public class HuggingfaceTextEmbeddingTranslator implements Translator<String, fl
         public void configure(Map<String, ?> arguments) {
             String batchifierStr = ArgumentsUtil.stringValue(arguments, "batchifier", "stack");
             optBatchifier(Batchifier.fromString(batchifierStr));
+            optNormalize(ArgumentsUtil.booleanValue(arguments, "normalize", true));
+            optPoolingMethod(ArgumentsUtil.stringValue(arguments, "pooling", "mean"));
         }
 
         /**
@@ -177,27 +256,7 @@ public class HuggingfaceTextEmbeddingTranslator implements Translator<String, fl
          * @throws IOException if I/O error occurs
          */
         public HuggingfaceTextEmbeddingTranslator build() throws IOException {
-            return new HuggingfaceTextEmbeddingTranslator(tokenizer, batchifier, poolingMethod, normalizeResult, modelType, neuron);
-        }
-
-        public Builder poolingMethod(TextEmbeddingModelConfig.PoolingMethod poolingMethod) {
-            this.poolingMethod = poolingMethod;
-            return this;
-        }
-
-        public Builder normalizeResult(boolean normalizeResult) {
-            this.normalizeResult = normalizeResult;
-            return this;
-        }
-
-        public Builder modelType(String modelType) {
-            this.modelType = modelType;
-            return this;
-        }
-
-        public Builder neuron(boolean neuron) {
-            this.neuron = neuron;
-            return this;
+            return new HuggingfaceTextEmbeddingTranslator(tokenizer, batchifier, pooling, normalize, withTokenTypeIdsInput);
         }
     }
 }

@@ -13,7 +13,6 @@ import ai.djl.translate.TranslateException;
 import ai.djl.translate.Translator;
 import ai.djl.translate.TranslatorFactory;
 import ai.djl.util.Pair;
-import org.opensearch.ml.common.model.TextEmbeddingModelConfig;
 
 import java.io.IOException;
 import java.lang.reflect.Type;
@@ -31,13 +30,13 @@ public class HuggingfaceTextEmbeddingTranslatorFactory implements TranslatorFact
         SUPPORTED_TYPES.add(new Pair<>(Input.class, Output.class));
     }
 
-    private final TextEmbeddingModelConfig.PoolingMethod poolingMethod;
+    private final String poolingMode;
     private boolean normalizeResult;
     private final String modelType;
     private final boolean neuron;
 
-    public HuggingfaceTextEmbeddingTranslatorFactory(TextEmbeddingModelConfig.PoolingMethod poolingMethod, boolean normalizeResult, String modelType, boolean neuron) {
-        this.poolingMethod = poolingMethod;
+    public HuggingfaceTextEmbeddingTranslatorFactory(String poolingMode, boolean normalizeResult, String modelType, boolean neuron) {
+        this.poolingMode = poolingMode;
         this.normalizeResult = normalizeResult;
         this.modelType = modelType;
         this.neuron = neuron;
@@ -62,12 +61,15 @@ public class HuggingfaceTextEmbeddingTranslatorFactory implements TranslatorFact
                             .optTokenizerPath(modelPath)
                             .optManager(model.getNDManager())
                             .build();
+            boolean withTokenTypeIdsInput = false;
+            if (neuron && ("bert".equalsIgnoreCase(modelType) || "albert".equalsIgnoreCase(modelType))) {
+                withTokenTypeIdsInput = true;
+            }
             HuggingfaceTextEmbeddingTranslator translator =
                     HuggingfaceTextEmbeddingTranslator.builder(tokenizer, arguments)
-                            .poolingMethod(poolingMethod)
-                            .normalizeResult(normalizeResult)
-                            .modelType(modelType)
-                            .neuron(neuron)
+                            .optPoolingMethod(poolingMode)
+                            .optNormalize(normalizeResult)
+                            .optWithTokenTypeIdsInput(withTokenTypeIdsInput)
                             .build();
             if (input == String.class && output == float[].class) {
                 return (Translator<I, O>) translator;

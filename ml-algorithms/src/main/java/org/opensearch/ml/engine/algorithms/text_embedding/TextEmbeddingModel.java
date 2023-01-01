@@ -187,7 +187,7 @@ public class TextEmbeddingModel implements Predictable {
                         TextEmbeddingModelConfig textEmbeddingModelConfig = (TextEmbeddingModelConfig) modelConfig;
                         TextEmbeddingModelConfig.FrameworkType transformersType = textEmbeddingModelConfig.getFrameworkType();
                         String modelType = textEmbeddingModelConfig.getModelType();
-                        TextEmbeddingModelConfig.PoolingMethod poolingMethod = textEmbeddingModelConfig.getPoolingMethod();
+                        String poolingMethod = textEmbeddingModelConfig.getPoolingMethod();
                         boolean normalizeResult = textEmbeddingModelConfig.isNormalizeResult();
                         Integer modelMaxLength = textEmbeddingModelConfig.getModelMaxLength();
                         if (modelMaxLength != null) {
