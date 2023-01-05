@@ -67,9 +67,10 @@ public class HuggingfaceTextEmbeddingTranslatorFactory implements TranslatorFact
             }
             HuggingfaceTextEmbeddingTranslator translator =
                     HuggingfaceTextEmbeddingTranslator.builder(tokenizer, arguments)
-                            .optPoolingMethod(poolingMode)
+                            //.optPoolingMethod(poolingMode)
+                            .optPoolingMode(poolingMode)
                             .optNormalize(normalizeResult)
-                            .optWithTokenTypeIdsInput(withTokenTypeIdsInput)
+                            //.optWithTokenTypeIdsInput(withTokenTypeIdsInput)
                             .build();
             if (input == String.class && output == float[].class) {
                 return (Translator<I, O>) translator;
