@@ -104,6 +104,7 @@ public class TransportSyncUpOnNodeActionTests extends OpenSearchTestCase {
         when(clusterService.getClusterName()).thenReturn(new ClusterName("Local Cluster"));
         action = new TransportSyncUpOnNodeAction(
             transportService,
+            settings,
             actionFilters,
             modelHelper,
             mlTaskManager,
