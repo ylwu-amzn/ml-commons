@@ -11,8 +11,9 @@ Test on AWS EC2 `g5.xlarge`, 64-bit(x86)
 - Ubuntu AMI:  `Deep Learning AMI GPU PyTorch 1.12.1 (Ubuntu 20.04) 20221114`
 - Amazon Linux AMI: `Deep Learning AMI GPU PyTorch 1.12.1 (Amazon Linux 2) 20221114`
 - PyTorch: 1.12.1
+- cuda: 11.6
 
-## 1.1 mount nvidia-uvm device
+## 1.1 Run on GPU instance
 
 Check if you can see `nvidia-uvm` and `nvidia-uvm-tools` under `/dev` by running
 ```
@@ -53,6 +54,36 @@ fi
 ```
 
 If you can see `nvidia-uvm` and `nvidia-uvm-tools` under `/dev`, then you can start OpenSearch.
+
+## 1.2 Run on docker image
+
+Run nvidia docker with deamon mode and assign port mapping to access OpenSearch running inside docker.
+``` 
+docker run -it -d --runtime=nvidia --gpus all -v $PWD:/workspace -p 9200:9200 nvidia/cuda:11.6.2-cudnn8-devel-ubuntu20.04
+```
+Find container id by running `docker ps`.
+
+Then open terminal with `docker exec -it <container_id> /bin/bash`
+
+
+```
+# install tools
+apt update && apt upgrade
+apt install curl
+apt install wget
+
+adduser opensearch
+# Then switch to user opensearch
+su opensearch
+cd ~; wget https://ci.opensearch.org/ci/dbc/distribution-build-opensearch/2.5.0/latest/linux/x64/tar/dist/opensearch/opensearch-2.5.0-linux-x64.tar.gz
+tar -xvf opensearch-2.5.0-linux-x64.tar.gz
+cd ~/opensearch-2.5.0; bash ./opensearch-tar-install.sh
+
+```
+Open a new terminal and ssh to GPU server. Test if OpenSearch is running
+```
+curl -XGET https://localhost:9200 -u admin:admin --insecure
+```
 
 # 2. AWS Inferentia
 
