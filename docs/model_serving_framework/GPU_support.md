@@ -4,14 +4,17 @@ To get better performance, we need GPU acceleration. We will support GPU ML node
 prepare GPU ML node to run model serving framework (the setup is one-time effort). This doc focus on two types of GPU 
 device: NVIDIA GPU and AWS Inferentia.
 
+Supported versions:
+
+- PyTorch: 1.12.1
+- cuda: 11.6
+
 # 1. NVIDIA GPU
 
 Test on AWS EC2 `g5.xlarge`, 64-bit(x86)
 
 - Ubuntu AMI:  `Deep Learning AMI GPU PyTorch 1.12.1 (Ubuntu 20.04) 20221114`
 - Amazon Linux AMI: `Deep Learning AMI GPU PyTorch 1.12.1 (Amazon Linux 2) 20221114`
-- PyTorch: 1.12.1
-- cuda: 11.6
 
 ## 1.1 Run on GPU instance
 
@@ -75,7 +78,7 @@ apt install wget
 adduser opensearch
 # Then switch to user opensearch
 su opensearch
-cd ~; wget https://ci.opensearch.org/ci/dbc/distribution-build-opensearch/2.5.0/latest/linux/x64/tar/dist/opensearch/opensearch-2.5.0-linux-x64.tar.gz
+cd ~; wget https://artifacts.opensearch.org/releases/bundle/opensearch/2.5.0/opensearch-2.5.0-linux-x64.tar.gz
 tar -xvf opensearch-2.5.0-linux-x64.tar.gz
 cd ~/opensearch-2.5.0; bash ./opensearch-tar-install.sh
 
@@ -102,13 +105,13 @@ Test on AWS EC2 `inf1.xlarge`,  64-bit(x86)
 
 Ubuntu AMI:  `Deep Learning AMI GPU PyTorch 1.12.1 (Ubuntu 20.04) 20221114`
 
-Download OpenSearch and set `OS_HOME` first. In this example, we install OpenSearch in home folder.
+Download OpenSearch and set `OPENSEARCH_HOME` first. In this example, we install OpenSearch in home folder.
 
 ```
 cd ~; wget https://artifacts.opensearch.org/releases/bundle/opensearch/2.5.0/opensearch-2.5.0-linux-x64.tar.gz
 tar -xvf opensearch-2.5.0-linux-x64.tar.gz
 
-echo "export OS_HOME=~/opensearch-2.5.0" | tee -a ~/.bash_profile
+echo "export OPENSEARCH_HOME=~/opensearch-2.5.0" | tee -a ~/.bash_profile
 echo "export PYTORCH_VERSION=1.12.1" | tee -a ~/.bash_profile
 source ~/.bash_profile
 ```
@@ -192,13 +195,13 @@ Test on AWS EC2 `inf1.xlarge`,  64-bit(x86)
 
 Amazon Linux AMI: `Deep Learning AMI GPU PyTorch 1.12.1 (Amazon Linux 2) 20221114`
 
-Download OpenSearch and set `OS_HOME` first. In this example, we install OpenSearch in home folder.
+Download OpenSearch and set `OPENSEARCH_HOME` first. In this example, we install OpenSearch in home folder.
 
 ```
 cd ~; wget https://artifacts.opensearch.org/releases/bundle/opensearch/2.5.0/opensearch-2.5.0-linux-x64.tar.gz
 tar -xvf opensearch-2.5.0-linux-x64.tar.gz
 
-echo "export OS_HOME=~/opensearch-2.5.0" | tee -a ~/.bash_profile
+echo "export OPENSEARCH_HOME=~/opensearch-2.5.0" | tee -a ~/.bash_profile
 echo "export PYTORCH_VERSION=1.12.1" | tee -a ~/.bash_profile
 source ~/.bash_profile
 ```
@@ -415,20 +418,16 @@ Note:
 
 ### 2.2.3 OpenSearch
 
-Copy torch neuron lib to OpenSearch lib
+Copy torch neuron lib to OpenSearch lib.
+Create `pytorch_venv` first if you haven't. Refer to [Install Driver](#221-install-driver) part
 
 ```
-OS_HOME=<OpenSearch installation path>
-# For example, if you install OS_HOME in your home folder, it will be 
-# OS_HOME=~/opensearch-2.5.0
+OPENSEARCH_HOME=<OpenSearch installation path>
+# For example, if you install OpenSearch in your home folder, it will be 
+OPENSEARCH_HOME=~/opensearch-2.5.0
 
-# Activate pytorch_venv first if you haven't. Refer to "Install Driver" part
-source pytorch_venv/bin/activate
-
- 
 # Set pytorch neuron lib path. In this example, we create pytorch_venv in home folder, so 
 PYTORCH_NEURON_LIB_PATH=~/pytorch_venv/lib/python3.7/site-packages/torch_neuron/lib/
-
 
 mkdir -p $OS_HOME/lib/torch_neuron; cp -r $PYTORCH_NEURON_LIB_PATH/ $OS_HOME/lib/torch_neuron
 export PYTORCH_EXTRA_LIBRARY_PATH=$OS_HOME/lib/torch_neuron/lib/libtorchneuron.so
