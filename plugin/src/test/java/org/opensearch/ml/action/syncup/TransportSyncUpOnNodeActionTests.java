@@ -112,6 +112,8 @@ public class TransportSyncUpOnNodeActionTests extends OpenSearchTestCase {
 
     private TransportSyncUpOnNodeAction action;
 
+    private Map<String, Set<String>> runningLoadModelTasks;
+
     @Before
     public void setup() throws IOException {
         MockitoAnnotations.openMocks(this);
@@ -130,6 +132,10 @@ public class TransportSyncUpOnNodeActionTests extends OpenSearchTestCase {
             xContentRegistry,
             mlEngine
         );
+        runningLoadModelTasks = new HashMap<>();
+        runningLoadModelTasks.put("model1", ImmutableSet.of("node1"));
+        when(mlTaskManager.getLocalRunningLoadModelTasks())
+            .thenReturn(Arrays.asList(new String[] { "load_task_id1" }, new String[] { "model_id1" }));
     }
 
     public void testConstructor() {
@@ -158,8 +164,15 @@ public class TransportSyncUpOnNodeActionTests extends OpenSearchTestCase {
             Version.CURRENT
         );
         String[] loadedModelIds = new String[] { "123" };
+        String[] runningLoadModelIds = new String[] { "model1" };
         String[] runningLoadModelTaskIds = new String[] { "1" };
-        MLSyncUpNodeResponse response = new MLSyncUpNodeResponse(mlNode1, "LOADED", loadedModelIds, runningLoadModelTaskIds);
+        MLSyncUpNodeResponse response = new MLSyncUpNodeResponse(
+            mlNode1,
+            "LOADED",
+            loadedModelIds,
+            runningLoadModelIds,
+            runningLoadModelTaskIds
+        );
         BytesStreamOutput output = new BytesStreamOutput();
         response.writeTo(output);
         final MLSyncUpNodeResponse response1 = action.newNodeResponse(output.bytes().streamInput());
@@ -239,13 +252,13 @@ public class TransportSyncUpOnNodeActionTests extends OpenSearchTestCase {
 
     public void testCleanUpLocalCache_NoTasks() {
         when(mlTaskManager.getAllTaskIds()).thenReturn(null);
-        action.cleanUpLocalCache();
+        action.cleanUpLocalCache(runningLoadModelTasks);
         verify(mlTaskManager, never()).updateMLTask(anyString(), any(), anyLong(), anyBoolean());
     }
 
     public void testCleanUpLocalCache_EmptyTasks() {
         when(mlTaskManager.getAllTaskIds()).thenReturn(new String[] {});
-        action.cleanUpLocalCache();
+        action.cleanUpLocalCache(runningLoadModelTasks);
         verify(mlTaskManager, never()).updateMLTask(anyString(), any(), anyLong(), anyBoolean());
     }
 
@@ -255,7 +268,7 @@ public class TransportSyncUpOnNodeActionTests extends OpenSearchTestCase {
         MLTask mlTask = MLTask.builder().lastUpdateTime(Instant.now()).build();
         MLTaskCache taskCache = MLTaskCache.builder().mlTask(mlTask).build();
         when(mlTaskManager.getMLTaskCache(taskId)).thenReturn(taskCache);
-        action.cleanUpLocalCache();
+        action.cleanUpLocalCache(runningLoadModelTasks);
         verify(mlTaskManager, never()).updateMLTask(anyString(), any(), anyLong(), anyBoolean());
     }
 
@@ -265,7 +278,7 @@ public class TransportSyncUpOnNodeActionTests extends OpenSearchTestCase {
         MLTask mlTask = MLTask.builder().taskType(MLTaskType.UPLOAD_MODEL).lastUpdateTime(Instant.now().minusSeconds(86400)).build();
         MLTaskCache taskCache = MLTaskCache.builder().mlTask(mlTask).build();
         when(mlTaskManager.getMLTaskCache(taskId)).thenReturn(taskCache);
-        action.cleanUpLocalCache();
+        action.cleanUpLocalCache(runningLoadModelTasks);
         verify(mlTaskManager, times(1)).updateMLTask(anyString(), any(), anyLong(), anyBoolean());
         verify(mlModelManager, never()).updateModel(anyString(), any());
     }
@@ -303,11 +316,10 @@ public class TransportSyncUpOnNodeActionTests extends OpenSearchTestCase {
             when(mlModelManager.getWorkerNodes(modelId)).thenReturn(new String[] { "node1" });
         }
         when(mlTaskManager.getMLTaskCache(taskId)).thenReturn(taskCache);
-        action.cleanUpLocalCache();
+        action.cleanUpLocalCache(runningLoadModelTasks);
         verify(mlTaskManager, times(1)).updateMLTask(anyString(), any(), anyLong(), anyBoolean());
         ArgumentCaptor<Map> argumentCaptor = ArgumentCaptor.forClass(Map.class);
-        verify(mlModelManager, times(1)).updateModel(eq(modelId), argumentCaptor.capture());
-        assertEquals(modelState, argumentCaptor.getValue().get(MLModel.MODEL_STATE_FIELD));
+        verify(mlModelManager, never()).updateModel(eq(modelId), argumentCaptor.capture());
     }
 
     private MLSyncUpInput prepareRequest() {
