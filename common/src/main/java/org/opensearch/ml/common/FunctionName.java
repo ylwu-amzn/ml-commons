@@ -16,7 +16,8 @@ public enum FunctionName {
     ANOMALY_LOCALIZATION,
     RCF_SUMMARIZE,
     LOGISTIC_REGRESSION,
-    TEXT_EMBEDDING;
+    TEXT_EMBEDDING,
+    QUESTION_ANSWERING;
 
     public static FunctionName from(String value) {
         try {
@@ -24,5 +25,17 @@ public enum FunctionName {
         } catch (Exception e) {
             throw new IllegalArgumentException("Wrong function name");
         }
+    }
+
+    /**
+     * Return true if model is DL model.
+     * @return
+     */
+    public static boolean isNLPModel(FunctionName functionName) {
+        if (functionName == TEXT_EMBEDDING ||
+                functionName == QUESTION_ANSWERING) {
+            return true;
+        }
+        return false;
     }
 }

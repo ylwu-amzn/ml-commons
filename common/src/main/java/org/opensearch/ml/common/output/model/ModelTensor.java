@@ -24,6 +24,7 @@ public class ModelTensor implements Writeable, ToXContentObject {
     private long[] shape;
     private MLResultDataType dataType;
     private ByteBuffer byteBuffer;
+    private String result;// whole result in string
 
     @Builder
     public ModelTensor(String name, Number[] data, long[] shape, MLResultDataType dataType, ByteBuffer byteBuffer) {
@@ -35,6 +36,11 @@ public class ModelTensor implements Writeable, ToXContentObject {
         this.shape = shape;
         this.dataType = dataType;
         this.byteBuffer = byteBuffer;
+    }
+
+    public ModelTensor(String name, String result) {
+        this.name = name;
+        this.result = result;
     }
 
     @Override
@@ -57,6 +63,9 @@ public class ModelTensor implements Writeable, ToXContentObject {
             builder.field("array", byteBuffer.array());
             builder.field("order", byteBuffer.order().toString());
             builder.endObject();
+        }
+        if (result != null) {
+            builder.field("result", result);
         }
         builder.endObject();
         return builder;
@@ -99,7 +108,7 @@ public class ModelTensor implements Writeable, ToXContentObject {
             this.byteBuffer = ByteBuffer.wrap(bytes);
             this.byteBuffer.order(byteOrder);
         }
-
+        this.result = in.readOptionalString();
     }
 
     @Override
@@ -139,5 +148,6 @@ public class ModelTensor implements Writeable, ToXContentObject {
         } else {
             out.writeBoolean(false);
         }
+        out.writeOptionalString(result);
     }
 }
