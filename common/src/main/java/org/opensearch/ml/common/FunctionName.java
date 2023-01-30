@@ -17,7 +17,8 @@ public enum FunctionName {
     RCF_SUMMARIZE,
     LOGISTIC_REGRESSION,
     TEXT_EMBEDDING,
-    QUESTION_ANSWERING;
+    QUESTION_ANSWERING,
+    TIME_SERIES_FORECASTING;
 
     public static FunctionName from(String value) {
         try {
@@ -33,7 +34,17 @@ public enum FunctionName {
      */
     public static boolean isNLPModel(FunctionName functionName) {
         if (functionName == TEXT_EMBEDDING ||
-                functionName == QUESTION_ANSWERING) {
+                functionName == QUESTION_ANSWERING||
+                functionName == TIME_SERIES_FORECASTING) {
+            return true;
+        }
+        return false;
+    }
+
+    public static boolean isDLPModel(FunctionName functionName) {
+        if (functionName == TEXT_EMBEDDING ||
+                functionName == QUESTION_ANSWERING||
+                functionName == TIME_SERIES_FORECASTING) {
             return true;
         }
         return false;

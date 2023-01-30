@@ -41,9 +41,11 @@ public class ModelHelper {
     public static final int CHUNK_SIZE = 10_000_000; // 10MB
     public static final String PYTORCH_FILE_EXTENSION = ".pt";
     public static final String ONNX_FILE_EXTENSION = ".onnx";
+    public static final String PARAMS_FILE_EXTENSION = ".params";
     public static final String TOKENIZER_FILE_NAME = "tokenizer.json";
     public static final String PYTORCH_ENGINE = "PyTorch";
     public static final String ONNX_ENGINE = "OnnxRuntime";
+    public static final String MXNET_ENGINE = "MXNet";
     private final MLEngine mlEngine;
     private Gson gson;
 
@@ -173,7 +175,7 @@ public class ModelHelper {
             Enumeration zipEntries = zipFile.entries();
             while (zipEntries.hasMoreElements()) {
                 String fileName = ((ZipEntry) zipEntries.nextElement()).getName();
-                if (fileName.endsWith(PYTORCH_FILE_EXTENSION) || fileName.endsWith(ONNX_FILE_EXTENSION)) {
+                if (fileName.endsWith(PYTORCH_FILE_EXTENSION) || fileName.endsWith(ONNX_FILE_EXTENSION) || fileName.endsWith(PARAMS_FILE_EXTENSION)) {
                     if (hasModelFile) {
                         throw new IllegalArgumentException("Find multiple model files, but expected only one");
                     }
@@ -187,9 +189,9 @@ public class ModelHelper {
         if (!hasModelFile) {
             throw new IllegalArgumentException("Can't find model file");
         }
-        if (!hasTokenizerFile) {
-            throw new IllegalArgumentException("Can't find tokenizer file");
-        }
+//        if (!hasTokenizerFile) {
+//            throw new IllegalArgumentException("Can't find tokenizer file");
+//        }
     }
 
     public void deleteFileCache(String modelId) {

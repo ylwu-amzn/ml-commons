@@ -7,7 +7,8 @@ package org.opensearch.ml.common.model;
 
 public enum MLModelFormat {
     ONNX,
-    TORCH_SCRIPT;
+    TORCH_SCRIPT,
+    GLUON;
 
     public static MLModelFormat from(String value) {
         try {

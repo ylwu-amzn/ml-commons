@@ -14,15 +14,11 @@ import ai.djl.translate.TranslatorFactory;
 import ai.djl.util.ZipUtils;
 import lombok.extern.log4j.Log4j2;
 import org.apache.commons.io.FileUtils;
-import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.common.MLModel;
 import org.opensearch.ml.common.dataset.MLInputDataset;
-import org.opensearch.ml.common.dataset.TextDocsInputDataSet;
 import org.opensearch.ml.common.exception.MLException;
 import org.opensearch.ml.common.input.MLInput;
 import org.opensearch.ml.common.model.MLModelConfig;
-import org.opensearch.ml.common.model.MLModelFormat;
-import org.opensearch.ml.common.model.TextEmbeddingModelConfig;
 import org.opensearch.ml.common.output.MLOutput;
 import org.opensearch.ml.common.output.model.ModelResultFilter;
 import org.opensearch.ml.common.output.model.ModelTensorOutput;
@@ -30,9 +26,6 @@ import org.opensearch.ml.common.output.model.ModelTensors;
 import org.opensearch.ml.engine.MLEngine;
 import org.opensearch.ml.engine.ModelHelper;
 import org.opensearch.ml.engine.Predictable;
-import org.opensearch.ml.engine.algorithms.text_embedding.HuggingfaceTextEmbeddingTranslatorFactory;
-import org.opensearch.ml.engine.algorithms.text_embedding.ONNXSentenceTransformerTextEmbeddingTranslator;
-import org.opensearch.ml.engine.algorithms.text_embedding.SentenceTransformerTextEmbeddingTranslator;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -45,11 +38,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static org.opensearch.ml.common.model.TextEmbeddingModelConfig.FrameworkType.SENTENCE_TRANSFORMERS;
-import static org.opensearch.ml.engine.ModelHelper.ONNX_ENGINE;
-import static org.opensearch.ml.engine.ModelHelper.ONNX_FILE_EXTENSION;
-import static org.opensearch.ml.engine.ModelHelper.PYTORCH_ENGINE;
-import static org.opensearch.ml.engine.ModelHelper.PYTORCH_FILE_EXTENSION;
+import static org.opensearch.ml.engine.ModelHelper.*;
 import static org.opensearch.ml.engine.utils.FileUtils.deleteFileQuietly;
 
 @Log4j2
@@ -106,11 +95,29 @@ public abstract class DLModel implements Predictable {
         return currentDevice;
     }
 
+    protected Predictor<Input, Output> getPredictor() {
+        return predictors[getCurrentDevice()];
+    }
+
     public abstract ModelTensorOutput predict(String modelId, MLInputDataset inputDataSet) throws TranslateException;
 
     @Override
     public void initModel(MLModel model, Map<String, Object> params) {
-        String engine = model.getModelFormat() == MLModelFormat.TORCH_SCRIPT ? PYTORCH_ENGINE : ONNX_ENGINE;
+        String engine;
+        switch (model.getModelFormat()) {
+            case TORCH_SCRIPT:
+                engine = PYTORCH_ENGINE;
+                break;
+            case ONNX:
+                engine = ONNX_ENGINE;
+                break;
+            case GLUON:
+                engine = MXNET_ENGINE;
+                break;
+            default:
+                throw new IllegalArgumentException("unsupported engine type");
+        }
+
         File modelZipFile = (File)params.get(MODEL_ZIP_FILE);
         modelHelper = (ModelHelper)params.get(MODEL_HELPER);
         mlEngine = (MLEngine)params.get(ML_ENGINE);
@@ -171,7 +178,7 @@ public abstract class DLModel implements Predictable {
                                           MLModelConfig modelConfig,
                                           String engine) {
         try {
-            if (!PYTORCH_ENGINE.equals(engine) && !ONNX_ENGINE.equals(engine)) {
+            if (!PYTORCH_ENGINE.equals(engine) && !ONNX_ENGINE.equals(engine) && !MXNET_ENGINE.equals(engine)) {
                 throw new IllegalArgumentException("unsupported engine");
             }
             List<Predictor<Input, Output>> predictorList = new ArrayList<>();
