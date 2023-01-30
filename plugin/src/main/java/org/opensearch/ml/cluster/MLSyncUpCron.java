@@ -61,6 +61,9 @@ public class MLSyncUpCron implements Runnable {
 
     @Override
     public void run() {
+        if (!clusterService.state().getRoutingTable().hasIndex(ML_MODEL_INDEX)) {
+            return;
+        }
         log.debug("ML sync job starts");
         DiscoveryNode[] allNodes = nodeHelper.getAllNodes();
         MLSyncUpInput gatherInfoInput = MLSyncUpInput.builder().getLoadedModels(true).build();
