@@ -99,7 +99,12 @@ public class MLModelAutoReloader {
         autoReloadMaxRetryTimes = ML_MODEL_RELOAD_MAX_RETRY_TIMES.get(settings);
         clusterService
             .getClusterSettings()
-            .addSettingsUpdateConsumer(ML_COMMONS_MODEL_AUTO_RELOAD_ENABLE, it -> enableAutoReloadModel = it);
+            .addSettingsUpdateConsumer(ML_COMMONS_MODEL_AUTO_RELOAD_ENABLE, it -> {
+                enableAutoReloadModel = it;
+                if (enableAutoReloadModel) {
+                    autoReloadModel();
+                }
+            });
 
         clusterService.getClusterSettings().addSettingsUpdateConsumer(ML_MODEL_RELOAD_MAX_RETRY_TIMES, it -> autoReloadMaxRetryTimes = it);
     }
@@ -117,7 +122,8 @@ public class MLModelAutoReloader {
 
         // At opensearch startup, get local node id, if not ml node,we ignored, just return without doing anything
         if (!MLNodeUtils.isMLNode(clusterService.localNode())) {
-            return;
+            System.out.println("Current node is not ML node");
+            //return;
         }
 
         String localNodeId = clusterService.localNode().getId();
