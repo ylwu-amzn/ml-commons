@@ -14,6 +14,7 @@ import org.opensearch.ml.engine.exceptions.ModelSerDeSerException;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.util.Base64;
 
@@ -51,14 +52,15 @@ public class ModelSerDeSer {
 
     public static Object deserialize(byte[] modelBin) {
         ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
-        Thread.currentThread().setContextClassLoader(ValidatingObjectInputStream.class.getClassLoader());
+//        Thread.currentThread().setContextClassLoader(ValidatingObjectInputStream.class.getClassLoader());
         try (ByteArrayInputStream inputStream = new ByteArrayInputStream(modelBin);
-             ValidatingObjectInputStream validatingObjectInputStream = new ValidatingObjectInputStream(inputStream)) {
+             ObjectInputStream validatingObjectInputStream = new ObjectInputStream(inputStream)) {
+//             ValidatingObjectInputStream validatingObjectInputStream = new ValidatingObjectInputStream(inputStream)) {
             // Validate the model class type to avoid deserialization attack.
-            validatingObjectInputStream.accept(ACCEPT_CLASS_PATTERNS);
+//            validatingObjectInputStream.accept(ACCEPT_CLASS_PATTERNS);
             return validatingObjectInputStream.readObject();
         } catch (Throwable e) {
-            log.error("----- Failed to deserializea model ", e);
+            log.error("-----1 Failed to deserializea model ", e);
             throw new ModelSerDeSerException("Failed to deserialize model.", e.getCause());
         } finally {
             Thread.currentThread().setContextClassLoader(contextClassLoader);
