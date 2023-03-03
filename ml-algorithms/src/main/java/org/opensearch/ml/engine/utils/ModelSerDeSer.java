@@ -51,14 +51,14 @@ public class ModelSerDeSer {
 
     public static Object deserialize(byte[] modelBin) {
         ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
+        Thread.currentThread().setContextClassLoader(ModelSerDeSer.class.getClassLoader());
         try (ByteArrayInputStream inputStream = new ByteArrayInputStream(modelBin);
-             ValidatingObjectInputStream validatingObjectInputStream = new ValidatingObjectInputStream(inputStream)){
-            Thread.currentThread().setContextClassLoader(ModelSerDeSer.class.getClassLoader());
+             ValidatingObjectInputStream validatingObjectInputStream = new ValidatingObjectInputStream(inputStream)) {
             // Validate the model class type to avoid deserialization attack.
             validatingObjectInputStream.accept(ACCEPT_CLASS_PATTERNS);
             return validatingObjectInputStream.readObject();
         } catch (Throwable e) {
-            log.error("Failed to deserializea model ", e);
+            log.error("----- Failed to deserializea model ", e);
             throw new ModelSerDeSerException("Failed to deserialize model.", e.getCause());
         } finally {
             Thread.currentThread().setContextClassLoader(contextClassLoader);
