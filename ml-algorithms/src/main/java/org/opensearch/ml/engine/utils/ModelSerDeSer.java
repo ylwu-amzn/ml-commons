@@ -53,9 +53,8 @@ public class ModelSerDeSer {
     public static Object deserialize(byte[] modelBin) {
 //        ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
 //        Thread.currentThread().setContextClassLoader(ValidatingObjectInputStream.class.getClassLoader());
-        try (ByteArrayInputStream inputStream = new ByteArrayInputStream(modelBin);
-             ValidatingObjectInputStream validatingObjectInputStream = new ValidatingObjectInputStream(inputStream);
-             ObjectInputStream objectInputStream = new ObjectInputStream(inputStream)) {
+        try (ValidatingObjectInputStream validatingObjectInputStream = new ValidatingObjectInputStream(new ByteArrayInputStream(modelBin));
+             ObjectInputStream objectInputStream = new ObjectInputStream(new ByteArrayInputStream(modelBin))) {
 //             ValidatingObjectInputStream validatingObjectInputStream = new ValidatingObjectInputStream(inputStream)) {
             // Validate the model class type to avoid deserialization attack.
             validatingObjectInputStream.accept(ACCEPT_CLASS_PATTERNS);
