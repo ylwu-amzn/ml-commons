@@ -29,9 +29,11 @@ public class CommonValue {
     public static String WARM_BOX_TYPE = "warm";
 
     public static final String ML_MODEL_INDEX = ".plugins-ml-model";
+    public static final String ML_MODEL_GROUP_INDEX = ".plugins-ml-model-group";
     public static final String ML_TASK_INDEX = ".plugins-ml-task";
     public static final Integer ML_MODEL_INDEX_SCHEMA_VERSION = 3;
     public static final Integer ML_TASK_INDEX_SCHEMA_VERSION = 1;
+    public static final Integer ML_MODEL_GROUP_INDEX_SCHEMA_VERSION = 1;
     public static final String USER_FIELD_MAPPING = "      \""
             + CommonValue.USER
             + "\": {\n"
@@ -43,6 +45,37 @@ public class CommonValue {
             + "          \"custom_attribute_names\": {\"type\":\"text\", \"fields\":{\"keyword\":{\"type\":\"keyword\"}}}\n"
             + "        }\n"
             + "      }\n";
+    public static final String ML_MODEL_GROUP_INDEX_MAPPING = "{\n" +
+            "  \"_meta\": {\n" +
+            "    \"schema_version\": "+ML_MODEL_GROUP_INDEX_SCHEMA_VERSION+"\n" +
+            "  },\n" +
+            "  \"properties\": {\n" +
+            "    \""+MLModelGroup.MODEL_GROUP_NAME_FIELD+"\": {\n" +
+            "      \"type\": \"text\",\n" +
+            "      \"fields\": {\n" +
+            "        \"keyword\": {\n" +
+            "          \"type\": \"keyword\",\n" +
+            "          \"ignore_above\": 256\n" +
+            "        }\n" +
+            "      }\n" +
+            "    },\n" +
+            "    \""+MLModelGroup.DESCRIPTION_FIELD+"\": {\n" +
+            "      \"type\": \"text\"\n" +
+            "    },\n" +
+            "    \""+MLModelGroup.TAGS_FIELD+"\": {\n" +
+            "      \"type\": \"text\",\n" +
+            "      \"fields\": {\n" +
+            "        \"keyword\": {\n" +
+            "          \"type\": \"keyword\",\n" +
+            "          \"ignore_above\": 256\n" +
+            "        }\n" +
+            "      }\n" +
+            "    },\n" +
+            "    \""+MLModelGroup.MODEL_IDS_FIELD+"\": {\n" +
+            "      \"type\": \"keyword\"\n" +
+            "    }\n" +
+            "  }\n" +
+            "}";
     public static final String ML_MODEL_INDEX_MAPPING = "{\n"
             + "    \"_meta\": {\"schema_version\": "
             + ML_MODEL_INDEX_SCHEMA_VERSION
@@ -59,6 +92,9 @@ public class CommonValue {
             + "\" : {\"type\": \"long\"},\n"
             + "      \""
             + MLModel.MODEL_VERSION_FIELD
+            + "\" : {\"type\": \"keyword\"},\n"
+            + "      \""
+            + MLModel.MODEL_GROUP_ID_FIELD
             + "\" : {\"type\": \"keyword\"},\n"
             + "      \""
             + MLModel.MODEL_CONTENT_FIELD

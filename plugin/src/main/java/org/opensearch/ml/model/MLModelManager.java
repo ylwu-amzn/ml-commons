@@ -8,6 +8,7 @@ package org.opensearch.ml.model;
 import static org.opensearch.common.xcontent.ToXContent.EMPTY_PARAMS;
 import static org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken;
 import static org.opensearch.common.xcontent.XContentType.JSON;
+import static org.opensearch.ml.common.CommonValue.ML_MODEL_GROUP_INDEX;
 import static org.opensearch.ml.common.CommonValue.ML_MODEL_INDEX;
 import static org.opensearch.ml.common.CommonValue.NOT_FOUND;
 import static org.opensearch.ml.common.CommonValue.UNLOADED;
@@ -38,6 +39,7 @@ import static org.opensearch.ml.utils.MLNodeUtils.createXContentParserFromRegist
 import java.io.File;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.HashMap;
@@ -77,6 +79,7 @@ import org.opensearch.index.reindex.DeleteByQueryRequest;
 import org.opensearch.ml.breaker.MLCircuitBreakerService;
 import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.common.MLModel;
+import org.opensearch.ml.common.MLModelGroup;
 import org.opensearch.ml.common.MLTask;
 import org.opensearch.ml.common.exception.MLException;
 import org.opensearch.ml.common.exception.MLResourceNotFoundException;
@@ -193,10 +196,40 @@ public class MLModelManager {
         try {
             mlStats.getStat(MLNodeLevelStat.ML_NODE_EXECUTING_TASK_COUNT).increment();
             mlStats.createCounterStatIfAbsent(mlTask.getFunctionName(), UPLOAD, ML_ACTION_REQUEST_COUNT).increment();
-            if (uploadInput.getUrl() != null) {
-                uploadModelFromUrl(uploadInput, mlTask);
+            String modelGroupId = uploadInput.getModelGroupId();
+            GetRequest getModelGroupRequest = new GetRequest(ML_MODEL_GROUP_INDEX).id(modelGroupId);
+
+            if (modelGroupId != null) {
+                client.get(getModelGroupRequest, ActionListener.wrap(modelGroup -> {
+                    if (modelGroup.isExists()) {
+                        Map<String, Object> source = modelGroup.getSourceAsMap();
+                        int latestVersion = (int)source.get(MLModelGroup.LATEST_VERSION_FIELD);
+                        int newVersion = latestVersion + 1;
+                        source.put(MLModelGroup.LATEST_VERSION_FIELD, newVersion);
+                        UpdateRequest updateModelGroupRequest = new UpdateRequest();
+                        long seqNo = modelGroup.getSeqNo();
+                        long primaryTerm = modelGroup.getPrimaryTerm();
+                        updateModelGroupRequest.index(ML_MODEL_GROUP_INDEX).id(modelGroupId)
+                                .setIfSeqNo(seqNo)
+                                .setIfPrimaryTerm(primaryTerm)
+                                .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
+                                .doc(source);
+                        client.update(updateModelGroupRequest, ActionListener.wrap(r -> {
+                            uploadModel(uploadInput, mlTask, newVersion + "", seqNo + 1, primaryTerm);
+                        }, e -> {
+                            log.error("Failed to update model group", e);
+                            handleException(uploadInput.getFunctionName(), mlTask.getTaskId(), e);
+                        }));
+                    } else {
+                        log.error("Model group not found");
+                        uploadModel(uploadInput, mlTask, null, -1, -1);
+                    }
+                }, e -> {
+                    log.error("Failed to get model group", e);
+                    handleException(uploadInput.getFunctionName(), mlTask.getTaskId(), e);
+                } ));
             } else {
-                uploadPrebuiltModel(uploadInput, mlTask);
+                uploadModel(uploadInput, mlTask, null, -1, -1);
             }
         } catch (Exception e) {
             mlStats.createCounterStatIfAbsent(mlTask.getFunctionName(), UPLOAD, MLActionLevelStat.ML_ACTION_FAILURE_COUNT).increment();
@@ -205,8 +238,17 @@ public class MLModelManager {
             mlStats.getStat(MLNodeLevelStat.ML_NODE_EXECUTING_TASK_COUNT).increment();
         }
     }
+    private void uploadModel(MLUploadInput uploadInput, MLTask mlTask, String modelVersion, long seqNo, long primaryTerm) {
+        if (uploadInput.getUrl() != null) {
+            uploadModelFromUrl(uploadInput, mlTask, modelVersion, seqNo, primaryTerm);
+        } else {
+            throw new IllegalArgumentException("model file URL is null");
+            // TODO: support prebuilt model later
+            //uploadPrebuiltModel(uploadInput, mlTask);
+        }
+    }
 
-    private void uploadModelFromUrl(MLUploadInput uploadInput, MLTask mlTask) {
+    private void uploadModelFromUrl(MLUploadInput uploadInput, MLTask mlTask, String modelVersion, long seqNo, long primaryTerm) {
         String taskId = mlTask.getTaskId();
         FunctionName functionName = mlTask.getFunctionName();
         try (ThreadContext.StoredContext context = client.threadPool().getThreadContext().stashContext()) {
@@ -215,12 +257,14 @@ public class MLModelManager {
             mlStats.createCounterStatIfAbsent(functionName, UPLOAD, ML_ACTION_REQUEST_COUNT).increment();
             mlStats.getStat(MLNodeLevelStat.ML_NODE_EXECUTING_TASK_COUNT).increment();
             String modelName = uploadInput.getModelName();
-            String version = uploadInput.getVersion();
+            String version = modelVersion == null? uploadInput.getVersion() : modelVersion;
+            String modelGroupId = uploadInput.getModelGroupId();
             Instant now = Instant.now();
             mlIndicesHandler.initModelIndexIfAbsent(ActionListener.wrap(res -> {
                 MLModel mlModelMeta = MLModel
                     .builder()
                     .name(modelName)
+                    .modelGroupId(modelGroupId)
                     .algorithm(functionName)
                     .version(version)
                     .description(uploadInput.getDescription())
@@ -239,7 +283,40 @@ public class MLModelManager {
                     mlTask.setModelId(modelId);
                     log.info("create new model meta doc {} for upload task {}", modelId, taskId);
 
-                    uploadModel(uploadInput, taskId, functionName, modelName, version, modelId);
+                    if (modelGroupId != null) {
+                        GetRequest getModelGroupRequest = new GetRequest(ML_MODEL_GROUP_INDEX).id(modelGroupId);
+                        client.get(getModelGroupRequest, ActionListener.wrap(modelGroup -> {
+                            if (modelGroup.isExists()) {
+                                Map<String, Object> source = modelGroup.getSourceAsMap();
+                                List<String> models = (ArrayList<String>)source.get(MLModelGroup.MODEL_IDS_FIELD);
+                                if (models == null) {
+                                    models = new ArrayList<>();
+                                }
+                                models.add(modelId);
+                                source.put(MLModelGroup.MODEL_IDS_FIELD, models);
+                                UpdateRequest updateModelGroupRequest = new UpdateRequest();
+                                updateModelGroupRequest.index(ML_MODEL_GROUP_INDEX).id(modelGroupId)
+                                        .setIfSeqNo(seqNo)
+                                        .setIfPrimaryTerm(primaryTerm)
+                                        .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
+                                        .doc(source);
+                                client.update(updateModelGroupRequest, ActionListener.wrap(r -> {
+                                    uploadModel(uploadInput, taskId, functionName, modelName, version, modelId);
+                                }, e -> {
+                                    log.error("Failed to update model group", e);
+                                    handleException(functionName, taskId, e);
+                                }));
+                            } else {
+                                log.error("Model group not found");
+                                handleException(functionName, taskId, new MLResourceNotFoundException("model group not found"));
+                            }
+                        }, e -> {
+                            log.error("Failed to get model group", e);
+                            handleException(functionName, taskId, e);
+                        }));
+                    } else {
+                        uploadModel(uploadInput, taskId, functionName, modelName, version, modelId);
+                    }
                 }, e -> {
                     log.error("Failed to index model meta doc", e);
                     handleException(functionName, taskId, e);
@@ -339,18 +416,18 @@ public class MLModelManager {
             );
     }
 
-    private void uploadPrebuiltModel(MLUploadInput uploadInput, MLTask mlTask) {
-        String taskId = mlTask.getTaskId();
-        modelHelper
-            .downloadPrebuiltModelConfig(
-                taskId,
-                uploadInput,
-                ActionListener.wrap(mlUploadInput -> { uploadModelFromUrl(mlUploadInput, mlTask); }, e -> {
-                    log.error("Failed to upload prebuilt model", e);
-                    handleException(uploadInput.getFunctionName(), taskId, e);
-                })
-            );
-    }
+//    private void uploadPrebuiltModel(MLUploadInput uploadInput, MLTask mlTask) {
+//        String taskId = mlTask.getTaskId();
+//        modelHelper
+//            .downloadPrebuiltModelConfig(
+//                taskId,
+//                uploadInput,
+//                ActionListener.wrap(mlUploadInput -> { uploadModelFromUrl(mlUploadInput, mlTask); }, e -> {
+//                    log.error("Failed to upload prebuilt model", e);
+//                    handleException(uploadInput.getFunctionName(), taskId, e);
+//                })
+//            );
+//    }
 
     private <T> ThreadedActionListener<T> threadedActionListener(String threadPoolName, ActionListener<T> listener) {
         return new ThreadedActionListener<>(log, threadPool, threadPoolName, listener, false);
