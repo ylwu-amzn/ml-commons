@@ -304,9 +304,7 @@ public class MLModelManager {
         if (registerModelInput.getUrl() != null) {
             registerModelFromUrl(registerModelInput, mlTask, modelVersion, seqNo, primaryTerm);
         } else {
-            throw new IllegalArgumentException("model file URL is null");
-            // TODO: support prebuilt model later
-            // uploadPrebuiltModel(uploadInput, mlTask);
+            registerPrebuiltModel(registerModelInput, mlTask, modelVersion, seqNo, primaryTerm);
         }
     }
 
@@ -494,18 +492,21 @@ public class MLModelManager {
             );
     }
 
-//    private void registerPrebuiltModel(MLRegisterModelInput registerModelInput, MLTask mlTask) {
-//        String taskId = mlTask.getTaskId();
-//        modelHelper
-//            .downloadPrebuiltModelConfig(
-//                taskId,
-//                registerModelInput,
-//                ActionListener.wrap(mlRegisterModelInput -> { registerModelFromUrl(mlRegisterModelInput, mlTask); }, e -> {
-//                    log.error("Failed to register prebuilt model", e);
-//                    handleException(registerModelInput.getFunctionName(), taskId, e);
-//                })
-//            );
-//    }
+    private void registerPrebuiltModel(MLRegisterModelInput registerModelInput, MLTask mlTask,
+                                       String modelVersion,
+                                       long seqNo,
+                                       long primaryTerm) {
+        String taskId = mlTask.getTaskId();
+        modelHelper
+            .downloadPrebuiltModelConfig(
+                taskId,
+                registerModelInput,
+                ActionListener.wrap(mlRegisterModelInput -> { registerModelFromUrl(mlRegisterModelInput, mlTask, modelVersion, seqNo, primaryTerm); }, e -> {
+                    log.error("Failed to register prebuilt model", e);
+                    handleException(registerModelInput.getFunctionName(), taskId, e);
+                })
+            );
+    }
 
     private <T> ThreadedActionListener<T> threadedActionListener(String threadPoolName, ActionListener<T> listener) {
         return new ThreadedActionListener<>(log, threadPool, threadPoolName, listener, false);
