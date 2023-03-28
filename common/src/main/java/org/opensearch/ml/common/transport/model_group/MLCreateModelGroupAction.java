@@ -6,7 +6,6 @@
 package org.opensearch.ml.common.transport.model_group;
 
 import org.opensearch.action.ActionType;
-import org.opensearch.ml.common.transport.upload_chunk.MLCreateModelMetaResponse;
 
 public class MLCreateModelGroupAction extends ActionType<MLCreateModelGroupResponse> {
     public static MLCreateModelGroupAction INSTANCE = new MLCreateModelGroupAction();
