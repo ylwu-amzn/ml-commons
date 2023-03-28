@@ -31,6 +31,7 @@ import static org.opensearch.ml.common.CommonValue.USER;
 public class MLModel implements ToXContentObject {
     public static final String ALGORITHM_FIELD = "algorithm";
     public static final String MODEL_NAME_FIELD = "name";
+    public static final String MODEL_GROUP_ID_FIELD = "model_group_id";
     // We use int type for version in first release 1.3. In 2.4, we changed to
     // use String type for version. Keep this old version field for old models.
     public static final String OLD_MODEL_VERSION_FIELD = "version";
@@ -66,6 +67,7 @@ public class MLModel implements ToXContentObject {
     public static final String DEPLOY_TO_ALL_NODES_FIELD = "deploy_to_all_nodes";
 
     private String name;
+    private String modelGroupId;
     private FunctionName algorithm;
     private String version;
     private String content;
@@ -95,6 +97,7 @@ public class MLModel implements ToXContentObject {
     private boolean deployToAllNodes;
     @Builder(toBuilder = true)
     public MLModel(String name,
+                   String modelGroupId,
                    FunctionName algorithm,
                    String version,
                    String content,
@@ -117,6 +120,7 @@ public class MLModel implements ToXContentObject {
                    String[] planningWorkerNodes,
                    boolean deployToAllNodes) {
         this.name = name;
+        this.modelGroupId = modelGroupId;
         this.algorithm = algorithm;
         this.version = version;
         this.content = content;
@@ -176,6 +180,7 @@ public class MLModel implements ToXContentObject {
             currentWorkerNodeCount = input.readOptionalInt();
             planningWorkerNodes = input.readOptionalStringArray();
             deployToAllNodes = input.readBoolean();
+            modelGroupId = input.readOptionalString();
         }
     }
 
@@ -223,6 +228,7 @@ public class MLModel implements ToXContentObject {
         out.writeOptionalInt(currentWorkerNodeCount);
         out.writeOptionalStringArray(planningWorkerNodes);
         out.writeBoolean(deployToAllNodes);
+        out.writeOptionalString(modelGroupId);
     }
 
     @Override
@@ -230,6 +236,9 @@ public class MLModel implements ToXContentObject {
         builder.startObject();
         if (name != null) {
             builder.field(MODEL_NAME_FIELD, name);
+        }
+        if (modelGroupId != null) {
+            builder.field(MODEL_GROUP_ID_FIELD, modelGroupId);
         }
         if (algorithm != null) {
             builder.field(ALGORITHM_FIELD, algorithm);
@@ -303,6 +312,7 @@ public class MLModel implements ToXContentObject {
 
     public static MLModel parse(XContentParser parser) throws IOException {
         String name = null;
+        String modelGroupId = null;
         FunctionName algorithm = null;
         String version = null;
         Integer oldVersion = null;
@@ -340,6 +350,9 @@ public class MLModel implements ToXContentObject {
             switch (fieldName) {
                 case MODEL_NAME_FIELD:
                     name = parser.text();
+                    break;
+                case MODEL_GROUP_ID_FIELD:
+                    modelGroupId = parser.text();
                     break;
                 case MODEL_CONTENT_FIELD:
                     content = parser.text();
@@ -432,6 +445,7 @@ public class MLModel implements ToXContentObject {
         }
         return MLModel.builder()
                 .name(name)
+                .modelGroupId(modelGroupId)
                 .algorithm(algorithm)
                 .version(version == null ? oldVersion + "" : version)
                 .content(content == null ? oldContent : content)
