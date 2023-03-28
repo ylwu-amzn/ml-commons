@@ -355,12 +355,6 @@ public class MLModelManager {
                         client.get(getModelGroupRequest, ActionListener.wrap(modelGroup -> {
                             if (modelGroup.isExists()) {
                                 Map<String, Object> source = modelGroup.getSourceAsMap();
-                                List<String> models = (ArrayList<String>) source.get(MLModelGroup.MODEL_IDS_FIELD);
-                                if (models == null) {
-                                    models = new ArrayList<>();
-                                }
-                                models.add(modelId);
-                                source.put(MLModelGroup.MODEL_IDS_FIELD, models);
                                 UpdateRequest updateModelGroupRequest = new UpdateRequest();
                                 updateModelGroupRequest
                                     .index(ML_MODEL_GROUP_INDEX)

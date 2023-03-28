@@ -61,17 +61,8 @@ public class CommonValue {
             "    \""+MLModelGroup.DESCRIPTION_FIELD+"\": {\n" +
             "      \"type\": \"text\"\n" +
             "    },\n" +
-            "    \""+MLModelGroup.TAGS_FIELD+"\": {\n" +
-            "      \"type\": \"text\",\n" +
-            "      \"fields\": {\n" +
-            "        \"keyword\": {\n" +
-            "          \"type\": \"keyword\",\n" +
-            "          \"ignore_above\": 256\n" +
-            "        }\n" +
-            "      }\n" +
-            "    },\n" +
-            "    \""+MLModelGroup.MODEL_IDS_FIELD+"\": {\n" +
-            "      \"type\": \"keyword\"\n" +
+            "    \""+MLModelGroup.LATEST_VERSION_FIELD+"\": {\n" +
+            "      \"type\": \"integer\"\n" +
             "    }\n" +
             "  }\n" +
             "}";

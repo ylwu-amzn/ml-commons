@@ -24,22 +24,16 @@ public class MLModelGroup implements ToXContentObject {
     public static final String LATEST_VERSION_FIELD = "latest_version";
     //SHA256 hash value of model content.
 
-    public static final String TAGS_FIELD = "tags";
-    public static final String MODEL_IDS_FIELD = "model_ids";
     //TODO: add created time, updated time,
     private String name;
     private String description;
-    private List<String> tags;
-    private List<String> models;
     private int latestVersion = 0;
 
 
     @Builder(toBuilder = true)
-    public MLModelGroup(String name, String description, List<String> tags, List<String> models, int latestVersion) {
+    public MLModelGroup(String name, String description, int latestVersion) {
         this.name = name;
         this.description = description;
-        this.tags = tags;
-        this.models = models;
         this.latestVersion = latestVersion;
     }
 
@@ -48,34 +42,12 @@ public class MLModelGroup implements ToXContentObject {
         name = input.readString();
         description = input.readOptionalString();
         latestVersion = input.readInt();
-        if (input.readBoolean()) {
-            this.tags = input.readStringList();
-        } else {
-            this.tags = null;
-        }
-        if (input.readBoolean()) {
-            this.models = input.readStringList();
-        } else {
-            this.models = null;
-        }
     }
 
     public void writeTo(StreamOutput out) throws IOException {
         out.writeString(name);
         out.writeOptionalString(description);
         out.writeInt(latestVersion);
-        if (tags != null) {
-            out.writeBoolean(true);
-            out.writeStringCollection(tags);
-        } else {
-            out.writeBoolean(false);
-        }
-        if (models != null) {
-            out.writeBoolean(true);
-            out.writeStringCollection(models);
-        } else {
-            out.writeBoolean(false);
-        }
     }
 
     @Override
@@ -85,12 +57,6 @@ public class MLModelGroup implements ToXContentObject {
         builder.field(LATEST_VERSION_FIELD, latestVersion);
         if (description != null) {
             builder.field(DESCRIPTION_FIELD, description);
-        }
-        if (tags != null && tags.size() > 0) {
-            builder.field(TAGS_FIELD, tags);
-        }
-        if (models != null && models.size() > 0) {
-            builder.field(MODEL_IDS_FIELD, models);
         }
         builder.endObject();
         return builder;

@@ -83,8 +83,6 @@ public class TransportCreateModelGroupAction extends HandledTransportAction<Acti
                         .builder()
                         .name(modelName)
                         .description(input.getDescription())
-                        .tags(input.getTags())
-                        .models(input.getModels())
                         .build();
                     IndexRequest indexRequest = new IndexRequest(ML_MODEL_GROUP_INDEX);
                     indexRequest
