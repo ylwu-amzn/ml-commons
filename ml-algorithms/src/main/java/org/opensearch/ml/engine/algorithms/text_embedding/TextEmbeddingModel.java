@@ -104,7 +104,7 @@ public class TextEmbeddingModel extends DLModel {
         Integer modelMaxLength = textEmbeddingModelConfig.getModelMaxLength();
         String warmUpSentence = "warm up sentence";
         if (modelMaxLength != null) {
-            warmUpSentence = "sentence ".repeat(modelMaxLength);
+            warmUpSentence = "sentence ".repeat(Math.max(1, modelMaxLength - 10));
         }
         // First request takes longer time. Predict once to warm up model.
         Input input = new Input();

@@ -8,8 +8,6 @@ package org.opensearch.ml.rest;
 import static org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken;
 import static org.opensearch.ml.plugin.MachineLearningPlugin.ML_BASE_URI;
 import static org.opensearch.ml.utils.RestActionUtils.PARAMETER_DEPLOY_MODEL;
-import static org.opensearch.ml.utils.RestActionUtils.PARAMETER_MODEL_ID;
-import static org.opensearch.ml.utils.RestActionUtils.PARAMETER_VERSION;
 
 import java.io.IOException;
 import java.util.List;
@@ -49,14 +47,6 @@ public class RestMLRegisterModelAction extends BaseRestHandler {
                     String.format(Locale.ROOT, "%s/models/_register", ML_BASE_URI),// new url
                     RestRequest.Method.POST,
                     String.format(Locale.ROOT, "%s/models/_upload", ML_BASE_URI)// old url
-                ),
-                new ReplacedRoute(
-                    RestRequest.Method.POST,
-                    // new url
-                    String.format(Locale.ROOT, "%s/models/{%s}/{%s}/_register", ML_BASE_URI, PARAMETER_MODEL_ID, PARAMETER_VERSION),
-                    RestRequest.Method.POST,
-                    // old url
-                    String.format(Locale.ROOT, "%s/models/{%s}/{%s}/_upload", ML_BASE_URI, PARAMETER_MODEL_ID, PARAMETER_VERSION)
                 )
             );
     }
@@ -75,24 +65,11 @@ public class RestMLRegisterModelAction extends BaseRestHandler {
      */
     @VisibleForTesting
     MLRegisterModelRequest getRequest(RestRequest request) throws IOException {
-        String modelName = request.param(PARAMETER_MODEL_ID);
-        String version = request.param(PARAMETER_VERSION);
-        boolean loadModel = request.paramAsBoolean(PARAMETER_DEPLOY_MODEL, false);
-        if (modelName != null && !request.hasContent()) {
-            MLRegisterModelInput mlInput = MLRegisterModelInput
-                .builder()
-                .deployModel(loadModel)
-                .modelName(modelName)
-                .version(version)
-                .build();
-            return new MLRegisterModelRequest(mlInput);
-        }
+        boolean deployModel = request.paramAsBoolean(PARAMETER_DEPLOY_MODEL, false);
 
         XContentParser parser = request.contentParser();
         ensureExpectedToken(XContentParser.Token.START_OBJECT, parser.nextToken(), parser);
-        MLRegisterModelInput mlInput = modelName == null
-            ? MLRegisterModelInput.parse(parser, loadModel)
-            : MLRegisterModelInput.parse(parser, modelName, version, loadModel);
+        MLRegisterModelInput mlInput = MLRegisterModelInput.parse(parser, deployModel);
         return new MLRegisterModelRequest(mlInput);
     }
 }

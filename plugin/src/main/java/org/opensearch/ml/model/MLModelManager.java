@@ -189,9 +189,11 @@ public class MLModelManager {
 
     public void registerModelMeta(MLRegisterModelMetaInput mlRegisterModelMetaInput, ActionListener<String> listener) {
         try {
+            FunctionName functionName = mlRegisterModelMetaInput.getFunctionName();
+            mlStats.getStat(MLNodeLevelStat.ML_NODE_TOTAL_REQUEST_COUNT).increment();
+            mlStats.createCounterStatIfAbsent(functionName, REGISTER, ML_ACTION_REQUEST_COUNT).increment();
             String modelName = mlRegisterModelMetaInput.getName();
             String version = mlRegisterModelMetaInput.getVersion();
-            FunctionName functionName = mlRegisterModelMetaInput.getFunctionName();
             try (ThreadContext.StoredContext context = client.threadPool().getThreadContext().stashContext()) {
                 mlIndicesHandler.initModelIndexIfAbsent(ActionListener.wrap(res -> {
                     Instant now = Instant.now();
