@@ -133,7 +133,8 @@ public class MLExecuteTaskRunnerTests extends OpenSearchTestCase {
                 mlTaskDispatcher,
                 mlCircuitBreakerService,
                 nodeHelper,
-                mlEngine
+                mlEngine,
+                null
             )
         );
 

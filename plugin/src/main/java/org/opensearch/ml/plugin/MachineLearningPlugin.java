@@ -301,7 +301,8 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin {
             mlTaskDispatcher,
             mlCircuitBreakerService,
             nodeHelper,
-            mlEngine
+            mlEngine,
+            mlModelManager
         );
 
         // Register thread-safe ML objects here.

@@ -8,12 +8,13 @@ package org.opensearch.ml.common.model;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
+import org.opensearch.common.io.stream.StreamInput;
+import org.opensearch.common.io.stream.StreamOutput;
 import org.opensearch.core.xcontent.XContentBuilder;
 import org.opensearch.core.xcontent.XContentParser;
 import org.opensearch.ml.common.FunctionName;
 
 import java.io.IOException;
-import java.util.Locale;
 
 import static org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken;
 
@@ -31,6 +32,15 @@ public class MetricsCorrelationModelConfig extends MLModelConfig {
     @Override
     public String getWriteableName() {
         return PARSE_FIELD_NAME;
+    }
+
+    public MetricsCorrelationModelConfig(StreamInput in) throws IOException{
+        super(in);
+    }
+
+    @Override
+    public void writeTo(StreamOutput out) throws IOException {
+        super.writeTo(out);
     }
 
     @Override

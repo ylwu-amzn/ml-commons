@@ -290,6 +290,9 @@ public class MLModelManager {
                 IndexRequest indexModelMetaRequest = new IndexRequest(ML_MODEL_INDEX);
                 indexModelMetaRequest.source(mlModelMeta.toXContent(XContentBuilder.builder(JSON.xContent()), EMPTY_PARAMS));
                 indexModelMetaRequest.setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE);
+                if (functionName == FunctionName.METRICS_CORRELATION) {
+                    indexModelMetaRequest.id(FunctionName.METRICS_CORRELATION.name());
+                }
                 // create model meta doc
                 ActionListener<IndexResponse> listener = ActionListener.wrap(modelMetaRes -> {
                     String modelId = modelMetaRes.getId();
