@@ -68,4 +68,7 @@ public final class MLCommonsSettings {
         .simpleString("plugins.ml_commons.exclude_nodes._name", Setting.Property.NodeScope, Setting.Property.Dynamic);
     public static final Setting<Boolean> ML_COMMONS_ALLOW_CUSTOM_DEPLOYMENT_PLAN = Setting
         .boolSetting("plugins.ml_commons.allow_custom_deployment_plan", false, Setting.Property.NodeScope, Setting.Property.Dynamic);
+
+    public static final Setting<Boolean> ML_COMMONS_VALIDATE_BACKEND_ROLES = Setting
+        .boolSetting("plugins.ml_commons.filter_by_backend_roles", true, Setting.Property.NodeScope, Setting.Property.Dynamic);
 }
