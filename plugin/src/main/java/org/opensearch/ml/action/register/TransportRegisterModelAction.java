@@ -7,6 +7,7 @@ package org.opensearch.ml.action.register;
 
 import static org.opensearch.ml.common.MLTask.STATE_FIELD;
 import static org.opensearch.ml.common.MLTaskState.FAILED;
+import static org.opensearch.ml.settings.MLCommonsSettings.ML_COMMONS_ALLOW_BYOM;
 import static org.opensearch.ml.settings.MLCommonsSettings.ML_COMMONS_TRUSTED_URL_REGEX;
 import static org.opensearch.ml.task.MLTaskManager.TASK_SEMAPHORE_TIMEOUT;
 import static org.opensearch.ml.utils.MLExceptionUtils.logException;
@@ -70,6 +71,7 @@ public class TransportRegisterModelAction extends HandledTransportAction<ActionR
     MLTaskDispatcher mlTaskDispatcher;
     MLStats mlStats;
     volatile String trustedUrlRegex;
+    volatile Boolean allowByom;
 
     @Inject
     public TransportRegisterModelAction(
@@ -102,12 +104,19 @@ public class TransportRegisterModelAction extends HandledTransportAction<ActionR
 
         trustedUrlRegex = ML_COMMONS_TRUSTED_URL_REGEX.get(settings);
         clusterService.getClusterSettings().addSettingsUpdateConsumer(ML_COMMONS_TRUSTED_URL_REGEX, it -> trustedUrlRegex = it);
+        allowByom = ML_COMMONS_ALLOW_BYOM.get(settings);
+        clusterService.getClusterSettings().addSettingsUpdateConsumer(ML_COMMONS_ALLOW_BYOM, it -> allowByom = it);
     }
 
     @Override
     protected void doExecute(Task task, ActionRequest request, ActionListener<MLRegisterModelResponse> listener) {
         MLRegisterModelRequest registerModelRequest = MLRegisterModelRequest.fromActionRequest(request);
         MLRegisterModelInput registerModelInput = registerModelRequest.getRegisterModelInput();
+        if (!allowByom.booleanValue() && registerModelInput.getUrl() != null) {
+            throw new IllegalArgumentException(
+                "Current cluster setting doesn't allow uploading your own model. Please try our pre-trained model: https://opensearch.org/docs/latest/ml-commons-plugin/pretrained-models/"
+            );
+        }
 
         FunctionName functionName = registerModelInput.getFunctionName();
 

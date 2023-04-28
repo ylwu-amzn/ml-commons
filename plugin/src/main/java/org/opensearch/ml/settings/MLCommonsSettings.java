@@ -71,4 +71,7 @@ public final class MLCommonsSettings {
 
     public static final Setting<String> ML_COMMONS_MASTER_SECRET_KEY = Setting
         .simpleString("plugins.ml_commons.encryption.master_key", "0000000000000000", Setting.Property.NodeScope, Setting.Property.Dynamic);
+
+    public static final Setting<Boolean> ML_COMMONS_ALLOW_BYOM = Setting
+        .boolSetting("plugins.ml_commons.allow_bring_your_own_model", true, Setting.Property.NodeScope, Setting.Property.Dynamic);
 }
