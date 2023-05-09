@@ -31,6 +31,7 @@ import org.opensearch.core.xcontent.XContentParser;
 import org.opensearch.index.IndexNotFoundException;
 import org.opensearch.ml.common.MLModel;
 import org.opensearch.ml.common.exception.MLResourceNotFoundException;
+import org.opensearch.ml.common.exception.MLValidationException;
 import org.opensearch.ml.common.transport.model.MLModelGetAction;
 import org.opensearch.ml.common.transport.model.MLModelGetRequest;
 import org.opensearch.ml.common.transport.model.MLModelGetResponse;
@@ -77,21 +78,23 @@ public class GetModelTransportAction extends HandledTransportAction<ActionReques
 
         try (ThreadContext.StoredContext context = client.threadPool().getThreadContext().stashContext()) {
             client.get(getRequest, ActionListener.runBefore(ActionListener.wrap(r -> {
-
                 if (r != null && r.isExists()) {
                     try (XContentParser parser = createXContentParserFromRegistry(xContentRegistry, r.getSourceAsBytesRef())) {
                         ensureExpectedToken(XContentParser.Token.START_OBJECT, parser.nextToken(), parser);
                         MLModel mlModel = MLModel.parse(parser);
+                        SecurityUtils.validateModelGroupAccess(user, mlModel.getModelGroupId(), client, ActionListener.wrap(access -> {
+                            if ((filterByEnabled) && (Boolean.FALSE.equals(access))) {
+                                actionListener
+                                    .onFailure(new MLValidationException("User Doesn't have previlege to perform this operation"));
+                            } else {
+                                log.debug("Completed Get Model Request, id:{}", modelId);
+                                actionListener.onResponse(MLModelGetResponse.builder().mlModel(mlModel).build());
+                            }
+                        }, e -> {
+                            log.error("Failed to validate Access for Model Id " + modelId, e);
+                            actionListener.onFailure(e);
+                        }));
 
-                        if ((mlModel.getModelGroupId() != null)
-                            && (filterByEnabled)
-                            && (!SecurityUtils.validateModelGroupAccess(user, mlModel.getModelGroupId(), client))) {
-                            log.error("User doesn't have valid privilege to perform this operation");
-                            throw new IllegalArgumentException("User doesn't have valid privilege to perform this operation");
-                        }
-
-                        log.debug("Completed Get Model Request, id:{}", modelId);
-                        actionListener.onResponse(MLModelGetResponse.builder().mlModel(mlModel).build());
                     } catch (Exception e) {
                         log.error("Failed to parse ml model" + r.getId(), e);
                         actionListener.onFailure(e);

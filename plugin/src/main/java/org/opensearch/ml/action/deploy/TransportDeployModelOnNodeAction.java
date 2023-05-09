@@ -5,12 +5,7 @@
 
 package org.opensearch.ml.action.deploy;
 
-import static org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken;
-import static org.opensearch.ml.common.CommonValue.ML_MODEL_INDEX;
-import static org.opensearch.ml.settings.MLCommonsSettings.ML_COMMONS_VALIDATE_BACKEND_ROLES;
 import static org.opensearch.ml.utils.MLExceptionUtils.logException;
-import static org.opensearch.ml.utils.MLNodeUtils.createXContentParserFromRegistry;
-import static org.opensearch.ml.utils.RestActionUtils.getFetchSourceContext;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -23,7 +18,6 @@ import lombok.extern.log4j.Log4j2;
 import org.opensearch.action.ActionListener;
 import org.opensearch.action.ActionListenerResponseHandler;
 import org.opensearch.action.FailedNodeException;
-import org.opensearch.action.get.GetRequest;
 import org.opensearch.action.support.ActionFilters;
 import org.opensearch.action.support.nodes.TransportNodesAction;
 import org.opensearch.client.Client;
@@ -33,27 +27,26 @@ import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.inject.Inject;
 import org.opensearch.common.io.stream.StreamInput;
 import org.opensearch.common.settings.Settings;
-import org.opensearch.common.util.concurrent.ThreadContext;
-import org.opensearch.commons.authuser.User;
 import org.opensearch.core.xcontent.NamedXContentRegistry;
-import org.opensearch.core.xcontent.XContentParser;
 import org.opensearch.ml.breaker.MLCircuitBreakerService;
 import org.opensearch.ml.common.FunctionName;
-import org.opensearch.ml.common.MLModel;
 import org.opensearch.ml.common.MLTask;
-import org.opensearch.ml.common.exception.MLResourceNotFoundException;
-import org.opensearch.ml.common.exception.MLValidationException;
-import org.opensearch.ml.common.transport.deploy.*;
-import org.opensearch.ml.common.transport.forward.*;
-import org.opensearch.ml.common.transport.model.MLModelGetRequest;
+import org.opensearch.ml.common.transport.deploy.MLDeployModelInput;
+import org.opensearch.ml.common.transport.deploy.MLDeployModelNodeRequest;
+import org.opensearch.ml.common.transport.deploy.MLDeployModelNodeResponse;
+import org.opensearch.ml.common.transport.deploy.MLDeployModelNodesRequest;
+import org.opensearch.ml.common.transport.deploy.MLDeployModelNodesResponse;
+import org.opensearch.ml.common.transport.deploy.MLDeployModelOnNodeAction;
+import org.opensearch.ml.common.transport.forward.MLForwardAction;
+import org.opensearch.ml.common.transport.forward.MLForwardInput;
+import org.opensearch.ml.common.transport.forward.MLForwardRequest;
+import org.opensearch.ml.common.transport.forward.MLForwardRequestType;
+import org.opensearch.ml.common.transport.forward.MLForwardResponse;
 import org.opensearch.ml.engine.ModelHelper;
 import org.opensearch.ml.model.MLModelManager;
 import org.opensearch.ml.stats.MLStats;
 import org.opensearch.ml.task.MLTaskManager;
 import org.opensearch.ml.utils.MLExceptionUtils;
-import org.opensearch.ml.utils.RestActionUtils;
-import org.opensearch.ml.utils.SecurityUtils;
-import org.opensearch.search.fetch.subphase.FetchSourceContext;
 import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.transport.TransportService;
 
@@ -70,8 +63,6 @@ public class TransportDeployModelOnNodeAction extends
     NamedXContentRegistry xContentRegistry;
     MLCircuitBreakerService mlCircuitBreakerService;
     MLStats mlStats;
-
-    private volatile boolean filterByEnabled;
 
     @Inject
     public TransportDeployModelOnNodeAction(
@@ -109,8 +100,6 @@ public class TransportDeployModelOnNodeAction extends
         this.xContentRegistry = xContentRegistry;
         this.mlCircuitBreakerService = mlCircuitBreakerService;
         this.mlStats = mlStats;
-        filterByEnabled = ML_COMMONS_VALIDATE_BACKEND_ROLES.get(settings);
-        clusterService.getClusterSettings().addSettingsUpdateConsumer(ML_COMMONS_VALIDATE_BACKEND_ROLES, it -> filterByEnabled = it);
     }
 
     @Override
@@ -140,33 +129,6 @@ public class TransportDeployModelOnNodeAction extends
     private MLDeployModelNodeResponse createDeployModelNodeResponse(MLDeployModelNodesRequest MLDeployModelNodesRequest) {
         MLDeployModelInput deployModelInput = MLDeployModelNodesRequest.getMlDeployModelInput();
         String modelId = deployModelInput.getModelId();
-        MLModelGetRequest mlModelGetRequest = new MLModelGetRequest(modelId, false);
-        FetchSourceContext fetchSourceContext = getFetchSourceContext(mlModelGetRequest.isReturnContent());
-        GetRequest getRequest = new GetRequest(ML_MODEL_INDEX).id(modelId).fetchSourceContext(fetchSourceContext);
-        User user = RestActionUtils.getUserContext(client);
-
-        try (ThreadContext.StoredContext context = client.threadPool().getThreadContext().stashContext()) {
-            client.get(getRequest, ActionListener.wrap(r -> {
-                if (r != null && r.isExists()) {
-                    try (XContentParser parser = createXContentParserFromRegistry(xContentRegistry, r.getSourceAsBytesRef())) {
-                        ensureExpectedToken(XContentParser.Token.START_OBJECT, parser.nextToken(), parser);
-                        MLModel mlModel = MLModel.parse(parser);
-                        log.info(mlModel.getModelGroupId());
-
-                        if ((mlModel.getModelGroupId() != null)
-                            && (filterByEnabled)
-                            && (!SecurityUtils.validateModelGroupAccess(user, mlModel.getModelGroupId(), client))) {
-                            log.info("backend roles did not match");
-                            log.error("User doesn't have valid privilege to perform this operation");
-                            throw new MLValidationException("User doesn't have valid privilege to perform this operation");
-                        }
-                    }
-                }
-            }, e -> { throw new MLResourceNotFoundException("Fail to find model"); }));
-        } catch (Exception e) {
-            throw e;
-        }
-
         String taskId = deployModelInput.getTaskId();
         Integer nodeCount = deployModelInput.getNodeCount();
         String coordinatingNodeId = deployModelInput.getCoordinatingNodeId();
