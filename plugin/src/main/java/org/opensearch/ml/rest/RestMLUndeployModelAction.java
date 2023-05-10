@@ -20,7 +20,8 @@ import org.opensearch.client.node.NodeClient;
 import org.opensearch.cluster.node.DiscoveryNode;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.core.xcontent.XContentParser;
-import org.opensearch.ml.common.transport.undeploy.MLUndeployModelAction;
+import org.opensearch.ml.common.transport.undeploy.MLUndeployModelsAction;
+import org.opensearch.ml.common.transport.undeploy.MLUndeployModelsRequest;
 import org.opensearch.ml.common.transport.undeploy.MLUndeployModelInput;
 import org.opensearch.ml.common.transport.undeploy.MLUndeployModelNodesRequest;
 import org.opensearch.rest.BaseRestHandler;
@@ -67,9 +68,36 @@ public class RestMLUndeployModelAction extends BaseRestHandler {
 
     @Override
     public RestChannelConsumer prepareRequest(RestRequest request, NodeClient client) throws IOException {
-        MLUndeployModelNodesRequest MLUndeployModelNodesRequest = getRequest(request);
+        //MLUndeployModelNodesRequest MLUndeployModelNodesRequest = getRequest(request);
+        MLUndeployModelsRequest mlUndeployModelsRequest = getUndeployRequest(request);
         return channel -> client
-            .execute(MLUndeployModelAction.INSTANCE, MLUndeployModelNodesRequest, new RestToXContentListener<>(channel));
+//            .execute(MLUndeployModelAction.INSTANCE, MLUndeployModelNodesRequest, new RestToXContentListener<>(channel));
+            .execute(MLUndeployModelsAction.INSTANCE, mlUndeployModelsRequest, new RestToXContentListener<>(channel));
+    }
+
+    MLUndeployModelsRequest getUndeployRequest(RestRequest request) throws IOException {
+        String modelId = request.param(PARAMETER_MODEL_ID);
+        String[] targetModelIds = null;
+        if (modelId != null) {
+            targetModelIds = new String[] { modelId };
+        }
+        String[] targetNodeIds = getAllNodes();
+        if (request.hasContent()) {
+            XContentParser parser = request.contentParser();
+            ensureExpectedToken(XContentParser.Token.START_OBJECT, parser.nextToken(), parser);
+            MLUndeployModelInput mlInput = MLUndeployModelInput.parse(parser);
+            String[] nodeIds = mlInput.getNodeIds();
+            String[] modelIds = mlInput.getModelIds();
+
+            if (ArrayUtils.isNotEmpty(nodeIds)) {
+                targetNodeIds = nodeIds;
+            }
+            if (ArrayUtils.isNotEmpty(modelIds)) {
+                targetModelIds = modelIds;
+            }
+        }
+
+        return new MLUndeployModelsRequest(targetNodeIds, targetModelIds);
     }
 
     /**

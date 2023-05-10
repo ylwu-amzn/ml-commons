@@ -113,6 +113,7 @@ public class TransportUndeployModelAction extends
         List<MLUndeployModelNodeResponse> responses,
         List<FailedNodeException> failures
     ) {
+        User user = RestActionUtils.getUserContext(client);
         if (responses != null) {
             Map<String, List<String>> removedNodeMap = new HashMap<>();
             Map<String, Integer> modelWorkNodeCounts = new HashMap<>();
