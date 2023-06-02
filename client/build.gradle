@@ -13,7 +13,7 @@ plugins {
 }
 
 dependencies {
-    implementation project(':opensearch-ml-common')
+    implementation project(':opensearch-ml-common', configuration: 'shadow')
     compileOnly group: 'org.opensearch', name: 'opensearch', version: "${opensearch_version}"
     testImplementation group: 'junit', name: 'junit', version: '4.13.2'
     testImplementation group: 'org.mockito', name: 'mockito-core', version: '4.4.0'
@@ -49,7 +49,6 @@ check.dependsOn jacocoTestCoverageVerification
 
 tasks.named("jar").configure { dependsOn("publishShadowPublicationToMavenLocal") }
 tasks.named("jar").configure { dependsOn("publishShadowPublicationToStagingRepository") }
-tasks.named("jar").configure { dependsOn("publishShadowPublicationToSnapshotsRepository") }
 
 shadowJar {
     archiveClassifier.set(null)
