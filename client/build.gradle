@@ -10,7 +10,6 @@ plugins {
     id 'com.github.johnrengelman.shadow'
     id 'maven-publish'
     id 'signing'
-    id 'com.netflix.nebula.ospackage' version "11.1.0"
 }
 
 dependencies {
