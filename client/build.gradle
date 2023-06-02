@@ -48,7 +48,6 @@ jacocoTestCoverageVerification {
 check.dependsOn jacocoTestCoverageVerification
 
 tasks.named("jar").configure { dependsOn("publishShadowPublicationToMavenLocal") }
-tasks.named("publishShadowPublicationToStagingRepository").configure { dependsOn("jar") }
 
 shadowJar {
     archiveClassifier.set(null)
