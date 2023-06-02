@@ -49,7 +49,7 @@ check.dependsOn jacocoTestCoverageVerification
 
 tasks.named("jar").configure { dependsOn("publishShadowPublicationToMavenLocal") }
 tasks.named("publishShadowPublicationToStagingRepository").configure {
-    mustRunAfter(tasks.named("jar"))
+    dependsOn("jar")
 }
 
 shadowJar {
