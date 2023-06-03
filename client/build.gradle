@@ -147,4 +147,5 @@ publishing {
 
 }
 
-publishing.publications.shadow.dependsOn publishing.publications.jars
+//publishing.publications.shadow.dependsOn publishing.publications.jars
+publishShadowPublicationToMavenLocal.dependsOn publishJarsPublicationToMavenLocal
