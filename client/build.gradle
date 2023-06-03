@@ -87,6 +87,8 @@ publishing {
 
         jars(MavenPublication) { publication ->
             from components.java
+            artifact sourcesJar
+            artifact javadocJar
 
             pom {
                 name = "OpenSearch Machine Learning Client"
