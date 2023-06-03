@@ -147,3 +147,4 @@ publishing {
 
 }
 
+publishing.publications.shadow.dependsOn publishing.publications.jars
