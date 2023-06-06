@@ -24,6 +24,7 @@ import org.opensearch.ml.common.input.MLInput;
 import org.opensearch.ml.common.output.model.ModelTensor;
 import org.opensearch.ml.common.output.model.ModelTensorOutput;
 import org.opensearch.ml.common.output.model.ModelTensors;
+import org.opensearch.ml.common.spi.tools.Tool;
 import org.opensearch.ml.engine.annotation.ConnectorExecutor;
 import org.opensearch.script.ScriptService;
 
@@ -39,6 +40,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.opensearch.ml.common.connector.ConnectorNames.HTTP_V1;
 import static org.opensearch.ml.engine.algorithms.remote.ConnectorUtils.processInput;
 import static org.opensearch.ml.engine.algorithms.remote.ConnectorUtils.processOutput;
+import static org.opensearch.ml.engine.algorithms.remote.PromptTemplate.AGENT_TEMPLATE;
 
 @Log4j2
 @ConnectorExecutor(HTTP_V1)
@@ -47,6 +49,7 @@ public class HttpJsonConnectorExecutor implements RemoteConnectorExecutor{
     private HttpConnector connector;
     @Setter
     private ScriptService scriptService;
+    private Agent agent;
 
     public HttpJsonConnectorExecutor(Connector connector) {
         this.connector = (HttpConnector)connector;
@@ -54,18 +57,27 @@ public class HttpJsonConnectorExecutor implements RemoteConnectorExecutor{
 
     @Override
     public ModelTensorOutput execute(MLInput mlInput) {
+        RemoteInferenceInputDataSet inputData = processInput(mlInput, connector, scriptService);
+        Map<String, String> parameters = inputData.getParameters();
+
+        if (agent != null) {
+            return agent.run(parameters, (params) -> executeDirectly(params));
+        } else {
+            return executeDirectly(parameters);
+        }
+    }
+
+    public ModelTensorOutput executeDirectly(Map<String, String> inputParameters) {
         List<ModelTensors> tensorOutputs = new ArrayList<>();
         List<ModelTensor> modelTensors = new ArrayList<>();
 
         try {
-            RemoteInferenceInputDataSet inputData = processInput(mlInput, connector, scriptService);
-
             Map<String, String> parameters = new HashMap<>();
             if (connector.getParameters() != null) {
                 parameters.putAll(connector.getParameters());
             }
-            if (inputData.getParameters() != null) {
-                parameters.putAll(inputData.getParameters());
+            if (inputParameters != null) {
+                parameters.putAll(inputParameters);
             }
 
             String payload = connector.createPayload(parameters);
@@ -123,6 +135,13 @@ public class HttpJsonConnectorExecutor implements RemoteConnectorExecutor{
         } catch (Throwable e) {
             log.error("Fail to execute http connector", e);
             throw new MLException("Fail to execute http connector", e);
+        }
+    }
+
+    @Override
+    public void setTools(List<Tool> tools) {
+        if (tools != null && tools.size() > 0) {
+            this.agent = new Agent(tools, AGENT_TEMPLATE);
         }
     }
 }

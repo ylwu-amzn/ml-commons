@@ -10,6 +10,7 @@ import static org.opensearch.ml.common.CommonValue.ML_TASK_INDEX;
 import static org.opensearch.ml.settings.MLCommonsSettings.ML_COMMONS_MASTER_SECRET_KEY;
 
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -74,6 +75,8 @@ import org.opensearch.ml.common.input.parameter.regression.LinearRegressionParam
 import org.opensearch.ml.common.input.parameter.regression.LogisticRegressionParams;
 import org.opensearch.ml.common.input.parameter.sample.SampleAlgoParams;
 import org.opensearch.ml.common.model.TextEmbeddingModelConfig;
+import org.opensearch.ml.common.spi.MLCommonsExtension;
+import org.opensearch.ml.common.spi.tools.Tool;
 import org.opensearch.ml.common.transport.deploy.MLDeployModelAction;
 import org.opensearch.ml.common.transport.deploy.MLDeployModelOnNodeAction;
 import org.opensearch.ml.common.transport.execute.MLExecuteTaskAction;
@@ -137,6 +140,7 @@ import org.opensearch.ml.utils.IndexUtils;
 import org.opensearch.monitor.jvm.JvmService;
 import org.opensearch.monitor.os.OsService;
 import org.opensearch.plugins.ActionPlugin;
+import org.opensearch.plugins.ExtensiblePlugin;
 import org.opensearch.plugins.Plugin;
 import org.opensearch.repositories.RepositoriesService;
 import org.opensearch.rest.RestController;
@@ -149,7 +153,7 @@ import org.opensearch.watcher.ResourceWatcherService;
 
 import com.google.common.collect.ImmutableList;
 
-public class MachineLearningPlugin extends Plugin implements ActionPlugin {
+public class MachineLearningPlugin extends Plugin implements ActionPlugin, ExtensiblePlugin {
     public static final String ML_THREAD_POOL_PREFIX = "thread_pool.ml_commons.";
     public static final String GENERAL_THREAD_POOL = "opensearch_ml_general";
     public static final String EXECUTE_THREAD_POOL = "opensearch_ml_execute";
@@ -183,6 +187,8 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin {
 
     public static final String ML_ROLE_NAME = "ml";
     private NamedXContentRegistry xContentRegistry;
+
+    private Map<String, Tool> externalTools;
 
     @Override
     public List<ActionHandler<? extends ActionRequest, ? extends ActionResponse>> getActions() {
@@ -274,7 +280,8 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin {
             mlTaskManager,
             modelCacheHelper,
             mlEngine,
-            nodeHelper
+            nodeHelper,
+            externalTools
         );
         mlInputDatasetHandler = new MLInputDatasetHandler(client);
 
@@ -524,5 +531,16 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin {
                 MLCommonsSettings.ML_COMMONS_MASTER_SECRET_KEY
             );
         return settings;
+    }
+
+    @Override
+    public void loadExtensions(ExtensionLoader loader) {
+        externalTools = new HashMap<>();
+        for (MLCommonsExtension extension : loader.loadExtensions(MLCommonsExtension.class)) {
+            List<Tool> tools = extension.getTools();
+            for (Tool tool : tools) {
+                externalTools.put(tool.getName(), tool);
+            }
+        }
     }
 }

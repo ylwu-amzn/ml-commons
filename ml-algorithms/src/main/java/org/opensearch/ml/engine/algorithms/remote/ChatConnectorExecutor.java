@@ -40,6 +40,7 @@ import org.opensearch.ml.common.input.MLInput;
 import org.opensearch.ml.common.output.model.ModelTensor;
 import org.opensearch.ml.common.output.model.ModelTensorOutput;
 import org.opensearch.ml.common.output.model.ModelTensors;
+import org.opensearch.ml.common.spi.tools.Tool;
 import org.opensearch.ml.engine.annotation.ConnectorExecutor;
 import org.opensearch.script.ScriptService;
 import org.opensearch.search.SearchHit;
@@ -81,6 +82,7 @@ import static org.opensearch.ml.common.connector.ChatConnector.CONTENT_FIELD_FIE
 import static org.opensearch.ml.common.connector.ChatConnector.SESSION_SIZE_FIELD;
 import static org.opensearch.ml.engine.algorithms.remote.ConnectorUtils.processOutput;
 import static org.opensearch.ml.engine.algorithms.remote.ConnectorUtils.signRequest;
+import static org.opensearch.ml.engine.algorithms.remote.PromptTemplate.AGENT_TEMPLATE_WITH_CONTEXT;
 import static org.opensearch.ml.engine.utils.ScriptUtils.gson;
 import static software.amazon.awssdk.http.SdkHttpMethod.POST;
 
@@ -95,6 +97,7 @@ public class ChatConnectorExecutor implements RemoteConnectorExecutor{
     private ClusterService clusterService;
     @Setter
     private ScriptService scriptService;
+    private Agent agent;
 
     public ChatConnectorExecutor(Connector connector) {
         this.connector = (ChatConnector)connector;
@@ -102,9 +105,6 @@ public class ChatConnectorExecutor implements RemoteConnectorExecutor{
 
     @Override
     public ModelTensorOutput execute(MLInput mlInput) {
-        List<ModelTensors> tensorOutputs = new ArrayList<>();
-        List<ModelTensor> modelTensors = new ArrayList<>();
-
         RemoteInferenceInputDataSet inputData = null;
         if (mlInput.getInputDataset() instanceof RemoteInferenceInputDataSet) {
             inputData = (RemoteInferenceInputDataSet)mlInput.getInputDataset();
@@ -123,7 +123,7 @@ public class ChatConnectorExecutor implements RemoteConnectorExecutor{
         String question = parameters.get("question");
         Boolean withMyContent = Boolean.parseBoolean(parameters.get("with_my_content"));
 
-        AtomicReference<String> contextRef = new AtomicReference<>("");
+        AtomicReference<String> knowledgeBaseRef = new AtomicReference<>("");
         AtomicReference<Exception> exceptionRef = new AtomicReference<>(null);
         String contentIndex = parameters.containsKey(CONTENT_INDEX)? parameters.get(CONTENT_INDEX) : connector.getContentIndex();
         if (withMyContent && contentIndex != null) {
@@ -133,27 +133,7 @@ public class ChatConnectorExecutor implements RemoteConnectorExecutor{
             if (connector.getContentFields() == null && !parameters.containsKey(CONTENT_FIELD_FIELD)) {
                 throw new IllegalArgumentException("Content field not set");
             }
-            Settings settings = clusterService.state().metadata().index(contentIndex).getSettings();
-            String ingestPipeline = settings.get("index.default_pipeline");
-            if (ingestPipeline != null) {
-                IngestMetadata ingest = (IngestMetadata)clusterService.state().getMetadata().customs().get("ingest");
-                PipelineConfiguration pipelineConfiguration = ingest.getPipelines().get(ingestPipeline);
-                Map<String, Object> configAsMap = pipelineConfiguration.getConfigAsMap();
-                List processors = (List)configAsMap.get("processors");
-                Map<String, Object> processor = (Map<String, Object>)processors.get(0);
-                Map<String, Object> textEmbedding = (Map<String, Object>)processor.get("text_embedding");
-                String modelId = (String)textEmbedding.get("model_id");
-                Map<String, Object> fieldMap = (Map<String, Object>)textEmbedding.get("field_map");
-                String contentField = connector.getParameters().get("content_fields");
-                String knnField = (String)fieldMap.get(contentField);
-
-                if (!parameters.containsKey("embedding_model_id")) {
-                    parameters.put("embedding_model_id", modelId);
-                }
-                if (!parameters.containsKey("embedding_field")) {
-                    parameters.put("embedding_field", knnField);
-                }
-            }
+            getEmbeddingModelId(parameters, contentIndex, "embedding_model_id", "embedding_field");
 
             try {
                 Integer contentDocSize = connector.getContentDocSize();
@@ -197,7 +177,7 @@ public class ChatConnectorExecutor implements RemoteConnectorExecutor{
                             String context = (String) sourceAsMap.get(connector.getContentFields());
                             contextBuilder.append("document_id: ").append(hit.getId()).append("\\\\nDocument context:").append(context).append("\\\\n");
                         }
-                        contextRef.set(gson.toJson(contextBuilder.toString()));
+                        knowledgeBaseRef.set("\n\nContext: \n" + gson.toJson( contextBuilder) + "\n\n");
                     }
                 }, e -> {
                     log.error("Failed to search index", e);
@@ -219,64 +199,168 @@ public class ChatConnectorExecutor implements RemoteConnectorExecutor{
         }
 
 
+        AtomicReference<String> chatHistoryRef = new AtomicReference<>("");
         String sessionId = parameters.get("session_id");
-        if (sessionId != null && connector.getSessionIndex() != null) {
-            try {
-                Integer sessionSize = connector.getSessionSize();
-                if (parameters.containsKey("session_size")) {
-                    sessionSize = Integer.parseInt(parameters.get(SESSION_SIZE_FIELD));
-                }
-                SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
-                searchSourceBuilder.query(new TermQueryBuilder(connector.getSessionIdField(), sessionId));
-                searchSourceBuilder.sort("created_time", SortOrder.DESC);
-                searchSourceBuilder.size(sessionSize);
-                SearchRequest searchRequest = new SearchRequest().source(searchSourceBuilder).indices(connector.getSessionIndex());
-
-                CountDownLatch latch = new CountDownLatch(1);
-                LatchedActionListener listener = new LatchedActionListener<SearchResponse>(ActionListener.wrap(r -> {
-                    SearchHit[] hits = r.getHits().getHits();
-
-                    if (hits != null && hits.length > 0) {
-                        StringBuilder contextBuilder = new StringBuilder("Chat history: \\\\n");
-                        for (int i = hits.length - 1; i >= 0; i--) {
-                            SearchHit hit = hits[i];
-                            String historicalQuestion = (String) hit.getSourceAsMap().get("question");
-                            String historicalAnswer = (String) hit.getSourceAsMap().get("answer");
-                            contextBuilder.append("Question: ").append(historicalQuestion).append("\\\\nAnswer:").append(historicalAnswer).append("\\\\n");
-                        }
-                        String myContent = contextRef.get().length() > 0 ? gson.fromJson(contextRef.get(), String.class) : "";
-                        String context = myContent + contextBuilder.toString();
-                        contextRef.set(gson.toJson(context));
-                    }
-                }, e -> {
-                    log.error("Failed to search index", e);
-                    exceptionRef.set(e);
-                }), latch);
-                client.search(searchRequest, listener);
-
-                try {
-                    latch.await();
-                } catch (InterruptedException e) {
-                    throw new IllegalStateException(e);
-                }
-                if (exceptionRef.get() != null) {
-                    throw new MLException(exceptionRef.get());
-                }
-            } catch (Exception e) {
-                log.error("Failed to search sessions", e);
+        String sessionIndex = connector.getSessionIndex();
+        if ((sessionId != null || "true".equals(parameters.get("with_all_sessions"))) && sessionIndex != null) {
+            if (!clusterService.state().metadata().hasIndex(sessionIndex)) {
+                throw new IllegalArgumentException("Index not found: " + sessionIndex);
             }
-        } else {
+            getEmbeddingModelId(parameters, contentIndex, "session_index_embedding_model_id", null);
+            if (parameters.containsKey("session_index_embedding_model_id")) {
+                try {
+                    Integer sessionSize = connector.getSessionSize();
+                    if (parameters.containsKey("session_size")) {
+                        sessionSize = Integer.parseInt(parameters.get(SESSION_SIZE_FIELD));
+                    }
+                    String query = connector.createNeuralSearchQueryForSession(parameters);
+
+                    SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+                    XContentParser queryParser = XContentType.JSON.xContent().createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE, query);
+                    searchSourceBuilder.parseXContent(queryParser);
+                    searchSourceBuilder.seqNoAndPrimaryTerm(true).version(true);
+                    searchSourceBuilder.size(sessionSize);
+
+                    SearchRequest searchRequest = new SearchRequest().source(searchSourceBuilder).indices(sessionIndex);
+                    CountDownLatch latch = new CountDownLatch(1);
+                    LatchedActionListener listener = new LatchedActionListener<SearchResponse>(ActionListener.wrap(r -> {
+                        SearchHit[] hits = r.getHits().getHits();
+
+                        if (hits != null && hits.length > 0) {
+                            StringBuilder contextBuilder = new StringBuilder();
+                            for (int i = hits.length - 1; i >= 0; i--) {
+                                SearchHit hit = hits[i];
+                                String historicalQuestion = (String) hit.getSourceAsMap().get("question");
+                                String historicalAnswer = (String) hit.getSourceAsMap().get("answer");
+                                contextBuilder.append("Human: ").append(historicalQuestion).append("\nAI:").append(historicalAnswer).append("\n");
+                            }
+                            chatHistoryRef.set("\n\nChat history between human and AI: \n" + gson.toJson(contextBuilder.toString()));
+                        }
+                    }, e -> {
+                        log.error("Failed to search index", e);
+                        exceptionRef.set(e);
+                    }), latch);
+                    client.search(searchRequest, listener);
+
+                    try {
+                        latch.await();
+                    } catch (InterruptedException e) {
+                        throw new IllegalStateException(e);
+                    }
+                    if (exceptionRef.get() != null) {
+                        throw new MLException(exceptionRef.get());
+                    }
+                } catch (Exception e) {
+                    log.error("Failed to search sessions", e);
+                }
+            } else if (sessionId != null && sessionIndex != null) {
+                try {
+                    Integer sessionSize = connector.getSessionSize();
+                    if (parameters.containsKey("session_size")) {
+                        sessionSize = Integer.parseInt(parameters.get(SESSION_SIZE_FIELD));
+                    }
+                    SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+                    searchSourceBuilder.query(new TermQueryBuilder(connector.getSessionIdField(), sessionId));
+                    searchSourceBuilder.sort("created_time", SortOrder.DESC);
+                    searchSourceBuilder.size(sessionSize);
+                    SearchRequest searchRequest = new SearchRequest().source(searchSourceBuilder).indices(sessionIndex);
+
+                    CountDownLatch latch = new CountDownLatch(1);
+                    LatchedActionListener listener = new LatchedActionListener<SearchResponse>(ActionListener.wrap(r -> {
+                        SearchHit[] hits = r.getHits().getHits();
+
+                        if (hits != null && hits.length > 0) {
+                            StringBuilder contextBuilder = new StringBuilder();
+                            for (int i = hits.length - 1; i >= 0; i--) {
+                                SearchHit hit = hits[i];
+                                String historicalQuestion = (String) hit.getSourceAsMap().get("question");
+                                String historicalAnswer = (String) hit.getSourceAsMap().get("answer");
+                                contextBuilder.append("Human: ").append(historicalQuestion).append("\nAI:").append(historicalAnswer).append("\n");
+                            }
+                            chatHistoryRef.set("\n\nChat history between human and AI: \n" + gson.toJson(contextBuilder.toString()));
+                        }
+                    }, e -> {
+                        log.error("Failed to search index", e);
+                        exceptionRef.set(e);
+                    }), latch);
+                    client.search(searchRequest, listener);
+
+                    try {
+                        latch.await();
+                    } catch (InterruptedException e) {
+                        throw new IllegalStateException(e);
+                    }
+                    if (exceptionRef.get() != null) {
+                        throw new MLException(exceptionRef.get());
+                    }
+                } catch (Exception e) {
+                    log.error("Failed to search sessions", e);
+                }
+            }
+
+        }
+        if (sessionId == null) {
             sessionId = UUID.randomUUID().toString();
         }
-
-
-        AtomicReference<String> responseRef = new AtomicReference<>("");
 
         Map<String, String> newParameters = new HashMap<>();
         newParameters.putAll(parameters);
         newParameters.put("question", question);
-        newParameters.put("context", contextRef.get());
-        String payload = connector.createPayload(newParameters);
+        newParameters.put("context", knowledgeBaseRef.get());
+        newParameters.put("chat_history", chatHistoryRef.get());
+
+        if (agent != null) {
+            String finalSessionId = sessionId;
+            newParameters.remove("prompt");
+            return agent.run(newParameters, (params) -> executeDirectly(params, question, finalSessionId));
+        } else {
+            return executeDirectly(newParameters, question, sessionId);
+        }
+
+    }
+
+    private void getEmbeddingModelId(Map<String, String> parameters, String contentIndex, String embeddingModelParamName, String knnFieldName) {
+        Settings settings = clusterService.state().metadata().index(contentIndex).getSettings();
+        String ingestPipeline = settings.get("index.default_pipeline");
+        if (ingestPipeline != null) {
+            IngestMetadata ingest = (IngestMetadata)clusterService.state().getMetadata().customs().get("ingest");
+            PipelineConfiguration pipelineConfiguration = ingest.getPipelines().get(ingestPipeline);
+            Map<String, Object> configAsMap = pipelineConfiguration.getConfigAsMap();
+            List processors = (List)configAsMap.get("processors");
+
+            Map<String, Object> processor = (Map<String, Object>)processors.get(0);
+            Map<String, Object> textEmbedding = (Map<String, Object>)processor.get("text_embedding");
+            String modelId = (String)textEmbedding.get("model_id");
+            Map<String, Object> fieldMap = (Map<String, Object>)textEmbedding.get("field_map");
+            String contentField = connector.getParameters().get("content_fields");
+            String knnField = (String)fieldMap.get(contentField);
+
+            if (embeddingModelParamName != null && !parameters.containsKey(embeddingModelParamName)) {
+                parameters.put(embeddingModelParamName, modelId);
+            }
+            if (knnFieldName != null && !parameters.containsKey(knnFieldName)) {
+                parameters.put(knnFieldName, knnField);
+            }
+        }
+    }
+
+    private ModelTensorOutput executeDirectly(Map<String, String> inputParameters,
+                                              String question,
+                                              String sessionId) {
+        List<ModelTensors> tensorOutputs = new ArrayList<>();
+        List<ModelTensor> modelTensors = new ArrayList<>();
+
+        AtomicReference<String> responseRef = new AtomicReference<>("");
+
+        Map<String, String> parameters = new HashMap<>();
+        if (connector.getParameters() != null) {
+            parameters.putAll(connector.getParameters());
+        }
+        if (inputParameters != null) {
+            parameters.putAll(inputParameters);
+        }
+
+        String payload = connector.createPayload(parameters);
 
         if (connector.hasAwsCredential()) {
             try {
@@ -321,7 +405,7 @@ public class ChatConnectorExecutor implements RemoteConnectorExecutor{
                 tensorOutputs.add(tensors);
                 if (connector.getSessionIndex() != null) {
                     IndexRequest indexRequest = new IndexRequest(connector.getSessionIndex());
-                    List results = (List)modelTensors.get(0).getDataAsMap().get("results");
+                    List results = (List) modelTensors.get(0).getDataAsMap().get("results");
                     indexRequest.source(ImmutableMap.of(connector.getSessionIdField(), sessionId,
                             "question", question,
                             "answer", ((Map)results.get(0)).get("outputText"),
@@ -388,7 +472,7 @@ public class ChatConnectorExecutor implements RemoteConnectorExecutor{
                 IndexRequest indexRequest = new IndexRequest(connector.getSessionIndex());
                 indexRequest.source(ImmutableMap.of(connector.getSessionIdField(), sessionId,
                         "question", question,
-                        "answer", modelTensors.get(0).getDataAsMap().get("response"),
+                        "answer", modelTensors.get(modelTensors.size() - 1).getDataAsMap().get("response"),
                         "created_time", Instant.now().toEpochMilli()));
                 client.index(indexRequest);
                 modelTensors.add(ModelTensor.builder().name("session_id").result(sessionId).build());
@@ -408,5 +492,12 @@ public class ChatConnectorExecutor implements RemoteConnectorExecutor{
     @Override
     public void setXContentRegistry(NamedXContentRegistry xContentRegistry) {
         this.xContentRegistry = xContentRegistry;
+    }
+
+    @Override
+    public void setTools(List<Tool> tools) {
+        if (tools != null && tools.size() > 0) {
+            this.agent = new Agent(tools, AGENT_TEMPLATE_WITH_CONTEXT);
+        }
     }
 }

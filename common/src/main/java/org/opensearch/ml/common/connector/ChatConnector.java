@@ -13,6 +13,7 @@ import org.opensearch.common.io.stream.StreamInput;
 import org.opensearch.core.xcontent.XContentParser;
 
 import java.io.IOException;
+import java.util.Locale;
 import java.util.Map;
 
 import static org.opensearch.ml.common.connector.ConnectorNames.CHAT_V1;
@@ -48,6 +49,79 @@ public class ChatConnector extends HttpConnector {
             "  ]\n" +
             "}";
 
+    public static final String DEFAULT_SEMANTIC_SEARCH_QUERY_FOR_SESSION = "{\n" +
+            "  \"query\": {\n" +
+            "    \"bool\": {\n" +
+            "      \"should\": [\n" +
+            "        {\n" +
+            "          \"neural\": {\n" +
+            "            \"question_knn\": {\n" +
+            "              \"query_text\": \"${parameters.question}\",\n" +
+            "              \"model_id\": \"${parameters.session_index_embedding_model_id}\",\n" +
+            "              \"k\": 10\n" +
+            "            }\n" +
+            "          }\n" +
+            "        },\n" +
+            "        {\n" +
+            "          \"neural\": {\n" +
+            "            \"answer_knn\": {\n" +
+            "              \"query_text\": \"${parameters.question}\",\n" +
+            "              \"model_id\": \"${parameters.session_index_embedding_model_id}\",\n" +
+            "              \"k\": 10\n" +
+            "            }\n" +
+            "          }\n" +
+            "        }\n" +
+            "      ],\n" +
+            "      \"must\": [\n" +
+            "         {\n" +
+            "           \"term\": {\n" +
+            "             \"session_id\": {\n" +
+            "               \"value\": \"${parameters.session_id}\"\n" +
+            "             }\n" +
+            "           }\n" +
+            "         }\n" +
+            "      ]\n" +
+            "    }\n" +
+            "  },\n" +
+            "  \"size\": \"${parameters.session_size}\",\n" +
+            "  \"_source\": [\n" +
+            "    \"question\",\n" +
+            "    \"answer\"\n" +
+            "  ]\n" +
+            "}";
+
+    public static final String DEFAULT_SEMANTIC_SEARCH_QUERY_FOR_ALL_SESSIONS = "{\n" +
+            "  \"query\": {\n" +
+            "    \"bool\": {\n" +
+            "      \"should\": [\n" +
+            "        {\n" +
+            "          \"neural\": {\n" +
+            "            \"question_knn\": {\n" +
+            "              \"query_text\": \"${parameters.question}\",\n" +
+            "              \"model_id\": \"${parameters.session_index_embedding_model_id}\",\n" +
+            "              \"k\": 10\n" +
+            "            }\n" +
+            "          }\n" +
+            "        },\n" +
+            "        {\n" +
+            "          \"neural\": {\n" +
+            "            \"answer_knn\": {\n" +
+            "              \"query_text\": \"${parameters.question}\",\n" +
+            "              \"model_id\": \"${parameters.session_index_embedding_model_id}\",\n" +
+            "              \"k\": 10\n" +
+            "            }\n" +
+            "          }\n" +
+            "        }\n" +
+            "      ]\n" +
+            "    }\n" +
+            "  },\n" +
+            "  \"size\": \"${parameters.session_size}\",\n" +
+            "  \"_source\": [\n" +
+            "    \"question\",\n" +
+            "    \"answer\"\n" +
+            "  ]\n" +
+            "}";
+
     public ChatConnector(String name, XContentParser parser) throws IOException {
         super(name, parser);
         validate();
@@ -66,6 +140,15 @@ public class ChatConnector extends HttpConnector {
 
     public String createNeuralSearchQuery(Map<String, String> params) {
         String searchTemplate = params.containsKey("search_query") ? params.get("search_query") : DEFAULT_SEMANTIC_SEARCH_QUERY;
+        StringSubstitutor substitutor = new StringSubstitutor(params, "${parameters.", "}");
+        String query = substitutor.replace(searchTemplate);
+        return query;
+    }
+
+    public String createNeuralSearchQueryForSession(Map<String, String> params) {
+        String withAllSessions = params.get("with_all_sessions");
+        boolean searchAllSessions = withAllSessions != null && "true".equals(withAllSessions.toLowerCase(Locale.ROOT));
+        String searchTemplate = searchAllSessions? DEFAULT_SEMANTIC_SEARCH_QUERY_FOR_ALL_SESSIONS : DEFAULT_SEMANTIC_SEARCH_QUERY_FOR_SESSION;
         StringSubstitutor substitutor = new StringSubstitutor(params, "${parameters.", "}");
         String query = substitutor.replace(searchTemplate);
         return query;
@@ -110,7 +193,7 @@ public class ChatConnector extends HttpConnector {
     }
 
     public String getSessionIdField() {
-        return parameters.get(SESSION_ID_FIELD_FIELD);
+        return parameters.containsKey(SESSION_ID_FIELD_FIELD)? parameters.get(SESSION_ID_FIELD_FIELD) : "session_id";
     }
 
     public Integer getSessionSize() {

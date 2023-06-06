@@ -45,6 +45,7 @@ public class MLRegisterModelInput implements ToXContentObject, Writeable {
     public static final String MODEL_NODE_IDS_FIELD = "model_node_ids";
     public static final String CONNECTOR_FIELD = "connector";
     public static final String MODEL_CONTENT_HASH_VALUE_FIELD = "model_content_hash_value";
+    public static final String TOOLS_FIELD = "tools";
 
     private FunctionName functionName;
     private String modelName;
@@ -59,6 +60,7 @@ public class MLRegisterModelInput implements ToXContentObject, Writeable {
 
     private Connector connector;
     private String modelContentHash;
+    private List<String> tools;
 
     @Builder(toBuilder = true)
     public MLRegisterModelInput(FunctionName functionName,
@@ -71,7 +73,8 @@ public class MLRegisterModelInput implements ToXContentObject, Writeable {
                                 boolean deployModel,
                                 String[] modelNodeIds,
                                 Connector connector,
-                                String modelContentHash) {
+                                String modelContentHash,
+                                List<String> tools) {
         if (functionName == null) {
             this.functionName = FunctionName.TEXT_EMBEDDING;
         } else {
@@ -101,6 +104,7 @@ public class MLRegisterModelInput implements ToXContentObject, Writeable {
         this.modelNodeIds = modelNodeIds;
         this.connector = connector;
         this.modelContentHash = modelContentHash;
+        this.tools = tools;
     }
 
 
@@ -123,6 +127,9 @@ public class MLRegisterModelInput implements ToXContentObject, Writeable {
             this.connector = MLCommonsClassLoader.initConnector(connectorName, new Object[]{connectorName, in}, String.class, StreamInput.class);
         }
         this.modelContentHash = in.readOptionalString();
+        if (in.readBoolean()) {
+            this.tools = in.readStringList();
+        }
     }
 
     @Override
@@ -154,6 +161,12 @@ public class MLRegisterModelInput implements ToXContentObject, Writeable {
             out.writeBoolean(false);
         }
         out.writeOptionalString(modelContentHash);
+        if (tools != null && tools.size() > 0) {
+            out.writeBoolean(true);
+            out.writeStringCollection(tools);
+        } else {
+            out.writeBoolean(false);
+        }
     }
 
     @Override
@@ -184,6 +197,9 @@ public class MLRegisterModelInput implements ToXContentObject, Writeable {
         if (modelContentHash != null) {
             builder.field(MODEL_CONTENT_HASH_VALUE_FIELD, modelContentHash);
         }
+        if (tools != null) {
+            builder.field(TOOLS_FIELD, tools);
+        }
         builder.endObject();
         return builder;
     }
@@ -197,6 +213,7 @@ public class MLRegisterModelInput implements ToXContentObject, Writeable {
         List<String> modelNodeIds = new ArrayList<>();
         Connector connector = null;
         String modelContentHash = null;
+        List<String> tools = null;
 
         ensureExpectedToken(XContentParser.Token.START_OBJECT, parser.currentToken(), parser);
         while (parser.nextToken() != XContentParser.Token.END_OBJECT) {
@@ -234,12 +251,19 @@ public class MLRegisterModelInput implements ToXContentObject, Writeable {
                 case MODEL_CONTENT_HASH_VALUE_FIELD:
                     modelContentHash = parser.text();
                     break;
+                case TOOLS_FIELD:
+                    tools = new ArrayList<>();
+                    ensureExpectedToken(XContentParser.Token.START_ARRAY, parser.currentToken(), parser);
+                    while (parser.nextToken() != XContentParser.Token.END_ARRAY) {
+                        tools.add(parser.text());
+                    }
+                    break;
                 default:
                     parser.skipChildren();
                     break;
             }
         }
-        return new MLRegisterModelInput(functionName, modelName, version, description, url, modelFormat, modelConfig, deployModel, modelNodeIds.toArray(new String[0]), connector, modelContentHash);
+        return new MLRegisterModelInput(functionName, modelName, version, description, url, modelFormat, modelConfig, deployModel, modelNodeIds.toArray(new String[0]), connector, modelContentHash, tools);
     }
 
     public static MLRegisterModelInput parse(XContentParser parser, boolean deployModel) throws IOException {
@@ -253,6 +277,7 @@ public class MLRegisterModelInput implements ToXContentObject, Writeable {
         List<String> modelNodeIds = new ArrayList<>();
         Connector connector = null;
         String modelContentHash = null;
+        List<String> tools = null;
 
         ensureExpectedToken(XContentParser.Token.START_OBJECT, parser.currentToken(), parser);
         while (parser.nextToken() != XContentParser.Token.END_OBJECT) {
@@ -297,11 +322,18 @@ public class MLRegisterModelInput implements ToXContentObject, Writeable {
                 case MODEL_CONTENT_HASH_VALUE_FIELD:
                     modelContentHash = parser.text();
                     break;
+                case TOOLS_FIELD:
+                    tools = new ArrayList<>();
+                    ensureExpectedToken(XContentParser.Token.START_ARRAY, parser.currentToken(), parser);
+                    while (parser.nextToken() != XContentParser.Token.END_ARRAY) {
+                        tools.add(parser.text());
+                    }
+                    break;
                 default:
                     parser.skipChildren();
                     break;
             }
         }
-        return new MLRegisterModelInput(functionName, name, version, description, url, modelFormat, modelConfig, deployModel, modelNodeIds.toArray(new String[0]), connector, modelContentHash);
+        return new MLRegisterModelInput(functionName, name, version, description, url, modelFormat, modelConfig, deployModel, modelNodeIds.toArray(new String[0]), connector, modelContentHash, tools);
     }
 }

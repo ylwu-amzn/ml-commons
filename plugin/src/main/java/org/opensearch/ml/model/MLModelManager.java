@@ -21,7 +21,9 @@ import static org.opensearch.ml.engine.ModelHelper.MODEL_FILE_HASH;
 import static org.opensearch.ml.engine.ModelHelper.MODEL_SIZE_IN_BYTES;
 import static org.opensearch.ml.engine.algorithms.remote.RemoteModel.CLIENT;
 import static org.opensearch.ml.engine.algorithms.remote.RemoteModel.CLUSTER_SERVICE;
+import static org.opensearch.ml.engine.algorithms.remote.RemoteModel.EXTERNAL_TOOLS;
 import static org.opensearch.ml.engine.algorithms.remote.RemoteModel.SCRIPT_SERVICE;
+import static org.opensearch.ml.engine.algorithms.remote.RemoteModel.SETTINGS;
 import static org.opensearch.ml.engine.algorithms.remote.RemoteModel.XCONTENT_REGISTRY;
 import static org.opensearch.ml.engine.algorithms.text_embedding.TextEmbeddingModel.ML_ENGINE;
 import static org.opensearch.ml.engine.algorithms.text_embedding.TextEmbeddingModel.MODEL_HELPER;
@@ -88,6 +90,7 @@ import org.opensearch.ml.common.MLTaskState;
 import org.opensearch.ml.common.exception.MLException;
 import org.opensearch.ml.common.exception.MLResourceNotFoundException;
 import org.opensearch.ml.common.model.MLModelState;
+import org.opensearch.ml.common.spi.tools.Tool;
 import org.opensearch.ml.common.transport.deploy.MLDeployModelAction;
 import org.opensearch.ml.common.transport.deploy.MLDeployModelRequest;
 import org.opensearch.ml.common.transport.deploy.MLDeployModelResponse;
@@ -127,6 +130,8 @@ public class MLModelManager {
     private final Client client;
     private final ClusterService clusterService;
     private final ScriptService scriptService;
+    private final Map<String, Tool> externalTools;
+    private final Settings settings;
     private ThreadPool threadPool;
     private NamedXContentRegistry xContentRegistry;
     private ModelHelper modelHelper;
@@ -167,8 +172,8 @@ public class MLModelManager {
         MLTaskManager mlTaskManager,
         MLModelCacheHelper modelCacheHelper,
         MLEngine mlEngine,
-        DiscoveryNodeHelper nodeHelper
-    ) {
+        DiscoveryNodeHelper nodeHelper,
+        Map<String, Tool> externalTools) {
         this.client = client;
         this.threadPool = threadPool;
         this.xContentRegistry = xContentRegistry;
@@ -182,6 +187,8 @@ public class MLModelManager {
         this.mlTaskManager = mlTaskManager;
         this.mlEngine = mlEngine;
         this.nodeHelper = nodeHelper;
+        this.externalTools = externalTools;
+        this.settings = settings;
 
         this.maxModelPerNode = ML_COMMONS_MAX_MODELS_PER_NODE.get(settings);
         clusterService.getClusterSettings().addSettingsUpdateConsumer(ML_COMMONS_MAX_MODELS_PER_NODE, it -> maxModelPerNode = it);
@@ -305,6 +312,7 @@ public class MLModelManager {
                     .modelFormat(registerModelInput.getModelFormat())
                     .modelState(MLModelState.REGISTERED)
                     .connector(registerModelInput.getConnector())
+                    .tools(registerModelInput.getTools())
                     .modelConfig(registerModelInput.getModelConfig())
                     .createdTime(now)
                     .lastUpdateTime(now)
@@ -620,7 +628,11 @@ public class MLModelManager {
                             XCONTENT_REGISTRY,
                             xContentRegistry,
                             CLUSTER_SERVICE,
-                            clusterService
+                            clusterService,
+                            SETTINGS,
+                            settings,
+                            EXTERNAL_TOOLS,
+                            externalTools
                         );
                     // deploy remote model or model trained by built-in algorithm like kmeans
                     Predictable predictable = mlEngine.deploy(mlModel, params);

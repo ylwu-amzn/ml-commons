@@ -10,6 +10,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.opensearch.ml.common.exception.MLException;
 import org.opensearch.ml.common.FunctionName;
+import org.opensearch.ml.common.spi.tools.ToolAnnotation;
 import org.opensearch.ml.engine.annotation.ConnectorExecutor;
 import org.opensearch.ml.engine.annotation.Function;
 import org.reflections.Reflections;
@@ -31,6 +32,7 @@ public class MLEngineClassLoader {
      */
     private static Map<Enum<?>, Class<?>> mlAlgoClassMap = new HashMap<>();
     private static Map<String, Class<?>> connectorExecutorMap = new HashMap<>();
+    private static Map<String, Class<?>> toolMap = new HashMap<>();
 
     /**
      * This map contains pre-created thread-safe ML objects.
@@ -91,11 +93,54 @@ public class MLEngineClassLoader {
                 connectorExecutorMap.put(connectorName, clazz);
             }
         }
+
+        reflections = new Reflections("org.opensearch.ml.engine.tools");
+        Set<Class<?>> toolClasses = reflections.getTypesAnnotatedWith(ToolAnnotation.class);
+        // Load tool class
+        for (Class<?> clazz : toolClasses) {
+            ToolAnnotation tool = clazz.getAnnotation(ToolAnnotation.class);
+            String toolName = tool.value();
+            if (toolName != null) {
+                toolMap.put(toolName, clazz);
+            }
+        }
     }
 
     @SuppressWarnings("unchecked")
     public static <T, S, I extends Object> S initInstance(T type, I in, Class<?> constructorParamClass) {
         return initInstance(type, in, constructorParamClass, null);
+    }
+
+    public static <S, I extends Object> S initToolInstance(String type, I in, Class<?> constructorParamClass) {
+        return initInstance(toolMap, type, in, constructorParamClass, null);
+    }
+
+    public static <T, S, I extends Object> S initInstance(Map<T, Class<?>> clazzMap, T type, I in, Class<?> constructorParamClass, Map<String, Object> properties) {
+        Class<?> clazz = clazzMap.get(type);
+        if (clazz == null) {
+            throw new IllegalArgumentException("Can't find class for type " + type);
+        }
+        try {
+            Constructor<?> constructor;
+            S instance;
+            try {
+                constructor = clazz.getConstructor(constructorParamClass);
+                instance = (S) constructor.newInstance(in);
+            } catch (NoSuchMethodException e) {
+                constructor = clazz.getConstructor();
+                instance = (S) constructor.newInstance();
+            }
+            BeanUtils.populate(instance, properties);
+            return instance;
+        } catch (Exception e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof MLException) {
+                throw (MLException)cause;
+            } else {
+                logger.error("Failed to init instance for type " + type, e);
+                return null;
+            }
+        }
     }
 
     /**

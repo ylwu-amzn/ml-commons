@@ -17,6 +17,7 @@ import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.core.xcontent.XContentBuilder;
 import org.opensearch.core.xcontent.XContentParser;
 import org.opensearch.ml.common.output.model.ModelTensor;
+import org.opensearch.ml.common.utils.StringUtils;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -28,7 +29,6 @@ import java.util.function.Function;
 import static org.apache.commons.text.StringEscapeUtils.escapeJson;
 import static org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken;
 import static org.opensearch.ml.common.connector.ConnectorNames.HTTP_V1;
-import static org.opensearch.ml.common.utils.StringUtils.gson;
 import static org.opensearch.ml.common.utils.StringUtils.isJson;
 import static org.opensearch.ml.common.utils.StringUtils.toUTF8;
 
@@ -91,6 +91,7 @@ public class HttpConnector implements Connector {
                     break;
                 case PARAMETERS_FIELD:
                     parameters = parser.mapStrings();
+                    parser.map();
                     break;
                 case CREDENTIAL_FIELD:
                     credential = new HashMap<>();
@@ -274,7 +275,7 @@ public class HttpConnector implements Connector {
             return;
         }
         if (response instanceof String && isJson((String)response)) {
-            Map<String, Object> data = gson.fromJson((String) response, Map.class);
+            Map<String, Object> data = StringUtils.fromJson((String) response, "response");
             modelTensors.add(ModelTensor.builder().name("response").dataAsMap(data).build());
         } else {
             Map<String, Object> map = new HashMap<>();

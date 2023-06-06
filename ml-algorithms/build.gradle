@@ -16,6 +16,7 @@ repositories {
 }
 
 dependencies {
+    implementation project(path: ":${rootProject.name}-spi", configuration: 'shadow')
     compileOnly group: 'org.opensearch', name: 'opensearch', version: "${opensearch_version}"
     implementation project(':opensearch-ml-common')
     implementation group: 'org.apache.commons', name: 'commons-text', version: '1.10.0'
@@ -72,6 +73,10 @@ dependencies {
         force = true
     }
     implementation 'com.jayway.jsonpath:json-path:2.8.0'
+
+    runtimeOnly group: 'org.apache.commons', name: 'commons-text', version: '1.10.0'
+    runtimeOnly group: 'com.google.code.gson', name: 'gson', version: '2.9.1'
+    runtimeOnly group: 'org.json', name: 'json', version: '20230227'
 }
 
 configurations.all {

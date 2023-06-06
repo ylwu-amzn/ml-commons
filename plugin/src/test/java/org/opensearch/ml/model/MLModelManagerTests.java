@@ -87,6 +87,7 @@ import org.opensearch.ml.common.model.MLModelConfig;
 import org.opensearch.ml.common.model.MLModelFormat;
 import org.opensearch.ml.common.model.MLModelState;
 import org.opensearch.ml.common.model.TextEmbeddingModelConfig;
+import org.opensearch.ml.common.spi.tools.Tool;
 import org.opensearch.ml.common.transport.deploy.MLDeployModelAction;
 import org.opensearch.ml.common.transport.register.MLRegisterModelInput;
 import org.opensearch.ml.common.transport.upload_chunk.MLRegisterModelMetaInput;
@@ -161,6 +162,7 @@ public class MLModelManagerTests extends OpenSearchTestCase {
     private ActionListener<String> actionListener;
     @Mock
     private ScriptService scriptService;
+    private Map<String, Tool> externalTools;
 
     @Before
     public void setup() throws URISyntaxException {
@@ -232,6 +234,7 @@ public class MLModelManagerTests extends OpenSearchTestCase {
         when(client.threadPool()).thenReturn(threadPool);
         when(threadPool.getThreadContext()).thenReturn(threadContext);
 
+        externalTools = new HashMap<>();
         modelManager = spy(
             new MLModelManager(
                 clusterService,
@@ -247,8 +250,8 @@ public class MLModelManagerTests extends OpenSearchTestCase {
                 mlTaskManager,
                 modelCacheHelper,
                 mlEngine,
-                nodeHelper
-            )
+                nodeHelper,
+                externalTools)
         );
 
         chunk0 = getClass().getResource("chunk/0").toURI().getPath();
