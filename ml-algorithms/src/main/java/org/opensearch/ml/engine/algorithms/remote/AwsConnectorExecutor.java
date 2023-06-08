@@ -7,8 +7,10 @@ package org.opensearch.ml.engine.algorithms.remote;
 
 import lombok.Setter;
 import lombok.extern.log4j.Log4j2;
+import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.common.connector.AwsConnector;
 import org.opensearch.ml.common.connector.Connector;
+import org.opensearch.ml.common.dataset.TextDocsInputDataSet;
 import org.opensearch.ml.common.dataset.remote.RemoteInferenceInputDataSet;
 import org.opensearch.ml.common.exception.MLException;
 import org.opensearch.ml.common.input.MLInput;
@@ -36,6 +38,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.AccessController;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -64,9 +67,26 @@ public class AwsConnectorExecutor implements RemoteConnectorExecutor{
     @Override
     public ModelTensorOutput execute(MLInput mlInput) {
         List<ModelTensors> tensorOutputs = new ArrayList<>();
-        List<ModelTensor> modelTensors = new ArrayList<>();
 
+        if (mlInput.getInputDataset() instanceof TextDocsInputDataSet) {
+            TextDocsInputDataSet textDocsInputDataSet = (TextDocsInputDataSet) mlInput.getInputDataset();
+            List textDocs = new ArrayList(textDocsInputDataSet.getDocs());
+            for (int i = 0; i < textDocsInputDataSet.getDocs().size(); i++) {
+                List<ModelTensor> modelTensors = new ArrayList<>();
+                getModelTensorOutput(MLInput.builder().algorithm(FunctionName.TEXT_EMBEDDING).inputDataset(TextDocsInputDataSet.builder().docs(textDocs).build()).build(), tensorOutputs, modelTensors);
+                if (tensorOutputs.size() >= textDocsInputDataSet.getDocs().size()) {
+                    break;
+                }
+                textDocs.remove(0);
+            }
+        } else {
+            List<ModelTensor> modelTensors = new ArrayList<>();
+            getModelTensorOutput(mlInput, tensorOutputs, modelTensors);
+        }
+        return new ModelTensorOutput(tensorOutputs);
+    }
 
+    private void getModelTensorOutput(MLInput mlInput, List<ModelTensors> tensorOutputs, List<ModelTensor> modelTensors) {
         try {
             RemoteInferenceInputDataSet inputData = processInput(mlInput, connector, scriptService);
 
@@ -79,6 +99,7 @@ public class AwsConnectorExecutor implements RemoteConnectorExecutor{
             }
 
             String payload = connector.createPayload(parameters);
+            connector.validatePayload(payload);
 
             String endpoint = connector.getEndpoint();
             RequestBody requestBody = RequestBody.fromString(payload);
@@ -119,7 +140,6 @@ public class AwsConnectorExecutor implements RemoteConnectorExecutor{
 
             ModelTensors tensors = processOutput(modelResponse, connector, scriptService, parameters, modelTensors);
             tensorOutputs.add(tensors);
-            return new ModelTensorOutput(tensorOutputs);
         } catch (Throwable e) {
             log.error("Failed to execute aws connector", e);
             throw new MLException("Fail to execute aws connector", e);

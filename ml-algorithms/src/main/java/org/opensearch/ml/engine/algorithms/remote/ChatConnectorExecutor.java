@@ -206,7 +206,11 @@ public class ChatConnectorExecutor implements RemoteConnectorExecutor{
             if (!clusterService.state().metadata().hasIndex(sessionIndex)) {
                 throw new IllegalArgumentException("Index not found: " + sessionIndex);
             }
-            getEmbeddingModelId(parameters, contentIndex, "session_index_embedding_model_id", null);
+            try{
+                getEmbeddingModelId(parameters, contentIndex, "session_index_embedding_model_id", null);
+            } catch (Exception e) {
+                log.info("Session index is not using embedding");
+            }
             if (parameters.containsKey("session_index_embedding_model_id")) {
                 try {
                     Integer sessionSize = connector.getSessionSize();
@@ -361,6 +365,7 @@ public class ChatConnectorExecutor implements RemoteConnectorExecutor{
         }
 
         String payload = connector.createPayload(parameters);
+        connector.validatePayload(payload);
 
         if (connector.hasAwsCredential()) {
             try {

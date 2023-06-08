@@ -102,6 +102,8 @@ import org.opensearch.ml.engine.algorithms.anomalylocalization.AnomalyLocalizerI
 import org.opensearch.ml.engine.algorithms.sample.LocalSampleCalculator;
 import org.opensearch.ml.engine.encryptor.Encryptor;
 import org.opensearch.ml.engine.encryptor.EncryptorImpl;
+import org.opensearch.ml.engine.tools.SearchWikipediaTool;
+import org.opensearch.ml.engine.tools.ToolSettings;
 import org.opensearch.ml.indices.MLIndicesHandler;
 import org.opensearch.ml.indices.MLInputDatasetHandler;
 import org.opensearch.ml.model.MLModelCacheHelper;
@@ -364,6 +366,12 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin, Exten
             mlIndicesHandler
         );
 
+        SearchWikipediaTool wikipediaTool = SearchWikipediaTool.getInstance();
+        wikipediaTool.setClient(client);
+        wikipediaTool.setSettings(clusterService.getSettings());
+        wikipediaTool.setClusterService(clusterService);
+        wikipediaTool.init();
+        externalTools.put(wikipediaTool.getName(), wikipediaTool);
         return ImmutableList
             .of(
                 mlEngine,
@@ -528,7 +536,8 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin, Exten
                 MLCommonsSettings.ML_COMMONS_NATIVE_MEM_THRESHOLD,
                 MLCommonsSettings.ML_COMMONS_EXCLUDE_NODE_NAMES,
                 MLCommonsSettings.ML_COMMONS_ALLOW_CUSTOM_DEPLOYMENT_PLAN,
-                MLCommonsSettings.ML_COMMONS_MASTER_SECRET_KEY
+                MLCommonsSettings.ML_COMMONS_MASTER_SECRET_KEY,
+                ToolSettings.SUMMARY_MODEL_ID
             );
         return settings;
     }

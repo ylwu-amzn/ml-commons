@@ -16,8 +16,11 @@ import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.util.EntityUtils;
+import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.common.connector.Connector;
 import org.opensearch.ml.common.connector.HttpConnector;
+import org.opensearch.ml.common.dataset.MLInputDataset;
+import org.opensearch.ml.common.dataset.TextDocsInputDataSet;
 import org.opensearch.ml.common.dataset.remote.RemoteInferenceInputDataSet;
 import org.opensearch.ml.common.exception.MLException;
 import org.opensearch.ml.common.input.MLInput;
@@ -57,30 +60,56 @@ public class HttpJsonConnectorExecutor implements RemoteConnectorExecutor{
 
     @Override
     public ModelTensorOutput execute(MLInput mlInput) {
-        RemoteInferenceInputDataSet inputData = processInput(mlInput, connector, scriptService);
-        Map<String, String> parameters = inputData.getParameters();
-
         if (agent != null) {
-            return agent.run(parameters, (params) -> executeDirectly(params));
+            RemoteInferenceInputDataSet inputData = processInput(mlInput, connector, scriptService);
+            return agent.run(inputData.getParameters(), (params) -> executeDirectly(params));
         } else {
-            return executeDirectly(parameters);
+            return executeDirectly(mlInput);
         }
     }
 
-    public ModelTensorOutput executeDirectly(Map<String, String> inputParameters) {
-        List<ModelTensors> tensorOutputs = new ArrayList<>();
-        List<ModelTensor> modelTensors = new ArrayList<>();
+    private ModelTensorOutput executeDirectly(Map<String, String> params) {
+        return executeDirectly(MLInput.builder()
+                .algorithm(FunctionName.REMOTE)
+                .inputDataset(RemoteInferenceInputDataSet.builder().parameters(params).build())
+                .build());
+    }
 
+    public ModelTensorOutput executeDirectly(MLInput mlInput) {
+        List<ModelTensors> tensorOutputs = new ArrayList<>();
+
+        if (mlInput.getInputDataset() instanceof TextDocsInputDataSet) {
+            TextDocsInputDataSet textDocsInputDataSet = (TextDocsInputDataSet) mlInput.getInputDataset();
+            List textDocs = new ArrayList(textDocsInputDataSet.getDocs());
+            for (int i = 0; i < textDocsInputDataSet.getDocs().size(); i++) {
+                List<ModelTensor> modelTensors = new ArrayList<>();
+                getModelTensorOutput(MLInput.builder().algorithm(FunctionName.TEXT_EMBEDDING).inputDataset(TextDocsInputDataSet.builder().docs(textDocs).build()).build(), tensorOutputs, modelTensors);
+                if (tensorOutputs.size() >= textDocsInputDataSet.getDocs().size()) {
+                    break;
+                }
+                textDocs.remove(0);
+            }
+        } else {
+            List<ModelTensor> modelTensors = new ArrayList<>();
+            getModelTensorOutput(mlInput, tensorOutputs, modelTensors);
+        }
+        return new ModelTensorOutput(tensorOutputs);
+    }
+
+    private void getModelTensorOutput(MLInput mlInput, List<ModelTensors> tensorOutputs, List<ModelTensor> modelTensors) {
         try {
+            RemoteInferenceInputDataSet inputData = processInput(mlInput, connector, scriptService);
+
             Map<String, String> parameters = new HashMap<>();
             if (connector.getParameters() != null) {
                 parameters.putAll(connector.getParameters());
             }
-            if (inputParameters != null) {
-                parameters.putAll(inputParameters);
+            if (inputData.getParameters() != null) {
+                parameters.putAll(inputData.getParameters());
             }
 
             String payload = connector.createPayload(parameters);
+            connector.validatePayload(payload);
 
             AtomicReference<String> responseRef = new AtomicReference<>("");
 
@@ -131,7 +160,6 @@ public class HttpJsonConnectorExecutor implements RemoteConnectorExecutor{
 
             ModelTensors tensors = processOutput(modelResponse, connector, scriptService, parameters, modelTensors);
             tensorOutputs.add(tensors);
-            return new ModelTensorOutput(tensorOutputs);
         } catch (Throwable e) {
             log.error("Fail to execute http connector", e);
             throw new MLException("Fail to execute http connector", e);

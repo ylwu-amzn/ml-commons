@@ -45,4 +45,10 @@ public interface Connector extends ToXContentObject, Writeable {
     }
 
     default <T> void parseResponse(T orElse, List<ModelTensor> modelTensors, boolean b) throws IOException {}
+
+    default void validatePayload(String payload) {
+        if (payload != null && payload.contains("${parameters")) {
+            throw new IllegalArgumentException("Some parameter placeholder not filled in payload");
+        }
+    }
 }
