@@ -201,8 +201,9 @@ public class ChatConnectorExecutor implements RemoteConnectorExecutor{
 
         AtomicReference<String> chatHistoryRef = new AtomicReference<>("");
         String sessionId = parameters.get("session_id");
+        boolean newSession = "true".equals(parameters.get("new_session"));
         String sessionIndex = connector.getSessionIndex();
-        if ((sessionId != null || "true".equals(parameters.get("with_all_sessions"))) && sessionIndex != null) {
+        if ((sessionId != null || "true".equals(parameters.get("with_all_sessions"))) && sessionIndex != null && !newSession) {
             if (!clusterService.state().metadata().hasIndex(sessionIndex)) {
                 throw new IllegalArgumentException("Index not found: " + sessionIndex);
             }
@@ -257,7 +258,7 @@ public class ChatConnectorExecutor implements RemoteConnectorExecutor{
                 } catch (Exception e) {
                     log.error("Failed to search sessions", e);
                 }
-            } else if (sessionId != null && sessionIndex != null) {
+            } else if (sessionId != null && sessionIndex != null && !newSession) {
                 try {
                     Integer sessionSize = connector.getSessionSize();
                     if (parameters.containsKey("session_size")) {
@@ -304,7 +305,7 @@ public class ChatConnectorExecutor implements RemoteConnectorExecutor{
 
         }
         if (sessionId == null) {
-            sessionId = UUID.randomUUID().toString();
+            throw new IllegalArgumentException("session id can't be null");
         }
 
         Map<String, String> newParameters = new HashMap<>();
@@ -315,12 +316,10 @@ public class ChatConnectorExecutor implements RemoteConnectorExecutor{
 
         if (agent != null) {
             String finalSessionId = sessionId;
-            newParameters.remove("prompt");
-            return agent.run(newParameters, (params) -> executeDirectly(params, question, finalSessionId));
+            return agent.run(newParameters, (params) -> executeDirectly(params, question, finalSessionId, false), message -> saveSessionMessage(message));
         } else {
-            return executeDirectly(newParameters, question, sessionId);
+            return executeDirectly(newParameters, question, sessionId, true);
         }
-
     }
 
     private void getEmbeddingModelId(Map<String, String> parameters, String contentIndex, String embeddingModelParamName, String knnFieldName) {
@@ -350,7 +349,8 @@ public class ChatConnectorExecutor implements RemoteConnectorExecutor{
 
     private ModelTensorOutput executeDirectly(Map<String, String> inputParameters,
                                               String question,
-                                              String sessionId) {
+                                              String sessionId,
+                                              boolean saveSessionMessage) {
         List<ModelTensors> tensorOutputs = new ArrayList<>();
         List<ModelTensor> modelTensors = new ArrayList<>();
 
@@ -418,7 +418,7 @@ public class ChatConnectorExecutor implements RemoteConnectorExecutor{
                     client.index(indexRequest);
                     modelTensors.add(ModelTensor.builder().name("session_id").result(sessionId).build());
                 }
-                return new ModelTensorOutput(tensorOutputs);
+                return ModelTensorOutput.builder().mlModelOutputs(tensorOutputs).build();
             } catch (Throwable e) {
                 log.error("Failed to execute chat connector", e);
                 throw new MLException("Fail to execute chat connector", e);
@@ -473,19 +473,28 @@ public class ChatConnectorExecutor implements RemoteConnectorExecutor{
 
             ModelTensors tensors = processOutput(modelResponse, connector, scriptService, parameters, modelTensors);
             tensorOutputs.add(tensors);
-            if (connector.getSessionIndex() != null) {
-                IndexRequest indexRequest = new IndexRequest(connector.getSessionIndex());
-                indexRequest.source(ImmutableMap.of(connector.getSessionIdField(), sessionId,
+            if (saveSessionMessage) {
+                Map<String, Object> message = ImmutableMap.of(connector.getSessionIdField(), sessionId,
                         "question", question,
                         "answer", modelTensors.get(modelTensors.size() - 1).getDataAsMap().get("response"),
-                        "created_time", Instant.now().toEpochMilli()));
-                client.index(indexRequest);
+                        "created_time", Instant.now().toEpochMilli());
+                saveSessionMessage(message);
+            }
+            if (connector.getSessionIndex() != null) {
                 modelTensors.add(ModelTensor.builder().name("session_id").result(sessionId).build());
             }
-            return new ModelTensorOutput(tensorOutputs);
+            return ModelTensorOutput.builder().mlModelOutputs(tensorOutputs).build();
         } catch (Throwable e) {
             log.error("Fail to execute qa connector", e);
             throw new MLException("Fail to execute qa connector", e);
+        }
+    }
+
+    private void saveSessionMessage(Map<String, Object> message) {
+        if (connector.getSessionIndex() != null) {
+            IndexRequest indexRequest = new IndexRequest(connector.getSessionIndex());
+            indexRequest.source(message);
+            client.index(indexRequest);
         }
     }
 

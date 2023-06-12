@@ -7,7 +7,9 @@ package org.opensearch.ml.common.input;
 
 import lombok.Builder;
 import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 import org.opensearch.common.io.stream.StreamInput;
 import org.opensearch.common.io.stream.StreamOutput;
 import org.opensearch.core.xcontent.XContentBuilder;
@@ -63,6 +65,9 @@ public class MLInput implements Input {
     protected MLAlgoParams parameters;
     // Input data to train model, run trained model to predict or run ML algorithms(no-model-based) directly.
     protected MLInputDataset inputDataset;
+
+    @Setter @Getter
+    private boolean async;
 
     private int version = 1;
 

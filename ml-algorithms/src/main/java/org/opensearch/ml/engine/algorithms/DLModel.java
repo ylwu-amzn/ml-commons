@@ -64,20 +64,28 @@ public abstract class DLModel implements Predictable {
     protected AtomicInteger nextDevice = new AtomicInteger(0);
 
     @Override
+    public boolean isModelReady() {
+        if (predictors == null || modelHelper == null || modelId == null) {
+            return false;
+        }
+        return true;
+    }
+
+    @Override
     public MLOutput predict(MLInput mlInput, MLModel model) {
-        throw new IllegalArgumentException("model not deployed");
+        throw new IllegalArgumentException("model not deployed: " + model.getModelId());
     }
 
     @Override
     public MLOutput predict(MLInput mlInput) {
         if (modelHelper == null || modelId == null) {
-            throw new IllegalArgumentException("model not deployed");
+            throw new IllegalArgumentException("model not deployed: " + modelId);
         }
         try {
             return AccessController.doPrivileged((PrivilegedExceptionAction<ModelTensorOutput>) () -> {
                 Thread.currentThread().setContextClassLoader(getClass().getClassLoader());
                 if (predictors == null) {
-                    throw new MLException("model not deployed.");
+                    throw new MLException("model not deployed: " + modelId);
                 }
                 return predict(modelId, mlInput);
             });

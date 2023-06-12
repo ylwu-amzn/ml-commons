@@ -10,6 +10,7 @@ import static org.opensearch.ml.plugin.MachineLearningPlugin.ML_BASE_URI;
 import static org.opensearch.ml.utils.RestActionUtils.PARAMETER_ALGORITHM;
 import static org.opensearch.ml.utils.RestActionUtils.PARAMETER_MODEL_ID;
 import static org.opensearch.ml.utils.RestActionUtils.getParameterId;
+import static org.opensearch.ml.utils.RestActionUtils.isAsync;
 
 import java.io.IOException;
 import java.util.List;
@@ -74,13 +75,14 @@ public class RestMLPredictionAction extends BaseRestHandler {
         String algorithm = request.param(PARAMETER_ALGORITHM);
         String modelId = getParameterId(request, PARAMETER_MODEL_ID);
         Optional<FunctionName> functionName = modelManager.getOptionalModelFunctionName(modelId);
+        boolean async = isAsync(request);
 
         if (algorithm == null && functionName.isPresent()) {
             algorithm = functionName.get().name();
         }
 
         if (algorithm != null) {
-            MLPredictionTaskRequest mlPredictionTaskRequest = getRequest(modelId, algorithm, request);
+            MLPredictionTaskRequest mlPredictionTaskRequest = getRequest(modelId, algorithm, async, request);
             return channel -> client
                 .execute(MLPredictionTaskAction.INSTANCE, mlPredictionTaskRequest, new RestToXContentListener<>(channel));
         }
@@ -93,7 +95,7 @@ public class RestMLPredictionAction extends BaseRestHandler {
                 client
                     .execute(
                         MLPredictionTaskAction.INSTANCE,
-                        getRequest(modelId, algoName, request),
+                        getRequest(modelId, algoName, async, request),
                         new RestToXContentListener<>(channel)
                     );
             }, e -> {
@@ -116,11 +118,11 @@ public class RestMLPredictionAction extends BaseRestHandler {
      * @return MLPredictionTaskRequest
      */
     @VisibleForTesting
-    MLPredictionTaskRequest getRequest(String modelId, String algorithm, RestRequest request) throws IOException {
+    MLPredictionTaskRequest getRequest(String modelId, String algorithm, boolean async, RestRequest request) throws IOException {
         XContentParser parser = request.contentParser();
         ensureExpectedToken(XContentParser.Token.START_OBJECT, parser.nextToken(), parser);
         MLInput mlInput = MLInput.parse(parser, algorithm);
-        return new MLPredictionTaskRequest(modelId, mlInput);
+        return new MLPredictionTaskRequest(modelId, mlInput, async);
     }
 
 }

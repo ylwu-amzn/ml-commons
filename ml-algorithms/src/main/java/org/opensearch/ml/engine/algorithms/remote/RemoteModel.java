@@ -5,11 +5,6 @@
 
 package org.opensearch.ml.engine.algorithms.remote;
 
-import ai.djl.modality.Input;
-import ai.djl.modality.Output;
-import ai.djl.translate.TranslateException;
-import ai.djl.translate.Translator;
-import ai.djl.translate.TranslatorFactory;
 import lombok.extern.log4j.Log4j2;
 import org.opensearch.client.Client;
 import org.opensearch.cluster.service.ClusterService;
@@ -19,12 +14,10 @@ import org.opensearch.ml.common.MLModel;
 import org.opensearch.ml.common.connector.Connector;
 import org.opensearch.ml.common.exception.MLException;
 import org.opensearch.ml.common.input.MLInput;
-import org.opensearch.ml.common.model.MLModelConfig;
 import org.opensearch.ml.common.output.MLOutput;
-import org.opensearch.ml.common.output.model.ModelTensorOutput;
 import org.opensearch.ml.common.spi.tools.Tool;
 import org.opensearch.ml.engine.MLEngineClassLoader;
-import org.opensearch.ml.engine.algorithms.DLModel;
+import org.opensearch.ml.engine.Predictable;
 import org.opensearch.ml.engine.annotation.Function;
 import org.opensearch.ml.engine.encryptor.Encryptor;
 import org.opensearch.ml.engine.tools.SearchIndexTool;
@@ -36,11 +29,12 @@ import java.util.Map;
 
 @Log4j2
 @Function(FunctionName.REMOTE)
-public class RemoteModel extends DLModel {
+public class RemoteModel implements Predictable {
 
     public static final String CLUSTER_SERVICE = "cluster_service";
     public static final String SCRIPT_SERVICE = "script_service";
     public static final String CLIENT = "client";
+    public static final String THREAD_POOL = "thread_pool";
     public static final String XCONTENT_REGISTRY = "xcontent_registry";
     public static final String EXTERNAL_TOOLS = "external_tools";
     public static final String SETTINGS = "settings";
@@ -48,18 +42,33 @@ public class RemoteModel extends DLModel {
     private List<Tool> tools;
 
     @Override
+    public MLOutput predict(MLInput mlInput, MLModel model) {
+        throw new IllegalArgumentException("model not deployed: " + model.getModelId());
+    }
+
+    @Override
     public MLOutput predict(MLInput mlInput) {
         try {
-            return predict(modelId, mlInput);
+            return connectorExecutor.execute(mlInput);
         } catch (Throwable t) {
             log.error("Failed to call remote model", t);
             throw new MLException("Failed to call remote model. " + t.getMessage());
         }
     }
 
+
     @Override
-    public ModelTensorOutput predict(String modelId, MLInput mlInput) throws TranslateException {
-        return connectorExecutor.execute(mlInput);
+    public void close() {
+        this.connectorExecutor = null;
+        if (tools != null) {
+            tools.clear();
+            tools = null;
+        }
+    }
+
+    @Override
+    public boolean isModelReady() {
+        return connectorExecutor != null;
     }
 
     @Override
@@ -97,16 +106,5 @@ public class RemoteModel extends DLModel {
             throw new MLException(e);
         }
     }
-
-    @Override
-    public Translator<Input, Output> getTranslator(String engine, MLModelConfig modelConfig) {
-        return null;
-    }
-
-    @Override
-    public TranslatorFactory getTranslatorFactory(String engine, MLModelConfig modelConfig) {
-        return null;
-    }
-
 
 }

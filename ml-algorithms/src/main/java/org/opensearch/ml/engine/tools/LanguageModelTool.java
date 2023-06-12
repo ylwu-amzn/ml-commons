@@ -14,7 +14,7 @@ import java.util.function.Supplier;
 @ToolAnnotation(LanguageModelTool.NAME)
 public class LanguageModelTool implements Tool {
     public static final String NAME = "LanguageModelTool";
-    private static final String description = "Use this tool for general knowledge question or other general purpose queries and logic. Do NOT use this tool if there are other tools available.";
+    private static final String description = "Useful for answering any general questions.";
     private Supplier<ModelTensorOutput> supplier;
 
     @Override

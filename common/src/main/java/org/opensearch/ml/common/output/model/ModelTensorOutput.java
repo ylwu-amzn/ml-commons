@@ -27,11 +27,17 @@ public class ModelTensorOutput extends MLOutput {
     public static final String INFERENCE_RESULT_FIELD = "inference_results";
 
     private List<ModelTensors> mlModelOutputs;
+    private String taskId;
 
     @Builder(toBuilder = true)
-    public ModelTensorOutput(List<ModelTensors> mlModelOutputs) {
+    public ModelTensorOutput(List<ModelTensors> mlModelOutputs, String taskId) {
         super(OUTPUT_TYPE);
         this.mlModelOutputs = mlModelOutputs;
+        this.taskId = taskId;
+    }
+
+    public ModelTensorOutput(List<ModelTensors> mlModelOutputs) {
+        this(mlModelOutputs, null);
     }
 
 
@@ -44,6 +50,7 @@ public class ModelTensorOutput extends MLOutput {
                 mlModelOutputs.add(new ModelTensors(in));
             }
         }
+        taskId = in.readOptionalString();
     }
 
     @Override
@@ -58,6 +65,7 @@ public class ModelTensorOutput extends MLOutput {
         } else {
             out.writeBoolean(false);
         }
+        out.writeOptionalString(taskId);
     }
 
     @Override
@@ -69,6 +77,9 @@ public class ModelTensorOutput extends MLOutput {
                 output.toXContent(builder, params);
             }
             builder.endArray();
+        }
+        if (taskId != null) {
+            builder.field("task_id").value(taskId);
         }
         builder.endObject();
         return builder;

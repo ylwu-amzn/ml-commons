@@ -41,6 +41,8 @@ public interface Predictable {
      */
     void initModel(MLModel model, Map<String, Object> params, Encryptor encryptor);
 
+    boolean isModelReady();
+
     /**
      * Close resources like deployed model.
      */

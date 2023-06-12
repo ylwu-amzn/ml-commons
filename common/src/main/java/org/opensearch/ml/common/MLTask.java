@@ -33,6 +33,7 @@ public class MLTask implements ToXContentObject, Writeable {
 
     public static final String TASK_ID_FIELD = "task_id";
     public static final String MODEL_ID_FIELD = "model_id";
+    public static final String SESSION_ID_FIELD = "session_id";
     public static final String TASK_TYPE_FIELD = "task_type";
     public static final String FUNCTION_NAME_FIELD = "function_name";
     public static final String STATE_FIELD = "state";
@@ -49,6 +50,8 @@ public class MLTask implements ToXContentObject, Writeable {
     private String taskId;
     @Setter
     private String modelId;
+    @Setter
+    private String sessionId;
     private final MLTaskType taskType;
     private final FunctionName functionName;
     @Setter
@@ -69,6 +72,7 @@ public class MLTask implements ToXContentObject, Writeable {
     public MLTask(
         String taskId,
         String modelId,
+        String sessionId,
         MLTaskType taskType,
         FunctionName functionName,
         MLTaskState state,
@@ -84,6 +88,7 @@ public class MLTask implements ToXContentObject, Writeable {
     ) {
         this.taskId = taskId;
         this.modelId = modelId;
+        this.sessionId = sessionId;
         this.taskType = taskType;
         this.functionName = functionName;
         this.state = state;
@@ -101,6 +106,7 @@ public class MLTask implements ToXContentObject, Writeable {
     public MLTask(StreamInput input) throws IOException {
         this.taskId = input.readOptionalString();
         this.modelId = input.readOptionalString();
+        this.sessionId = input.readOptionalString();
         this.taskType = input.readEnum(MLTaskType.class);
         this.functionName = input.readEnum(FunctionName.class);
         this.state = input.readEnum(MLTaskState.class);
@@ -127,6 +133,7 @@ public class MLTask implements ToXContentObject, Writeable {
     public void writeTo(StreamOutput out) throws IOException {
         out.writeOptionalString(taskId);
         out.writeOptionalString(modelId);
+        out.writeOptionalString(sessionId);
         out.writeEnum(taskType);
         out.writeEnum(functionName);
         out.writeEnum(state);
@@ -158,6 +165,9 @@ public class MLTask implements ToXContentObject, Writeable {
         }
         if (modelId != null) {
             builder.field(MODEL_ID_FIELD, modelId);
+        }
+        if (sessionId != null) {
+            builder.field(SESSION_ID_FIELD, sessionId);
         }
         if (taskType != null) {
             builder.field(TASK_TYPE_FIELD, taskType);
@@ -204,6 +214,7 @@ public class MLTask implements ToXContentObject, Writeable {
     public static MLTask parse(XContentParser parser) throws IOException {
         String taskId = null;
         String modelId = null;
+        String sessionId = null;
         MLTaskType taskType = null;
         FunctionName functionName = null;
         MLTaskState state = null;
@@ -228,6 +239,9 @@ public class MLTask implements ToXContentObject, Writeable {
                     break;
                 case MODEL_ID_FIELD:
                     modelId = parser.text();
+                    break;
+                case SESSION_ID_FIELD:
+                    sessionId = parser.text();
                     break;
                 case TASK_TYPE_FIELD:
                     taskType = MLTaskType.valueOf(parser.text());
@@ -281,6 +295,7 @@ public class MLTask implements ToXContentObject, Writeable {
         return MLTask.builder()
                 .taskId(taskId)
                 .modelId(modelId)
+                .sessionId(sessionId)
                 .taskType(taskType)
                 .functionName(functionName)
                 .state(state)

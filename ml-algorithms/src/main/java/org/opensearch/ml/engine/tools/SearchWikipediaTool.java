@@ -7,7 +7,6 @@ import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.util.EntityUtils;
 import org.opensearch.action.ActionFuture;
-import org.opensearch.action.ActionRequest;
 import org.opensearch.client.Client;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.settings.Settings;
@@ -15,10 +14,8 @@ import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.common.dataset.MLInputDataset;
 import org.opensearch.ml.common.dataset.remote.RemoteInferenceInputDataSet;
 import org.opensearch.ml.common.input.MLInput;
-import org.opensearch.ml.common.output.MLOutput;
 import org.opensearch.ml.common.output.model.ModelTensorOutput;
 import org.opensearch.ml.common.spi.tools.Tool;
-import org.opensearch.ml.common.spi.tools.ToolAnnotation;
 import org.opensearch.ml.common.transport.MLTaskResponse;
 import org.opensearch.ml.common.transport.prediction.MLPredictionTaskAction;
 import org.opensearch.ml.common.transport.prediction.MLPredictionTaskRequest;
@@ -35,7 +32,6 @@ import java.util.concurrent.TimeUnit;
 import static org.opensearch.ml.engine.tools.ToolSettings.SUMMARY_MODEL_ID;
 
 
-//@ToolAnnotation(SearchWikipediaTool.NAME)
 public class SearchWikipediaTool implements Tool {
     public static final String NAME = "SearchWikipediaTool";
 
@@ -70,14 +66,11 @@ public class SearchWikipediaTool implements Tool {
     private Client client;
     private Settings settings;
     private ClusterService clusterService;
-    private static final String description = "Use this tool to search general knowledge on wikipedia.";
+    private static final String description = "Useful when you need to use this tool to search general knowledge on wikipedia.";
 
     @Override
     public <T> T run(String input) {
         HttpClient httpClient = HttpClientBuilder.create().build();
-        //String title = "English";
-        //String title = "Pet_Door";
-        //String title = "Atmosphere_of_Earth";
         String title = input.trim().replace(" ", "_");
         title = title.replace("\"", "");
         HttpGet httpGet = new HttpGet("https://en.wikipedia.org/w/api.php?action=query&prop=revisions&titles=" + title + "&rvslots=*&rvprop=content&formatversion=2&format=json");
@@ -92,10 +85,8 @@ public class SearchWikipediaTool implements Tool {
                     List pages = (List) queryMap.get("pages");
                     content = gson.toJson(pages.get(0));
                 }
-                //content = content.replaceAll("[^\\p{L}\\p{N}]+", " ");
                 int limit = 700;
                 int overlap = 100;
-                // Split the string into words
                 String[] words = content.split("\\s+");
 
                 int processedWords = 0;
@@ -117,9 +108,7 @@ public class SearchWikipediaTool implements Tool {
                     MLPredictionTaskRequest request = new MLPredictionTaskRequest(summaryModelId, mlInput);
                     ActionFuture<MLTaskResponse> taskResponse = client.execute(MLPredictionTaskAction.INSTANCE, request);
                     MLTaskResponse mlTaskResponse = taskResponse.actionGet(30, TimeUnit.SECONDS);
-                    //ActionFuture<MLOutput> output = mlClient.predict(summaryModelId, mlInput);
                     ModelTensorOutput mlOutput = (ModelTensorOutput)mlTaskResponse.getOutput();
-                    //ModelTensorOutput mlOutput = (ModelTensorOutput)output.actionGet(30, TimeUnit.SECONDS);
                     String summary = (String)mlOutput.getMlModelOutputs().get(0).getMlModelTensors().get(0).getDataAsMap().get("response");
                     summaries.add(summary);
                     processedWords += limit;
@@ -137,8 +126,6 @@ public class SearchWikipediaTool implements Tool {
                 ActionFuture<MLTaskResponse> taskResponse = client.execute(MLPredictionTaskAction.INSTANCE, request);
                 MLTaskResponse mlTaskResponse = taskResponse.actionGet(30, TimeUnit.SECONDS);
                 ModelTensorOutput mlOutput = (ModelTensorOutput)mlTaskResponse.getOutput();
-//                ActionFuture<MLOutput> output = mlClient.predict(summaryModelId, mlInput);
-//                ModelTensorOutput mlOutput = (ModelTensorOutput)output.actionGet(30, TimeUnit.SECONDS);
                 String summary = (String)mlOutput.getMlModelOutputs().get(0).getMlModelTensors().get(0).getDataAsMap().get("response");
 
                 return summary;

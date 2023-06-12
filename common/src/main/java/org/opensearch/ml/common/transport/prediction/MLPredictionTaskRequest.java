@@ -34,22 +34,29 @@ public class MLPredictionTaskRequest extends MLTaskRequest {
 
     String modelId;
     MLInput mlInput;
+    boolean async;
 
     @Builder
-    public MLPredictionTaskRequest(String modelId, MLInput mlInput, boolean dispatchTask) {
+    public MLPredictionTaskRequest(String modelId, MLInput mlInput, boolean dispatchTask, boolean async) {
         super(dispatchTask);
         this.mlInput = mlInput;
         this.modelId = modelId;
+        this.async = async;
     }
 
     public MLPredictionTaskRequest(String modelId, MLInput mlInput) {
-        this(modelId, mlInput, true);
+        this(modelId, mlInput, true, false);
+    }
+
+    public MLPredictionTaskRequest(String modelId, MLInput mlInput, boolean async) {
+        this(modelId, mlInput, true, async);
     }
 
     public MLPredictionTaskRequest(StreamInput in) throws IOException {
         super(in);
         this.modelId = in.readOptionalString();
         this.mlInput = new MLInput(in);
+        this.async = in.readBoolean();
     }
 
     @Override
@@ -57,6 +64,7 @@ public class MLPredictionTaskRequest extends MLTaskRequest {
         super.writeTo(out);
         out.writeOptionalString(this.modelId);
         this.mlInput.writeTo(out);
+        out.writeBoolean(async);
     }
 
     @Override

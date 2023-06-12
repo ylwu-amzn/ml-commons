@@ -38,7 +38,7 @@ import static org.opensearch.ml.engine.utils.ScriptUtils.gson;
 public class SearchIndexTool implements Tool {
     public static final String NAME = "SearchIndexTool";
 
-    private static final String description = "Use this tool to query OpenSearch index.";
+    private static final String description = "Useful for when you don't know answer for some question or need to search my private data in OpenSearch index.";
 
     private Client client;
     private NamedXContentRegistry xContentRegistry;

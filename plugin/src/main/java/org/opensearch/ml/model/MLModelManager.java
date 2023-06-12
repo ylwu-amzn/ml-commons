@@ -24,6 +24,7 @@ import static org.opensearch.ml.engine.algorithms.remote.RemoteModel.CLUSTER_SER
 import static org.opensearch.ml.engine.algorithms.remote.RemoteModel.EXTERNAL_TOOLS;
 import static org.opensearch.ml.engine.algorithms.remote.RemoteModel.SCRIPT_SERVICE;
 import static org.opensearch.ml.engine.algorithms.remote.RemoteModel.SETTINGS;
+import static org.opensearch.ml.engine.algorithms.remote.RemoteModel.THREAD_POOL;
 import static org.opensearch.ml.engine.algorithms.remote.RemoteModel.XCONTENT_REGISTRY;
 import static org.opensearch.ml.engine.algorithms.text_embedding.TextEmbeddingModel.ML_ENGINE;
 import static org.opensearch.ml.engine.algorithms.text_embedding.TextEmbeddingModel.MODEL_HELPER;
@@ -625,6 +626,8 @@ public class MLModelManager {
                             scriptService,
                             CLIENT,
                             client,
+                            THREAD_POOL,
+                            threadPool,
                             XCONTENT_REGISTRY,
                             xContentRegistry,
                             CLUSTER_SERVICE,

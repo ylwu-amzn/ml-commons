@@ -267,10 +267,12 @@ public class MLTaskManager {
      */
     public void updateMLTask(String taskId, Map<String, Object> updatedFields, long timeoutInMillis, boolean removeFromCache) {
         ActionListener<UpdateResponse> internalListener = ActionListener.wrap(response -> {
-            if (response.status() == RestStatus.OK) {
-                log.debug("Updated ML task successfully: {}, taskId: {}, updatedFields: {}", response.status(), taskId, updatedFields);
-            } else {
-                log.error("Failed to update ML task {}, status: {}, updatedFields: {}", taskId, response.status(), updatedFields);
+            if (response != null) {
+                if (response.status() == RestStatus.OK) {
+                    log.debug("Updated ML task successfully: {}, taskId: {}, updatedFields: {}", response.status(), taskId, updatedFields);
+                } else {
+                    log.error("Failed to update ML task {}, status: {}, updatedFields: {}", taskId, response.status(), updatedFields);
+                }
             }
         }, e -> { logException("Failed to update ML task: " + taskId, e, log); });
         updateMLTask(taskId, updatedFields, internalListener, timeoutInMillis, removeFromCache);
@@ -328,10 +330,14 @@ public class MLTaskManager {
                 ActionListener<UpdateResponse> actionListener = semaphore == null
                     ? listener
                     : ActionListener.runAfter(listener, () -> semaphore.release());
-                try (ThreadContext.StoredContext context = client.threadPool().getThreadContext().stashContext()) {
-                    client.update(updateRequest, ActionListener.runBefore(actionListener, () -> context.restore()));
-                } catch (Exception e) {
-                    actionListener.onFailure(e);
+                if (taskId.length() > 20) {
+                    actionListener.onResponse(null);
+                } else {
+                    try (ThreadContext.StoredContext context = client.threadPool().getThreadContext().stashContext()) {
+                        client.update(updateRequest, ActionListener.runBefore(actionListener, () -> context.restore()));
+                    } catch (Exception e) {
+                        actionListener.onFailure(e);
+                    }
                 }
             } catch (Exception e) {
                 semaphore.release();
