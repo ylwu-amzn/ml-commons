@@ -9,6 +9,7 @@ import org.opensearch.ml.common.output.model.ModelTensorOutput;
 import org.opensearch.ml.common.spi.tools.Tool;
 import org.opensearch.ml.common.spi.tools.ToolAnnotation;
 
+import java.util.Map;
 import java.util.function.Supplier;
 
 @ToolAnnotation(LanguageModelTool.NAME)
@@ -18,7 +19,7 @@ public class LanguageModelTool implements Tool {
     private Supplier<ModelTensorOutput> supplier;
 
     @Override
-    public <T> T run(String input) {
+    public <T> T run(String input, Map<String, String> toolParameters) {
         ModelTensorOutput output = supplier.get();
         String result = (String) output.getMlModelOutputs().get(0).getMlModelTensors().get(0).getDataAsMap().get("response");
         return (T)result;
@@ -35,7 +36,7 @@ public class LanguageModelTool implements Tool {
     }
 
     @Override
-    public boolean validate(String input) {
+    public boolean validate(String input, Map<String, String> toolParameters) {
         if (input == null || input.length() == 0) {
             return false;
         }

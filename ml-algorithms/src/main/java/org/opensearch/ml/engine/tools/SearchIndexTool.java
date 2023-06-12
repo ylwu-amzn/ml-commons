@@ -44,7 +44,7 @@ public class SearchIndexTool implements Tool {
     private NamedXContentRegistry xContentRegistry;
 
     @Override
-    public <T> T run(String input) {
+    public <T> T run(String input, Map<String, String> toolParameters) {
         Map<String, String> parameters = parseInput(input);
         String index = parameters.get("index");
         String query = parameters.get("query");
@@ -56,7 +56,9 @@ public class SearchIndexTool implements Tool {
             SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
             XContentParser queryParser = XContentType.JSON.xContent().createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE, query);
             searchSourceBuilder.parseXContent(queryParser);
-            searchSourceBuilder.size(2);//TODO: make this configurable
+            if (toolParameters != null && toolParameters.containsKey("doc_size")) {
+                searchSourceBuilder.size(Integer.parseInt(toolParameters.get("doc_size")));
+            }
             SearchRequest searchRequest = new SearchRequest().source(searchSourceBuilder).indices(index);
             CountDownLatch latch = new CountDownLatch(1);
             LatchedActionListener listener = new LatchedActionListener<SearchResponse>(ActionListener.wrap(r -> {
@@ -112,7 +114,7 @@ public class SearchIndexTool implements Tool {
     }
 
     @Override
-    public boolean validate(String input) {
+    public boolean validate(String input, Map<String, String> toolParameters) {
         return parseInput(input) != null;
     }
 

@@ -10,6 +10,7 @@ import org.opensearch.ml.common.output.model.ModelTensorOutput;
 import org.opensearch.ml.common.output.model.ModelTensors;
 import org.opensearch.ml.common.spi.tools.Tool;
 import org.opensearch.ml.engine.tools.LanguageModelTool;
+import org.opensearch.ml.engine.tools.SearchIndexTool;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -158,7 +159,13 @@ public class Agent {
 
             String actionResult = null;
             if (action != null && toolsMap.containsKey(action) && inputTools.contains(action)) {
-                if (toolsMap.get(action).validate(actionInput)) {
+                Map<String, String> toolParams = new HashMap<>();
+                if (toolsMap.get(action) instanceof SearchIndexTool) {
+                    if (tmpParameters.containsKey("SearchIndexTool.doc_size")) {
+                        toolParams.put("doc_size", tmpParameters.get("SearchIndexTool.doc_size"));
+                    }
+                }
+                if (toolsMap.get(action).validate(actionInput, toolParams)) {
                     if (toolsMap.get(action) instanceof LanguageModelTool) {
                         Map<String, String> llmToolTmpParameters = new HashMap<>();
                         llmToolTmpParameters.putAll(tmpParameters);
@@ -167,7 +174,7 @@ public class Agent {
                         llmToolTmpParameters.put(QUESTION, actionInput);
                         ((LanguageModelTool) toolsMap.get(action)).setSupplier(() -> executeDirectly.apply(llmToolTmpParameters));
                     }
-                    actionResult = toolsMap.get(action).run(actionInput);
+                    actionResult = toolsMap.get(action).run(actionInput, toolParams);
                     modelTensors.add(ModelTensors.builder().mlModelTensors(Arrays.asList(ModelTensor.builder().dataAsMap(ImmutableMap.of("response", thought + "\nObservation: " + actionResult)).build())).build());
                 } else {
                     actionResult = "Tool " + action + " can't work for input: " + actionInput;

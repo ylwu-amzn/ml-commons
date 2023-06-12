@@ -69,7 +69,7 @@ public class SearchWikipediaTool implements Tool {
     private static final String description = "Useful when you need to use this tool to search general knowledge on wikipedia.";
 
     @Override
-    public <T> T run(String input) {
+    public <T> T run(String input, Map<String, String> toolParameters) {
         HttpClient httpClient = HttpClientBuilder.create().build();
         String title = input.trim().replace(" ", "_");
         title = title.replace("\"", "");
@@ -147,8 +147,8 @@ public class SearchWikipediaTool implements Tool {
     }
 
     @Override
-    public boolean validate(String s) {
-        return s != null && s.length() > 0;
+    public boolean validate(String input, Map<String, String> toolParameters) {
+        return input != null && input.length() > 0;
     }
 
     public void setClient(Client client) {

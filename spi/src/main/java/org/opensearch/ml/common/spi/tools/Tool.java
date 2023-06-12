@@ -5,14 +5,16 @@
 
 package org.opensearch.ml.common.spi.tools;
 
+import java.util.Map;
+
 public interface Tool {
 
-    <T> T run(String input);
+    <T> T run(String input, Map<String, String> toolParameters);
 
     String getName();
     String getDescription();
 
-    boolean validate(String input);
-    default boolean end(String input){return false;}
+    boolean validate(String input, Map<String, String> toolParameters);
+    default boolean end(String input, Map<String, String> toolParameters){return false;}
 
 }

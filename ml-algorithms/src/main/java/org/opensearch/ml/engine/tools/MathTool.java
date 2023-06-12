@@ -10,6 +10,7 @@ import org.opensearch.ml.common.spi.tools.Tool;
 import org.opensearch.ml.common.spi.tools.ToolAnnotation;
 import org.opensearch.script.ScriptService;
 
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -27,7 +28,7 @@ public class MathTool implements Tool {
     }
 
     @Override
-    public <T> T run(String input) {
+    public <T> T run(String input, Map<String, String> toolParameters) {
         try {
             input = gson.fromJson(input, String.class);
         } catch (Exception e) {
@@ -59,9 +60,9 @@ public class MathTool implements Tool {
     }
 
     @Override
-    public boolean validate(String input) {
+    public boolean validate(String input, Map<String, String> toolParameters) {
         try {
-            run(input);
+            run(input, toolParameters);
         } catch (Exception e) {
             return false;
         }
