@@ -29,6 +29,8 @@ import java.util.function.Function;
 import static org.apache.commons.text.StringEscapeUtils.escapeJson;
 import static org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken;
 import static org.opensearch.ml.common.connector.ConnectorNames.HTTP_V1;
+import static org.opensearch.ml.common.utils.StringUtils.getParameterMap;
+import static org.opensearch.ml.common.utils.StringUtils.gson;
 import static org.opensearch.ml.common.utils.StringUtils.isJson;
 import static org.opensearch.ml.common.utils.StringUtils.toUTF8;
 
@@ -90,7 +92,8 @@ public class HttpConnector implements Connector {
                     endpoint = parser.text();
                     break;
                 case PARAMETERS_FIELD:
-                    parameters = parser.mapStrings();
+                    Map<String, Object> map = parser.map();
+                    parameters = getParameterMap(map);
                     parser.map();
                     break;
                 case CREDENTIAL_FIELD:

@@ -29,6 +29,7 @@ import org.opensearch.common.xcontent.LoggingDeprecationHandler;
 import org.opensearch.common.xcontent.XContentType;
 import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.core.xcontent.XContentParser;
+import org.opensearch.index.query.BoolQueryBuilder;
 import org.opensearch.index.query.TermQueryBuilder;
 import org.opensearch.ingest.IngestMetadata;
 import org.opensearch.ingest.PipelineConfiguration;
@@ -265,7 +266,14 @@ public class ChatConnectorExecutor implements RemoteConnectorExecutor{
                         sessionSize = Integer.parseInt(parameters.get(SESSION_SIZE_FIELD));
                     }
                     SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
-                    searchSourceBuilder.query(new TermQueryBuilder(connector.getSessionIdField(), sessionId));
+                    BoolQueryBuilder boolQueryBuilder = new BoolQueryBuilder();
+                    boolQueryBuilder.filter(new TermQueryBuilder(connector.getSessionIdField(), sessionId));
+                    if (parameters.containsKey("session_history.only_include_final_answer")) {
+                        if ("true".equals(parameters.get("session_history.only_include_final_answer"))) {
+                            boolQueryBuilder.filter(new TermQueryBuilder("final_answer", "true"));
+                        }
+                    }
+                    searchSourceBuilder.query(boolQueryBuilder);
                     searchSourceBuilder.sort("created_time", SortOrder.DESC);
                     searchSourceBuilder.size(sessionSize);
                     SearchRequest searchRequest = new SearchRequest().source(searchSourceBuilder).indices(sessionIndex);

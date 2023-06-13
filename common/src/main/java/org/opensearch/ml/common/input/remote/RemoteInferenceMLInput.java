@@ -13,14 +13,11 @@ import org.opensearch.ml.common.dataset.remote.RemoteInferenceInputDataSet;
 import org.opensearch.ml.common.input.MLInput;
 
 import java.io.IOException;
-import java.security.AccessController;
-import java.security.PrivilegedActionException;
-import java.security.PrivilegedExceptionAction;
 import java.util.HashMap;
 import java.util.Map;
 
 import static org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken;
-import static org.opensearch.ml.common.utils.StringUtils.gson;
+import static org.opensearch.ml.common.utils.StringUtils.getParameterMap;
 
 @org.opensearch.ml.common.annotation.MLInput(functionNames = {FunctionName.REMOTE})
 public class RemoteInferenceMLInput extends MLInput {
@@ -54,22 +51,7 @@ public class RemoteInferenceMLInput extends MLInput {
                     break;
             }
         }
-        Map<String, String> parameters = new HashMap<>();
-        for (String key : parameterObjs.keySet()) {
-            Object value = parameterObjs.get(key);
-            try {
-                AccessController.doPrivileged((PrivilegedExceptionAction<Void>) () -> {
-                    if (value instanceof String) {
-                        parameters.put(key, (String)value);
-                    } else {
-                        parameters.put(key, gson.toJson(value));
-                    }
-                    return null;
-                });
-            } catch (PrivilegedActionException e) {
-                throw new RuntimeException(e);
-            }
-        }
+        Map<String, String> parameters = getParameterMap(parameterObjs);
         inputDataset = new RemoteInferenceInputDataSet(parameters);
     }
 

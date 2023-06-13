@@ -70,10 +70,10 @@ public class Agent {
         Map<String, String> tmpParameters = new HashMap<>();
         tmpParameters.putAll(parameters);
         if (!tmpParameters.containsKey("stop")) {
-            tmpParameters.put("stop", gson.toJson(new String[]{"\nObservation:", "\n\tObservation:", "\n\t[End of", "\n[End of", "[End of"}));
+            tmpParameters.put("stop", gson.toJson(new String[]{"\nObservation:", "\n\tObservation:"}));
         }
         if (!tmpParameters.containsKey("stop_sequences")) {
-            tmpParameters.put("stop_sequences", gson.toJson(new String[]{"\n\nHuman:", "\nObservation:", "\n\tObservation:","\nObservation", "\n\tObservation", "\n\nQuestion", "\n\t[End of", "\n[End of", "[End of"}));
+            tmpParameters.put("stop_sequences", gson.toJson(new String[]{"\n\nHuman:", "\nObservation:", "\n\tObservation:","\nObservation", "\n\tObservation", "\n\nQuestion"}));
         }
 
         Integer maxIterations = parameters.containsKey("max_iterations")? Integer.parseInt(parameters.get("max_iterations")) : 3;
@@ -169,7 +169,7 @@ public class Agent {
                     if (toolsMap.get(action) instanceof LanguageModelTool) {
                         Map<String, String> llmToolTmpParameters = new HashMap<>();
                         llmToolTmpParameters.putAll(tmpParameters);
-                        String llmToolPrompt = tmpParameters.containsKey("LanguageModelTool.prompt")? tmpParameters.get("LanguageModelTool.prompt") : "Try your best to answer this question: ${parameter.question}";
+                        String llmToolPrompt = tmpParameters.containsKey("LanguageModelTool.prompt")? tmpParameters.get("LanguageModelTool.prompt") : "Try your best to answer this question: ${parameters.question}";
                         llmToolTmpParameters.put(PROMPT, llmToolPrompt);
                         llmToolTmpParameters.put(QUESTION, actionInput);
                         ((LanguageModelTool) toolsMap.get(action)).setSupplier(() -> executeDirectly.apply(llmToolTmpParameters));
@@ -260,11 +260,11 @@ public class Agent {
         if (parameters.containsKey(OS_INDICES)) {
             String indices = parameters.get(OS_INDICES);
             List<String> indicesList = gson.fromJson(indices, List.class);
-            StringBuilder indicesBuilder = new StringBuilder("You have access to the following OpenSearch Index: \n[OpenSearch Index]:\n");
+            StringBuilder indicesBuilder = new StringBuilder("You have access to the following OpenSearch Index: \n");
             for (String e : indicesList) {
                 indicesBuilder.append(e).append("\n");
             }
-            indicesBuilder.append("\n[End of OpenSearch Index]:\n");
+            indicesBuilder.append("\nEnd of OpenSearch Index\n");
             indicesMap.put(OS_INDICES, indicesBuilder.toString());
         } else {
             indicesMap.put(OS_INDICES, "");
@@ -278,12 +278,12 @@ public class Agent {
         if (parameters.containsKey(EXAMPLES)) {
             String examples = parameters.get(EXAMPLES);
             List<String> exampleList = gson.fromJson(examples, List.class);
-            StringBuilder exampleBuilder = new StringBuilder("[Examples]: \n");
+            StringBuilder exampleBuilder = new StringBuilder("Examples: \n");
             for (int i = 0; i< exampleList.size(); i++) {
                 String example = exampleList.get(i);
-                exampleBuilder.append("[Example ").append(i + 1).append("]:\n").append(example).append("\n[End of Example ").append(i + 1).append("]\n");
+                exampleBuilder.append("Example ").append(i + 1).append(":\n").append(example).append("\n");
             }
-            exampleBuilder.append("[End of Examples]\n");
+            exampleBuilder.append("End of Examples\n");
             examplesMap.put(EXAMPLES, exampleBuilder.toString());
         } else {
             examplesMap.put(EXAMPLES, "");
@@ -294,7 +294,7 @@ public class Agent {
 
     private String addChatHistoryToPrompt(Map<String, String> parameters, String prompt) {
         Map<String, String> chatHistoryMap = new HashMap<>();
-        String chatHistory = parameters.containsKey(CHAT_HISTORY) ? "[Chat History]: \n" + parameters.get(CHAT_HISTORY) + "\n[End of Chat History]\n" : "";
+        String chatHistory = parameters.containsKey(CHAT_HISTORY) ? parameters.get(CHAT_HISTORY) : "";
         chatHistoryMap.put(CHAT_HISTORY, chatHistory);
         parameters.put(CHAT_HISTORY, chatHistory);
         if (chatHistoryMap.size() > 0) {
@@ -307,7 +307,7 @@ public class Agent {
     private String addContextToPrompt(Map<String, String> parameters, String prompt) {
         Map<String, String> contextMap = new HashMap<>();
         if (parameters.containsKey(CONTEXT)) {
-            contextMap.put(CONTEXT, "[Context]: \n" + parameters.get(CONTEXT) + "\n[End of Context]\n");
+            contextMap.put(CONTEXT, parameters.get(CONTEXT));
         } else {
             contextMap.put(CONTEXT, "");
         }
