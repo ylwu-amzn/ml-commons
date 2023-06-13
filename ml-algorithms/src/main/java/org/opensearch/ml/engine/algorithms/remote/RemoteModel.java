@@ -11,6 +11,7 @@ import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.common.MLModel;
+import org.opensearch.ml.common.MLTask;
 import org.opensearch.ml.common.connector.Connector;
 import org.opensearch.ml.common.exception.MLException;
 import org.opensearch.ml.common.input.MLInput;
@@ -42,14 +43,14 @@ public class RemoteModel implements Predictable {
     private List<Tool> tools;
 
     @Override
-    public MLOutput predict(MLInput mlInput, MLModel model) {
+    public MLOutput predict(MLInput mlInput, MLTask mlTask, MLModel model) {
         throw new IllegalArgumentException("model not deployed: " + model.getModelId());
     }
 
     @Override
-    public MLOutput predict(MLInput mlInput) {
+    public MLOutput predict(MLInput mlInput, MLTask mlTask) {
         try {
-            return connectorExecutor.execute(mlInput);
+            return connectorExecutor.execute(mlInput, mlTask);
         } catch (Throwable t) {
             log.error("Failed to call remote model", t);
             throw new MLException("Failed to call remote model. " + t.getMessage());

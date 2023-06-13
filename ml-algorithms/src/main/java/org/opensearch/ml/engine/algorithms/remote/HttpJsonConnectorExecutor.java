@@ -17,9 +17,9 @@ import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.util.EntityUtils;
 import org.opensearch.ml.common.FunctionName;
+import org.opensearch.ml.common.MLTask;
 import org.opensearch.ml.common.connector.Connector;
 import org.opensearch.ml.common.connector.HttpConnector;
-import org.opensearch.ml.common.dataset.MLInputDataset;
 import org.opensearch.ml.common.dataset.TextDocsInputDataSet;
 import org.opensearch.ml.common.dataset.remote.RemoteInferenceInputDataSet;
 import org.opensearch.ml.common.exception.MLException;
@@ -59,10 +59,10 @@ public class HttpJsonConnectorExecutor implements RemoteConnectorExecutor{
     }
 
     @Override
-    public ModelTensorOutput execute(MLInput mlInput) {
+    public ModelTensorOutput execute(MLInput mlInput, MLTask mlTask) {
         if (agent != null) {
             RemoteInferenceInputDataSet inputData = processInput(mlInput, connector, scriptService);
-            return agent.run(inputData.getParameters(), (params) -> executeDirectly(params));
+            return agent.run(inputData.getParameters(), null,  (params) -> executeDirectly(params), null);
         } else {
             return executeDirectly(mlInput);
         }

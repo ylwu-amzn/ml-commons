@@ -20,6 +20,7 @@ import lombok.extern.log4j.Log4j2;
 import org.apache.commons.io.FileUtils;
 import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.common.MLModel;
+import org.opensearch.ml.common.MLTask;
 import org.opensearch.ml.common.exception.MLException;
 import org.opensearch.ml.common.input.MLInput;
 import org.opensearch.ml.common.model.MLModelConfig;
@@ -72,12 +73,12 @@ public abstract class DLModel implements Predictable {
     }
 
     @Override
-    public MLOutput predict(MLInput mlInput, MLModel model) {
+    public MLOutput predict(MLInput mlInput, MLTask mlTask, MLModel model) {
         throw new IllegalArgumentException("model not deployed: " + model.getModelId());
     }
 
     @Override
-    public MLOutput predict(MLInput mlInput) {
+    public MLOutput predict(MLInput mlInput, MLTask mlTask) {
         if (modelHelper == null || modelId == null) {
             throw new IllegalArgumentException("model not deployed: " + modelId);
         }

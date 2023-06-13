@@ -7,6 +7,7 @@ package org.opensearch.ml.engine;
 
 import lombok.Getter;
 import org.opensearch.ml.common.MLModel;
+import org.opensearch.ml.common.MLTask;
 import org.opensearch.ml.common.dataframe.DataFrame;
 import org.opensearch.ml.common.dataset.DataFrameInputDataset;
 import org.opensearch.ml.common.dataset.MLInputDataset;
@@ -116,14 +117,14 @@ public class MLEngine {
         return predictable;
     }
 
-    public MLOutput predict(Input input, MLModel model) {
+    public MLOutput predict(Input input, MLTask mlTask, MLModel model) {
         validateMLInput(input);
         MLInput mlInput = (MLInput) input;
         Predictable predictable = MLEngineClassLoader.initInstance(mlInput.getAlgorithm(), mlInput.getParameters(), MLAlgoParams.class);
         if (predictable == null) {
             throw new IllegalArgumentException("Unsupported algorithm: " + mlInput.getAlgorithm());
         }
-        return predictable.predict(mlInput, model);
+        return predictable.predict(mlInput, mlTask, model);
     }
 
     public MLOutput trainAndPredict(Input input) {

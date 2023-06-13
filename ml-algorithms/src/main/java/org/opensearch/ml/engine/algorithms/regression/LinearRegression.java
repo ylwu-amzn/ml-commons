@@ -6,6 +6,7 @@
 package org.opensearch.ml.engine.algorithms.regression;
 
 import org.opensearch.ml.common.MLModel;
+import org.opensearch.ml.common.MLTask;
 import org.opensearch.ml.common.dataframe.DataFrame;
 import org.opensearch.ml.common.dataframe.DataFrameBuilder;
 import org.opensearch.ml.common.dataset.DataFrameInputDataset;
@@ -215,7 +216,7 @@ public class LinearRegression implements Trainable, Predictable {
     }
 
     @Override
-    public MLOutput predict(MLInput mlInput) {
+    public MLOutput predict(MLInput mlInput, MLTask mlTask) {
         if (regressionModel == null) {
             throw new IllegalArgumentException("model not deployed");
         }
@@ -230,13 +231,13 @@ public class LinearRegression implements Trainable, Predictable {
     }
 
     @Override
-    public MLOutput predict(MLInput mlInput, MLModel model) {
+    public MLOutput predict(MLInput mlInput, MLTask mlTask, MLModel model) {
         if (model == null) {
             throw new IllegalArgumentException("No model found for linear regression prediction.");
         }
 
         regressionModel = (org.tribuo.Model<Regressor>) ModelSerDeSer.deserialize(model);
-        return predict(mlInput);
+        return predict(mlInput, mlTask);
     }
 
     @Override

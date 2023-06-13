@@ -6,6 +6,7 @@
 package org.opensearch.ml.engine;
 
 import org.opensearch.ml.common.MLModel;
+import org.opensearch.ml.common.MLTask;
 import org.opensearch.ml.common.input.MLInput;
 import org.opensearch.ml.common.output.MLOutput;
 import org.opensearch.ml.engine.encryptor.Encryptor;
@@ -21,17 +22,19 @@ public interface Predictable {
      * Predict with given input data and model.
      * Will reload model into memory with model content.
      * @param mlInput input data
+     * @param mlTask ML task
      * @param model the java serialized model
      * @return predicted results
      */
-    MLOutput predict(MLInput mlInput, MLModel model);
+    MLOutput predict(MLInput mlInput, MLTask mlTask, MLModel model);
 
     /**
      * Predict with given input data for deployed model.
      * @param mlInput input data
+     * @param mlTask ML task
      * @return predicted results
      */
-    MLOutput predict(MLInput mlInput);
+    MLOutput predict(MLInput mlInput, MLTask mlTask);
 
     /**
      * Init model (load model into memory) with ML model content and params.

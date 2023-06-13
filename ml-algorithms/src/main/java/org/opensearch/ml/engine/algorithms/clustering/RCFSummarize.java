@@ -6,6 +6,7 @@
 package org.opensearch.ml.engine.algorithms.clustering;
 
 import org.opensearch.ml.common.MLModel;
+import org.opensearch.ml.common.MLTask;
 import org.opensearch.ml.common.dataframe.DataFrame;
 import org.opensearch.ml.common.dataframe.DataFrameBuilder;
 import org.opensearch.ml.common.dataset.DataFrameInputDataset;
@@ -151,7 +152,7 @@ public class RCFSummarize implements TrainAndPredictable {
     }
 
     @Override
-    public MLOutput predict(MLInput mlInput) {
+    public MLOutput predict(MLInput mlInput, MLTask mlTask) {
         Iterable<float[]> centroidsLst = Arrays.asList(summary.summaryPoints);
         DataFrame dataFrame = ((DataFrameInputDataset)mlInput.getInputDataset()).getDataFrame();
         Tuple<String[], float[][]> featureNamesValues = TribuoUtil.transformDataFrameFloat(dataFrame);
@@ -165,13 +166,13 @@ public class RCFSummarize implements TrainAndPredictable {
     }
 
     @Override
-    public MLOutput predict(MLInput mlInput, MLModel model) {
+    public MLOutput predict(MLInput mlInput, MLTask mlTask, MLModel model) {
         if (model == null) {
             throw new IllegalArgumentException("No model found for RCFSummarize prediction.");
         }
 
         summary = ((SerializableSummary)ModelSerDeSer.deserialize(model)).getSummary();
-        return predict(mlInput);
+        return predict(mlInput, mlTask);
     }
 
     @Override

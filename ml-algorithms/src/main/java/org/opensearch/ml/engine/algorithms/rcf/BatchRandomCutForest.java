@@ -11,6 +11,7 @@ import com.amazon.randomcutforest.state.RandomCutForestState;
 import lombok.extern.log4j.Log4j2;
 import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.common.MLModel;
+import org.opensearch.ml.common.MLTask;
 import org.opensearch.ml.common.dataframe.ColumnMeta;
 import org.opensearch.ml.common.dataframe.ColumnValue;
 import org.opensearch.ml.common.dataframe.DataFrame;
@@ -88,20 +89,20 @@ public class BatchRandomCutForest implements TrainAndPredictable {
     }
 
     @Override
-    public MLOutput predict(MLInput mlInput) {
+    public MLOutput predict(MLInput mlInput, MLTask mlTask) {
         DataFrame dataFrame = ((DataFrameInputDataset)mlInput.getInputDataset()).getDataFrame();
         List<Map<String, Object>> predictResult = process(dataFrame, forest, 0);
         return MLPredictionOutput.builder().predictionResult(DataFrameBuilder.load(predictResult)).build();
     }
 
     @Override
-    public MLOutput predict(MLInput mlInput, MLModel model) {
+    public MLOutput predict(MLInput mlInput, MLTask mlTask, MLModel model) {
         if (model == null) {
             throw new IllegalArgumentException("No model found for batch RCF prediction.");
         }
         RandomCutForestState state = RCFModelSerDeSer.deserializeRCF(model);
         forest = rcfMapper.toModel(state);
-        return predict(mlInput);
+        return predict(mlInput, mlTask);
     }
 
     @Override

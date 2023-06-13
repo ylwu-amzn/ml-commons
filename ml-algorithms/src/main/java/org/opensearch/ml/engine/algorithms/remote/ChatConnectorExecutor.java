@@ -33,6 +33,7 @@ import org.opensearch.index.query.BoolQueryBuilder;
 import org.opensearch.index.query.TermQueryBuilder;
 import org.opensearch.ingest.IngestMetadata;
 import org.opensearch.ingest.PipelineConfiguration;
+import org.opensearch.ml.common.MLTask;
 import org.opensearch.ml.common.connector.Connector;
 import org.opensearch.ml.common.connector.ChatConnector;
 import org.opensearch.ml.common.dataset.remote.RemoteInferenceInputDataSet;
@@ -72,7 +73,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -105,7 +105,7 @@ public class ChatConnectorExecutor implements RemoteConnectorExecutor{
     }
 
     @Override
-    public ModelTensorOutput execute(MLInput mlInput) {
+    public ModelTensorOutput execute(MLInput mlInput, MLTask mlTask) {
         RemoteInferenceInputDataSet inputData = null;
         if (mlInput.getInputDataset() instanceof RemoteInferenceInputDataSet) {
             inputData = (RemoteInferenceInputDataSet)mlInput.getInputDataset();
@@ -324,7 +324,7 @@ public class ChatConnectorExecutor implements RemoteConnectorExecutor{
 
         if (agent != null) {
             String finalSessionId = sessionId;
-            return agent.run(newParameters, (params) -> executeDirectly(params, question, finalSessionId, false), message -> saveSessionMessage(message));
+            return agent.run(newParameters, mlTask, (params) -> executeDirectly(params, question, finalSessionId, false), message -> saveSessionMessage(message));
         } else {
             return executeDirectly(newParameters, question, sessionId, true);
         }

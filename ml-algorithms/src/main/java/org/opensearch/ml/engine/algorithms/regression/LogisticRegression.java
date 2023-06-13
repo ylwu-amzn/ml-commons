@@ -7,6 +7,7 @@ package org.opensearch.ml.engine.algorithms.regression;
 
 import org.opensearch.ml.common.MLModel;
 import org.opensearch.ml.common.FunctionName;
+import org.opensearch.ml.common.MLTask;
 import org.opensearch.ml.common.dataframe.DataFrame;
 import org.opensearch.ml.common.dataframe.DataFrameBuilder;
 import org.opensearch.ml.common.dataset.DataFrameInputDataset;
@@ -208,7 +209,7 @@ public class LogisticRegression implements Trainable, Predictable {
     }
 
     @Override
-    public MLOutput predict(MLInput mlInput) {
+    public MLOutput predict(MLInput mlInput, MLTask mlTask) {
         DataFrame dataFrame = ((DataFrameInputDataset)mlInput.getInputDataset()).getDataFrame();
         MutableDataset<Label> predictionDataset = TribuoUtil.generateDataset(dataFrame, new LabelFactory(),
                 "Logistic regression prediction data from OpenSearch", TribuoOutputType.LABEL);
@@ -221,12 +222,12 @@ public class LogisticRegression implements Trainable, Predictable {
     }
 
     @Override
-    public MLOutput predict(MLInput mlInput, MLModel model) {
+    public MLOutput predict(MLInput mlInput, MLTask mlTask, MLModel model) {
         if (model == null) {
             throw new IllegalArgumentException("No model found for logistic regression prediction.");
         }
 
         classificationModel = (org.tribuo.Model<Label>)ModelSerDeSer.deserialize(model);
-        return predict(mlInput);
+        return predict(mlInput, mlTask);
     }
 }

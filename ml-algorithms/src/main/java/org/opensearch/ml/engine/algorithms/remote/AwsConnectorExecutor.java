@@ -8,6 +8,7 @@ package org.opensearch.ml.engine.algorithms.remote;
 import lombok.Setter;
 import lombok.extern.log4j.Log4j2;
 import org.opensearch.ml.common.FunctionName;
+import org.opensearch.ml.common.MLTask;
 import org.opensearch.ml.common.connector.AwsConnector;
 import org.opensearch.ml.common.connector.Connector;
 import org.opensearch.ml.common.dataset.TextDocsInputDataSet;
@@ -38,7 +39,6 @@ import java.nio.charset.StandardCharsets;
 import java.security.AccessController;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -65,7 +65,7 @@ public class AwsConnectorExecutor implements RemoteConnectorExecutor{
     }
 
     @Override
-    public ModelTensorOutput execute(MLInput mlInput) {
+    public ModelTensorOutput execute(MLInput mlInput, MLTask mlTask) {
         List<ModelTensors> tensorOutputs = new ArrayList<>();
 
         if (mlInput.getInputDataset() instanceof TextDocsInputDataSet) {

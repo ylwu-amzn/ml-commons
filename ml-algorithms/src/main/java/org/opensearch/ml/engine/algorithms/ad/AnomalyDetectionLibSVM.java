@@ -6,6 +6,7 @@
 package org.opensearch.ml.engine.algorithms.ad;
 
 import org.opensearch.ml.common.MLModel;
+import org.opensearch.ml.common.MLTask;
 import org.opensearch.ml.common.dataframe.DataFrame;
 import org.opensearch.ml.common.dataframe.DataFrameBuilder;
 import org.opensearch.ml.common.FunctionName;
@@ -90,7 +91,7 @@ public class AnomalyDetectionLibSVM implements Trainable, Predictable {
     }
 
     @Override
-    public MLOutput predict(MLInput mlInput) {
+    public MLOutput predict(MLInput mlInput, MLTask mlTask) {
         MLInputDataset inputDataset = mlInput.getInputDataset();
         DataFrame dataFrame = ((DataFrameInputDataset)inputDataset).getDataFrame();
         if (libSVMAnomalyModel == null) {
@@ -113,13 +114,13 @@ public class AnomalyDetectionLibSVM implements Trainable, Predictable {
     }
 
     @Override
-    public MLOutput predict(MLInput mlInput, MLModel model) {
+    public MLOutput predict(MLInput mlInput, MLTask mlTask, MLModel model) {
         if (model == null) {
             throw new IllegalArgumentException("No model found for KMeans prediction.");
         }
 
         libSVMAnomalyModel = (LibSVMModel) ModelSerDeSer.deserialize(model);
-        return predict(mlInput);
+        return predict(mlInput, mlTask);
     }
 
     @Override

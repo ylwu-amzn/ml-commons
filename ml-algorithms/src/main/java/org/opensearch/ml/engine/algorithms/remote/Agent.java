@@ -4,6 +4,7 @@ import com.google.common.collect.ImmutableMap;
 import lombok.Getter;
 import lombok.extern.log4j.Log4j2;
 import org.apache.commons.text.StringSubstitutor;
+import org.opensearch.ml.common.MLTask;
 import org.opensearch.ml.common.exception.MLException;
 import org.opensearch.ml.common.output.model.ModelTensor;
 import org.opensearch.ml.common.output.model.ModelTensorOutput;
@@ -60,13 +61,13 @@ public class Agent {
             this.defaultPrompt = PromptTemplate.AGENT_TEMPLATE;
         }
     }
-    public ModelTensorOutput run(Map<String, String> parameters, Function<Map<String, String>, ModelTensorOutput> executeDirectly) {
-        return run(parameters, executeDirectly);
-    }
 
-    public ModelTensorOutput run(Map<String, String> parameters, Function<Map<String, String>, ModelTensorOutput> executeDirectly,
+    public ModelTensorOutput run(Map<String, String> parameters,
+                                 MLTask mlTask,
+                                 Function<Map<String, String>, ModelTensorOutput> executeDirectly,
                                  Consumer<Map<String, Object>> saveSessionMessageConsumer) {
         String question = parameters.get("question");
+        String taskId = mlTask.getTaskId();
         Map<String, String> tmpParameters = new HashMap<>();
         tmpParameters.putAll(parameters);
         if (!tmpParameters.containsKey("stop")) {
@@ -142,7 +143,8 @@ public class Agent {
                             "question", question,
                             "answer", finalAnswer,
                             "final_answer", true,
-                            "created_time", Instant.now().toEpochMilli()));
+                            "created_time", Instant.now().toEpochMilli(),
+                            "task_id", taskId));
                 }
                 List<ModelTensors> finalModelTensors = new ArrayList<>();
                 finalModelTensors.add(ModelTensors.builder().mlModelTensors(Arrays.asList(ModelTensor.builder().name("response").dataAsMap(ImmutableMap.of("response", finalAnswer)).build())).build());
@@ -205,7 +207,8 @@ public class Agent {
                         "question", question,
                         "answer", sessionMsgAnswerBuilder.toString(),
                         "final_answer", i == maxIterations - 1,
-                        "created_time", Instant.now().toEpochMilli()));
+                        "created_time", Instant.now().toEpochMilli(),
+                        "task_id", taskId));
             }
         }
         List<ModelTensors> finalModelTensors = new ArrayList<>();

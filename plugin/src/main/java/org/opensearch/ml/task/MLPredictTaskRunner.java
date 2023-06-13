@@ -254,7 +254,7 @@ public class MLPredictTaskRunner extends MLTaskRunner<MLPredictionTaskRequest, M
                             throw new IllegalArgumentException("model not deployed: " + modelId);
                         }
                         mlTaskManager.updateMLTask(mlTask.getTaskId(), ImmutableMap.of(STATE_FIELD, RUNNING), TASK_SEMAPHORE_TIMEOUT, false);
-                        return predictor.predict(mlInput);
+                        return predictor.predict(mlInput, mlTask);
                     });
                     if (output instanceof MLPredictionOutput) {
                         ((MLPredictionOutput) output).setStatus(MLTaskState.COMPLETED.name());
@@ -298,7 +298,7 @@ public class MLPredictTaskRunner extends MLTaskRunner<MLPredictionTaskRequest, M
                         }
                         // run predict
                         mlTaskManager.updateTaskStateAsRunning(mlTask.getTaskId(), mlTask.isAsync());
-                        MLOutput output = mlEngine.predict(mlInput, mlModel);
+                        MLOutput output = mlEngine.predict(mlInput, mlTask, mlModel);
                         if (output instanceof MLPredictionOutput) {
                             ((MLPredictionOutput) output).setStatus(MLTaskState.COMPLETED.name());
                         }

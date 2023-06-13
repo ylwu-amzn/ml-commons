@@ -6,6 +6,7 @@
 package org.opensearch.ml.engine.algorithms.clustering;
 
 import org.opensearch.ml.common.MLModel;
+import org.opensearch.ml.common.MLTask;
 import org.opensearch.ml.common.dataframe.DataFrame;
 import org.opensearch.ml.common.dataframe.DataFrameBuilder;
 import org.opensearch.ml.common.dataset.DataFrameInputDataset;
@@ -104,7 +105,7 @@ public class KMeans implements TrainAndPredictable {
     }
 
     @Override
-    public MLOutput predict(MLInput mlInput) {
+    public MLOutput predict(MLInput mlInput, MLTask mlTask) {
         DataFrame dataFrame = ((DataFrameInputDataset)mlInput.getInputDataset()).getDataFrame();
         MutableDataset<ClusterID> predictionDataset = TribuoUtil.generateDataset(dataFrame, new ClusteringFactory(),
                 "KMeans prediction data from opensearch", TribuoOutputType.CLUSTERID);
@@ -116,12 +117,12 @@ public class KMeans implements TrainAndPredictable {
     }
 
     @Override
-    public MLOutput predict(MLInput mlInput, MLModel model) {
+    public MLOutput predict(MLInput mlInput, MLTask mlTask, MLModel model) {
         if (model == null) {
             throw new IllegalArgumentException("No model found for KMeans prediction.");
         }
         this.kMeansModel = (KMeansModel) ModelSerDeSer.deserialize(model);
-        return predict(mlInput);
+        return predict(mlInput, mlTask);
     }
 
     @Override

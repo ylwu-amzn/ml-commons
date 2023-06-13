@@ -14,6 +14,7 @@ import com.amazon.randomcutforest.parkservices.state.ThresholdedRandomCutForestS
 import lombok.extern.log4j.Log4j2;
 import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.common.MLModel;
+import org.opensearch.ml.common.MLTask;
 import org.opensearch.ml.common.dataframe.ColumnMeta;
 import org.opensearch.ml.common.dataframe.ColumnType;
 import org.opensearch.ml.common.dataframe.ColumnValue;
@@ -116,20 +117,20 @@ public class FixedInTimeRandomCutForest implements TrainAndPredictable {
     }
 
     @Override
-    public MLOutput predict(MLInput mlInput) {
+    public MLOutput predict(MLInput mlInput, MLTask mlTask) {
         DataFrame dataFrame = ((DataFrameInputDataset)mlInput.getInputDataset()).getDataFrame();
         List<Map<String, Object>> predictResult = process(dataFrame, forest, mlInput.getParameters());
         return MLPredictionOutput.builder().predictionResult(DataFrameBuilder.load(predictResult)).build();
     }
 
     @Override
-    public MLOutput predict(MLInput mlInput, MLModel model) {
+    public MLOutput predict(MLInput mlInput, MLTask mlTask, MLModel model) {
         if (model == null) {
             throw new IllegalArgumentException("No model found for FIT RCF prediction.");
         }
         ThresholdedRandomCutForestState state = RCFModelSerDeSer.deserializeTRCF(model);
         forest = trcfMapper.toModel(state);
-        return predict(mlInput);
+        return predict(mlInput, mlTask);
     }
 
     @Override

@@ -6,6 +6,7 @@
 package org.opensearch.ml.engine.algorithms.sample;
 
 import org.opensearch.ml.common.MLModel;
+import org.opensearch.ml.common.MLTask;
 import org.opensearch.ml.common.dataframe.DataFrame;
 import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.common.dataset.DataFrameInputDataset;
@@ -54,7 +55,7 @@ public class SampleAlgo implements Trainable, Predictable {
     }
 
     @Override
-    public MLOutput predict(MLInput mlInput) {
+    public MLOutput predict(MLInput mlInput, MLTask mlTask) {
         AtomicReference<Double> sum = new AtomicReference<>((double) 0);
         DataFrame dataFrame = ((DataFrameInputDataset)mlInput.getInputDataset()).getDataFrame();
         dataFrame.forEach(row -> {
@@ -64,11 +65,11 @@ public class SampleAlgo implements Trainable, Predictable {
     }
 
     @Override
-    public MLOutput predict(MLInput mlInput, MLModel model) {
+    public MLOutput predict(MLInput mlInput, MLTask mlTask, MLModel model) {
         if (model == null) {
             throw new IllegalArgumentException("No model found for sample algo.");
         }
-        return predict(mlInput);
+        return predict(mlInput, mlTask);
     }
 
     @Override

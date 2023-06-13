@@ -8,6 +8,7 @@ package org.opensearch.ml.engine.algorithms.remote;
 import org.opensearch.client.Client;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.core.xcontent.NamedXContentRegistry;
+import org.opensearch.ml.common.MLTask;
 import org.opensearch.ml.common.input.MLInput;
 import org.opensearch.ml.common.output.model.ModelTensorOutput;
 import org.opensearch.ml.common.spi.tools.Tool;
@@ -17,7 +18,7 @@ import java.util.List;
 
 public interface RemoteConnectorExecutor {
 
-    ModelTensorOutput execute(MLInput mlInput);
+    ModelTensorOutput execute(MLInput mlInput, MLTask mlTask);
 
     default void setScriptService(ScriptService scriptService){}
     default void setClient(Client client){}
