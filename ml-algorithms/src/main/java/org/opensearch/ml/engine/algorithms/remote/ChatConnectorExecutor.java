@@ -6,6 +6,8 @@
 package org.opensearch.ml.engine.algorithms.remote;
 
 import com.google.common.collect.ImmutableMap;
+import com.jayway.jsonpath.JsonPath;
+import com.jayway.jsonpath.PathNotFoundException;
 import lombok.Setter;
 import lombok.extern.log4j.Log4j2;
 import org.apache.http.HttpEntity;
@@ -478,6 +480,20 @@ public class ChatConnectorExecutor implements RemoteConnectorExecutor{
                 return null;
             });
             String modelResponse = responseRef.get();
+            if (parameters.containsKey("model.error_check")) {
+                String errorCheck = parameters.get("model.error_check");
+                try {
+                    Object error = JsonPath.parse(modelResponse).read(errorCheck);
+                    if (error !=  null) {
+                        String errorMessage = AccessController.doPrivileged((PrivilegedExceptionAction<String>) () -> {
+                            return error instanceof String? (String) error : gson.toJson(error);
+                        });
+                        throw new MLException(errorMessage);
+                    }
+                } catch (PathNotFoundException e) {
+                    log.debug("No error happened");
+                }
+            }
 
             ModelTensors tensors = processOutput(modelResponse, connector, scriptService, parameters, modelTensors);
             tensorOutputs.add(tensors);
@@ -494,7 +510,10 @@ public class ChatConnectorExecutor implements RemoteConnectorExecutor{
             return ModelTensorOutput.builder().mlModelOutputs(tensorOutputs).build();
         } catch (Throwable e) {
             log.error("Fail to execute qa connector", e);
-            throw new MLException("Fail to execute qa connector", e);
+            if (e instanceof MLException) {
+                throw (MLException) e;
+            }
+            throw new MLException(e);
         }
     }
 

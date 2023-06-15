@@ -38,6 +38,7 @@ public class Agent {
     public static final String PROMPT_PREFIX = "prompt_prefix";
     public static final String PROMPT_SUFFIX = "prompt_suffix";
     public static final String TOOLS = "tools";
+    public static final String TOOL_DESCRIPTIONS = "tool_descriptions";
     public static final String TOOL_NAMES = "tool_names";
     public static final String OS_INDICES = "opensearch_indices";
     public static final String EXAMPLES = "examples";
@@ -88,8 +89,8 @@ public class Agent {
         }
 
         List<String> inputTools = new ArrayList<>();
-        if (parameters.containsKey("tools")) {
-            inputTools = gson.fromJson(parameters.get("tools"), List.class);
+        if (parameters.containsKey(TOOLS)) {
+            inputTools = gson.fromJson(parameters.get(TOOLS), List.class);
         } else {
             for (Tool t : tools) {
                 inputTools.add(t.getName());
@@ -150,14 +151,36 @@ public class Agent {
                 finalModelTensors.add(ModelTensors.builder().mlModelTensors(Arrays.asList(ModelTensor.builder().name("response").dataAsMap(ImmutableMap.of("response", finalAnswer)).build())).build());
                 return verbose ? ModelTensorOutput.builder().mlModelOutputs(cotModelTensors).build() : ModelTensorOutput.builder().mlModelOutputs(finalModelTensors).build();
             }
-            Pattern pattern = Pattern.compile("Action:\\s*(\\w+)\\s*Action Input:\\s*(.*)");
-            Matcher matcher = pattern.matcher(thought);
+            List<String> actionRegexList = parameters.containsKey("cot.action_regex") ?
+                    gson.fromJson(parameters.get("cot.action_regex"), List.class) :
+                    Arrays.asList("Action:\\s*(\\w+)\\s*Action Input:\\s*(.*)", "action[:=]*\\s*([^\\n]+)\\s*action input[:=]*\\s*([^\\n]+)");
+
             String action = null;
             String actionInput = null;
-            if (matcher.find()) {
-                action = matcher.group(1);
-                actionInput = matcher.group(2);
+            for (String actionRegex : actionRegexList) {
+                Pattern pattern = Pattern.compile(actionRegex);
+                //Matcher matcher = pattern.matcher(thought.toLowerCase(Locale.ROOT));
+                Matcher matcher = pattern.matcher(thought);
+                if (matcher.find()) {
+                    action = matcher.group(1);
+                    actionInput = matcher.group(2);
+                }
+                if (action != null && actionInput != null) {
+                    action = action.trim();
+                    actionInput = actionInput.trim();
+                    break;
+                }
             }
+
+            String toolName = action;
+            if (action != null) {
+                for(String key : toolsMap.keySet()){
+                    if (action.toLowerCase().contains(key.toLowerCase())) {
+                        toolName = key;
+                    }
+                }
+            }
+            action = toolName;
 
             String actionResult = null;
             if (action != null && toolsMap.containsKey(action) && inputTools.contains(action)) {
@@ -182,6 +205,7 @@ public class Agent {
                     actionResult = "Tool " + action + " can't work for input: " + actionInput;
                 }
 
+                thought = thought.replaceAll("Observation:.+\\n?", "").trim();
                 scratchpadBuilder.append(thought).append("\nObservation: ").append(actionResult).append("\n\n");
 
                 tmpSubstitutor = new StringSubstitutor(ImmutableMap.of(SCRATCHPAD, scratchpadBuilder.toString()), "${parameters.", "}");
@@ -209,6 +233,15 @@ public class Agent {
                         "final_answer", i == maxIterations - 1,
                         "created_time", Instant.now().toEpochMilli(),
                         "task_id", taskId));
+            }
+            if (i != maxIterations - 1 && parameters.containsKey("cot.step_interval_millis")) {
+                Long interval = Long.parseLong(parameters.get("cot.step_interval_millis"));
+                try {
+                    Thread.sleep(interval);
+                } catch (InterruptedException e) {
+                    log.error("Failed to sleep", e);
+                    throw new MLException(e);
+                }
             }
         }
         List<ModelTensors> finalModelTensors = new ArrayList<>();
@@ -245,11 +278,11 @@ public class Agent {
             toolNamesBuilder.append(toolName).append(", ");
         }
         Map<String, String> toolsPromptMap = new HashMap<>();
-        toolsPromptMap.put(TOOLS, toolsBuilder.toString());
+        toolsPromptMap.put(TOOL_DESCRIPTIONS, toolsBuilder.toString());
         toolsPromptMap.put(TOOL_NAMES, toolNamesBuilder.substring(0, toolNamesBuilder.length() - 1));
 
-        if (parameters.containsKey(TOOLS)) {
-            toolsPromptMap.put(TOOLS, parameters.get(TOOLS));
+        if (parameters.containsKey(TOOL_DESCRIPTIONS)) {
+            toolsPromptMap.put(TOOL_DESCRIPTIONS, parameters.get(TOOL_DESCRIPTIONS));
         }
         if (parameters.containsKey(TOOL_NAMES)) {
             toolsPromptMap.put(TOOL_NAMES, parameters.get(TOOL_NAMES));
@@ -281,12 +314,12 @@ public class Agent {
         if (parameters.containsKey(EXAMPLES)) {
             String examples = parameters.get(EXAMPLES);
             List<String> exampleList = gson.fromJson(examples, List.class);
-            StringBuilder exampleBuilder = new StringBuilder("Examples: \n");
+            StringBuilder exampleBuilder = new StringBuilder("\nExamples: \n\n");
             for (int i = 0; i< exampleList.size(); i++) {
                 String example = exampleList.get(i);
                 exampleBuilder.append("Example ").append(i + 1).append(":\n").append(example).append("\n");
             }
-            exampleBuilder.append("End of Examples\n");
+            exampleBuilder.append("\nEnd of Examples\n");
             examplesMap.put(EXAMPLES, exampleBuilder.toString());
         } else {
             examplesMap.put(EXAMPLES, "");

@@ -8,14 +8,14 @@ import static org.opensearch.ml.engine.algorithms.remote.Agent.PROMPT_PREFIX;
 import static org.opensearch.ml.engine.algorithms.remote.Agent.PROMPT_SUFFIX;
 import static org.opensearch.ml.engine.algorithms.remote.Agent.QUESTION;
 import static org.opensearch.ml.engine.algorithms.remote.Agent.SCRATCHPAD;
-import static org.opensearch.ml.engine.algorithms.remote.Agent.TOOLS;
+import static org.opensearch.ml.engine.algorithms.remote.Agent.TOOL_DESCRIPTIONS;
 import static org.opensearch.ml.engine.algorithms.remote.Agent.TOOL_NAMES;
 
 public class PromptTemplate {
 
     public static final String AGENT_TEMPLATE = "${parameters." + PROMPT_PREFIX + "}\n" +
             "Answer the following questions as best you can. You have access to the following tools:\n\n" +
-            "${parameters." + TOOLS + "}\n" +
+            "${parameters." + TOOL_DESCRIPTIONS + "}\n" +
             "${parameters." + OS_INDICES + "}\n" +
             "${parameters." + EXAMPLES + "}\n" +
             "Use the following format (Do NOT add sequence number after Action and Action Input):\n\n" +
@@ -34,7 +34,7 @@ public class PromptTemplate {
 
     public static final String AGENT_TEMPLATE_WITH_CONTEXT = "${parameters." + PROMPT_PREFIX + "}\n" +
             "Answer the following questions as best you can. Always try to answer question based on Context or Chat History first.\nYou have access to the following tools:\n\n" +
-            "${parameters." + TOOLS + "}\n" +
+            "${parameters." + TOOL_DESCRIPTIONS + "}\n" +
             "${parameters." + OS_INDICES + "}\n" +
             "${parameters." + EXAMPLES + "}\n" +
             "${parameters." + CHAT_HISTORY + "}\n" +

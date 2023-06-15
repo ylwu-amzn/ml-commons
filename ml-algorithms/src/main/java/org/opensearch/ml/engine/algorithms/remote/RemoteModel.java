@@ -51,9 +51,12 @@ public class RemoteModel implements Predictable {
     public MLOutput predict(MLInput mlInput, MLTask mlTask) {
         try {
             return connectorExecutor.execute(mlInput, mlTask);
-        } catch (Throwable t) {
-            log.error("Failed to call remote model", t);
-            throw new MLException("Failed to call remote model. " + t.getMessage());
+        } catch (Throwable e) {
+            log.error("Failed to call remote model", e);
+            if (e instanceof MLException) {
+                throw (MLException) e;
+            }
+            throw new MLException(e);
         }
     }
 
