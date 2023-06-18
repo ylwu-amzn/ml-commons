@@ -54,10 +54,6 @@ public class HttpConnector extends AbstractConnector {
 
     @Getter
     protected String bodyTemplate;
-    @Getter
-    protected String preProcessFunction;
-    @Getter
-    protected String postProcessFunction;
 
     //TODO: add RequestConfig like request time out,
 
@@ -89,12 +85,6 @@ public class HttpConnector extends AbstractConnector {
                     break;
                 case BODY_TEMPLATE_FIELD:
                     bodyTemplate = parser.text();
-                    break;
-                case PRE_PROCESS_FUNCTION_FIELD:
-                    preProcessFunction = parser.text();
-                    break;
-                case POST_PROCESS_FUNCTION_FIELD:
-                    postProcessFunction = parser.text();
                     break;
                 default:
                     parser.skipChildren();
@@ -129,12 +119,6 @@ public class HttpConnector extends AbstractConnector {
         if (bodyTemplate != null) {
             builder.field(BODY_TEMPLATE_FIELD, bodyTemplate);
         }
-        if (preProcessFunction != null) {
-            builder.field(PRE_PROCESS_FUNCTION_FIELD, preProcessFunction);
-        }
-        if (postProcessFunction != null) {
-            builder.field(POST_PROCESS_FUNCTION_FIELD, postProcessFunction);
-        }
         builder.endObject();
         builder.endObject();
         return builder;
@@ -154,8 +138,6 @@ public class HttpConnector extends AbstractConnector {
             headers = input.readMap(StreamInput::readString, StreamInput::readString);
         }
         bodyTemplate = input.readOptionalString();
-        preProcessFunction = input.readOptionalString();
-        postProcessFunction = input.readOptionalString();
     }
 
     @Override
@@ -182,8 +164,6 @@ public class HttpConnector extends AbstractConnector {
             out.writeBoolean(false);
         }
         out.writeOptionalString(bodyTemplate);
-        out.writeOptionalString(preProcessFunction);
-        out.writeOptionalString(postProcessFunction);
     }
 
     @Override
@@ -275,4 +255,5 @@ public class HttpConnector extends AbstractConnector {
     public String getPredictEndpoint() {
         return getEndpoint();
     }
+
 }
