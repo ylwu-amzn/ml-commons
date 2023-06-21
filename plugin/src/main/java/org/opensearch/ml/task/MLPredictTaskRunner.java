@@ -249,11 +249,11 @@ public class MLPredictTaskRunner extends MLTaskRunner<MLPredictionTaskRequest, M
             try {
                 Predictable predictor = mlModelManager.getPredictor(modelId);
                 if (predictor != null) {
+                    if (!predictor.isModelReady()) {
+                        throw new IllegalArgumentException("model not deployed: " + modelId);
+                    }
+                    mlTaskManager.updateMLTask(mlTask.getTaskId(), ImmutableMap.of(STATE_FIELD, RUNNING), TASK_SEMAPHORE_TIMEOUT, false);
                     MLOutput output = mlModelManager.trackPredictDuration(modelId, () -> {
-                        if (!predictor.isModelReady()) {
-                            throw new IllegalArgumentException("model not deployed: " + modelId);
-                        }
-                        mlTaskManager.updateMLTask(mlTask.getTaskId(), ImmutableMap.of(STATE_FIELD, RUNNING), TASK_SEMAPHORE_TIMEOUT, false);
                         return predictor.predict(mlInput, mlTask);
                     });
                     if (output instanceof MLPredictionOutput) {

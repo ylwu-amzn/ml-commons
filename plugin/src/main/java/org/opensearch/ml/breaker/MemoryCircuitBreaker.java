@@ -13,7 +13,7 @@ import org.opensearch.monitor.jvm.JvmService;
 public class MemoryCircuitBreaker extends ThresholdCircuitBreaker<Short> {
     // TODO: make this value configurable as cluster setting
     private static final String ML_MEMORY_CB = "Memory Circuit Breaker";
-    public static final short DEFAULT_JVM_HEAP_USAGE_THRESHOLD = 85;
+    public static final short DEFAULT_JVM_HEAP_USAGE_THRESHOLD = 100;
     private final JvmService jvmService;
 
     public MemoryCircuitBreaker(JvmService jvmService) {
