@@ -657,7 +657,7 @@ public class MLModelManager {
                     }
                     log.debug("Model content matches original hash value, continue deploying");
                     Map<String, Object> params = ImmutableMap
-                        .of(MODEL_ZIP_FILE, modelZipFile, MODEL_HELPER, modelHelper, ML_ENGINE, mlEngine, SETTINGS, settings);
+                        .of(MODEL_ZIP_FILE, modelZipFile, MODEL_HELPER, modelHelper, ML_ENGINE, mlEngine);
                     Predictable predictable = mlEngine.deploy(mlModel, params);
                     try {
                         modelCacheHelper.setPredictor(modelId, predictable);

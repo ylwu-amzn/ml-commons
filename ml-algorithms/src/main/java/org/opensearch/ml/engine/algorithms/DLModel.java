@@ -9,7 +9,6 @@ import ai.djl.Application;
 import ai.djl.Device;
 import ai.djl.engine.Engine;
 import ai.djl.inference.Predictor;
-import ai.djl.metric.Metrics;
 import ai.djl.modality.Input;
 import ai.djl.modality.Output;
 import ai.djl.repository.zoo.Criteria;
@@ -19,8 +18,6 @@ import ai.djl.translate.Translator;
 import ai.djl.translate.TranslatorFactory;
 import lombok.extern.log4j.Log4j2;
 import org.apache.commons.io.FileUtils;
-import org.opensearch.common.settings.Settings;
-import org.opensearch.common.util.concurrent.OpenSearchExecutors;
 import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.common.MLModel;
 import org.opensearch.ml.common.MLTask;
@@ -51,7 +48,6 @@ import static org.opensearch.ml.engine.ModelHelper.ONNX_ENGINE;
 import static org.opensearch.ml.engine.ModelHelper.ONNX_FILE_EXTENSION;
 import static org.opensearch.ml.engine.ModelHelper.PYTORCH_ENGINE;
 import static org.opensearch.ml.engine.ModelHelper.PYTORCH_FILE_EXTENSION;
-import static org.opensearch.ml.engine.algorithms.remote.RemoteModel.SETTINGS;
 import static org.opensearch.ml.engine.utils.FileUtils.deleteFileQuietly;
 
 @Log4j2
@@ -129,8 +125,6 @@ public abstract class DLModel implements Predictable {
         File modelZipFile = (File)params.get(MODEL_ZIP_FILE);
         modelHelper = (ModelHelper)params.get(MODEL_HELPER);
         mlEngine = (MLEngine)params.get(ML_ENGINE);
-        Settings settings = (Settings)params.get(SETTINGS);
-        int processors = OpenSearchExecutors.allocatedProcessors(settings);
         if (modelZipFile == null) {
             throw new IllegalArgumentException("model file is null");
         }
@@ -153,8 +147,7 @@ public abstract class DLModel implements Predictable {
                 model.getName(),
                 model.getVersion(),
                 model.getModelConfig(),
-                engine,
-                processors
+                engine
         );
     }
 
@@ -185,7 +178,7 @@ public abstract class DLModel implements Predictable {
 
     protected void loadModel(File modelZipFile, String modelId, String modelName, String version,
                              MLModelConfig modelConfig,
-                             String engine, int processors) {
+                             String engine) {
         try {
             if (!PYTORCH_ENGINE.equals(engine) && !ONNX_ENGINE.equals(engine)) {
                 throw new IllegalArgumentException("unsupported engine");
@@ -200,7 +193,7 @@ public abstract class DLModel implements Predictable {
                     // DJL will read "/usr/java/packages/lib" if don't set "java.library.path". That will throw
                     // access denied exception
                     System.setProperty("java.library.path", mlEngine.getMlCachePath().toAbsolutePath().toString());
-                    System.setProperty("ai.djl.pytorch.num_interop_threads", processors + "");
+                    System.setProperty("ai.djl.pytorch.num_interop_threads", "1");
                     System.setProperty("ai.djl.pytorch.num_threads", "1");
                     Thread.currentThread().setContextClassLoader(ai.djl.Model.class.getClassLoader());
                     Path modelPath = mlEngine.getModelCachePath(modelId, modelName, version);

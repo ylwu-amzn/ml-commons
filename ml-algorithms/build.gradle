@@ -36,11 +36,11 @@ dependencies {
     testImplementation group: 'org.mockito', name: 'mockito-core', version: '4.4.0'
     testImplementation group: 'org.mockito', name: 'mockito-inline', version: '4.4.0'
     implementation group: 'com.google.guava', name: 'guava', version: '31.0.1-jre'
-    implementation platform("ai.djl:bom:0.21.0")
+    implementation platform("ai.djl:bom:0.19.0")
     implementation group: 'ai.djl.pytorch', name: 'pytorch-model-zoo'
     implementation group: 'ai.djl', name: 'api'
     implementation group: 'ai.djl.huggingface', name: 'tokenizers'
-    implementation("ai.djl.onnxruntime:onnxruntime-engine:0.21.0") {
+    implementation("ai.djl.onnxruntime:onnxruntime-engine:0.19.0") {
         exclude group: "com.microsoft.onnxruntime", module: "onnxruntime"
     }
     def os = DefaultNativePlatform.currentOperatingSystem
@@ -51,7 +51,7 @@ dependencies {
         }
     } else {
         dependencies {
-            implementation "com.microsoft.onnxruntime:onnxruntime_gpu:1.14.0"
+            implementation "com.microsoft.onnxruntime:onnxruntime_gpu:1.13.1"
         }
     }
 
@@ -75,7 +75,7 @@ dependencies {
     implementation 'com.jayway.jsonpath:json-path:2.8.0'
 
     runtimeOnly group: 'org.apache.commons', name: 'commons-text', version: '1.10.0'
-    runtimeOnly group: 'com.google.code.gson', name: 'gson', version: '2.10.1'
+    runtimeOnly group: 'com.google.code.gson', name: 'gson', version: '2.9.1'
     runtimeOnly group: 'org.json', name: 'json', version: '20230227'
 }
 
