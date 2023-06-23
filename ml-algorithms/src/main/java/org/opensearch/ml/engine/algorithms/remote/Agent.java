@@ -20,11 +20,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static org.opensearch.ml.engine.algorithms.remote.PromptTemplate.DEFAULT_LLM_PROMPT;
 import static org.opensearch.ml.engine.utils.ScriptUtils.gson;
 
 @Log4j2
@@ -36,6 +38,8 @@ public class Agent {
     private String defaultPrompt;
     public static final String SESSION_ID = "session_id";
     public static final String PROMPT_PREFIX = "prompt_prefix";
+    public static final String LLM_TOOL_PROMPT_PREFIX = "LanguageModelTool.prompt_prefix";
+    public static final String LLM_TOOL_PROMPT_SUFFIX = "LanguageModelTool.prompt_suffix";
     public static final String PROMPT_SUFFIX = "prompt_suffix";
     public static final String TOOLS = "tools";
     public static final String TOOL_DESCRIPTIONS = "tool_descriptions";
@@ -67,7 +71,7 @@ public class Agent {
                                  MLTask mlTask,
                                  Function<Map<String, String>, ModelTensorOutput> executeDirectly,
                                  Consumer<Map<String, Object>> saveSessionMessageConsumer) {
-        String question = parameters.get("question");
+        String question = parameters.get(QUESTION);
         String taskId = mlTask.getTaskId();
         Map<String, String> tmpParameters = new HashMap<>();
         tmpParameters.putAll(parameters);
@@ -194,9 +198,13 @@ public class Agent {
                     if (toolsMap.get(action) instanceof LanguageModelTool) {
                         Map<String, String> llmToolTmpParameters = new HashMap<>();
                         llmToolTmpParameters.putAll(tmpParameters);
-                        String llmToolPrompt = tmpParameters.containsKey("LanguageModelTool.prompt")? tmpParameters.get("LanguageModelTool.prompt") : "Try your best to answer this question: ${parameters.question}";
+
+                        String llmToolPrompt = tmpParameters.containsKey("LanguageModelTool.prompt")? tmpParameters.get("LanguageModelTool.prompt") : DEFAULT_LLM_PROMPT;
                         llmToolTmpParameters.put(PROMPT, llmToolPrompt);
                         llmToolTmpParameters.put(QUESTION, actionInput);
+                        llmToolTmpParameters.put(LLM_TOOL_PROMPT_PREFIX, Optional.ofNullable(parameters.get(LLM_TOOL_PROMPT_PREFIX)).orElse(""));
+                        llmToolTmpParameters.put(LLM_TOOL_PROMPT_SUFFIX, Optional.ofNullable(parameters.get(LLM_TOOL_PROMPT_SUFFIX)).orElse(""));
+                        llmToolTmpParameters.put(SCRATCHPAD, scratchpadBuilder.toString());
                         ((LanguageModelTool) toolsMap.get(action)).setSupplier(() -> executeDirectly.apply(llmToolTmpParameters));
                     }
                     actionResult = toolsMap.get(action).run(actionInput, toolParams);

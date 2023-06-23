@@ -83,6 +83,9 @@ import static org.opensearch.ml.common.connector.ConnectorNames.CHAT_V1;
 import static org.opensearch.ml.common.connector.ChatConnector.CONTENT_DOC_SIZE_FIELD;
 import static org.opensearch.ml.common.connector.ChatConnector.CONTENT_FIELD_FIELD;
 import static org.opensearch.ml.common.connector.ChatConnector.SESSION_SIZE_FIELD;
+import static org.opensearch.ml.engine.algorithms.remote.Agent.CHAT_HISTORY;
+import static org.opensearch.ml.engine.algorithms.remote.Agent.CONTEXT;
+import static org.opensearch.ml.engine.algorithms.remote.Agent.QUESTION;
 import static org.opensearch.ml.engine.algorithms.remote.ConnectorUtils.processOutput;
 import static org.opensearch.ml.engine.algorithms.remote.ConnectorUtils.signRequest;
 import static org.opensearch.ml.engine.algorithms.remote.PromptTemplate.AGENT_TEMPLATE_WITH_CONTEXT;
@@ -320,9 +323,9 @@ public class ChatConnectorExecutor implements RemoteConnectorExecutor{
 
         Map<String, String> newParameters = new HashMap<>();
         newParameters.putAll(parameters);
-        newParameters.put("question", question);
-        newParameters.put("context", knowledgeBaseRef.get());
-        newParameters.put("chat_history", chatHistoryRef.get());
+        newParameters.put(QUESTION, question);
+        newParameters.put(CONTEXT, knowledgeBaseRef.get());
+        newParameters.put(CHAT_HISTORY, chatHistoryRef.get());
 
         if (agent != null) {
             String finalSessionId = sessionId;
