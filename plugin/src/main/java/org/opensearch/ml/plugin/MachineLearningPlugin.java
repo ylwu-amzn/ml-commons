@@ -491,7 +491,7 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin, Exten
         FixedExecutorBuilder predictThreadPool = new FixedExecutorBuilder(
             settings,
             PREDICT_THREAD_POOL,
-            OpenSearchExecutors.allocatedProcessors(settings) * 2,
+            OpenSearchExecutors.allocatedProcessors(settings) * 1,
             10000,
             ML_THREAD_POOL_PREFIX + PREDICT_THREAD_POOL,
             false
