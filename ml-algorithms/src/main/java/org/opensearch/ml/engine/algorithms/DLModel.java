@@ -80,13 +80,13 @@ public abstract class DLModel implements Predictable {
     @Override
     public MLOutput predict(MLInput mlInput, MLTask mlTask) {
         if (modelHelper == null || modelId == null) {
-            throw new IllegalArgumentException("model not deployed: " + modelId);
+            throw new IllegalArgumentException("Model not deployed: " + modelId);
         }
         try {
             return AccessController.doPrivileged((PrivilegedExceptionAction<ModelTensorOutput>) () -> {
                 Thread.currentThread().setContextClassLoader(getClass().getClassLoader());
                 if (predictors == null) {
-                    throw new MLException("model not deployed: " + modelId);
+                    throw new MLException("Null predictor. Check if model deployed.  " + modelId);
                 }
                 return predict(modelId, mlInput);
             });

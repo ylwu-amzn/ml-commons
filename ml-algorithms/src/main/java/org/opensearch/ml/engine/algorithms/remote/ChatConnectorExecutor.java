@@ -181,7 +181,7 @@ public class ChatConnectorExecutor implements RemoteConnectorExecutor{
                             SearchHit hit = hits[i];
                             Map<String, Object> sourceAsMap = hit.getSourceAsMap();
                             String context = (String) sourceAsMap.get(connector.getContentFields());
-                            contextBuilder.append("document_id: ").append(hit.getId()).append("\\\\nDocument context:").append(context).append("\\\\n");
+                            contextBuilder.append("document_id: ").append(hit.getId()).append("\\\\nDocument content:").append(context).append("\\\\n");
                         }
                         knowledgeBaseRef.set("\n\nContext: \n" + gson.toJson( contextBuilder) + "\n\n");
                     }

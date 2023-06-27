@@ -79,7 +79,7 @@ public class SearchIndexTool implements Tool {
                             return null;
                         });
 
-                        contextBuilder.append("document_id: ").append(hit.getId()).append("\\\\nDocument context:").append(fieldContentBuilder).append("\\\\n");
+                        contextBuilder.append("document_id: ").append(hit.getId()).append("\\\\nDocument content:").append(fieldContentBuilder).append("\\\\n");
                     }
                     contextRef.set(gson.toJson(contextBuilder.toString()));
                 }

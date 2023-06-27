@@ -136,7 +136,7 @@ public class MLPredictTaskRunner extends MLTaskRunner<MLPredictionTaskRequest, M
             String[] workerNodes = mlModelManager.getWorkerNodes(modelId, true);
             if (workerNodes == null || workerNodes.length == 0) {
                 if (algorithm == FunctionName.TEXT_EMBEDDING || algorithm == FunctionName.REMOTE) {
-                    listener.onFailure(new IllegalArgumentException("model not deployed: " + modelId));
+                    listener.onFailure(new IllegalArgumentException("No available worker node for model " + modelId));
                     return;
                 } else {
                     workerNodes = nodeHelper.getEligibleNodeIds();
@@ -251,7 +251,7 @@ public class MLPredictTaskRunner extends MLTaskRunner<MLPredictionTaskRequest, M
                 if (predictor != null) {
                     MLOutput output = mlModelManager.trackPredictDuration(modelId, () -> {
                         if (!predictor.isModelReady()) {
-                            throw new IllegalArgumentException("model not deployed: " + modelId);
+                            throw new IllegalArgumentException("Model not ready: " + modelId);
                         }
                         mlTaskManager.updateMLTask(mlTask.getTaskId(), ImmutableMap.of(STATE_FIELD, RUNNING), TASK_SEMAPHORE_TIMEOUT, false);
                         return predictor.predict(mlInput, mlTask);
@@ -266,7 +266,7 @@ public class MLPredictTaskRunner extends MLTaskRunner<MLPredictionTaskRequest, M
                     internalListener.onResponse(response);
                     return;
                 } else if (algorithm == FunctionName.TEXT_EMBEDDING || algorithm == FunctionName.REMOTE) {
-                    throw new IllegalArgumentException("model not deployed: " + modelId);
+                    throw new IllegalArgumentException("Model not ready to be used: " + modelId);
                 }
             } catch (Exception e) {
                 handlePredictFailure(mlTask, internalListener, e, false);
