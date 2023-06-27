@@ -53,6 +53,7 @@ import org.opensearch.ml.action.syncup.TransportSyncUpOnNodeAction;
 import org.opensearch.ml.action.tasks.DeleteTaskTransportAction;
 import org.opensearch.ml.action.tasks.GetTaskTransportAction;
 import org.opensearch.ml.action.tasks.SearchTaskTransportAction;
+import org.opensearch.ml.action.tools.GetToolsTransportAction;
 import org.opensearch.ml.action.training.TransportTrainingTaskAction;
 import org.opensearch.ml.action.trainpredict.TransportTrainAndPredictionTaskAction;
 import org.opensearch.ml.action.undeploy.TransportUndeployModelAction;
@@ -90,6 +91,7 @@ import org.opensearch.ml.common.transport.sync.MLSyncUpAction;
 import org.opensearch.ml.common.transport.task.MLTaskDeleteAction;
 import org.opensearch.ml.common.transport.task.MLTaskGetAction;
 import org.opensearch.ml.common.transport.task.MLTaskSearchAction;
+import org.opensearch.ml.common.transport.tools.MLGetToolsAction;
 import org.opensearch.ml.common.transport.training.MLTrainingTaskAction;
 import org.opensearch.ml.common.transport.trainpredict.MLTrainAndPredictionTaskAction;
 import org.opensearch.ml.common.transport.undeploy.MLUndeployModelAction;
@@ -114,6 +116,7 @@ import org.opensearch.ml.rest.RestMLDeployModelAction;
 import org.opensearch.ml.rest.RestMLExecuteAction;
 import org.opensearch.ml.rest.RestMLGetModelAction;
 import org.opensearch.ml.rest.RestMLGetTaskAction;
+import org.opensearch.ml.rest.RestMLGetToolsAction;
 import org.opensearch.ml.rest.RestMLPredictionAction;
 import org.opensearch.ml.rest.RestMLProfileAction;
 import org.opensearch.ml.rest.RestMLRegisterModelAction;
@@ -215,7 +218,8 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin, Exten
                 new ActionHandler<>(MLRegisterModelMetaAction.INSTANCE, TransportRegisterModelMetaAction.class),
                 new ActionHandler<>(MLUploadModelChunkAction.INSTANCE, TransportUploadModelChunkAction.class),
                 new ActionHandler<>(MLForwardAction.INSTANCE, TransportForwardAction.class),
-                new ActionHandler<>(MLSyncUpAction.INSTANCE, TransportSyncUpOnNodeAction.class)
+                new ActionHandler<>(MLSyncUpAction.INSTANCE, TransportSyncUpOnNodeAction.class),
+                new ActionHandler<>(MLGetToolsAction.INSTANCE, GetToolsTransportAction.class)
             );
     }
 
@@ -423,6 +427,8 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin, Exten
         RestMLUndeployModelAction restMLUndeployModelAction = new RestMLUndeployModelAction(clusterService);
         RestMLRegisterModelMetaAction restMLRegisterModelMetaAction = new RestMLRegisterModelMetaAction();
         RestMLUploadModelChunkAction restMLUploadModelChunkAction = new RestMLUploadModelChunkAction();
+        RestMLGetToolsAction restMLGetToolsAction = new RestMLGetToolsAction(externalTools);
+
 
         return ImmutableList
             .of(
@@ -442,7 +448,8 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin, Exten
                 restMLDeployModelAction,
                 restMLUndeployModelAction,
                 restMLRegisterModelMetaAction,
-                restMLUploadModelChunkAction
+                restMLUploadModelChunkAction,
+                restMLGetToolsAction
             );
     }
 
