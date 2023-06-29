@@ -126,8 +126,16 @@ public class Agent {
             StringBuilder sessionMsgAnswerBuilder = new StringBuilder("");
 
             ModelTensorOutput tmpModelTensorOutput = executeDirectly.apply(tmpParameters);
-            String thought = (String) tmpModelTensorOutput.getMlModelOutputs().get(0).getMlModelTensors().get(0).getDataAsMap().get("response");
-            if (i == 0) {
+            Object response = tmpModelTensorOutput.getMlModelOutputs().get(0).getMlModelTensors().get(0).getDataAsMap().get("response");
+
+            String thought = "";
+            if (response instanceof String) {
+                thought = (String) response;
+            } else if (response instanceof List) {
+                Object value = ((List) response).get(0);
+                thought = value instanceof String? (String)value : gson.toJson(value);
+            }
+            if (i == 0 && !thought.contains("Thought:")) {
                 sessionMsgAnswerBuilder.append("Thought: ");
             }
             sessionMsgAnswerBuilder.append(thought);
@@ -135,7 +143,8 @@ public class Agent {
                 modelTensors.addAll(tmpModelTensorOutput.getMlModelOutputs());
             }
             if (thought != null && thought.toLowerCase(Locale.ROOT).contains("final answer:")) {
-                String finalAnswer = thought.substring(thought.indexOf("Final Answer:") + 14, thought.length());
+                int indexOfFinalAnswer = thought.indexOf("Final Answer:");
+                String finalAnswer = indexOfFinalAnswer >= 0? thought.substring(indexOfFinalAnswer + 13) : thought;
                 if (finalAnswer.contains("\n\nQuestion:")) {
                     finalAnswer = finalAnswer.substring(0, finalAnswer.indexOf("\n\nQuestion:"));
                 }
@@ -205,6 +214,15 @@ public class Agent {
                         llmToolTmpParameters.put(LLM_TOOL_PROMPT_PREFIX, Optional.ofNullable(parameters.get(LLM_TOOL_PROMPT_PREFIX)).orElse(""));
                         llmToolTmpParameters.put(LLM_TOOL_PROMPT_SUFFIX, Optional.ofNullable(parameters.get(LLM_TOOL_PROMPT_SUFFIX)).orElse(""));
                         llmToolTmpParameters.put(SCRATCHPAD, scratchpadBuilder.toString());
+                        if (parameters.containsKey("cot.step_interval_millis")) {
+                            Long interval = Long.parseLong(parameters.get("cot.step_interval_millis"));
+                            try {
+                                Thread.sleep(interval);
+                            } catch (InterruptedException e) {
+                                log.error("Failed to sleep", e);
+                                throw new MLException(e);
+                            }
+                        }
                         ((LanguageModelTool) toolsMap.get(action)).setSupplier(() -> executeDirectly.apply(llmToolTmpParameters));
                     }
                     actionResult = toolsMap.get(action).run(actionInput, toolParams);
@@ -224,6 +242,29 @@ public class Agent {
                     actionResult = "no access to this tool ";
                     scratchpadBuilder.append(thought).append("\nObservation: no access to this tool ").append(action).append("\n\n");
                 } else {
+                    log.info("tools not found, end this cot earlier");
+                    String stopEarly = parameters.get("cot.stop_when_no_tool_found");
+                    if ("true".equalsIgnoreCase(stopEarly)) {
+                        String finalAnswer = thought.substring(thought.indexOf("Final Answer:") + 14, thought.length());
+                        if (finalAnswer.contains("\n\nQuestion:")) {
+                            finalAnswer = finalAnswer.substring(0, finalAnswer.indexOf("\n\nQuestion:"));
+                        }
+                        if (finalAnswer.contains("\nHuman:")) {
+                            finalAnswer = finalAnswer.substring(0, finalAnswer.indexOf("\nHuman:"));
+                        }
+                        cotModelTensors.add(ModelTensors.builder().mlModelTensors(Arrays.asList(ModelTensor.builder().name("response").result(finalAnswer).build())).build());
+                        if (saveSessionMessageConsumer != null) {
+                            saveSessionMessageConsumer.accept(ImmutableMap.of(SESSION_ID, tmpParameters.get(SESSION_ID),
+                                    "question", question,
+                                    "answer", finalAnswer,
+                                    "final_answer", true,
+                                    "created_time", Instant.now().toEpochMilli(),
+                                    "task_id", taskId));
+                        }
+                        List<ModelTensors> finalModelTensors = new ArrayList<>();
+                        finalModelTensors.add(ModelTensors.builder().mlModelTensors(Arrays.asList(ModelTensor.builder().name("response").dataAsMap(ImmutableMap.of("response", finalAnswer)).build())).build());
+                        return verbose ? ModelTensorOutput.builder().mlModelOutputs(cotModelTensors).build() : ModelTensorOutput.builder().mlModelOutputs(finalModelTensors).build();
+                    }
                     actionResult = "tool not found";
                     scratchpadBuilder.append(thought).append("\nObservation: tool not found").append("\n\n");
                 }

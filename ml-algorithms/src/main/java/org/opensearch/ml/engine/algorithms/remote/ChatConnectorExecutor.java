@@ -10,6 +10,7 @@ import com.jayway.jsonpath.JsonPath;
 import com.jayway.jsonpath.PathNotFoundException;
 import lombok.Setter;
 import lombok.extern.log4j.Log4j2;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.http.HttpEntity;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
@@ -54,10 +55,12 @@ import org.opensearch.search.sort.SortOrder;
 import software.amazon.awssdk.core.internal.http.loader.DefaultSdkHttpClientBuilder;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.http.AbortableInputStream;
+import software.amazon.awssdk.http.ExecutableHttpRequest;
 import software.amazon.awssdk.http.HttpExecuteRequest;
 import software.amazon.awssdk.http.HttpExecuteResponse;
 import software.amazon.awssdk.http.SdkHttpClient;
 import software.amazon.awssdk.http.SdkHttpFullRequest;
+import software.amazon.awssdk.http.apache.ApacheHttpClient;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -66,6 +69,7 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.security.AccessController;
 import java.security.PrivilegedExceptionAction;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -243,9 +247,9 @@ public class ChatConnectorExecutor implements RemoteConnectorExecutor{
                                 SearchHit hit = hits[i];
                                 String historicalQuestion = (String) hit.getSourceAsMap().get("question");
                                 String historicalAnswer = (String) hit.getSourceAsMap().get("answer");
-                                contextBuilder.append("Human: ").append(historicalQuestion).append("\nAI:").append(historicalAnswer).append("\n");
+                                contextBuilder.append("Human: ").append(historicalQuestion).append("\nAssistant:").append(historicalAnswer).append("\n");
                             }
-                            chatHistoryRef.set("\n\nChat history between human and AI: \n" + gson.toJson(contextBuilder.toString()));
+                            chatHistoryRef.set("\n\nChat history between Human and Assistant: \n" + gson.toJson(contextBuilder.toString()));
                         }
                     }, e -> {
                         log.error("Failed to search index", e);
@@ -293,9 +297,9 @@ public class ChatConnectorExecutor implements RemoteConnectorExecutor{
                                 SearchHit hit = hits[i];
                                 String historicalQuestion = (String) hit.getSourceAsMap().get("question");
                                 String historicalAnswer = (String) hit.getSourceAsMap().get("answer");
-                                contextBuilder.append("Human: ").append(historicalQuestion).append("\nAI:").append(historicalAnswer).append("\n");
+                                contextBuilder.append("Human: ").append(historicalQuestion).append("\nAssistant:").append(historicalAnswer).append("\n");
                             }
-                            chatHistoryRef.set("\n\nChat history between human and AI: \n" + gson.toJson(contextBuilder.toString()));
+                            chatHistoryRef.set("\n\nChat history between human and Assistant: \n" + gson.toJson(contextBuilder.toString()));
                         }
                     }, e -> {
                         log.error("Failed to search index", e);
@@ -378,6 +382,7 @@ public class ChatConnectorExecutor implements RemoteConnectorExecutor{
         }
 
         String payload = connector.createPayload(parameters);
+        log.debug("---------------------------------------------payload\n{}", payload);
         connector.validatePayload(payload);
 
         if (connector.hasAwsCredential()) {
@@ -392,15 +397,24 @@ public class ChatConnectorExecutor implements RemoteConnectorExecutor{
                 for (String key : headers.keySet()) {
                     builder.putHeader(key, headers.get(key));
                 }
+
                 SdkHttpFullRequest sdkHttpFullRequest = builder.build();
                 HttpExecuteRequest executeRequest = HttpExecuteRequest.builder()
                         .request(signRequest(sdkHttpFullRequest, connector.getAccessKey(), connector.getSecretKey(), connector.getServiceName(), connector.getRegion()))
                         .contentStreamProvider(sdkHttpFullRequest.contentStreamProvider().orElse(null))
                         .build();
 
-                SdkHttpClient sdkHttpClient = new DefaultSdkHttpClientBuilder().build();
+                long timeout = parameters.containsKey("http_client_timeout") ? Long.parseLong(parameters.get("http_client_timeout")) : 60;
+                log.info("http client timeout : {}", timeout);
+                // Create a custom client options builder
+                ApacheHttpClient.Builder clientOptionsBuilder = ApacheHttpClient.builder()
+                        .connectionTimeout(Duration.ofSeconds(timeout))
+                        .socketTimeout(Duration.ofSeconds(timeout));
+                SdkHttpClient sdkHttpClient = clientOptionsBuilder.build();
+//                SdkHttpClient sdkHttpClient = new DefaultSdkHttpClientBuilder().build();
                 HttpExecuteResponse response = AccessController.doPrivileged((PrivilegedExceptionAction<HttpExecuteResponse>) () -> {
-                    return sdkHttpClient.prepareRequest(executeRequest).call();
+                    ExecutableHttpRequest executableHttpRequest = sdkHttpClient.prepareRequest(executeRequest);
+                    return executableHttpRequest.call();
                 });
 
                 AbortableInputStream body = null;
@@ -418,23 +432,39 @@ public class ChatConnectorExecutor implements RemoteConnectorExecutor{
                     }
                 }
                 String modelResponse = responseBuilder.toString();
+                log.debug("---------------------------------------------modelResponse\n{}", modelResponse);
+
+                if (parameters.containsKey("model.error_check")) {
+                    String errorCheck = parameters.get("model.error_check");
+                    try {
+                        Object error = JsonPath.parse(modelResponse).read(errorCheck);
+                        if (error !=  null) {
+                            String errorMessage = AccessController.doPrivileged((PrivilegedExceptionAction<String>) () -> {
+                                return error instanceof String? (String) error : gson.toJson(error);
+                            });
+                            throw new MLException(errorMessage);
+                        }
+                    } catch (PathNotFoundException e) {
+                        log.debug("No error happened");
+                    }
+                }
 
                 ModelTensors tensors = processOutput(modelResponse, connector, scriptService, parameters, modelTensors);
                 tensorOutputs.add(tensors);
-                if (connector.getSessionIndex() != null) {
-                    IndexRequest indexRequest = new IndexRequest(connector.getSessionIndex());
-                    List results = (List) modelTensors.get(0).getDataAsMap().get("results");
-                    indexRequest.source(ImmutableMap.of(connector.getSessionIdField(), sessionId,
+                if (saveSessionMessage) {
+                    Map<String, Object> message = ImmutableMap.of(connector.getSessionIdField(), sessionId,
                             "question", question,
-                            "answer", ((Map)results.get(0)).get("outputText"),
-                            "created_time", Instant.now().toEpochMilli()));
-                    client.index(indexRequest);
+                            "answer", modelTensors.get(modelTensors.size() - 1).getDataAsMap().get("response"),
+                            "created_time", Instant.now().toEpochMilli());
+                    saveSessionMessage(message);
+                }
+                if (connector.getSessionIndex() != null) {
                     modelTensors.add(ModelTensor.builder().name("session_id").result(sessionId).build());
                 }
                 return ModelTensorOutput.builder().mlModelOutputs(tensorOutputs).build();
             } catch (Throwable e) {
                 log.error("Failed to execute chat connector", e);
-                throw new MLException("Fail to execute chat connector", e);
+                throw new MLException("Fail to execute chat connector: " + ExceptionUtils.getRootCauseMessage(e), e);
             }
         }
 
@@ -483,6 +513,7 @@ public class ChatConnectorExecutor implements RemoteConnectorExecutor{
                 return null;
             });
             String modelResponse = responseRef.get();
+            log.debug("--------------------------------------------- response : \n{}", modelResponse);
             if (parameters.containsKey("model.error_check")) {
                 String errorCheck = parameters.get("model.error_check");
                 try {
