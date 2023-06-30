@@ -25,6 +25,7 @@ import org.opensearch.search.builder.SearchSourceBuilder;
 import java.io.IOException;
 import java.security.AccessController;
 import java.security.PrivilegedExceptionAction;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicReference;
@@ -68,18 +69,14 @@ public class SearchIndexTool implements Tool {
                     StringBuilder contextBuilder = new StringBuilder();
                     for (int i = 0; i < hits.length; i++) {
                         SearchHit hit = hits[i];
-                        Map<String, Object> sourceAsMap = hit.getSourceAsMap();
-                        StringBuilder fieldContentBuilder = new StringBuilder();
-                        AccessController.doPrivileged((PrivilegedExceptionAction<Void>) () -> {
-                            for (String key : sourceAsMap.keySet()) {
-                                Object content = sourceAsMap.get(key);
-                                String contentStr = content instanceof String ? (String)content : gson.toJson(content);
-                                fieldContentBuilder.append(key).append(": ").append(contentStr);
-                            }
-                            return null;
+                        String doc = AccessController.doPrivileged((PrivilegedExceptionAction<String>) () -> {
+                            Map<String, Object> docContent = new HashMap<>();
+                            docContent.put("_id", hit.getId());
+                            docContent.put("_source", hit.getSourceAsMap());
+                            return gson.toJson(docContent);
                         });
 
-                        contextBuilder.append("document_id: ").append(hit.getId()).append("\\\\nDocument content:").append(fieldContentBuilder).append("\\\\n");
+                        contextBuilder.append(doc).append("\n");
                     }
                     contextRef.set(gson.toJson(contextBuilder.toString()));
                 }

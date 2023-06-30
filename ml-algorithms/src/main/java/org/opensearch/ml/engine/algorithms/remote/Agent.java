@@ -243,9 +243,10 @@ public class Agent {
                     scratchpadBuilder.append(thought).append("\nObservation: no access to this tool ").append(action).append("\n\n");
                 } else {
                     log.info("tools not found, end this cot earlier");
-                    String stopEarly = parameters.get("cot.stop_when_no_tool_found");
-                    if ("true".equalsIgnoreCase(stopEarly)) {
-                        String finalAnswer = thought.substring(thought.indexOf("Final Answer:") + 14, thought.length());
+                    String stopWhenNoToolFound = parameters.get("cot.stop_when_no_tool_found");
+                    if ("true".equalsIgnoreCase(stopWhenNoToolFound)) {
+                        int indexOfFinalAnswer = thought.indexOf("Final Answer:");
+                        String finalAnswer = indexOfFinalAnswer >= 0? thought.substring(indexOfFinalAnswer + 13) : thought;
                         if (finalAnswer.contains("\n\nQuestion:")) {
                             finalAnswer = finalAnswer.substring(0, finalAnswer.indexOf("\n\nQuestion:"));
                         }
@@ -319,13 +320,19 @@ public class Agent {
         StringBuilder toolsBuilder = new StringBuilder();
         StringBuilder toolNamesBuilder = new StringBuilder();
 
+        String toolsPrefix = Optional.ofNullable(parameters.get("agent.tools.prefix")).orElse("You have access to the following tools defined in <tools>: \n" + "<tools>\n");
+        String toolsSuffix = Optional.ofNullable(parameters.get("agent.tools.suffix")).orElse("</tools>\n");
+        String toolPrefix = Optional.ofNullable(parameters.get("agent.tools.tool.prefix")).orElse("<tool>\n");
+        String toolSuffix = Optional.ofNullable(parameters.get("agent.tools.tool.suffix")).orElse("\n</tool>\n");
+        toolsBuilder.append(toolsPrefix);
         for (String toolName : inputTools) {
             if (!toolsMap.containsKey(toolName)) {
                 throw new IllegalArgumentException("Tool ["+toolName+"] not registered for model");
             }
-            toolsBuilder.append(toolName).append(": ").append(toolsMap.get(toolName).getDescription()).append("\n");
+            toolsBuilder.append(toolPrefix).append(toolName).append(": ").append(toolsMap.get(toolName).getDescription()).append(toolSuffix);
             toolNamesBuilder.append(toolName).append(", ");
         }
+        toolsBuilder.append(toolsSuffix);
         Map<String, String> toolsPromptMap = new HashMap<>();
         toolsPromptMap.put(TOOL_DESCRIPTIONS, toolsBuilder.toString());
         toolsPromptMap.put(TOOL_NAMES, toolNamesBuilder.substring(0, toolNamesBuilder.length() - 1));
@@ -345,11 +352,16 @@ public class Agent {
         if (parameters.containsKey(OS_INDICES)) {
             String indices = parameters.get(OS_INDICES);
             List<String> indicesList = gson.fromJson(indices, List.class);
-            StringBuilder indicesBuilder = new StringBuilder("You have access to the following OpenSearch Index: \n");
+            StringBuilder indicesBuilder = new StringBuilder();
+            String indicesPrefix = Optional.ofNullable(parameters.get("opensearch_indices.prefix")).orElse("You have access to the following OpenSearch Index defined in <opensearch_indexes>: \n" + "<opensearch_indexes>\n");
+            String indicesSuffix = Optional.ofNullable(parameters.get("opensearch_indices.suffix")).orElse("</opensearch_indexes>\n");
+            String indexPrefix = Optional.ofNullable(parameters.get("opensearch_indices.index.prefix")).orElse("<index>\n");
+            String indexSuffix = Optional.ofNullable(parameters.get("opensearch_indices.index.suffix")).orElse("\n</index>\n");
+            indicesBuilder.append(indicesPrefix);
             for (String e : indicesList) {
-                indicesBuilder.append(e).append("\n");
+                indicesBuilder.append(indexPrefix).append(e).append(indexSuffix);
             }
-            indicesBuilder.append("\nEnd of OpenSearch Index\n");
+            indicesBuilder.append(indicesSuffix);
             indicesMap.put(OS_INDICES, indicesBuilder.toString());
         } else {
             indicesMap.put(OS_INDICES, "");
@@ -363,12 +375,18 @@ public class Agent {
         if (parameters.containsKey(EXAMPLES)) {
             String examples = parameters.get(EXAMPLES);
             List<String> exampleList = gson.fromJson(examples, List.class);
-            StringBuilder exampleBuilder = new StringBuilder("\nExamples: \n\n");
+            StringBuilder exampleBuilder = new StringBuilder();
+            String examplesPrefix = Optional.ofNullable(parameters.get("examples.prefix")).orElse("You should follow and learn from examples defined in <examples>: \n" + "<examples>\n");
+            String examplesSuffix = Optional.ofNullable(parameters.get("examples.suffix")).orElse("</examples>\n");
+            exampleBuilder.append(examplesPrefix);
+
+            String examplePrefix = Optional.ofNullable(parameters.get("examples.example.prefix")).orElse("<example>\n");
+            String exampleSuffix = Optional.ofNullable(parameters.get("examples.example.suffix")).orElse("\n</example>\n");
             for (int i = 0; i< exampleList.size(); i++) {
                 String example = exampleList.get(i);
-                exampleBuilder.append("Example ").append(i + 1).append(":\n").append(example).append("\n");
+                exampleBuilder.append(examplePrefix).append(example).append(exampleSuffix);
             }
-            exampleBuilder.append("\nEnd of Examples\n");
+            exampleBuilder.append(examplesSuffix);
             examplesMap.put(EXAMPLES, exampleBuilder.toString());
         } else {
             examplesMap.put(EXAMPLES, "");

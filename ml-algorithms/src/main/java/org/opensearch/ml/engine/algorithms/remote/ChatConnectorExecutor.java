@@ -78,6 +78,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicReference;
@@ -185,6 +186,7 @@ public class ChatConnectorExecutor implements RemoteConnectorExecutor{
                             SearchHit hit = hits[i];
                             Map<String, Object> sourceAsMap = hit.getSourceAsMap();
                             String context = (String) sourceAsMap.get(connector.getContentFields());
+                            //TODO: change this to json?
                             contextBuilder.append("document_id: ").append(hit.getId()).append("\\\\nDocument content:").append(context).append("\\\\n");
                         }
                         knowledgeBaseRef.set("\n\nContext: \n" + gson.toJson( contextBuilder) + "\n\n");
@@ -243,13 +245,30 @@ public class ChatConnectorExecutor implements RemoteConnectorExecutor{
 
                         if (hits != null && hits.length > 0) {
                             StringBuilder contextBuilder = new StringBuilder();
+                            String chatHistoryPrefix = Optional.ofNullable(parameters.get("session_history.prefix")).orElse("\nThis is the chat history defined in <chat_history>: \n<chat_history>\n");
+                            String chatHistorySuffix = Optional.ofNullable(parameters.get("session_history.suffix")).orElse("</chat_history>\n");
+                            String chatMessagePrefix = Optional.ofNullable(parameters.get("session_history.message.prefix")).orElse("<message>\n");
+                            String chatMessageSuffix = Optional.ofNullable(parameters.get("session_history.message.suffix")).orElse("\n</message>\n");
+                            String chatMessageQuestionPrefix = Optional.ofNullable(parameters.get("session_history.message.question.suffix")).orElse("<question>\n");// "H: <question>"
+                            String chatMessageQuestionSuffix = Optional.ofNullable(parameters.get("session_history.message.question.suffix")).orElse("\n</question>\n");
+                            String chatMessageAnswerPrefix = Optional.ofNullable(parameters.get("session_history.message.answer.suffix")).orElse("<answer>\n");// "A: <answer>"
+                            String chatMessageAnswerSuffix = Optional.ofNullable(parameters.get("session_history.message.answer.suffix")).orElse("\n</answer>\n");
+                            contextBuilder.append(chatHistoryPrefix);
                             for (int i = hits.length - 1; i >= 0; i--) {
                                 SearchHit hit = hits[i];
                                 String historicalQuestion = (String) hit.getSourceAsMap().get("question");
                                 String historicalAnswer = (String) hit.getSourceAsMap().get("answer");
-                                contextBuilder.append("Human: ").append(historicalQuestion).append("\nAssistant:").append(historicalAnswer).append("\n");
+                                contextBuilder.append(chatMessagePrefix)
+                                        .append(chatMessageQuestionPrefix)
+                                        .append(historicalQuestion)
+                                        .append(chatMessageQuestionSuffix)
+                                        .append(chatMessageAnswerPrefix)
+                                        .append(historicalAnswer)
+                                        .append(chatMessageAnswerSuffix)
+                                        .append(chatMessageSuffix);
                             }
-                            chatHistoryRef.set("\n\nChat history between Human and Assistant: \n" + gson.toJson(contextBuilder.toString()));
+                            contextBuilder.append(chatHistorySuffix);
+                            chatHistoryRef.set(contextBuilder.toString());
                         }
                     }, e -> {
                         log.error("Failed to search index", e);
@@ -293,13 +312,30 @@ public class ChatConnectorExecutor implements RemoteConnectorExecutor{
 
                         if (hits != null && hits.length > 0) {
                             StringBuilder contextBuilder = new StringBuilder();
+                            String chatHistoryPrefix = Optional.ofNullable(parameters.get("session_history.prefix")).orElse("\nThis is the chat history defined in <chat_history>: \n<chat_history>\n");
+                            String chatHistorySuffix = Optional.ofNullable(parameters.get("session_history.suffix")).orElse("</chat_history>\n");
+                            String chatMessagePrefix = Optional.ofNullable(parameters.get("session_history.message.prefix")).orElse("<message>\n");
+                            String chatMessageSuffix = Optional.ofNullable(parameters.get("session_history.message.suffix")).orElse("\n</message>\n");
+                            String chatMessageQuestionPrefix = Optional.ofNullable(parameters.get("session_history.message.question.suffix")).orElse("<question>\n");// "H: <question>"
+                            String chatMessageQuestionSuffix = Optional.ofNullable(parameters.get("session_history.message.question.suffix")).orElse("\n</question>\n");
+                            String chatMessageAnswerPrefix = Optional.ofNullable(parameters.get("session_history.message.answer.suffix")).orElse("<answer>\n");// "A: <answer>"
+                            String chatMessageAnswerSuffix = Optional.ofNullable(parameters.get("session_history.message.answer.suffix")).orElse("\n</answer>\n");
+                            contextBuilder.append(chatHistoryPrefix);
                             for (int i = hits.length - 1; i >= 0; i--) {
                                 SearchHit hit = hits[i];
                                 String historicalQuestion = (String) hit.getSourceAsMap().get("question");
                                 String historicalAnswer = (String) hit.getSourceAsMap().get("answer");
-                                contextBuilder.append("Human: ").append(historicalQuestion).append("\nAssistant:").append(historicalAnswer).append("\n");
+                                contextBuilder.append(chatMessagePrefix)
+                                        .append(chatMessageQuestionPrefix)
+                                        .append(historicalQuestion)
+                                        .append(chatMessageQuestionSuffix)
+                                        .append(chatMessageAnswerPrefix)
+                                        .append(historicalAnswer)
+                                        .append(chatMessageAnswerSuffix)
+                                        .append(chatMessageSuffix);
                             }
-                            chatHistoryRef.set("\n\nChat history between human and Assistant: \n" + gson.toJson(contextBuilder.toString()));
+                            contextBuilder.append(chatHistorySuffix);
+                            chatHistoryRef.set(contextBuilder.toString());
                         }
                     }, e -> {
                         log.error("Failed to search index", e);
