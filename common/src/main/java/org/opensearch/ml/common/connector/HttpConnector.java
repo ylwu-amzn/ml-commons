@@ -59,7 +59,9 @@ public class HttpConnector implements Connector {
     @Getter
     protected String endpoint;
 
+    @Getter
     protected Map<String, String> headers ;
+    @Getter
     protected Map<String, String> credential ;
     protected Map<String, String> decryptedCredential;
     protected Map<String, String> decryptedHeaders;
@@ -117,9 +119,9 @@ public class HttpConnector implements Connector {
                     break;
             }
         }
-        if (endpoint == null) {
-            throw new IllegalArgumentException("wrong input");
-        }
+//        if (endpoint == null) {
+//            throw new IllegalArgumentException("wrong input");
+//        }
     }
 
     @Override
@@ -296,6 +298,34 @@ public class HttpConnector implements Connector {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    public Connector merge(HttpConnector newConnector) {
+        if (this.parameters == null) {
+            this.parameters = newConnector.getParameters();
+        } else if (newConnector.getParameters() != null) {
+            this.parameters.putAll(newConnector.getParameters());
+        }
+        if (this.credential == null) {
+            this.credential = newConnector.getCredential();
+        } else if (newConnector.getCredential() != null) {
+            this.credential.putAll(newConnector.getCredential());
+        }
+        if (this.headers == null) {
+            this.headers = newConnector.getHeaders();
+        } else if (newConnector.getHeaders() != null) {
+            this.headers.putAll(newConnector.getHeaders());
+        }
+        if (newConnector.getHttpMethod() != null) {
+            this.httpMethod = newConnector.getHttpMethod();
+        }
+        if (newConnector.getEndpoint() != null) {
+            this.endpoint = newConnector.getEndpoint();
+        }
+        if (newConnector.getBodyTemplate() != null) {
+            this.bodyTemplate = newConnector.getBodyTemplate();
+        }
+        return this;
     }
 
     public void removeCredential() {

@@ -43,6 +43,7 @@ import org.opensearch.ml.action.handler.MLSearchHandler;
 import org.opensearch.ml.action.models.DeleteModelTransportAction;
 import org.opensearch.ml.action.models.GetModelTransportAction;
 import org.opensearch.ml.action.models.SearchModelTransportAction;
+import org.opensearch.ml.action.models.UpdateModelTransportAction;
 import org.opensearch.ml.action.prediction.TransportPredictionTaskAction;
 import org.opensearch.ml.action.profile.MLProfileAction;
 import org.opensearch.ml.action.profile.MLProfileTransportAction;
@@ -84,6 +85,7 @@ import org.opensearch.ml.common.transport.forward.MLForwardAction;
 import org.opensearch.ml.common.transport.model.MLModelDeleteAction;
 import org.opensearch.ml.common.transport.model.MLModelGetAction;
 import org.opensearch.ml.common.transport.model.MLModelSearchAction;
+import org.opensearch.ml.common.transport.model.MLModelUpdateAction;
 import org.opensearch.ml.common.transport.prediction.MLPredictionTaskAction;
 import org.opensearch.ml.common.transport.register.MLRegisterModelAction;
 import org.opensearch.ml.common.transport.sync.MLSyncUpAction;
@@ -124,6 +126,7 @@ import org.opensearch.ml.rest.RestMLStatsAction;
 import org.opensearch.ml.rest.RestMLTrainAndPredictAction;
 import org.opensearch.ml.rest.RestMLTrainingAction;
 import org.opensearch.ml.rest.RestMLUndeployModelAction;
+import org.opensearch.ml.rest.RestMLUpdateModelAction;
 import org.opensearch.ml.rest.RestMLUploadModelChunkAction;
 import org.opensearch.ml.settings.MLCommonsSettings;
 import org.opensearch.ml.stats.MLClusterLevelStat;
@@ -202,6 +205,7 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin, Exten
                 new ActionHandler<>(MLTrainingTaskAction.INSTANCE, TransportTrainingTaskAction.class),
                 new ActionHandler<>(MLTrainAndPredictionTaskAction.INSTANCE, TransportTrainAndPredictionTaskAction.class),
                 new ActionHandler<>(MLModelGetAction.INSTANCE, GetModelTransportAction.class),
+                new ActionHandler<>(MLModelUpdateAction.INSTANCE, UpdateModelTransportAction.class),
                 new ActionHandler<>(MLModelDeleteAction.INSTANCE, DeleteModelTransportAction.class),
                 new ActionHandler<>(MLModelSearchAction.INSTANCE, SearchModelTransportAction.class),
                 new ActionHandler<>(MLTaskGetAction.INSTANCE, GetTaskTransportAction.class),
@@ -412,6 +416,7 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin, Exten
         RestMLPredictionAction restMLPredictionAction = new RestMLPredictionAction(mlModelManager);
         RestMLExecuteAction restMLExecuteAction = new RestMLExecuteAction();
         RestMLGetModelAction restMLGetModelAction = new RestMLGetModelAction();
+        RestMLUpdateModelAction restMLUpdateModelAction = new RestMLUpdateModelAction();
         RestMLDeleteModelAction restMLDeleteModelAction = new RestMLDeleteModelAction();
         RestMLSearchModelAction restMLSearchModelAction = new RestMLSearchModelAction();
         RestMLGetTaskAction restMLGetTaskAction = new RestMLGetTaskAction();
@@ -432,6 +437,7 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin, Exten
                 restMLExecuteAction,
                 restMLTrainAndPredictAction,
                 restMLGetModelAction,
+                restMLUpdateModelAction,
                 restMLDeleteModelAction,
                 restMLSearchModelAction,
                 restMLGetTaskAction,
