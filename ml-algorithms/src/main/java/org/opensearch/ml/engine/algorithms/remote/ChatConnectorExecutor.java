@@ -436,7 +436,7 @@ public class ChatConnectorExecutor implements RemoteConnectorExecutor{
 
                 SdkHttpFullRequest sdkHttpFullRequest = builder.build();
                 HttpExecuteRequest executeRequest = HttpExecuteRequest.builder()
-                        .request(signRequest(sdkHttpFullRequest, connector.getAccessKey(), connector.getSecretKey(), connector.getServiceName(), connector.getRegion()))
+                        .request(signRequest(sdkHttpFullRequest, connector.getAccessKey(), connector.getSecretKey(), connector.getSessionToken(),connector.getServiceName(), connector.getRegion()))
                         .contentStreamProvider(sdkHttpFullRequest.contentStreamProvider().orElse(null))
                         .build();
 

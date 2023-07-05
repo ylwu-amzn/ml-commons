@@ -155,14 +155,6 @@ public class AwsConnectorExecutor implements RemoteConnectorExecutor{
         String signingName = connector.getServiceName();
         String region = connector.getRegion();
 
-        AwsCredentials credentials = sessionToken == null ? AwsBasicCredentials.create(accessKey, secretKey) : AwsSessionCredentials.create(accessKey, secretKey, sessionToken);
-
-        Aws4SignerParams params = Aws4SignerParams.builder()
-                .awsCredentials(credentials)
-                .signingName(signingName)
-                .signingRegion(Region.of(region))
-                .build();
-
-        return signer.sign(request, params);
+        return ConnectorUtils.signRequest(request, accessKey, secretKey, sessionToken, signingName, region);
     }
 }
