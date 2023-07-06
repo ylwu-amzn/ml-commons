@@ -6,7 +6,7 @@
 package org.opensearch.ml.action.remote;
 
 import static org.opensearch.ml.common.CommonValue.ML_CONNECTOR_INDEX;
-import static org.opensearch.ml.common.utils.StringUtils.toJson;
+import static org.opensearch.ml.common.utils.StringUtils.gson;
 import static org.opensearch.ml.settings.MLCommonsSettings.ML_COMMONS_TRUSTED_CONNECTOR_ENDPOINTS_REGEX;
 
 import java.time.Instant;
@@ -108,8 +108,8 @@ public class TransportCreateConnectorAction extends HandledTransportAction<Actio
                 .version(mlCreateConnectorInput.getVersion())
                 .description(mlCreateConnectorInput.getDescription())
                 .protocol(mlCreateConnectorInput.getProtocol())
-                .parameterStr(toJson(mlCreateConnectorInput.getParameters()))
-                .credentialStr(toJson(mlCreateConnectorInput.getCredential()))
+                .parameterStr(gson.toJson(mlCreateConnectorInput.getParameters()))
+                .credentialStr(gson.toJson(mlCreateConnectorInput.getCredential()))
                 .predictAPI(getAPIStringValue(mlCreateConnectorInput.getConnectorTemplate().getPredictSchema()))
                 .metadataAPI(getAPIStringValue(mlCreateConnectorInput.getConnectorTemplate().getMetadataSchema()))
                 .connectorState(ConnectorState.CREATED)
@@ -223,10 +223,10 @@ public class TransportCreateConnectorAction extends HandledTransportAction<Actio
 
         String predictAPISchema = getAPIStringValue(mlCreateConnectorInput.getConnectorTemplate().getPredictSchema());
         String metadataAPISchema = getAPIStringValue(mlCreateConnectorInput.getConnectorTemplate().getMetadataSchema());
-        Map<String, String> predictAPIMap = StringUtils.fromJson(predictAPISchema);
-        Map<String, String> metadataAPIMap = StringUtils.fromJson(metadataAPISchema);
-        String predictUrl = predictAPIMap.get(APISchema.URL_FIELD);
-        String metadataUrl = metadataAPIMap.get(APISchema.URL_FIELD);
+        Map<String, Object> predictAPIMap = StringUtils.fromJson(predictAPISchema, "predict");
+        Map<String, Object> metadataAPIMap = StringUtils.fromJson(metadataAPISchema, "metadata");
+        String predictUrl = predictAPIMap.get(APISchema.URL_FIELD).toString();
+        String metadataUrl = metadataAPIMap.get(APISchema.URL_FIELD).toString();
 
         StringSubstitutor substitutor = new StringSubstitutor(parameters, "${parameters.", "}");
         String finalPredictUrl = substitutor.replace(predictUrl);

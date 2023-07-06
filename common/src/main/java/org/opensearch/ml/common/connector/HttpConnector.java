@@ -26,12 +26,10 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
 
-import static org.apache.commons.text.StringEscapeUtils.escapeJson;
 import static org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken;
 import static org.opensearch.ml.common.connector.ConnectorNames.HTTP;
 import static org.opensearch.ml.common.utils.StringUtils.getParameterMap;
 import static org.opensearch.ml.common.utils.StringUtils.isJson;
-import static org.opensearch.ml.common.utils.StringUtils.toUTF8;
 
 @Log4j2
 @NoArgsConstructor
@@ -217,34 +215,6 @@ public class HttpConnector extends AbstractConnector {
         }
         this.decryptedCredential = decrypted;
         this.decryptedHeaders = createPredictDecryptedHeaders(headers);
-    }
-
-    @Override
-    @SuppressWarnings("unchecked")
-    public <T> void parseResponse(T response, List<ModelTensor> modelTensors, boolean modelTensorJson) throws IOException {
-        if (modelTensorJson) {
-            String modelTensorJsonContent = (String) response;
-            XContentParser parser = XContentType.JSON.xContent().createParser(NamedXContentRegistry.EMPTY, null, modelTensorJsonContent);
-            parser.nextToken();
-            if (XContentParser.Token.START_ARRAY == parser.currentToken()) {
-                while (parser.nextToken() != XContentParser.Token.END_ARRAY) {
-                    ModelTensor modelTensor = ModelTensor.parser(parser);
-                    modelTensors.add(modelTensor);
-                }
-            } else {
-                ModelTensor modelTensor = ModelTensor.parser(parser);
-                modelTensors.add(modelTensor);
-            }
-            return;
-        }
-        if (response instanceof String && isJson((String)response)) {
-            Map<String, Object> data = StringUtils.fromJson((String) response, "response");
-            modelTensors.add(ModelTensor.builder().name("response").dataAsMap(data).build());
-        } else {
-            Map<String, Object> map = new HashMap<>();
-            map.put("response", response);
-            modelTensors.add(ModelTensor.builder().name("response").dataAsMap(map).build());
-        }
     }
 
     @Override
