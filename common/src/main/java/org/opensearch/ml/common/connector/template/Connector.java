@@ -28,7 +28,7 @@ public class Connector implements ToXContentObject, Writeable {
     public static final String DESCRIPTION_FIELD = "description";
     public static final String PREDICT_API_SCHEMA_FIELD = "predict_API_schema";
     public static final String METADATA_API_SCHEMA_FIELD = "metadata_API_schema";
-    public static final String CONNECTOR_STATE_FIELD = "connector_state";
+//    public static final String CONNECTOR_STATE_FIELD = "connector_state";
     public static final String CREATED_TIME_FIELD = "created_time";
     public static final String LAST_UPDATED_TIME_FIELD = "last_updated_time";
     public static final String CREDENTIAL_ID_FIELD = "credential_id";

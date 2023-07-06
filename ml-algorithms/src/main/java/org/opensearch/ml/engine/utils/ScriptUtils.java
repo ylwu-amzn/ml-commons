@@ -22,7 +22,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-import static org.opensearch.ml.common.connector.HttpConnector.POST_PROCESS_FUNCTION_FIELD;
+import static org.opensearch.ml.common.connector.MLPostProcessFunction.POST_PROCESS_FUNCTION;
+
 
 public class ScriptUtils {
 
@@ -45,14 +46,10 @@ public class ScriptUtils {
     }
     public static Optional<String> executePostprocessFunction(ScriptService scriptService,
                                                               String postProcessFunction,
-                                                              Map<String, String> parameters,
                                                               String resultJson) {
         Map<String, Object> result = StringUtils.fromJson(resultJson, "result");
         if (MLPostProcessFunction.contains(postProcessFunction)) {
             postProcessFunction = MLPostProcessFunction.get(postProcessFunction);
-        }
-        if (parameters.containsKey(POST_PROCESS_FUNCTION_FIELD)) {
-            postProcessFunction = gson.fromJson(parameters.get(POST_PROCESS_FUNCTION_FIELD), String.class);
         }
         if (postProcessFunction != null) {
             return Optional.ofNullable(executeScript(scriptService, postProcessFunction, result));
