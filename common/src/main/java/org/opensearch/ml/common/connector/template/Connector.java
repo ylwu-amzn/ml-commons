@@ -28,7 +28,6 @@ public class Connector implements ToXContentObject, Writeable {
     public static final String DESCRIPTION_FIELD = "description";
     public static final String PREDICT_API_SCHEMA_FIELD = "predict_API_schema";
     public static final String METADATA_API_SCHEMA_FIELD = "metadata_API_schema";
-//    public static final String CONNECTOR_STATE_FIELD = "connector_state";
     public static final String CREATED_TIME_FIELD = "created_time";
     public static final String LAST_UPDATED_TIME_FIELD = "last_updated_time";
     public static final String CREDENTIAL_ID_FIELD = "credential_id";
@@ -39,7 +38,6 @@ public class Connector implements ToXContentObject, Writeable {
     private String description;
     private APISchema predictSchema;
     private APISchema metadataSchema;
-    private ConnectorState connectorState;
     private Instant createdTime;
     private Instant lastUpdateTime;
     private String credentialId;
@@ -51,7 +49,6 @@ public class Connector implements ToXContentObject, Writeable {
                      String description,
                      APISchema predictSchema,
                      APISchema metadataSchema,
-                     ConnectorState connectorState,
                      Instant createdTime,
                      Instant lastUpdateTime,
                      String credentialId
@@ -62,7 +59,6 @@ public class Connector implements ToXContentObject, Writeable {
         this.description = description;
         this.predictSchema = predictSchema;
         this.metadataSchema = metadataSchema;
-        this.connectorState = connectorState;
         this.createdTime = createdTime;
         this.lastUpdateTime = lastUpdateTime;
         this.credentialId = credentialId;
@@ -78,9 +74,6 @@ public class Connector implements ToXContentObject, Writeable {
         }
         if (input.readBoolean()) {
             this.metadataSchema = new APISchema(input);
-        }
-        if (input.readBoolean()) {
-            connectorState = input.readEnum(ConnectorState.class);
         }
         createdTime = input.readOptionalInstant();
         lastUpdateTime = input.readOptionalInstant();
@@ -101,12 +94,6 @@ public class Connector implements ToXContentObject, Writeable {
         if (metadataSchema != null) {
             out.writeBoolean(true);
             metadataSchema.writeTo(out);
-        } else {
-            out.writeBoolean(false);
-        }
-        if (connectorState != null) {
-            out.writeBoolean(true);
-            out.writeEnum(connectorState);
         } else {
             out.writeBoolean(false);
         }
@@ -136,9 +123,6 @@ public class Connector implements ToXContentObject, Writeable {
         if (metadataSchema != null) {
             builder.field(METADATA_API_SCHEMA_FIELD, metadataSchema);
         }
-        if (connectorState != null) {
-            builder.field(CONNECTOR_STATE_FIELD, connectorState);
-        }
         if (createdTime != null) {
             builder.field(CREATED_TIME_FIELD, createdTime.toEpochMilli());
         }
@@ -159,7 +143,6 @@ public class Connector implements ToXContentObject, Writeable {
         String description = null;
         APISchema predictSchema = null;
         APISchema metadataSchema = null;
-        ConnectorState connectorState = null;
         Instant createdTime = null;
         Instant lastUpdateTime = null;
         List<String> models = new ArrayList<>();
@@ -189,8 +172,6 @@ public class Connector implements ToXContentObject, Writeable {
                 case METADATA_API_SCHEMA_FIELD:
                     metadataSchema = APISchema.parse(parser);
                     break;
-                case CONNECTOR_STATE_FIELD:
-                    connectorState = ConnectorState.from(parser.text());
                 case CREATED_TIME_FIELD:
                     createdTime = Instant.ofEpochMilli(parser.longValue());
                     break;
@@ -213,7 +194,6 @@ public class Connector implements ToXContentObject, Writeable {
                 .description(description)
                 .predictSchema(predictSchema)
                 .metadataSchema(metadataSchema)
-                .connectorState(connectorState)
                 .createdTime(createdTime)
                 .lastUpdateTime(lastUpdateTime)
                 .credentialId(credentialId)
