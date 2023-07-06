@@ -54,7 +54,8 @@ public class EncryptorImpl implements Encryptor {
     }
 
     private void checkMasterKey() {
-        if (masterKey == "0000000000000000" || masterKey == null) {
+        //TODO: support set encryption key
+        if (masterKey == null) {
             throw new MetaDataException("Please provide a masterKey for credential encryption! Example: PUT /_cluster/settings\n" +
                     "{\n" +
                     "  \"persistent\" : {\n" +

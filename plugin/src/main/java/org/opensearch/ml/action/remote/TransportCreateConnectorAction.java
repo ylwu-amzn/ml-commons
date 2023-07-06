@@ -222,19 +222,19 @@ public class TransportCreateConnectorAction extends HandledTransportAction<Actio
         Map<String, String> parameters = mlCreateConnectorInput.getParameters();
 
         String predictAPISchema = getAPIStringValue(mlCreateConnectorInput.getConnectorTemplate().getPredictSchema());
-        String metadataAPISchema = getAPIStringValue(mlCreateConnectorInput.getConnectorTemplate().getMetadataSchema());
+//        String metadataAPISchema = getAPIStringValue(mlCreateConnectorInput.getConnectorTemplate().getMetadataSchema());
         Map<String, String> predictAPIMap = StringUtils.fromJson(predictAPISchema);
-        Map<String, String> metadataAPIMap = StringUtils.fromJson(metadataAPISchema);
+//        Map<String, String> metadataAPIMap = StringUtils.fromJson(metadataAPISchema);
         String predictUrl = predictAPIMap.get(APISchema.URL_FIELD);
-        String metadataUrl = metadataAPIMap.get(APISchema.URL_FIELD);
+//        String metadataUrl = metadataAPIMap.get(APISchema.URL_FIELD);
 
         StringSubstitutor substitutor = new StringSubstitutor(parameters, "${parameters.", "}");
         String finalPredictUrl = substitutor.replace(predictUrl);
-        String finalMetadataUrl = substitutor.replace(metadataUrl);
+//        String finalMetadataUrl = substitutor.replace(metadataUrl);
 
         Pattern pattern = Pattern.compile(trustedConnectorEndpointsRegex);
         Matcher predictUrlMatcher = pattern.matcher(finalPredictUrl);
-        Matcher metadataUrlMatcher = pattern.matcher(finalMetadataUrl);
+//        Matcher metadataUrlMatcher = pattern.matcher(finalMetadataUrl);
 
         if (!predictUrlMatcher.matches()) {
             throw new IllegalArgumentException(
@@ -244,13 +244,13 @@ public class TransportCreateConnectorAction extends HandledTransportAction<Actio
                     + finalPredictUrl
             );
         }
-        if (!metadataUrlMatcher.matches()) {
-            throw new IllegalArgumentException(
-                "Connector URL is not matching the trusted connector endpoint regex, regex is: "
-                    + trustedConnectorEndpointsRegex
-                    + ",URL is: "
-                    + finalMetadataUrl
-            );
-        }
+//        if (!metadataUrlMatcher.matches()) {
+//            throw new IllegalArgumentException(
+//                "Connector URL is not matching the trusted connector endpoint regex, regex is: "
+//                    + trustedConnectorEndpointsRegex
+//                    + ",URL is: "
+//                    + finalMetadataUrl
+//            );
+//        }
     }
 }
