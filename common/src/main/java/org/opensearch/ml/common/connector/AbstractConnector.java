@@ -21,7 +21,7 @@ import java.util.Map;
 
 import static org.opensearch.ml.common.utils.StringUtils.isJson;
 
-public abstract class AbstractConnector implements Connector {
+public abstract class /**/AbstractConnector implements Connector {
     protected String httpMethod;
     @Getter
     protected Map<String, String> parameters;

@@ -7,6 +7,7 @@ package org.opensearch.ml.engine.algorithms.remote;
 
 import com.google.common.collect.ImmutableMap;
 import com.jayway.jsonpath.JsonPath;
+import lombok.extern.log4j.Log4j2;
 import org.opensearch.ml.common.connector.Connector;
 import org.opensearch.ml.common.dataset.TextDocsInputDataSet;
 import org.opensearch.ml.common.dataset.remote.RemoteInferenceInputDataSet;
@@ -32,14 +33,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-import static org.apache.commons.text.StringEscapeUtils.escapeJava;
+import static org.apache.commons.text.StringEscapeUtils.escapeJson;
 import static org.opensearch.ml.common.connector.HttpConnector.RESPONSE_FILTER_FIELD;
-import static org.opensearch.ml.common.connector.MLPostProcessFunction.POST_PROCESS_FUNCTION;
-import static org.opensearch.ml.common.connector.MLPreProcessFunction.PRE_PROCESS_FUNCTION;
 import static org.opensearch.ml.engine.utils.ScriptUtils.executePostprocessFunction;
 import static org.opensearch.ml.engine.utils.ScriptUtils.executePreprocessFunction;
 import static org.opensearch.ml.engine.utils.ScriptUtils.gson;
 
+@Log4j2
 public class ConnectorUtils {
 
     private static final Aws4Signer signer;
@@ -51,12 +51,12 @@ public class ConnectorUtils {
         RemoteInferenceInputDataSet inputData;
         if (mlInput.getInputDataset() instanceof TextDocsInputDataSet) {
             TextDocsInputDataSet inputDataSet = (TextDocsInputDataSet)mlInput.getInputDataset();
-            List<String> docs = new ArrayList<>(inputDataSet.getDocs());
-            Map<String, Object> params = ImmutableMap.of("text_docs", docs);
-            String preProcessFunction = null;
-            if (connector.getParameters() != null && connector.getParameters().containsKey(PRE_PROCESS_FUNCTION)) {
-                preProcessFunction = connector.getParameters().get(PRE_PROCESS_FUNCTION);
+            List<String> docs = new ArrayList<>();
+            for (String doc : inputDataSet.getDocs()) {
+                docs.add(escapeJson(doc));
             }
+            Map<String, Object> params = ImmutableMap.of("text_docs", docs);
+            String preProcessFunction = connector.getPreProcessFunction();
             Optional<String> processedResponse = executePreprocessFunction(scriptService, preProcessFunction, params);
             if (!processedResponse.isPresent()) {
                 throw new IllegalArgumentException("Wrong input");
@@ -68,7 +68,7 @@ public class ConnectorUtils {
                 try {
                     AccessController.doPrivileged((PrivilegedExceptionAction<Void>) () -> {
                         if (parametersMap.get(key) instanceof String) {
-                            processedParameters.put(key, (String) parametersMap.get(key));
+                            processedParameters.put(key, escapeJson((String)parametersMap.get(key)));
                         } else {
                             processedParameters.put(key, gson.toJson(parametersMap.get(key)));
                         }
@@ -84,18 +84,12 @@ public class ConnectorUtils {
         } else {
             throw new IllegalArgumentException("Wrong input type");
         }
-        inputData.getParameters().entrySet().forEach(entry -> {
-            entry.setValue(escapeJava(entry.getValue()));
-        });
         return inputData;
     }
 
     public static ModelTensors processOutput(String modelResponse, Connector connector, ScriptService scriptService, Map<String, String> parameters, List<ModelTensor> modelTensors) throws IOException {
 
-        String postProcessFunction = null;
-        if (parameters != null && parameters.containsKey(POST_PROCESS_FUNCTION)) {
-            postProcessFunction = parameters.get(POST_PROCESS_FUNCTION);
-        }
+        String postProcessFunction = connector.getPostProcessFunction();
         Optional<String> processedResponse = executePostprocessFunction(scriptService, postProcessFunction, parameters, modelResponse);
 
         String response = processedResponse.orElse(modelResponse);

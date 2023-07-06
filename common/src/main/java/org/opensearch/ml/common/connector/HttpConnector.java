@@ -12,18 +12,26 @@ import org.apache.commons.text.StringSubstitutor;
 import org.opensearch.common.io.stream.BytesStreamOutput;
 import org.opensearch.common.io.stream.StreamInput;
 import org.opensearch.common.io.stream.StreamOutput;
+import org.opensearch.common.xcontent.XContentType;
+import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.core.xcontent.XContentBuilder;
 import org.opensearch.core.xcontent.XContentParser;
+import org.opensearch.ml.common.output.model.ModelTensor;
+import org.opensearch.ml.common.utils.StringUtils;
 
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
 
+import static org.apache.commons.text.StringEscapeUtils.escapeJson;
 import static org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken;
 import static org.opensearch.ml.common.connector.ConnectorNames.HTTP;
+import static org.opensearch.ml.common.utils.StringUtils.getParameterMap;
 import static org.opensearch.ml.common.utils.StringUtils.isJson;
+import static org.opensearch.ml.common.utils.StringUtils.toUTF8;
 
 @Log4j2
 @NoArgsConstructor
@@ -36,9 +44,11 @@ public class HttpConnector extends AbstractConnector {
     public static final String BODY_TEMPLATE_FIELD = "body_template";
     public static final String RESPONSE_FILTER_FIELD = "response_filter";
     public static final String PARAMETERS_FIELD = "parameters";
+    public static final String PRE_PROCESS_FUNCTION_FIELD = "pre_process_function";
     public static final String POST_PROCESS_FUNCTION_FIELD = "post_process_function";
     public static final String ACCESS_KEY_FIELD = "access_key";
     public static final String SECRET_KEY_FIELD = "secret_key";
+    public static final String SESSION_TOKEN_FIELD = "session_token";
     public static final String SERVICE_NAME_FIELD = "service_name";
     public static final String REGION_FIELD = "region";
 
@@ -51,6 +61,10 @@ public class HttpConnector extends AbstractConnector {
 
     @Getter
     protected String bodyTemplate;
+    @Getter
+    protected String preProcessFunction;
+    @Getter
+    protected String postProcessFunction;
 
     //TODO: add RequestConfig like request time out,
 
@@ -71,7 +85,8 @@ public class HttpConnector extends AbstractConnector {
                     endpoint = parser.text();
                     break;
                 case PARAMETERS_FIELD:
-                    parameters = parser.mapStrings();
+                    Map<String, Object> map = parser.map();
+                    parameters = getParameterMap(map);
                     break;
                 case CREDENTIAL_FIELD:
                     credential = new HashMap<>();
@@ -82,6 +97,12 @@ public class HttpConnector extends AbstractConnector {
                     break;
                 case BODY_TEMPLATE_FIELD:
                     bodyTemplate = parser.text();
+                    break;
+                case PRE_PROCESS_FUNCTION_FIELD:
+                    preProcessFunction = parser.text();
+                    break;
+                case POST_PROCESS_FUNCTION_FIELD:
+                    postProcessFunction = parser.text();
                     break;
                 default:
                     parser.skipChildren();
@@ -116,6 +137,12 @@ public class HttpConnector extends AbstractConnector {
         if (bodyTemplate != null) {
             builder.field(BODY_TEMPLATE_FIELD, bodyTemplate);
         }
+        if (preProcessFunction != null) {
+            builder.field(PRE_PROCESS_FUNCTION_FIELD, preProcessFunction);
+        }
+        if (postProcessFunction != null) {
+            builder.field(POST_PROCESS_FUNCTION_FIELD, postProcessFunction);
+        }
         builder.endObject();
         builder.endObject();
         return builder;
@@ -135,6 +162,8 @@ public class HttpConnector extends AbstractConnector {
             headers = input.readMap(StreamInput::readString, StreamInput::readString);
         }
         bodyTemplate = input.readOptionalString();
+        preProcessFunction = input.readOptionalString();
+        postProcessFunction = input.readOptionalString();
     }
 
     @Override
@@ -161,6 +190,8 @@ public class HttpConnector extends AbstractConnector {
             out.writeBoolean(false);
         }
         out.writeOptionalString(bodyTemplate);
+        out.writeOptionalString(preProcessFunction);
+        out.writeOptionalString(postProcessFunction);
     }
 
     @Override
@@ -186,6 +217,34 @@ public class HttpConnector extends AbstractConnector {
         }
         this.decryptedCredential = decrypted;
         this.decryptedHeaders = createPredictDecryptedHeaders(headers);
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public <T> void parseResponse(T response, List<ModelTensor> modelTensors, boolean modelTensorJson) throws IOException {
+        if (modelTensorJson) {
+            String modelTensorJsonContent = (String) response;
+            XContentParser parser = XContentType.JSON.xContent().createParser(NamedXContentRegistry.EMPTY, null, modelTensorJsonContent);
+            parser.nextToken();
+            if (XContentParser.Token.START_ARRAY == parser.currentToken()) {
+                while (parser.nextToken() != XContentParser.Token.END_ARRAY) {
+                    ModelTensor modelTensor = ModelTensor.parser(parser);
+                    modelTensors.add(modelTensor);
+                }
+            } else {
+                ModelTensor modelTensor = ModelTensor.parser(parser);
+                modelTensors.add(modelTensor);
+            }
+            return;
+        }
+        if (response instanceof String && isJson((String)response)) {
+            Map<String, Object> data = StringUtils.fromJson((String) response, "response");
+            modelTensors.add(ModelTensor.builder().name("response").dataAsMap(data).build());
+        } else {
+            Map<String, Object> map = new HashMap<>();
+            map.put("response", response);
+            modelTensors.add(ModelTensor.builder().name("response").dataAsMap(map).build());
+        }
     }
 
     @Override
@@ -223,6 +282,11 @@ public class HttpConnector extends AbstractConnector {
     public String getSecretKey() {
         return decryptedCredential.get(SECRET_KEY_FIELD);
     }
+
+    public String getSessionToken() {
+        return decryptedCredential.get(SESSION_TOKEN_FIELD);
+    }
+
     public String getServiceName() {
         if (parameters == null) {
             return decryptedCredential.get(SERVICE_NAME_FIELD);
