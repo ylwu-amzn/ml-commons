@@ -79,11 +79,4 @@ public abstract class AbstractConnector implements Connector {
         }
     }
 
-    abstract public String getAccessKey();
-
-    abstract public String getSecretKey();
-
-    abstract public String getServiceName();
-
-    abstract public String getRegion();
 }

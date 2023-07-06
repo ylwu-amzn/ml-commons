@@ -17,6 +17,7 @@ import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.util.EntityUtils;
 import org.opensearch.ml.common.connector.AbstractConnector;
 import org.opensearch.ml.common.connector.Connector;
+import org.opensearch.ml.common.connector.HttpConnector;
 import org.opensearch.ml.common.dataset.remote.RemoteInferenceInputDataSet;
 import org.opensearch.ml.common.exception.MLException;
 import org.opensearch.ml.common.input.MLInput;
@@ -36,20 +37,20 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
-import static org.opensearch.ml.common.connector.ConnectorNames.HTTP_V1;
+import static org.opensearch.ml.common.connector.ConnectorNames.HTTP;
 import static org.opensearch.ml.engine.algorithms.remote.ConnectorUtils.processInput;
 import static org.opensearch.ml.engine.algorithms.remote.ConnectorUtils.processOutput;
 
 @Log4j2
-@ConnectorExecutor(HTTP_V1)
+@ConnectorExecutor(HTTP)
 public class HttpJsonConnectorExecutor implements RemoteConnectorExecutor {
 
-    private AbstractConnector connector;
+    private HttpConnector connector;
     @Setter
     private ScriptService scriptService;
 
     public HttpJsonConnectorExecutor(Connector connector) {
-        this.connector = (AbstractConnector)connector;
+        this.connector = (HttpConnector)connector;
     }
 
     @Override

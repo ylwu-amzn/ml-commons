@@ -7,7 +7,7 @@ package org.opensearch.ml.engine.algorithms.remote;
 
 import lombok.Setter;
 import lombok.extern.log4j.Log4j2;
-import org.opensearch.ml.common.connector.AbstractConnector;
+import org.opensearch.ml.common.connector.AwsConnector;
 import org.opensearch.ml.common.connector.Connector;
 import org.opensearch.ml.common.dataset.remote.RemoteInferenceInputDataSet;
 import org.opensearch.ml.common.exception.MLException;
@@ -17,9 +17,6 @@ import org.opensearch.ml.common.output.model.ModelTensorOutput;
 import org.opensearch.ml.common.output.model.ModelTensors;
 import org.opensearch.ml.engine.annotation.ConnectorExecutor;
 import org.opensearch.script.ScriptService;
-import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
-import software.amazon.awssdk.auth.signer.Aws4Signer;
-import software.amazon.awssdk.auth.signer.params.Aws4SignerParams;
 import software.amazon.awssdk.core.internal.http.loader.DefaultSdkHttpClientBuilder;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.http.AbortableInputStream;
@@ -27,7 +24,6 @@ import software.amazon.awssdk.http.HttpExecuteRequest;
 import software.amazon.awssdk.http.HttpExecuteResponse;
 import software.amazon.awssdk.http.SdkHttpClient;
 import software.amazon.awssdk.http.SdkHttpFullRequest;
-import software.amazon.awssdk.regions.Region;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
@@ -40,24 +36,22 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static org.opensearch.ml.common.connector.ConnectorNames.AWS_V1;
+import static org.opensearch.ml.common.connector.ConnectorNames.AWS;
 import static org.opensearch.ml.engine.algorithms.remote.ConnectorUtils.processInput;
 import static org.opensearch.ml.engine.algorithms.remote.ConnectorUtils.processOutput;
 import static software.amazon.awssdk.http.SdkHttpMethod.POST;
 
 @Log4j2
-@ConnectorExecutor(AWS_V1)
+@ConnectorExecutor(AWS)
 public class AwsConnectorExecutor implements RemoteConnectorExecutor{
 
-    private AbstractConnector connector;
-    private final Aws4Signer signer;
+    private AwsConnector connector;
     private final SdkHttpClient httpClient;
     @Setter
     private ScriptService scriptService;
 
     public AwsConnectorExecutor(Connector connector) {
-        this.connector = (AbstractConnector)connector;
-        this.signer = Aws4Signer.create();
+        this.connector = (AwsConnector)connector;
         this.httpClient = new DefaultSdkHttpClientBuilder().build();
     }
 
@@ -132,16 +126,10 @@ public class AwsConnectorExecutor implements RemoteConnectorExecutor{
     private SdkHttpFullRequest signRequest(SdkHttpFullRequest request) {
         String accessKey = connector.getAccessKey();
         String secretKey = connector.getSecretKey();
+        String sessionToken = connector.getSessionToken();
         String signingName = connector.getServiceName();
         String region = connector.getRegion();
-        AwsBasicCredentials credentials = AwsBasicCredentials.create(accessKey, secretKey);
 
-        Aws4SignerParams params = Aws4SignerParams.builder()
-                .awsCredentials(credentials)
-                .signingName(signingName)
-                .signingRegion(Region.of(region))
-                .build();
-
-        return signer.sign(request, params);
+        return ConnectorUtils.signRequest(request, accessKey, secretKey, sessionToken, signingName, region);
     }
 }

@@ -6,8 +6,6 @@
 package org.opensearch.ml.engine.utils;
 
 import com.google.gson.Gson;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonParser;
 import org.opensearch.ml.common.connector.MLPostProcessFunction;
 import org.opensearch.ml.common.connector.MLPreProcessFunction;
 import org.opensearch.ml.common.utils.StringUtils;
@@ -17,8 +15,6 @@ import org.opensearch.script.ScriptType;
 import org.opensearch.script.TemplateScript;
 
 import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -43,6 +39,7 @@ public class ScriptUtils {
         }
         return Optional.empty();
     }
+
     public static Optional<String> executePostprocessFunction(ScriptService scriptService,
                                                               String postProcessFunction,
                                                               Map<String, String> parameters,
@@ -51,8 +48,8 @@ public class ScriptUtils {
         if (MLPostProcessFunction.contains(postProcessFunction)) {
             postProcessFunction = MLPostProcessFunction.get(postProcessFunction);
         }
-        if (parameters.containsKey(POST_PROCESS_FUNCTION_FIELD)) {
-            postProcessFunction = gson.fromJson(parameters.get(POST_PROCESS_FUNCTION_FIELD), String.class);
+        if (parameters.containsKey(MLPostProcessFunction.POST_PROCESS_FUNCTION)) {
+            postProcessFunction = gson.fromJson(parameters.get(MLPostProcessFunction.POST_PROCESS_FUNCTION), String.class);
         }
         if (postProcessFunction != null) {
             return Optional.ofNullable(executeScript(scriptService, postProcessFunction, result));

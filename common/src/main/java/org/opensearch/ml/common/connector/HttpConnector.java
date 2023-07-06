@@ -22,12 +22,12 @@ import java.util.Optional;
 import java.util.function.Function;
 
 import static org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken;
-import static org.opensearch.ml.common.connector.ConnectorNames.HTTP_V1;
+import static org.opensearch.ml.common.connector.ConnectorNames.HTTP;
 import static org.opensearch.ml.common.utils.StringUtils.isJson;
 
 @Log4j2
 @NoArgsConstructor
-@org.opensearch.ml.common.annotation.Connector(HTTP_V1)
+@org.opensearch.ml.common.annotation.Connector(HTTP)
 public class HttpConnector extends AbstractConnector {
     public static final String HTTP_METHOD_FIELD = "http_method";
     public static final String ENDPOINT_FIELD = "endpoint";
@@ -36,7 +36,6 @@ public class HttpConnector extends AbstractConnector {
     public static final String BODY_TEMPLATE_FIELD = "body_template";
     public static final String RESPONSE_FILTER_FIELD = "response_filter";
     public static final String PARAMETERS_FIELD = "parameters";
-    public static final String PRE_PROCESS_FUNCTION_FIELD = "pre_process_function";
     public static final String POST_PROCESS_FUNCTION_FIELD = "post_process_function";
     public static final String ACCESS_KEY_FIELD = "access_key";
     public static final String SECRET_KEY_FIELD = "secret_key";

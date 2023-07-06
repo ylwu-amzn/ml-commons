@@ -14,15 +14,16 @@ import org.opensearch.core.xcontent.XContentParser;
 import java.io.IOException;
 import java.util.Optional;
 
-import static org.opensearch.ml.common.connector.ConnectorNames.AWS_V1;
+import static org.opensearch.ml.common.connector.ConnectorNames.AWS;
 
 @Log4j2
 @NoArgsConstructor
-@org.opensearch.ml.common.annotation.Connector(AWS_V1)
+@org.opensearch.ml.common.annotation.Connector(AWS)
 public class AwsConnector extends HttpConnector {
 
     public static final String ACCESS_KEY_FIELD = "access_key";
     public static final String SECRET_KEY_FIELD = "secret_key";
+    public static final String SESSION_TOKEN_FIELD = "session_token";
     public static final String SERVICE_NAME_FIELD = "service_name";
     public static final String REGION_FIELD = "region";
 
@@ -61,6 +62,11 @@ public class AwsConnector extends HttpConnector {
     public String getSecretKey() {
         return decryptedCredential.get(SECRET_KEY_FIELD);
     }
+
+    public String getSessionToken() {
+        return decryptedCredential.get(SESSION_TOKEN_FIELD);
+    }
+
     public String getServiceName() {
         if (parameters == null) {
             return decryptedCredential.get(SERVICE_NAME_FIELD);
