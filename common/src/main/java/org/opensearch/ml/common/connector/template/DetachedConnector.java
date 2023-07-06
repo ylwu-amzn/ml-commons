@@ -50,9 +50,9 @@ public class DetachedConnector extends AbstractConnector {
     public static final String CONNECTOR_PROTOCOL_FIELD = "protocol";
     public static final String CONNECTOR_PARAMETERS_FIELD = "parameters";
     public static final String CONNECTOR_CREDENTIAL_FIELD = "credential";
-    public static final String PREDICT_API_SCHEMA_FIELD = "predict_API";
-    public static final String METADATA_API_SCHEMA_FIELD = "metadata_API";
-    public static final String CONNECTOR_STATE_FIELD = "connector_state";
+    public static final String PREDICT_API_SCHEMA_FIELD = "predict";
+    public static final String METADATA_API_SCHEMA_FIELD = "actions";
+    public static final String CONNECTOR_STATE_FIELD = "state";
     public static final String BACKEND_ROLES_FIELD = "backend_roles";
     public static final String OWNER_FIELD = "owner";
     public static final String ACCESS_FIELD = "access";
