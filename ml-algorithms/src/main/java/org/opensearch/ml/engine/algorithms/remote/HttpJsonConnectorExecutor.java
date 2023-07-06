@@ -8,6 +8,7 @@ package org.opensearch.ml.engine.algorithms.remote;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.log4j.Log4j2;
+import org.apache.commons.text.StringSubstitutor;
 import org.apache.http.HttpEntity;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
@@ -57,7 +58,8 @@ public class HttpJsonConnectorExecutor implements RemoteConnectorExecutor {
             switch (connector.getPredictHttpMethod().toUpperCase(Locale.ROOT)) {
                 case "POST":
                     try {
-                        request = new HttpPost(connector.getPredictEndpoint());
+                        String predictEndpoint = connector.getPredictEndpoint(parameters);
+                        request = new HttpPost(predictEndpoint);
                         HttpEntity entity = new StringEntity(payload);
                         ((HttpPost)request).setEntity(entity);
                     } catch (Exception e) {

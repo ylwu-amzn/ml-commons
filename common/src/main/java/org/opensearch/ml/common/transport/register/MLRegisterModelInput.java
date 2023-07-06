@@ -10,6 +10,12 @@ import lombok.Data;
 import org.opensearch.common.io.stream.StreamInput;
 import org.opensearch.common.io.stream.StreamOutput;
 import org.opensearch.common.io.stream.Writeable;
+import org.opensearch.common.xcontent.LoggingDeprecationHandler;
+import org.opensearch.common.xcontent.XContentFactory;
+import org.opensearch.common.xcontent.XContentParserUtils;
+import org.opensearch.common.xcontent.XContentType;
+import org.opensearch.core.xcontent.MediaType;
+import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.core.xcontent.ToXContentObject;
 import org.opensearch.core.xcontent.XContentBuilder;
 import org.opensearch.core.xcontent.XContentParser;
@@ -22,14 +28,20 @@ import org.opensearch.ml.common.model.MLModelFormat;
 import org.opensearch.ml.common.model.TextEmbeddingModelConfig;
 
 import java.io.IOException;
+import java.security.AccessController;
+import java.security.PrivilegedActionException;
+import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 import static org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken;
+import static org.opensearch.ml.common.connector.Connector.createConnector;
 import static org.opensearch.ml.common.transport.connector.MLCreateConnectorInput.ACCESS_MODE_FIELD;
 import static org.opensearch.ml.common.transport.connector.MLCreateConnectorInput.BACKEND_ROLES_FIELD;
 import static org.opensearch.ml.common.transport.connector.MLCreateConnectorInput.ADD_ALL_BACKEND_ROLES_FIELD;
+import static org.opensearch.ml.common.utils.StringUtils.gson;
 
 /**
  * ML input data: algirithm name, parameters and input data set.
@@ -367,11 +379,7 @@ public class MLRegisterModelInput implements ToXContentObject, Writeable {
                     url = parser.text();
                     break;
                 case CONNECTOR_FIELD:
-                    parser.nextToken();
-                    String connectorName = parser.currentName();
-                    parser.nextToken();
-                    connector = MLCommonsClassLoader.initConnector(connectorName, new Object[]{connectorName, parser}, String.class, XContentParser.class);
-                    parser.nextToken();
+                    connector = createConnector(parser);
                     break;
                 case HASH_VALUE_FIELD:
                     hashValue = parser.text();

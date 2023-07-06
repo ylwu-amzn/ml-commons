@@ -88,8 +88,8 @@ public class HttpConnector extends AbstractConnector {
     @Override
     public XContentBuilder toXContent(XContentBuilder builder, Params params) throws IOException {
         builder.startObject();
-        builder.field(this.protocol);
-        builder.startObject();
+//        builder.field(this.protocol);
+//        builder.startObject();
         if (name != null) {
             builder.field(NAME_FIELD, name);
         }
@@ -111,7 +111,7 @@ public class HttpConnector extends AbstractConnector {
         if (actions != null) {
             builder.field(ACTIONS_FIELD, actions);
         }
-        builder.endObject();
+//        builder.endObject();
         builder.endObject();
         return builder;
     }

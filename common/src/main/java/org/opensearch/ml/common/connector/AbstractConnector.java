@@ -104,6 +104,15 @@ public abstract class AbstractConnector implements Connector {
         }
     }
 
+    public String getPredictEndpoint(Map<String, String> parameters) {
+        String predictEndpoint = getPredictEndpoint();
+        if (parameters != null && parameters.size() > 0) {
+            StringSubstitutor substitutor = new StringSubstitutor(parameters, "${parameters.", "}");
+            predictEndpoint = substitutor.replace(predictEndpoint);
+        }
+        return predictEndpoint;
+    }
+
     public String getAccessKey() {
         return decryptedCredential.get(ACCESS_KEY_FIELD);
     }

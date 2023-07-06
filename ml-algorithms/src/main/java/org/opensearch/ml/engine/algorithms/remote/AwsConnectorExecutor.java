@@ -54,7 +54,7 @@ public class AwsConnectorExecutor implements RemoteConnectorExecutor{
      @Override
      public void invokeRemoteModel(MLInput mlInput, Map<String, String> parameters, String payload, List<ModelTensors> tensorOutputs) {
         try {
-            String endpoint = connector.getPredictEndpoint();
+            String endpoint = connector.getPredictEndpoint(parameters);
             RequestBody requestBody = RequestBody.fromString(payload);
 
             SdkHttpFullRequest.Builder builder = SdkHttpFullRequest.builder()

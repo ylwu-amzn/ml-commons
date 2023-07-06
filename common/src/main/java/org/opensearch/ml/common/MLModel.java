@@ -10,7 +10,10 @@ import lombok.Getter;
 import lombok.Setter;
 import org.opensearch.common.io.stream.StreamInput;
 import org.opensearch.common.io.stream.StreamOutput;
+import org.opensearch.common.xcontent.LoggingDeprecationHandler;
+import org.opensearch.common.xcontent.XContentType;
 import org.opensearch.commons.authuser.User;
+import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.core.xcontent.ToXContent;
 import org.opensearch.core.xcontent.ToXContentObject;
 import org.opensearch.core.xcontent.XContentBuilder;
@@ -23,13 +26,19 @@ import org.opensearch.ml.common.model.TextEmbeddingModelConfig;
 import org.opensearch.ml.common.model.MetricsCorrelationModelConfig;
 
 import java.io.IOException;
+import java.security.AccessController;
+import java.security.PrivilegedActionException;
+import java.security.PrivilegedExceptionAction;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 import static org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken;
 import static org.opensearch.ml.common.CommonValue.USER;
+import static org.opensearch.ml.common.connector.Connector.createConnector;
+import static org.opensearch.ml.common.utils.StringUtils.gson;
 
 @Getter
 public class MLModel implements ToXContentObject {
@@ -474,11 +483,7 @@ public class MLModel implements ToXContentObject {
                     deployToAllNodes = parser.booleanValue();
                     break;
                 case CONNECTOR_FIELD:
-                    parser.nextToken();
-                    String connectorName = parser.currentName();
-                    parser.nextToken();
-                    connector = MLCommonsClassLoader.initConnector(connectorName, new Object[]{connectorName, parser}, String.class, XContentParser.class);
-                    parser.nextToken();
+                    connector = createConnector(parser);
                     break;
                 case CONNECTOR_ID_FIELD:
                     connectorId = parser.text();
@@ -542,6 +547,7 @@ public class MLModel implements ToXContentObject {
                 .connectorId(connectorId)
                 .build();
     }
+
 
     public static MLModel fromStream(StreamInput in) throws IOException {
         MLModel mlModel = new MLModel(in);
