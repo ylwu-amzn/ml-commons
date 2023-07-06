@@ -39,6 +39,7 @@ public abstract class AbstractConnector implements Connector {
     protected String name;
     protected String description;
     protected String version;
+    @Getter
     protected String protocol;
 
     @Getter

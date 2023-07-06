@@ -23,6 +23,7 @@ import java.util.regex.Pattern;
 public interface Connector extends ToXContentObject, Writeable {
 
     String getName();
+    String getProtocol();
 
     Map<String, String> getParameters();
     String getPredictEndpoint();
@@ -37,7 +38,7 @@ public interface Connector extends ToXContentObject, Writeable {
     Connector cloneConnector();
 
     default void writeTo(StreamOutput out) throws IOException {
-        out.writeString(getName());
+        out.writeString(getProtocol());
         out.writeOptionalString(getPredictEndpoint());
     }
 

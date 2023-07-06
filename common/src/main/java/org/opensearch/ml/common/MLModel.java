@@ -262,7 +262,7 @@ public class MLModel implements ToXContentObject {
         out.writeOptionalString(modelGroupId);
         if (connector != null) {
             out.writeBoolean(true);
-            out.writeString(connector.getName());
+            out.writeString(connector.getProtocol());
             connector.writeTo(out);
         } else {
             out.writeBoolean(false);
