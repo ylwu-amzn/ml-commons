@@ -84,7 +84,7 @@ public class MLSearchHandler {
                 true,
                 null,
                 new String[] {
-                    MLModel.CONNECTOR_FIELD + "." + ConnectorNames.AWS + "." + HttpConnector.CREDENTIAL_FIELD,
+                    MLModel.CONNECTOR_FIELD + "." + ConnectorNames.AWS_SIGV4 + "." + HttpConnector.CREDENTIAL_FIELD,
                     MLModel.CONNECTOR_FIELD + "." + ConnectorNames.HTTP + "." + HttpConnector.CREDENTIAL_FIELD }
             );
             request.source().fetchSource(fetchSourceContext);

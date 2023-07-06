@@ -13,11 +13,11 @@ import org.opensearch.core.xcontent.XContentParser;
 
 import java.io.IOException;
 
-import static org.opensearch.ml.common.connector.ConnectorNames.AWS;
+import static org.opensearch.ml.common.connector.ConnectorNames.AWS_SIGV4;
 
 @Log4j2
 @NoArgsConstructor
-@org.opensearch.ml.common.annotation.Connector(AWS)
+@org.opensearch.ml.common.annotation.Connector(AWS_SIGV4)
 public class AwsConnector extends HttpConnector {
 
     public AwsConnector(String name, XContentParser parser) throws IOException {

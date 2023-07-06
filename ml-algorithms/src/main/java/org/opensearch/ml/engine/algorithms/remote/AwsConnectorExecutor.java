@@ -32,12 +32,12 @@ import java.security.PrivilegedExceptionAction;
 import java.util.List;
 import java.util.Map;
 
-import static org.opensearch.ml.common.connector.ConnectorNames.AWS;
+import static org.opensearch.ml.common.connector.ConnectorNames.AWS_SIGV4;
 import static org.opensearch.ml.engine.algorithms.remote.ConnectorUtils.processOutput;
 import static software.amazon.awssdk.http.SdkHttpMethod.POST;
 
 @Log4j2
-@ConnectorExecutor(AWS)
+@ConnectorExecutor(AWS_SIGV4)
 public class AwsConnectorExecutor implements RemoteConnectorExecutor{
 
     @Getter
