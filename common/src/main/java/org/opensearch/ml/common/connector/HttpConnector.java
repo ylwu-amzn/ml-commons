@@ -36,7 +36,6 @@ public class HttpConnector extends AbstractConnector {
     public static final String BODY_TEMPLATE_FIELD = "body_template";
     public static final String RESPONSE_FILTER_FIELD = "response_filter";
     public static final String PARAMETERS_FIELD = "parameters";
-    public static final String POST_PROCESS_FUNCTION_FIELD = "post_process_function";
     public static final String SERVICE_NAME_FIELD = "service_name";
     public static final String REGION_FIELD = "region";
 
