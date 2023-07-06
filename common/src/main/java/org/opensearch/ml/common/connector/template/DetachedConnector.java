@@ -41,7 +41,6 @@ import static org.opensearch.ml.common.connector.template.APISchema.REQUEST_BODY
 import static org.opensearch.ml.common.connector.template.APISchema.URL_FIELD;
 import static org.opensearch.ml.common.utils.StringUtils.fromJson;
 import static org.opensearch.ml.common.utils.StringUtils.isJson;
-import static org.opensearch.ml.common.utils.StringUtils.toJson;
 
 public class DetachedConnector extends AbstractConnector {
     public static final String CONNECTOR_NAME_FIELD = "name";
