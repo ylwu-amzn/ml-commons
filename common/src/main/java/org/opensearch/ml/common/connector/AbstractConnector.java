@@ -10,6 +10,7 @@ import lombok.Setter;
 import org.apache.commons.text.StringSubstitutor;
 import org.opensearch.common.xcontent.XContentType;
 import org.opensearch.core.xcontent.NamedXContentRegistry;
+import org.opensearch.core.xcontent.XContentBuilder;
 import org.opensearch.core.xcontent.XContentParser;
 import org.opensearch.ml.common.output.model.ModelTensor;
 import org.opensearch.ml.common.utils.StringUtils;
@@ -28,8 +29,18 @@ public abstract class AbstractConnector implements Connector {
     public static final String ACCESS_KEY_FIELD = "access_key";
     public static final String SECRET_KEY_FIELD = "secret_key";
     public static final String SESSION_TOKEN_FIELD = "session_token";
+    public static final String NAME_FIELD = "name";
+    public static final String VERSION_FIELD = "version";
+    public static final String DESCRIPTION_FIELD = "description";
+    public static final String PROTOCOL_FIELD = "protocol";
+    public static final String ACTIONS_FIELD = "actions";
 
-    protected String httpMethod;
+    @Getter
+    protected String name;
+    protected String description;
+    protected String version;
+    protected String protocol;
+
     @Getter
     protected Map<String, String> parameters;
     protected Map<String, String> credential;
@@ -38,7 +49,13 @@ public abstract class AbstractConnector implements Connector {
     @Setter@Getter
     protected Map<String, String> decryptedCredential;
 
+    @Getter
+    protected List<ConnectorAction> actions;
+
     protected Map<String, String> createPredictDecryptedHeaders(Map<String, String> headers) {
+        if (headers == null) {
+            return null;
+        }
         Map<String, String> decryptedHeaders = new HashMap<>();
         StringSubstitutor substitutor = new StringSubstitutor(getDecryptedCredential(), "${credential.", "}");
         for (String key : headers.keySet()) {

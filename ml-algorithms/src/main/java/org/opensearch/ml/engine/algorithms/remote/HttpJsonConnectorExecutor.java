@@ -32,7 +32,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
-import static org.opensearch.ml.common.connector.ConnectorNames.HTTP;
+import static org.opensearch.ml.common.connector.ConnectorProtocols.HTTP;
 import static org.opensearch.ml.engine.algorithms.remote.ConnectorUtils.processOutput;
 
 @Log4j2
