@@ -30,6 +30,9 @@ public class ConnectorAction implements ToXContentObject, Writeable {
     public static final String URL_FIELD = "url";
     public static final String HEADERS_FIELD = "headers";
     public static final String REQUEST_BODY_FIELD = "request_body";
+    //TODO: add process function to action level
+    public static final String PRE_PROCESS_FUNCTION_FIELD = "pre_process_function";
+    public static final String POST_PROCESS_FUNCTION_FIELD = "post_process_function";
 
     private ActionType actionType;
     private String method;

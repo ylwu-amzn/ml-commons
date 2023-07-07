@@ -5,6 +5,7 @@
 
 package org.opensearch.ml.common;
 
+import org.opensearch.ml.common.connector.AbstractConnector;
 import org.opensearch.ml.common.connector.template.DetachedConnector;
 
 import static org.opensearch.ml.common.model.MLModelConfig.ALL_CONFIG_FIELD;
@@ -99,6 +100,29 @@ public class CommonValue {
             "  }\n" +
             "}";
 
+    public static final String ML_CONNECTOR_INDEX_FIELDS = "    \"properties\": {\n"
+            + "      \""
+            + AbstractConnector.NAME_FIELD
+            + "\" : {\"type\":\"text\",\"fields\":{\"keyword\":{\"type\":\"keyword\",\"ignore_above\":256}}},\n"
+            + "      \""
+            + AbstractConnector.VERSION_FIELD
+            + "\" : {\"type\": \"keyword\"},\n"
+            + "      \""
+            + AbstractConnector.DESCRIPTION_FIELD
+            + "\" : {\"type\": \"text\"},\n"
+            + "      \""
+            + AbstractConnector.PROTOCOL_FIELD
+            + "\" : {\"type\": \"keyword\"},\n"
+            + "      \""
+            + AbstractConnector.PARAMETERS_FIELD
+            + "\" : {\"type\": \"flat_object\"},\n"
+            + "      \""
+            + AbstractConnector.CREDENTIAL_FIELD
+            + "\" : {\"type\": \"flat_object\"},\n"
+            + "      \""
+            + AbstractConnector.ACTIONS_FIELD
+            + "\" : {\"type\": \"flat_object\"}\n";
+
     public static final String ML_MODEL_INDEX_MAPPING = "{\n"
             + "    \"_meta\": {\"schema_version\": "
             + ML_MODEL_INDEX_SCHEMA_VERSION
@@ -188,7 +212,7 @@ public class CommonValue {
             + "\": {\"type\": \"date\", \"format\": \"strict_date_time||epoch_millis\"},\n"
             + "      \""
             + MLModel.CONNECTOR_FIELD
-            + "\": {\"type\": \"flat_object\"},\n"
+            + "\": {" + ML_CONNECTOR_INDEX_FIELDS + "    }\n},"
             + USER_FIELD_MAPPING
             + "    }\n"
             + "}";
@@ -242,25 +266,7 @@ public class CommonValue {
             + "    \"_meta\": {\"schema_version\": "
             + ML_CONNECTOR_SCHEMA_VERSION
             + "},\n"
-            + "    \"properties\": {\n"
-            + "      \""
-            + DetachedConnector.CONNECTOR_NAME_FIELD
-            + "\" : {\"type\":\"text\",\"fields\":{\"keyword\":{\"type\":\"keyword\",\"ignore_above\":256}}},\n"
-            + "      \""
-            + DetachedConnector.CONNECTOR_VERSION_FIELD
-            + "\" : {\"type\": \"keyword\"},\n"
-            + "      \""
-            + DetachedConnector.CONNECTOR_DESCRIPTION_FIELD
-            + "\" : {\"type\": \"text\"},\n"
-            + "      \""
-            + DetachedConnector.CONNECTOR_PROTOCOL_FIELD
-            + "\" : {\"type\": \"keyword\"},\n"
-            + "      \""
-            + DetachedConnector.CONNECTOR_PARAMETERS_FIELD
-            + "\" : {\"type\": \"text\"},\n"
-            + "      \""
-            + DetachedConnector.CONNECTOR_CREDENTIAL_FIELD
-            + "\" : {\"type\": \"text\"},\n"
+            + ML_CONNECTOR_INDEX_FIELDS + ",\n"
             + "      \""
             + MLModelGroup.BACKEND_ROLES_FIELD
             + "\": {\n"
