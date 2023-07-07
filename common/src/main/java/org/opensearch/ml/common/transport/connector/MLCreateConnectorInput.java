@@ -49,7 +49,7 @@ public class MLCreateConnectorInput implements ToXContentObject, Writeable {
     private String protocol;
     private Map<String, String> parameters;
     private Map<String, String> credential;
-    private ConnectorAction connectorAction;
+    private List<ConnectorAction> actions;
     private List<String> backendRoles;
     private Boolean addAllBackendRoles;
     private AccessMode access;
@@ -61,7 +61,7 @@ public class MLCreateConnectorInput implements ToXContentObject, Writeable {
                                   String protocol,
                                   Map<String, String> parameters,
                                   Map<String, String> credential,
-                                  ConnectorAction connectorAction,
+                                  List<ConnectorAction> actions,
                                   List<String> backendRoles,
                                   Boolean addAllBackendRoles,
                                   AccessMode access
@@ -72,7 +72,7 @@ public class MLCreateConnectorInput implements ToXContentObject, Writeable {
         this.protocol = protocol;
         this.parameters = parameters;
         this.credential = credential;
-        this.connectorAction = connectorAction;
+        this.actions = actions;
         this.backendRoles = backendRoles;
         this.addAllBackendRoles = addAllBackendRoles;
         this.access = access;
@@ -85,7 +85,7 @@ public class MLCreateConnectorInput implements ToXContentObject, Writeable {
         String protocol = null;
         Map<String, String> parameters = new HashMap<>();
         Map<String, String> credential = new HashMap<>();
-        ConnectorAction connectorTemplate = null;
+        List<ConnectorAction> actions = null;
         List<String> backendRoles = null;
         Boolean addAllBackendRoles = null;
         AccessMode access = null;
@@ -115,7 +115,11 @@ public class MLCreateConnectorInput implements ToXContentObject, Writeable {
                     credential = parser.mapStrings();
                     break;
                 case CONNECTOR_ACTIONS_FIELD:
-                    connectorTemplate = ConnectorAction.parse(parser);
+                    actions = new ArrayList<>();
+                    ensureExpectedToken(XContentParser.Token.START_ARRAY, parser.currentToken(), parser);
+                    while (parser.nextToken() != XContentParser.Token.END_ARRAY) {
+                        actions.add(ConnectorAction.parse(parser));
+                    }
                     break;
                 case BACKEND_ROLES_FIELD:
                     ensureExpectedToken(XContentParser.Token.START_ARRAY, parser.currentToken(), parser);
@@ -135,7 +139,7 @@ public class MLCreateConnectorInput implements ToXContentObject, Writeable {
                     break;
             }
         }
-        return new MLCreateConnectorInput(name, description, version, protocol, parameters, credential, connectorTemplate, backendRoles, addAllBackendRoles, access);
+        return new MLCreateConnectorInput(name, description, version, protocol, parameters, credential, actions, backendRoles, addAllBackendRoles, access);
     }
 
     @Override
@@ -159,8 +163,8 @@ public class MLCreateConnectorInput implements ToXContentObject, Writeable {
         if (credential != null) {
             builder.field(CONNECTOR_CREDENTIAL_FIELD, credential);
         }
-        if (connectorAction != null) {
-            builder.field(CONNECTOR_ACTIONS_FIELD, connectorAction);
+        if (actions != null) {
+            builder.field(CONNECTOR_ACTIONS_FIELD, actions);
         }
         if (backendRoles != null) {
             builder.field(BACKEND_ROLES_FIELD, backendRoles);
@@ -193,9 +197,12 @@ public class MLCreateConnectorInput implements ToXContentObject, Writeable {
         } else {
             output.writeBoolean(false);
         }
-        if (connectorAction != null) {
+        if (actions != null) {
             output.writeBoolean(true);
-            connectorAction.writeTo(output);
+            output.writeInt(actions.size());
+            for (ConnectorAction action : actions) {
+                action.writeTo(output);
+            }
         } else {
             output.writeBoolean(false);
         }
@@ -228,7 +235,11 @@ public class MLCreateConnectorInput implements ToXContentObject, Writeable {
             credential = input.readMap(s -> s.readString(), s-> s.readString());
         }
         if (input.readBoolean()) {
-            this.connectorAction = new ConnectorAction(input);
+            actions = new ArrayList<>();
+            int size = input.readInt();
+            for (int i = 0; i < size; i++) {
+                actions.add(new ConnectorAction(input));
+            }
         }
         if (input.readBoolean()) {
             this.backendRoles = input.readList(StreamInput::readString);

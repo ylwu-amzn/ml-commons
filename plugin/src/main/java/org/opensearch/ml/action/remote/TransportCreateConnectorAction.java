@@ -92,14 +92,12 @@ public class TransportCreateConnectorAction extends HandledTransportAction<Actio
         }
         String connectorName = mlCreateConnectorInput.getName();
         try {
-            if (mlCreateConnectorInput.getConnectorAction() == null) {
-                throw new IllegalArgumentException("Invalid Connector template, Actions are missing");
-            }
-            User user = RestActionUtils.getUserContext(client);
             XContentBuilder builder = XContentFactory.contentBuilder(XContentType.JSON);
             mlCreateConnectorInput.toXContent(builder, ToXContent.EMPTY_PARAMS);
             Connector connector = Connector.createConnector(builder, mlCreateConnectorInput.getProtocol());
             connector.validateConnectorURL(trustedConnectorEndpointsRegex);
+
+            User user = RestActionUtils.getUserContext(client);
             if (connectorAccessControlHelper.accessControlNotEnabled(user)) {
                 validateSecurityDisabledOrConnectorAccessControlDisabled(mlCreateConnectorInput);
                 indexConnector(connector, listener);
