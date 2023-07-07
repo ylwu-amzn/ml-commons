@@ -6,7 +6,6 @@
 package org.opensearch.ml.common;
 
 import org.opensearch.ml.common.connector.AbstractConnector;
-import org.opensearch.ml.common.connector.template.DetachedConnector;
 
 import static org.opensearch.ml.common.model.MLModelConfig.ALL_CONFIG_FIELD;
 import static org.opensearch.ml.common.model.MLModelConfig.MODEL_TYPE_FIELD;

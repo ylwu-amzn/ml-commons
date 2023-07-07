@@ -8,7 +8,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.opensearch.ml.settings.MLCommonsSettings.ML_COMMONS_CONNECTOR_ACCESS_CONTROL_ENABLED;
 import static org.opensearch.ml.settings.MLCommonsSettings.ML_COMMONS_TRUSTED_CONNECTOR_ENDPOINTS_REGEX;
-import static org.opensearch.ml.settings.MLCommonsSettings.ML_COMMONS_TRUSTED_URL_REGEX;
 import static org.opensearch.ml.task.MLPredictTaskRunnerTests.USER_STRING;
 import static org.opensearch.ml.utils.TestHelper.clusterSetting;
 
@@ -118,7 +117,7 @@ public class TransportCreateConnectorActionTests extends OpenSearchTestCase {
         ConnectorTemplate template = mock(ConnectorTemplate.class);
         when(template.getPredictSchema()).thenReturn(mock(APISchema.class));
         when(template.getMetadataSchema()).thenReturn(mock(APISchema.class));
-        when(input.getConnectorTemplate()).thenReturn(template);
+        when(input.getConnectorAction()).thenReturn(template);
 
         APISchema predictSchema = new APISchema("POST", "https://${parameters.endpoint}/v1/completions", ImmutableMap.of(), null, null, null);
         APISchema metadataSchema = new APISchema("POST", "https://${parameters.endpoint}/v1/models/{model}", ImmutableMap.of(), null, null, null);
@@ -428,7 +427,7 @@ public class TransportCreateConnectorActionTests extends OpenSearchTestCase {
         ConnectorTemplate template = mock(ConnectorTemplate.class);
         when(template.getPredictSchema()).thenReturn(mock(APISchema.class));
         when(template.getMetadataSchema()).thenReturn(mock(APISchema.class));
-        when(mlCreateConnectorInput.getConnectorTemplate()).thenReturn(template);
+        when(mlCreateConnectorInput.getConnectorAction()).thenReturn(template);
 
         APISchema predictSchema = new APISchema("POST", "https://${parameters.endpoint}/v1/completions", ImmutableMap.of(), null, null, null);
         APISchema metadataSchema = new APISchema("POST", "https://${parameters.endpoint}/v1/models/{model}", ImmutableMap.of(), null, null, null);

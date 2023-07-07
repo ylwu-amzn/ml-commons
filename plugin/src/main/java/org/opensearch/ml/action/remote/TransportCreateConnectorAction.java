@@ -6,17 +6,9 @@
 package org.opensearch.ml.action.remote;
 
 import static org.opensearch.ml.common.CommonValue.ML_CONNECTOR_INDEX;
-import static org.opensearch.ml.common.utils.StringUtils.toJson;
 import static org.opensearch.ml.settings.MLCommonsSettings.ML_COMMONS_TRUSTED_CONNECTOR_ENDPOINTS_REGEX;
 
-import java.time.Instant;
 import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
-import org.apache.commons.text.StringSubstitutor;
 import org.opensearch.action.ActionListener;
 import org.opensearch.action.ActionRequest;
 import org.opensearch.action.index.IndexRequest;
@@ -30,20 +22,18 @@ import org.opensearch.common.inject.Inject;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.common.util.CollectionUtils;
 import org.opensearch.common.util.concurrent.ThreadContext;
+import org.opensearch.common.xcontent.XContentFactory;
 import org.opensearch.common.xcontent.XContentType;
 import org.opensearch.commons.authuser.User;
 import org.opensearch.core.xcontent.ToXContent;
 import org.opensearch.core.xcontent.XContentBuilder;
 import org.opensearch.ml.common.AccessMode;
 import org.opensearch.ml.common.connector.Connector;
-import org.opensearch.ml.common.connector.ConnectorAction;
 import org.opensearch.ml.common.connector.template.APISchema;
-import org.opensearch.ml.common.connector.template.DetachedConnector;
 import org.opensearch.ml.common.transport.connector.MLCreateConnectorAction;
 import org.opensearch.ml.common.transport.connector.MLCreateConnectorInput;
 import org.opensearch.ml.common.transport.connector.MLCreateConnectorRequest;
 import org.opensearch.ml.common.transport.connector.MLCreateConnectorResponse;
-import org.opensearch.ml.common.utils.StringUtils;
 import org.opensearch.ml.engine.MLEngine;
 import org.opensearch.ml.engine.exceptions.MetaDataException;
 import org.opensearch.ml.helper.ConnectorAccessControlHelper;
@@ -92,21 +82,26 @@ public class TransportCreateConnectorAction extends HandledTransportAction<Actio
     @Override
     protected void doExecute(Task task, ActionRequest request, ActionListener<MLCreateConnectorResponse> listener) {
         MLCreateConnectorRequest mlCreateConnectorRequest = MLCreateConnectorRequest.fromActionRequest(request);
-        Connector connector = mlCreateConnectorRequest.getConnector();
-        if (mlCreateConnectorRequest.isDryRun()) {
+        MLCreateConnectorInput mlCreateConnectorInput = mlCreateConnectorRequest.getMlCreateConnectorInput();
+        if (MLCreateConnectorInput.DRY_RUN_CONNECTOR_NAME.equals(mlCreateConnectorInput.getName())) {
             MLCreateConnectorResponse response = new MLCreateConnectorResponse(
                 MLCreateConnectorInput.DRY_RUN_CONNECTOR_NAME
             );
             listener.onResponse(response);
             return;
         }
-        String connectorName = connector.getName();
+        String connectorName = mlCreateConnectorInput.getName();
         try {
-            connector.validateConnectorURL(trustedConnectorEndpointsRegex);
+            if (mlCreateConnectorInput.getConnectorAction() == null) {
+                throw new IllegalArgumentException("Invalid Connector template, Actions are missing");
+            }
             User user = RestActionUtils.getUserContext(client);
-            Instant now = Instant.now();
+            XContentBuilder builder = XContentFactory.contentBuilder(XContentType.JSON);
+            mlCreateConnectorInput.toXContent(builder, ToXContent.EMPTY_PARAMS);
+            Connector connector = Connector.createConnector(builder, mlCreateConnectorInput.getProtocol());
+            connector.validateConnectorURL(trustedConnectorEndpointsRegex);
             if (connectorAccessControlHelper.accessControlNotEnabled(user)) {
-                validateSecurityDisabledOrConnectorAccessControlDisabled(mlCreateConnectorRequest);
+                validateSecurityDisabledOrConnectorAccessControlDisabled(mlCreateConnectorInput);
                 indexConnector(connector, listener);
             } else {
                 validateRequest4AccessControl(mlCreateConnectorInput, user);
@@ -197,8 +192,8 @@ public class TransportCreateConnectorAction extends HandledTransportAction<Actio
         }
     }
 
-    private void validateSecurityDisabledOrConnectorAccessControlDisabled(MLCreateConnectorRequest request) {
-        if (request.getConnector().getAccess() != null || request.isAddAllBackendRoles() || request.getConnector().getBackendRoles() != null) {
+    private void validateSecurityDisabledOrConnectorAccessControlDisabled(MLCreateConnectorInput input) {
+        if (input.getAccess() != null || input.getAddAllBackendRoles() != null || input.getBackendRoles() != null) {
             throw new IllegalArgumentException(
                 "You cannot specify connector access control parameters because the Security plugin or connector access control is disabled on your cluster."
             );

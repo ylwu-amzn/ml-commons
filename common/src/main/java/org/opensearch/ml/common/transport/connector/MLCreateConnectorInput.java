@@ -14,6 +14,7 @@ import org.opensearch.core.xcontent.ToXContentObject;
 import org.opensearch.core.xcontent.XContentBuilder;
 import org.opensearch.core.xcontent.XContentParser;
 import org.opensearch.ml.common.AccessMode;
+import org.opensearch.ml.common.connector.ConnectorAction;
 import org.opensearch.ml.common.connector.template.ConnectorTemplate;
 
 import java.io.IOException;
@@ -48,7 +49,7 @@ public class MLCreateConnectorInput implements ToXContentObject, Writeable {
     private String protocol;
     private Map<String, String> parameters;
     private Map<String, String> credential;
-    private ConnectorTemplate connectorTemplate;
+    private ConnectorAction connectorAction;
     private List<String> backendRoles;
     private Boolean addAllBackendRoles;
     private AccessMode access;
@@ -60,7 +61,7 @@ public class MLCreateConnectorInput implements ToXContentObject, Writeable {
                                   String protocol,
                                   Map<String, String> parameters,
                                   Map<String, String> credential,
-                                  ConnectorTemplate connectorTemplate,
+                                  ConnectorAction connectorAction,
                                   List<String> backendRoles,
                                   Boolean addAllBackendRoles,
                                   AccessMode access
@@ -71,7 +72,7 @@ public class MLCreateConnectorInput implements ToXContentObject, Writeable {
         this.protocol = protocol;
         this.parameters = parameters;
         this.credential = credential;
-        this.connectorTemplate = connectorTemplate;
+        this.connectorAction = connectorAction;
         this.backendRoles = backendRoles;
         this.addAllBackendRoles = addAllBackendRoles;
         this.access = access;
@@ -84,7 +85,7 @@ public class MLCreateConnectorInput implements ToXContentObject, Writeable {
         String protocol = null;
         Map<String, String> parameters = new HashMap<>();
         Map<String, String> credential = new HashMap<>();
-        ConnectorTemplate connectorTemplate = null;
+        ConnectorAction connectorTemplate = null;
         List<String> backendRoles = null;
         Boolean addAllBackendRoles = null;
         AccessMode access = null;
@@ -114,7 +115,7 @@ public class MLCreateConnectorInput implements ToXContentObject, Writeable {
                     credential = parser.mapStrings();
                     break;
                 case CONNECTOR_ACTIONS_FIELD:
-                    connectorTemplate = connectorTemplate.parse(parser);
+                    connectorTemplate = ConnectorAction.parse(parser);
                     break;
                 case BACKEND_ROLES_FIELD:
                     ensureExpectedToken(XContentParser.Token.START_ARRAY, parser.currentToken(), parser);
@@ -158,8 +159,8 @@ public class MLCreateConnectorInput implements ToXContentObject, Writeable {
         if (credential != null) {
             builder.field(CONNECTOR_CREDENTIAL_FIELD, credential);
         }
-        if (connectorTemplate != null) {
-            builder.field(CONNECTOR_ACTIONS_FIELD, connectorTemplate);
+        if (connectorAction != null) {
+            builder.field(CONNECTOR_ACTIONS_FIELD, connectorAction);
         }
         if (backendRoles != null) {
             builder.field(BACKEND_ROLES_FIELD, backendRoles);
@@ -192,9 +193,9 @@ public class MLCreateConnectorInput implements ToXContentObject, Writeable {
         } else {
             output.writeBoolean(false);
         }
-        if (connectorTemplate != null) {
+        if (connectorAction != null) {
             output.writeBoolean(true);
-            connectorTemplate.writeTo(output);
+            connectorAction.writeTo(output);
         } else {
             output.writeBoolean(false);
         }
@@ -227,7 +228,7 @@ public class MLCreateConnectorInput implements ToXContentObject, Writeable {
             credential = input.readMap(s -> s.readString(), s-> s.readString());
         }
         if (input.readBoolean()) {
-            this.connectorTemplate = new ConnectorTemplate(input);
+            this.connectorAction = new ConnectorAction(input);
         }
         if (input.readBoolean()) {
             this.backendRoles = input.readList(StreamInput::readString);
