@@ -13,6 +13,7 @@ import org.opensearch.common.io.stream.InputStreamStreamInput;
 import org.opensearch.common.io.stream.OutputStreamStreamOutput;
 import org.opensearch.common.io.stream.StreamInput;
 import org.opensearch.common.io.stream.StreamOutput;
+import org.opensearch.ml.common.connector.Connector;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -23,22 +24,34 @@ import static org.opensearch.action.ValidateActions.addValidationError;
 
 @Getter
 public class MLCreateConnectorRequest extends ActionRequest {
-    private MLCreateConnectorInput mlCreateConnectorInput;
+    private Connector connector;
+    private boolean dryRun;
+    private boolean addAllBackendRoles;
 
     @Builder
-    public MLCreateConnectorRequest(MLCreateConnectorInput mlCreateConnectorInput) {
-        this.mlCreateConnectorInput = mlCreateConnectorInput;
+    public MLCreateConnectorRequest(Connector connector, boolean dryRun, boolean addAllBackendRoles) {
+        this.connector = connector;
+        this.dryRun = dryRun;
+        this.addAllBackendRoles = addAllBackendRoles;
+    }
+
+    public MLCreateConnectorRequest(Connector connector) {
+        this.connector = connector;
+        this.dryRun = false;
+        this.addAllBackendRoles = false;
     }
 
     public MLCreateConnectorRequest(StreamInput in) throws IOException {
         super(in);
-        this.mlCreateConnectorInput = new MLCreateConnectorInput(in);
+        this.connector = Connector.fromStream(in);
+        this.dryRun = in.readBoolean();
+        this.addAllBackendRoles = in.readBoolean();
     }
 
     @Override
     public ActionRequestValidationException validate() {
         ActionRequestValidationException exception = null;
-        if (mlCreateConnectorInput == null) {
+        if (connector == null) {
             exception = addValidationError("ML Connector input can't be null", exception);
         }
 
@@ -48,7 +61,9 @@ public class MLCreateConnectorRequest extends ActionRequest {
     @Override
     public void writeTo(StreamOutput out) throws IOException {
         super.writeTo(out);
-        this.mlCreateConnectorInput.writeTo(out);
+        this.connector.writeTo(out);
+        out.writeBoolean(dryRun);
+        out.writeBoolean(addAllBackendRoles);
     }
 
     public static MLCreateConnectorRequest fromActionRequest(ActionRequest actionRequest) {

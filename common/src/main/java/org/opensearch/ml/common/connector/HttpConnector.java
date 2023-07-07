@@ -212,11 +212,6 @@ public class HttpConnector extends AbstractConnector {
         }
     }
 
-    public void removeCredential() {
-        this.credential = null;
-        this.decryptedCredential = null;
-    }
-
     public String getPredictHttpMethod() {
         return findPredictAction().get().getMethod();
     }

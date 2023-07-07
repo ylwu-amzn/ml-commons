@@ -5,13 +5,17 @@
 
 package org.opensearch.ml.common.connector;
 
+import org.apache.commons.text.StringSubstitutor;
+import org.opensearch.common.io.stream.StreamInput;
 import org.opensearch.common.io.stream.StreamOutput;
 import org.opensearch.common.io.stream.Writeable;
 import org.opensearch.common.xcontent.LoggingDeprecationHandler;
 import org.opensearch.common.xcontent.XContentType;
+import org.opensearch.commons.authuser.User;
 import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.core.xcontent.ToXContentObject;
 import org.opensearch.core.xcontent.XContentParser;
+import org.opensearch.ml.common.AccessMode;
 import org.opensearch.ml.common.MLCommonsClassLoader;
 import org.opensearch.ml.common.output.model.ModelTensor;
 
@@ -35,8 +39,12 @@ public interface Connector extends ToXContentObject, Writeable {
 
     String getName();
     String getProtocol();
-
+    User getOwner();
+    AccessMode getAccess();
+    List<String> getBackendRoles();
     Map<String, String> getParameters();
+
+    List<ConnectorAction> getActions();
     String getPredictEndpoint();
     String getPredictEndpoint(Map<String, String> parameters);
 
@@ -49,10 +57,10 @@ public interface Connector extends ToXContentObject, Writeable {
 
     Connector cloneConnector();
 
-    default void writeTo(StreamOutput out) throws IOException {
-        out.writeString(getProtocol());
-        out.writeOptionalString(getPredictEndpoint());
-    }
+    void removeCredential();
+
+    void writeTo(StreamOutput out) throws IOException;
+
 
     default <T> void parseResponse(T orElse, List<ModelTensor> modelTensors, boolean b) throws IOException {}
 
@@ -69,6 +77,12 @@ public interface Connector extends ToXContentObject, Writeable {
             String error = errorBuilder.substring(0, errorBuilder.length() - 2).toString();
             throw new IllegalArgumentException("Some parameter placeholder not filled in payload: " + error);
         }
+    }
+
+
+    static Connector fromStream(StreamInput in) throws IOException {
+        String connectorProtocol = in.readString();
+        return MLCommonsClassLoader.initConnector(connectorProtocol, new Object[]{in}, String.class, StreamInput.class);
     }
 
     static Connector createConnector(XContentParser parser) throws IOException {
@@ -89,5 +103,27 @@ public interface Connector extends ToXContentObject, Writeable {
             connector = MLCommonsClassLoader.initConnector(connectorProtocol, new Object[]{connectorProtocol, connectorParser}, String.class, XContentParser.class);
         }
         return connector;
+    }
+
+    default void validateConnectorURL(String urlRegex) {
+        if (getActions() == null) {
+            throw new IllegalArgumentException("No actions configured for this connector");
+        }
+        Map<String, String> parameters = getParameters();
+        List<ConnectorAction> actions = getActions();
+        StringSubstitutor substitutor = new StringSubstitutor(parameters, "${parameters.", "}");
+        Pattern pattern = Pattern.compile(urlRegex);
+        for (ConnectorAction action : actions) {
+            String url = substitutor.replace(action.getUrl());
+            Matcher matcher = pattern.matcher(url);
+            if (!matcher.matches()) {
+                throw new IllegalArgumentException(
+                        "Connector URL is not matching the trusted connector endpoint regex, regex is: "
+                                + urlRegex
+                                + ",URL is: "
+                                + url
+                );
+            }
+        }
     }
 }

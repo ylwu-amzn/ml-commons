@@ -6,14 +6,20 @@
 package org.opensearch.ml.rest;
 
 import static org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken;
+import static org.opensearch.ml.common.utils.StringUtils.getParameterMap;
 import static org.opensearch.ml.plugin.MachineLearningPlugin.ML_BASE_URI;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 import org.opensearch.client.node.NodeClient;
 import org.opensearch.core.xcontent.XContentParser;
+import org.opensearch.ml.common.connector.Connector;
+import org.opensearch.ml.common.connector.ConnectorAction;
 import org.opensearch.ml.common.transport.connector.MLCreateConnectorAction;
 import org.opensearch.ml.common.transport.connector.MLCreateConnectorInput;
 import org.opensearch.ml.common.transport.connector.MLCreateConnectorRequest;
@@ -61,7 +67,25 @@ public class RestMLCreateConnectorAction extends BaseRestHandler {
         }
         XContentParser parser = request.contentParser();
         ensureExpectedToken(XContentParser.Token.START_OBJECT, parser.nextToken(), parser);
-        MLCreateConnectorInput mlCreateConnectorInput = MLCreateConnectorInput.parse(parser);
-        return new MLCreateConnectorRequest(mlCreateConnectorInput);
+        Connector connector = null;
+        boolean addAllBackendRoles = false;
+        while (parser.nextToken() != XContentParser.Token.END_OBJECT) {
+            String fieldName = parser.currentName();
+            parser.nextToken();
+
+            switch (fieldName) {
+                case "connector":
+                    connector = Connector.createConnector(parser);
+                    break;
+                case "add_all_backend_roles":
+                    addAllBackendRoles = parser.booleanValue();
+                    break;
+                default:
+                    parser.skipChildren();
+                    break;
+            }
+        }
+
+        return new MLCreateConnectorRequest(connector, false, addAllBackendRoles);
     }
 }

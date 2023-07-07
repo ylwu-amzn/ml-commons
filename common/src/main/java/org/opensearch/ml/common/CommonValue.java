@@ -295,10 +295,10 @@ public class CommonValue {
             + "        }\n"
             + "    },\n"
             + "  \""
-            + DetachedConnector.CREATED_TIME_FIELD
+            + AbstractConnector.CREATED_TIME_FIELD
             + "\": {\"type\": \"date\", \"format\": \"strict_date_time||epoch_millis\"},\n"
             + "      \""
-            + DetachedConnector.LAST_UPDATED_TIME_FIELD
+            + AbstractConnector.LAST_UPDATED_TIME_FIELD
             + "\": {\"type\": \"date\", \"format\": \"strict_date_time||epoch_millis\"}\n"
             + "    }\n"
             + "}";
