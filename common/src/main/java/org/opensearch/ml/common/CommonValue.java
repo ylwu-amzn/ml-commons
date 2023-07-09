@@ -30,7 +30,8 @@ public class CommonValue {
 
     public static final String ML_MODEL_INDEX = ".plugins-ml-model";
     public static final String ML_TASK_INDEX = ".plugins-ml-task";
-    public static final Integer ML_MODEL_INDEX_SCHEMA_VERSION = 5;
+    public static final Integer ML_MODEL_INDEX_SCHEMA_VERSION = 4;
+//    public static final Integer ML_MODEL_INDEX_SCHEMA_VERSION = 5;
     public static final Integer ML_TASK_INDEX_SCHEMA_VERSION = 1;
     public static final String USER_FIELD_MAPPING = "      \""
             + CommonValue.USER
@@ -124,9 +125,9 @@ public class CommonValue {
             + "      \""
             + MLModel.LAST_UNDEPLOYED_TIME_FIELD
             + "\": {\"type\": \"date\", \"format\": \"strict_date_time||epoch_millis\"},\n"
-            + "      \""
-            + MLModel.CONNECTOR_FIELD
-            + "\": {\"type\": \"flat_object\"},\n"
+//            + "      \""
+//            + MLModel.CONNECTOR_FIELD
+//            + "\": {\"type\": \"flat_object\"},\n"
             + USER_FIELD_MAPPING
             + "    }\n"
             + "}";

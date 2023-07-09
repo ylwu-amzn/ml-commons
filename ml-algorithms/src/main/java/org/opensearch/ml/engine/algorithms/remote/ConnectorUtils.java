@@ -105,7 +105,7 @@ public class ConnectorUtils {
     }
 
     public static SdkHttpFullRequest signRequest(SdkHttpFullRequest request, String accessKey, String secretKey, String sessionToken, String signingName, String region) {
-        AwsCredentials credentials = sessionToken == null ? AwsBasicCredentials.create(accessKey, secretKey) : AwsSessionCredentials.create(accessKey, secretKey, sessionToken);
+        AwsCredentials credentials = sessionToken == null || sessionToken.trim().length() == 0 ? AwsBasicCredentials.create(accessKey, secretKey) : AwsSessionCredentials.create(accessKey, secretKey, sessionToken);
 
         Aws4SignerParams params = Aws4SignerParams.builder()
                 .awsCredentials(credentials)
