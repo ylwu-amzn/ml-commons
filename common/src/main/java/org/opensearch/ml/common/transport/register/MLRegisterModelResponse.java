@@ -19,6 +19,7 @@ import java.io.IOException;
 public class MLRegisterModelResponse extends ActionResponse implements ToXContentObject {
     public static final String TASK_ID_FIELD = "task_id";
     public static final String STATUS_FIELD = "status";
+    //TODO: return model id when register remote model
 
     private String taskId;
     private String status;

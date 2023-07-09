@@ -15,6 +15,7 @@ import static org.opensearch.ml.common.CommonValue.ML_TASK_INDEX;
 import static org.opensearch.ml.common.CommonValue.ML_TASK_INDEX_MAPPING;
 import static org.opensearch.ml.common.CommonValue.ML_TASK_INDEX_SCHEMA_VERSION;
 
+//TODO: Xun PR
 public enum MLIndex {
     MODEL_GROUP(ML_MODEL_GROUP_INDEX, false, ML_MODEL_GROUP_INDEX_MAPPING, ML_MODEL_GROUP_INDEX_SCHEMA_VERSION),
     MODEL(ML_MODEL_INDEX, false, ML_MODEL_INDEX_MAPPING, ML_MODEL_INDEX_SCHEMA_VERSION),
