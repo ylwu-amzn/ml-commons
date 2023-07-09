@@ -108,7 +108,11 @@ public class MLModelAutoReDeployer {
 
     private void undeployModelsOnDataNodes() {
         List<String> dataNodeIds = new ArrayList<>();
-        clusterService.state().nodes().getDataNodes().values().iterator().forEachRemaining(x -> { dataNodeIds.add(x.getId()); });
+        // TODO: comment out this line to unblock local build,
+        // Seems OS core has breaking change. Local build throws such error
+        /// » java.lang.NoSuchMethodError: 'java.util.Map org.opensearch.cluster.node.DiscoveryNodes.getDataNodes()'
+        // » at org.opensearch.ml.autoredeploy.MLModelAutoReDeployer.undeployModelsOnDataNodes(MLModelAutoReDeployer.java:111)
+        // clusterService.state().nodes().getDataNodes().values().iterator().forEachRemaining(x -> { dataNodeIds.add(x.getId()); });
         if (dataNodeIds.size() > 0)
             triggerUndeployModelsOnDataNodes(dataNodeIds);
     }
