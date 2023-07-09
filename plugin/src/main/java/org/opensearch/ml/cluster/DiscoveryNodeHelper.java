@@ -19,8 +19,8 @@ import org.opensearch.cluster.ClusterState;
 import org.opensearch.cluster.node.DiscoveryNode;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.settings.Settings;
-import org.opensearch.ml.common.utils.Strings;
 import org.opensearch.ml.common.CommonValue;
+import org.opensearch.ml.common.utils.Strings;
 import org.opensearch.ml.utils.MLNodeUtils;
 
 import lombok.extern.log4j.Log4j2;
