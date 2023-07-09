@@ -32,7 +32,7 @@ import org.opensearch.action.search.ShardSearchFailure;
 import org.opensearch.client.node.NodeClient;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.common.xcontent.XContentFactory;
-import org.opensearch.core.common.Strings;
+import org.opensearch.ml.common.utils.Strings;
 import org.opensearch.core.xcontent.XContentBuilder;
 import org.opensearch.ml.common.transport.model_group.MLModelGroupSearchAction;
 import org.opensearch.ml.utils.TestHelper;

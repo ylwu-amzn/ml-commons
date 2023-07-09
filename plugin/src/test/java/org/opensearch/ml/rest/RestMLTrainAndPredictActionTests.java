@@ -23,7 +23,7 @@ import org.mockito.MockitoAnnotations;
 import org.opensearch.action.ActionListener;
 import org.opensearch.client.node.NodeClient;
 import org.opensearch.common.settings.Settings;
-import org.opensearch.core.common.Strings;
+import org.opensearch.ml.common.utils.Strings;
 import org.opensearch.ml.common.MLTaskState;
 import org.opensearch.ml.common.input.MLInput;
 import org.opensearch.ml.common.output.MLTrainingOutput;
