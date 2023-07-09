@@ -40,7 +40,7 @@ import org.opensearch.ml.common.MLTaskType;
 import org.opensearch.ml.common.exception.MLException;
 import org.opensearch.ml.common.exception.MLLimitExceededException;
 import org.opensearch.ml.common.exception.MLResourceNotFoundException;
-import org.opensearch.ml.common.utils.StringUtils;
+import org.opensearch.ml.common.utils.Strings;
 import org.opensearch.ml.indices.MLIndicesHandler;
 import org.opensearch.rest.RestStatus;
 import org.opensearch.threadpool.ThreadPool;
@@ -193,7 +193,7 @@ public class MLTaskManager {
      * @return an array of all the keys in the taskCaches
      */
     public String[] getAllTaskIds() {
-        return StringUtils.toStringArray(taskCaches.keySet());
+        return Strings.toStringArray(taskCaches.keySet());
     }
 
     /**
