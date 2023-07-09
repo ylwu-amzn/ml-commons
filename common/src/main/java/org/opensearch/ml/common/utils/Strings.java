@@ -30,9 +30,8 @@ import java.util.function.Supplier;
  * »       at org.opensearch.ml.cluster.DiscoveryNodeHelper.<init>(DiscoveryNodeHelper.java:40)
  * »       at org.opensearch.ml.plugin.MachineLearningPlugin.createComponents(MachineLearningPlugin.java:264)
  * </p>
- * We copy the class org.opensearch.core.common.Strings here to unblock our local
- * build.
- * //TODO: change to OS core Strings class when local build can pass.
+ * We copy the class org.opensearch.core.common.Strings here to unblock our local build.
+ * TODO: change to OS core Strings class when local build can pass.
  */
 public class Strings {
     public static final String UNKNOWN_UUID_VALUE = "_na_";
