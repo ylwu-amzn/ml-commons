@@ -274,16 +274,20 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin {
         this.clusterService = clusterService;
         this.xContentRegistry = xContentRegistry;
         Settings settings = environment.settings();
-        Path path = environment.dataFiles()[0];
+        Path dataPath = environment.dataFiles()[0];
+        Path configFile = environment.configFile();
+        System.out.println("----------------ylwwwdebug");
+        System.out.println(configFile);
+        System.out.println("----------------ylwwwdebugend");
 
-        mlEngine = new MLEngine(path);
+        mlEngine = new MLEngine(dataPath, configFile);
         nodeHelper = new DiscoveryNodeHelper(clusterService, settings);
         modelCacheHelper = new MLModelCacheHelper(clusterService, settings);
 
         JvmService jvmService = new JvmService(environment.settings());
         OsService osService = new OsService(environment.settings());
         MLCircuitBreakerService mlCircuitBreakerService = new MLCircuitBreakerService(jvmService, osService, settings, clusterService)
-            .init(path);
+            .init(dataPath);
 
         Map<Enum, MLStat<?>> stats = new ConcurrentHashMap<>();
         // cluster level stats

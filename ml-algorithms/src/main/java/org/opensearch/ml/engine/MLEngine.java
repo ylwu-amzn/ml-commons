@@ -24,7 +24,10 @@ import org.opensearch.ml.common.output.MLOutput;
 import org.opensearch.ml.common.output.Output;
 import org.opensearch.ml.engine.encryptor.Encryptor;
 import org.opensearch.ml.engine.encryptor.EncryptorImpl;
+import org.yaml.snakeyaml.DumperOptions;
+import org.yaml.snakeyaml.Yaml;
 
+import java.io.FileInputStream;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.nio.file.Files;
@@ -47,23 +50,26 @@ public class MLEngine {
     public static final String DEPLOY_MODEL_FOLDER = "deploy";
     private final String MODEL_REPO = "https://artifacts.opensearch.org/models/ml-models";
 
+    private final Path mlUserConfigPath;
+    @Getter
+    private final Path mlConfigPath;
+
     @Getter
     private final Path mlCachePath;
     private final Path mlModelsCachePath;
 
     private Encryptor encryptor;
 
-    private final Gson gson;
-
-    public MLEngine(Path opensearchDataFolder) {
-        gson = new GsonBuilder().setPrettyPrinting().create();
+    public MLEngine(Path opensearchDataFolder, Path opensearchConfigFolder) {
         mlCachePath = opensearchDataFolder.resolve("ml_cache");
         mlModelsCachePath = mlCachePath.resolve("models_cache");
+        mlUserConfigPath = opensearchConfigFolder.resolve("opensearch-ml");
+        mlConfigPath = mlCachePath.resolve("config");
         initMasterKey();
     }
 
 
-    private String generateMasterKey() {
+    public String generateMasterKey() {
         byte[] keyBytes = new byte[16];
         new SecureRandom().nextBytes(keyBytes);
         String base64Key = Base64.getEncoder().encodeToString(keyBytes);
@@ -73,27 +79,39 @@ public class MLEngine {
     private synchronized void initMasterKey() {
         try {
             AccessController.doPrivileged((PrivilegedExceptionAction<Void>) () -> {
-                Path configFilePath = mlCachePath.resolve("security_config.json");
+                Path userConfigFilePath = mlUserConfigPath.resolve("security_config.json");
+                Path configFilePath = mlConfigPath.resolve("security_config.yml");
                 Map<String, String> config = null;
-                if (Files.exists(configFilePath)) {
-                    try (JsonReader reader = new JsonReader(new FileReader(configFilePath.toFile()))) {
-                        config = gson.fromJson(reader, Map.class);
+                if (Files.exists(userConfigFilePath)) {
+                    try (FileInputStream fis = new FileInputStream(userConfigFilePath.toFile());) {
+                        Yaml yaml = new Yaml();
+                        config = yaml.load(fis);
+                    }
+                }
+                if ((config == null || !config.containsKey("master_key")) && Files.exists(configFilePath)) {
+                    try (FileInputStream fis = new FileInputStream(configFilePath.toFile());) {
+                        Yaml yaml = new Yaml();
+                        config = yaml.load(fis);
                     }
                 }
                 if (config == null) {
                     config = new HashMap<>();
                 }
 
-                Files.createDirectories(mlCachePath);
                 if (!config.containsKey("master_key")) {
+                    Files.createDirectories(mlConfigPath);
                     String masterKey = generateMasterKey();
                     config.put("master_key", masterKey);
                     try (FileWriter writer = new FileWriter(configFilePath.toFile())) {
-                        String json = gson.toJson(config);
-                        writer.write(json);
+                        DumperOptions dumperOptions = new DumperOptions();
+                        dumperOptions.setIndent(2);
+                        dumperOptions.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
+                        Yaml yaml = new Yaml(dumperOptions);
+                        yaml.dump(config, writer);
                         log.info("ml-commons master key initialized successfully");
                         encryptor = new EncryptorImpl(masterKey);
                     }
+                    log.info("------------------ylwudeeebug: file created: " + configFilePath);
                 } else {
                     encryptor = new EncryptorImpl(config.get("master_key"));
                 }
