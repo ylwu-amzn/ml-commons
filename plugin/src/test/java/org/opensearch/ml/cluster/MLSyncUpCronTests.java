@@ -51,12 +51,14 @@ import org.opensearch.action.update.UpdateRequest;
 import org.opensearch.client.Client;
 import org.opensearch.cluster.ClusterName;
 import org.opensearch.cluster.ClusterState;
+import org.opensearch.cluster.metadata.IndexMetadata;
 import org.opensearch.cluster.metadata.Metadata;
 import org.opensearch.cluster.node.DiscoveryNode;
 import org.opensearch.cluster.node.DiscoveryNodeRole;
 import org.opensearch.cluster.node.DiscoveryNodes;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.bytes.BytesReference;
+import org.opensearch.common.collect.ImmutableOpenMap;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.common.transport.TransportAddress;
 import org.opensearch.common.util.concurrent.ThreadContext;
@@ -173,7 +175,7 @@ public class MLSyncUpCronTests extends OpenSearchTestCase {
     }
 
     public void testRun_NoMLModelIndex() {
-        Metadata metadata = new Metadata.Builder().indices(Map.of()).build();
+        Metadata metadata = new Metadata.Builder().indices(ImmutableOpenMap.<String, IndexMetadata>builder().build()).build();
         DiscoveryNode node = new DiscoveryNode(
             "node",
             new TransportAddress(TransportAddress.META_ADDRESS, new AtomicInteger().incrementAndGet()),
@@ -189,7 +191,7 @@ public class MLSyncUpCronTests extends OpenSearchTestCase {
             null,
             DiscoveryNodes.builder().add(node).build(),
             null,
-            Map.of(),
+            null,
             0,
             false
         );

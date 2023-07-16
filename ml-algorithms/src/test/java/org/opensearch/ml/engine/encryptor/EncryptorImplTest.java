@@ -17,6 +17,7 @@ import org.opensearch.cluster.ClusterState;
 import org.opensearch.cluster.metadata.IndexMetadata;
 import org.opensearch.cluster.metadata.Metadata;
 import org.opensearch.cluster.service.ClusterService;
+import org.opensearch.common.collect.ImmutableOpenMap;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.common.util.concurrent.ThreadContext;
 import org.opensearch.commons.ConfigConstants;
@@ -70,9 +71,9 @@ public class EncryptorImplTest {
         when(clusterService.state()).thenReturn(clusterState);
 
         Metadata metadata = new Metadata.Builder()
-                .indices(ImmutableMap
+                .indices(ImmutableOpenMap
                         .<String, IndexMetadata>builder()
-                        .put(ML_CONFIG_INDEX, IndexMetadata.builder(ML_CONFIG_INDEX)
+                        .fPut(ML_CONFIG_INDEX, IndexMetadata.builder(ML_CONFIG_INDEX)
                                 .settings(Settings.builder()
                                         .put("index.number_of_shards", 1)
                                         .put("index.number_of_replicas", 1)
@@ -157,7 +158,7 @@ public class EncryptorImplTest {
         exceptionRule.expect(ResourceNotFoundException.class);
         exceptionRule.expectMessage("ML encryption master key not initialized yet");
 
-        Metadata metadata = new Metadata.Builder().indices(ImmutableMap.of()).build();
+        Metadata metadata = new Metadata.Builder().indices(ImmutableOpenMap.of()).build();
         when(clusterState.metadata()).thenReturn(metadata);
 
         doAnswer(invocation -> {

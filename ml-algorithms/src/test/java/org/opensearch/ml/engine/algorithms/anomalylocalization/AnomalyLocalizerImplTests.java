@@ -38,6 +38,7 @@ import org.opensearch.cluster.node.DiscoveryNode;
 import org.opensearch.cluster.node.DiscoveryNodeRole;
 import org.opensearch.cluster.node.DiscoveryNodes;
 import org.opensearch.cluster.service.ClusterService;
+import org.opensearch.common.collect.ImmutableOpenMap;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.common.transport.TransportAddress;
 import org.opensearch.index.IndexNotFoundException;
@@ -439,9 +440,9 @@ public class AnomalyLocalizerImplTests {
                 new HashMap<>(), roleSet,
                 Version.CURRENT);
         Metadata metadata = new Metadata.Builder()
-                .indices(ImmutableMap
+                .indices(ImmutableOpenMap
                         .<String, IndexMetadata>builder()
-                        .put(indexName, IndexMetadata.builder("test")
+                        .fPut(indexName, IndexMetadata.builder("test")
                                 .settings(Settings.builder()
                                         .put("index.number_of_shards", 1)
                                         .put("index.number_of_replicas", 1)
@@ -450,7 +451,7 @@ public class AnomalyLocalizerImplTests {
                         .build()).build();
         return new ClusterState(new ClusterName(clusterName), 123l, "111111",
                 metadata, null, DiscoveryNodes.builder().add(node).build(),
-                null, Map.of(), 0, false);
+                null, null, 0, false);
     }
 }
 
