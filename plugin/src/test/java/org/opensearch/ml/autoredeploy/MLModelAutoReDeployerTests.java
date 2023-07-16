@@ -37,6 +37,7 @@ import org.opensearch.cluster.node.DiscoveryNode;
 import org.opensearch.cluster.node.DiscoveryNodes;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.bytes.BytesReference;
+import org.opensearch.common.collect.ImmutableOpenMap;
 import org.opensearch.common.settings.ClusterSettings;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.common.transport.TransportAddress;
@@ -353,7 +354,7 @@ public class MLModelAutoReDeployerTests extends OpenSearchTestCase {
         DiscoveryNodes discoveryNodes = mock(DiscoveryNodes.class);
         DiscoveryNode dataNode = mock(DiscoveryNode.class);
         when(dataNode.getId()).thenReturn("mockDataNodeId");
-        final Map<String, DiscoveryNode> dataNodes = Map.of("0", dataNode);
+        ImmutableOpenMap<String, DiscoveryNode> dataNodes = ImmutableOpenMap.<String, DiscoveryNode>builder().fPut("0", dataNode).build();
         when(discoveryNodes.getDataNodes()).thenReturn(dataNodes);
         when(clusterState.nodes()).thenReturn(discoveryNodes);
 
@@ -396,7 +397,7 @@ public class MLModelAutoReDeployerTests extends OpenSearchTestCase {
         DiscoveryNodes discoveryNodes = mock(DiscoveryNodes.class);
         DiscoveryNode dataNode = mock(DiscoveryNode.class);
         when(dataNode.getId()).thenReturn("mockDataNodeId");
-        final Map<String, DiscoveryNode> dataNodes = Map.of("0", dataNode);
+        ImmutableOpenMap<String, DiscoveryNode> dataNodes = ImmutableOpenMap.<String, DiscoveryNode>builder().fPut("0", dataNode).build();
         when(discoveryNodes.getDataNodes()).thenReturn(dataNodes);
         when(clusterState.nodes()).thenReturn(discoveryNodes);
 
@@ -438,7 +439,7 @@ public class MLModelAutoReDeployerTests extends OpenSearchTestCase {
         DiscoveryNodes discoveryNodes = mock(DiscoveryNodes.class);
         DiscoveryNode dataNode = mock(DiscoveryNode.class);
         when(dataNode.getId()).thenReturn("mockDataNodeId");
-        final Map<String, DiscoveryNode> dataNodes = Map.of("0", dataNode);
+        ImmutableOpenMap<String, DiscoveryNode> dataNodes = ImmutableOpenMap.<String, DiscoveryNode>builder().fPut("0", dataNode).build();
         when(discoveryNodes.getDataNodes()).thenReturn(dataNodes);
         when(clusterState.nodes()).thenReturn(discoveryNodes);
 
@@ -495,7 +496,7 @@ public class MLModelAutoReDeployerTests extends OpenSearchTestCase {
         DiscoveryNodes discoveryNodes = mock(DiscoveryNodes.class);
         DiscoveryNode dataNode = mock(DiscoveryNode.class);
         when(dataNode.getId()).thenReturn("mockDataNodeId");
-        final Map<String, DiscoveryNode> dataNodes = Map.of("0", dataNode);
+        ImmutableOpenMap<String, DiscoveryNode> dataNodes = ImmutableOpenMap.<String, DiscoveryNode>builder().fPut("0", dataNode).build();
         when(discoveryNodes.getDataNodes()).thenReturn(dataNodes);
         when(clusterState.nodes()).thenReturn(discoveryNodes);
 
@@ -632,7 +633,10 @@ public class MLModelAutoReDeployerTests extends OpenSearchTestCase {
     private void mockClusterDataNodes(ClusterService clusterService) {
         ClusterState clusterState = mock(ClusterState.class);
         DiscoveryNodes discoveryNodes = mock(DiscoveryNodes.class);
-        final Map<String, DiscoveryNode> dataNodes = Map.of("dataNodeId", mock(DiscoveryNode.class));
+        ImmutableOpenMap<String, DiscoveryNode> dataNodes = ImmutableOpenMap
+                .<String, DiscoveryNode>builder(1)
+                .fPut("dataNodeId", mock(DiscoveryNode.class))
+                .build();
         when(discoveryNodes.getDataNodes()).thenReturn(dataNodes);
         when(discoveryNodes.getSize()).thenReturn(2); // a ml node join cluster.
         when(clusterState.nodes()).thenReturn(discoveryNodes);
