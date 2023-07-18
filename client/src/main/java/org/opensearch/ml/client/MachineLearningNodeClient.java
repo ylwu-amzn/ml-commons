@@ -193,22 +193,11 @@ public class MachineLearningNodeClient implements MachineLearningClient {
     /**
      * Get ToolMetadata and return a list of ToolMetadata in listener
      * For more info on get tools, refer: https://opensearch.org/docs/latest/ml-commons-plugin/api/#get-tools
-     *
-     * @param externalTools a map of external tools
      * @param listener      action listener
      */
     @Override
-    public void getTools(Map<String, Tool> externalTools, ActionListener<List<ToolMetadata>> listener) {
-        List<ToolMetadata> toolMetadataList = new ArrayList<>();
-        for (String key : externalTools.keySet()) {
-            toolMetadataList.add(ToolMetadata.builder().
-                    name(key).
-                    description(externalTools.get(key).getDescription()).
-                    build());
-        }
-        MLToolsGetRequest mlToolsGetRequest = MLToolsGetRequest.builder()
-                .externalTools(toolMetadataList)
-                .build();
+    public void getTools(ActionListener<List<ToolMetadata>> listener) {
+        MLToolsGetRequest mlToolsGetRequest = MLToolsGetRequest.builder().build();
 
         client.execute(MLGetToolsAction.INSTANCE, mlToolsGetRequest, getMlGetToolsResponseActionListener(listener));
     }

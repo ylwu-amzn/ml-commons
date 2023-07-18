@@ -231,20 +231,18 @@ public interface MachineLearningClient {
     /**
      * Get ToolMetadata and return ActionFuture.
      * For more info on get model, refer: https://opensearch.org/docs/latest/ml-commons-plugin/api/#get-tools
-     * @param externalTools a map of external tools
      * @return ActionFuture of ml model
      */
-    default ActionFuture<List<ToolMetadata>> getTools(Map<String, Tool> externalTools) {
+    default ActionFuture<List<ToolMetadata>> getTools() {
         PlainActionFuture<List<ToolMetadata>> actionFuture = PlainActionFuture.newFuture();
-        getTools(externalTools, actionFuture);
+        getTools(actionFuture);
         return actionFuture;
     }
 
     /**
      * Get ToolMetadata and return ToolMetadata in listener
      * For more info on get tools, refer: https://opensearch.org/docs/latest/ml-commons-plugin/api/#get-tools
-     * @param externalTools a map of external tools
      * @param listener action listener
      */
-    void getTools(Map<String, Tool> externalTools, ActionListener<List<ToolMetadata>> listener);
+    void getTools(ActionListener<List<ToolMetadata>> listener);
 }

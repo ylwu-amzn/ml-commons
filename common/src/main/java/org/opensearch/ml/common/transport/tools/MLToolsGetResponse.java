@@ -37,13 +37,13 @@ public class MLToolsGetResponse extends ActionResponse implements ToXContentObje
     }
 
     @Override
-    public XContentBuilder toXContent(XContentBuilder builder, ToXContent.Params params) throws IOException {
-        builder.startObject();
+    public XContentBuilder toXContent(XContentBuilder xContentBuilder, ToXContent.Params params) throws IOException {
+        xContentBuilder.startObject();
         for (ToolMetadata toolMetadata : toolMetadataList) {
-            builder.field(toolMetadata.getName(), toolMetadata.getDescription());
+            xContentBuilder.field(toolMetadata.getName(), toolMetadata.getDescription());
         }
-        builder.endObject();
-        return builder;
+        xContentBuilder.endObject();
+        return xContentBuilder;
     }
 
     public static MLToolsGetResponse fromActionResponse(ActionResponse actionResponse) {

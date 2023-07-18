@@ -13,9 +13,11 @@ import org.opensearch.rest.action.RestToXContentListener;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 import static org.opensearch.ml.plugin.MachineLearningPlugin.ML_BASE_URI;
+import static org.opensearch.ml.utils.RestActionUtils.PARAMETER_MODEL_ID;
 
 public class RestMLGetToolsAction extends BaseRestHandler {
     private static final String ML_GET_MODEL_ACTION = "ml_get_tools_action";
@@ -33,7 +35,8 @@ public class RestMLGetToolsAction extends BaseRestHandler {
 
     @Override
     public List<Route> routes() {
-        return ImmutableList.of(new Route(RestRequest.Method.GET, ML_BASE_URI + "/{nodeId}/tools/"));
+        return ImmutableList
+                .of(new Route(RestRequest.Method.GET, String.format(Locale.ROOT, "%s/tools", ML_BASE_URI)));
     }
 
     /**
