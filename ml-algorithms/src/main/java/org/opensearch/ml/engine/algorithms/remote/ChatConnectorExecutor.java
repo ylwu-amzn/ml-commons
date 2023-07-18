@@ -10,6 +10,7 @@ import com.jayway.jsonpath.JsonPath;
 import com.jayway.jsonpath.PathNotFoundException;
 import lombok.Setter;
 import lombok.extern.log4j.Log4j2;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.http.HttpEntity;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
@@ -54,10 +55,12 @@ import org.opensearch.search.sort.SortOrder;
 import software.amazon.awssdk.core.internal.http.loader.DefaultSdkHttpClientBuilder;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.http.AbortableInputStream;
+import software.amazon.awssdk.http.ExecutableHttpRequest;
 import software.amazon.awssdk.http.HttpExecuteRequest;
 import software.amazon.awssdk.http.HttpExecuteResponse;
 import software.amazon.awssdk.http.SdkHttpClient;
 import software.amazon.awssdk.http.SdkHttpFullRequest;
+import software.amazon.awssdk.http.apache.ApacheHttpClient;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -66,6 +69,7 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.security.AccessController;
 import java.security.PrivilegedExceptionAction;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -74,6 +78,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicReference;
@@ -83,6 +88,9 @@ import static org.opensearch.ml.common.connector.ConnectorNames.CHAT_V1;
 import static org.opensearch.ml.common.connector.ChatConnector.CONTENT_DOC_SIZE_FIELD;
 import static org.opensearch.ml.common.connector.ChatConnector.CONTENT_FIELD_FIELD;
 import static org.opensearch.ml.common.connector.ChatConnector.SESSION_SIZE_FIELD;
+import static org.opensearch.ml.engine.algorithms.remote.Agent.CHAT_HISTORY;
+import static org.opensearch.ml.engine.algorithms.remote.Agent.CONTEXT;
+import static org.opensearch.ml.engine.algorithms.remote.Agent.QUESTION;
 import static org.opensearch.ml.engine.algorithms.remote.ConnectorUtils.processOutput;
 import static org.opensearch.ml.engine.algorithms.remote.ConnectorUtils.signRequest;
 import static org.opensearch.ml.engine.algorithms.remote.PromptTemplate.AGENT_TEMPLATE_WITH_CONTEXT;
@@ -178,7 +186,8 @@ public class ChatConnectorExecutor implements RemoteConnectorExecutor{
                             SearchHit hit = hits[i];
                             Map<String, Object> sourceAsMap = hit.getSourceAsMap();
                             String context = (String) sourceAsMap.get(connector.getContentFields());
-                            contextBuilder.append("document_id: ").append(hit.getId()).append("\\\\nDocument context:").append(context).append("\\\\n");
+                            //TODO: change this to json?
+                            contextBuilder.append("document_id: ").append(hit.getId()).append("\\\\nDocument content:").append(context).append("\\\\n");
                         }
                         knowledgeBaseRef.set("\n\nContext: \n" + gson.toJson( contextBuilder) + "\n\n");
                     }
@@ -236,13 +245,30 @@ public class ChatConnectorExecutor implements RemoteConnectorExecutor{
 
                         if (hits != null && hits.length > 0) {
                             StringBuilder contextBuilder = new StringBuilder();
+                            String chatHistoryPrefix = Optional.ofNullable(parameters.get("session_history.prefix")).orElse("\nThis is the chat history defined in <chat_history>: \n<chat_history>\n");
+                            String chatHistorySuffix = Optional.ofNullable(parameters.get("session_history.suffix")).orElse("</chat_history>\n");
+                            String chatMessagePrefix = Optional.ofNullable(parameters.get("session_history.message.prefix")).orElse("<message>\n");
+                            String chatMessageSuffix = Optional.ofNullable(parameters.get("session_history.message.suffix")).orElse("\n</message>\n");
+                            String chatMessageQuestionPrefix = Optional.ofNullable(parameters.get("session_history.message.question.suffix")).orElse("<question>\n");// "H: <question>"
+                            String chatMessageQuestionSuffix = Optional.ofNullable(parameters.get("session_history.message.question.suffix")).orElse("\n</question>\n");
+                            String chatMessageAnswerPrefix = Optional.ofNullable(parameters.get("session_history.message.answer.suffix")).orElse("<answer>\n");// "A: <answer>"
+                            String chatMessageAnswerSuffix = Optional.ofNullable(parameters.get("session_history.message.answer.suffix")).orElse("\n</answer>\n");
+                            contextBuilder.append(chatHistoryPrefix);
                             for (int i = hits.length - 1; i >= 0; i--) {
                                 SearchHit hit = hits[i];
                                 String historicalQuestion = (String) hit.getSourceAsMap().get("question");
                                 String historicalAnswer = (String) hit.getSourceAsMap().get("answer");
-                                contextBuilder.append("Human: ").append(historicalQuestion).append("\nAI:").append(historicalAnswer).append("\n");
+                                contextBuilder.append(chatMessagePrefix)
+                                        .append(chatMessageQuestionPrefix)
+                                        .append(historicalQuestion)
+                                        .append(chatMessageQuestionSuffix)
+                                        .append(chatMessageAnswerPrefix)
+                                        .append(historicalAnswer)
+                                        .append(chatMessageAnswerSuffix)
+                                        .append(chatMessageSuffix);
                             }
-                            chatHistoryRef.set("\n\nChat history between human and AI: \n" + gson.toJson(contextBuilder.toString()));
+                            contextBuilder.append(chatHistorySuffix);
+                            chatHistoryRef.set(contextBuilder.toString());
                         }
                     }, e -> {
                         log.error("Failed to search index", e);
@@ -286,13 +312,30 @@ public class ChatConnectorExecutor implements RemoteConnectorExecutor{
 
                         if (hits != null && hits.length > 0) {
                             StringBuilder contextBuilder = new StringBuilder();
+                            String chatHistoryPrefix = Optional.ofNullable(parameters.get("session_history.prefix")).orElse("\nThis is the chat history defined in <chat_history>: \n<chat_history>\n");
+                            String chatHistorySuffix = Optional.ofNullable(parameters.get("session_history.suffix")).orElse("</chat_history>\n");
+                            String chatMessagePrefix = Optional.ofNullable(parameters.get("session_history.message.prefix")).orElse("<message>\n");
+                            String chatMessageSuffix = Optional.ofNullable(parameters.get("session_history.message.suffix")).orElse("\n</message>\n");
+                            String chatMessageQuestionPrefix = Optional.ofNullable(parameters.get("session_history.message.question.suffix")).orElse("<question>\n");// "H: <question>"
+                            String chatMessageQuestionSuffix = Optional.ofNullable(parameters.get("session_history.message.question.suffix")).orElse("\n</question>\n");
+                            String chatMessageAnswerPrefix = Optional.ofNullable(parameters.get("session_history.message.answer.suffix")).orElse("<answer>\n");// "A: <answer>"
+                            String chatMessageAnswerSuffix = Optional.ofNullable(parameters.get("session_history.message.answer.suffix")).orElse("\n</answer>\n");
+                            contextBuilder.append(chatHistoryPrefix);
                             for (int i = hits.length - 1; i >= 0; i--) {
                                 SearchHit hit = hits[i];
                                 String historicalQuestion = (String) hit.getSourceAsMap().get("question");
                                 String historicalAnswer = (String) hit.getSourceAsMap().get("answer");
-                                contextBuilder.append("Human: ").append(historicalQuestion).append("\nAI:").append(historicalAnswer).append("\n");
+                                contextBuilder.append(chatMessagePrefix)
+                                        .append(chatMessageQuestionPrefix)
+                                        .append(historicalQuestion)
+                                        .append(chatMessageQuestionSuffix)
+                                        .append(chatMessageAnswerPrefix)
+                                        .append(historicalAnswer)
+                                        .append(chatMessageAnswerSuffix)
+                                        .append(chatMessageSuffix);
                             }
-                            chatHistoryRef.set("\n\nChat history between human and AI: \n" + gson.toJson(contextBuilder.toString()));
+                            contextBuilder.append(chatHistorySuffix);
+                            chatHistoryRef.set(contextBuilder.toString());
                         }
                     }, e -> {
                         log.error("Failed to search index", e);
@@ -320,9 +363,9 @@ public class ChatConnectorExecutor implements RemoteConnectorExecutor{
 
         Map<String, String> newParameters = new HashMap<>();
         newParameters.putAll(parameters);
-        newParameters.put("question", question);
-        newParameters.put("context", knowledgeBaseRef.get());
-        newParameters.put("chat_history", chatHistoryRef.get());
+        newParameters.put(QUESTION, question);
+        newParameters.put(CONTEXT, knowledgeBaseRef.get());
+        newParameters.put(CHAT_HISTORY, chatHistoryRef.get());
 
         if (agent != null) {
             String finalSessionId = sessionId;
@@ -375,6 +418,7 @@ public class ChatConnectorExecutor implements RemoteConnectorExecutor{
         }
 
         String payload = connector.createPayload(parameters);
+        log.debug("---------------------------------------------payload\n{}", payload);
         connector.validatePayload(payload);
 
         if (connector.hasAwsCredential()) {
@@ -389,15 +433,24 @@ public class ChatConnectorExecutor implements RemoteConnectorExecutor{
                 for (String key : headers.keySet()) {
                     builder.putHeader(key, headers.get(key));
                 }
+
                 SdkHttpFullRequest sdkHttpFullRequest = builder.build();
                 HttpExecuteRequest executeRequest = HttpExecuteRequest.builder()
-                        .request(signRequest(sdkHttpFullRequest, connector.getAccessKey(), connector.getSecretKey(), connector.getServiceName(), connector.getRegion()))
+                        .request(signRequest(sdkHttpFullRequest, connector.getAccessKey(), connector.getSecretKey(), connector.getSessionToken(),connector.getServiceName(), connector.getRegion()))
                         .contentStreamProvider(sdkHttpFullRequest.contentStreamProvider().orElse(null))
                         .build();
 
-                SdkHttpClient sdkHttpClient = new DefaultSdkHttpClientBuilder().build();
+                long timeout = parameters.containsKey("http_client_timeout") ? Long.parseLong(parameters.get("http_client_timeout")) : 60;
+                log.info("http client timeout : {}", timeout);
+                // Create a custom client options builder
+                ApacheHttpClient.Builder clientOptionsBuilder = ApacheHttpClient.builder()
+                        .connectionTimeout(Duration.ofSeconds(timeout))
+                        .socketTimeout(Duration.ofSeconds(timeout));
+                SdkHttpClient sdkHttpClient = clientOptionsBuilder.build();
+//                SdkHttpClient sdkHttpClient = new DefaultSdkHttpClientBuilder().build();
                 HttpExecuteResponse response = AccessController.doPrivileged((PrivilegedExceptionAction<HttpExecuteResponse>) () -> {
-                    return sdkHttpClient.prepareRequest(executeRequest).call();
+                    ExecutableHttpRequest executableHttpRequest = sdkHttpClient.prepareRequest(executeRequest);
+                    return executableHttpRequest.call();
                 });
 
                 AbortableInputStream body = null;
@@ -415,23 +468,39 @@ public class ChatConnectorExecutor implements RemoteConnectorExecutor{
                     }
                 }
                 String modelResponse = responseBuilder.toString();
+                log.debug("---------------------------------------------modelResponse\n{}", modelResponse);
+
+                if (parameters.containsKey("model.error_check")) {
+                    String errorCheck = parameters.get("model.error_check");
+                    try {
+                        Object error = JsonPath.parse(modelResponse).read(errorCheck);
+                        if (error !=  null) {
+                            String errorMessage = AccessController.doPrivileged((PrivilegedExceptionAction<String>) () -> {
+                                return error instanceof String? (String) error : gson.toJson(error);
+                            });
+                            throw new MLException(errorMessage);
+                        }
+                    } catch (PathNotFoundException e) {
+                        log.debug("No error happened");
+                    }
+                }
 
                 ModelTensors tensors = processOutput(modelResponse, connector, scriptService, parameters, modelTensors);
                 tensorOutputs.add(tensors);
-                if (connector.getSessionIndex() != null) {
-                    IndexRequest indexRequest = new IndexRequest(connector.getSessionIndex());
-                    List results = (List) modelTensors.get(0).getDataAsMap().get("results");
-                    indexRequest.source(ImmutableMap.of(connector.getSessionIdField(), sessionId,
+                if (saveSessionMessage) {
+                    Map<String, Object> message = ImmutableMap.of(connector.getSessionIdField(), sessionId,
                             "question", question,
-                            "answer", ((Map)results.get(0)).get("outputText"),
-                            "created_time", Instant.now().toEpochMilli()));
-                    client.index(indexRequest);
+                            "answer", modelTensors.get(modelTensors.size() - 1).getDataAsMap().get("response"),
+                            "created_time", Instant.now().toEpochMilli());
+                    saveSessionMessage(message);
+                }
+                if (connector.getSessionIndex() != null) {
                     modelTensors.add(ModelTensor.builder().name("session_id").result(sessionId).build());
                 }
                 return ModelTensorOutput.builder().mlModelOutputs(tensorOutputs).build();
             } catch (Throwable e) {
                 log.error("Failed to execute chat connector", e);
-                throw new MLException("Fail to execute chat connector", e);
+                throw new MLException("Fail to execute chat connector: " + ExceptionUtils.getRootCauseMessage(e), e);
             }
         }
 
@@ -480,6 +549,7 @@ public class ChatConnectorExecutor implements RemoteConnectorExecutor{
                 return null;
             });
             String modelResponse = responseRef.get();
+            log.debug("--------------------------------------------- response : \n{}", modelResponse);
             if (parameters.containsKey("model.error_check")) {
                 String errorCheck = parameters.get("model.error_check");
                 try {

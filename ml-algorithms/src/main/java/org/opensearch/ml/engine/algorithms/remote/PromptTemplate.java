@@ -3,6 +3,8 @@ package org.opensearch.ml.engine.algorithms.remote;
 import static org.opensearch.ml.engine.algorithms.remote.Agent.CHAT_HISTORY;
 import static org.opensearch.ml.engine.algorithms.remote.Agent.CONTEXT;
 import static org.opensearch.ml.engine.algorithms.remote.Agent.EXAMPLES;
+import static org.opensearch.ml.engine.algorithms.remote.Agent.LLM_TOOL_PROMPT_PREFIX;
+import static org.opensearch.ml.engine.algorithms.remote.Agent.LLM_TOOL_PROMPT_SUFFIX;
 import static org.opensearch.ml.engine.algorithms.remote.Agent.OS_INDICES;
 import static org.opensearch.ml.engine.algorithms.remote.Agent.PROMPT_PREFIX;
 import static org.opensearch.ml.engine.algorithms.remote.Agent.PROMPT_SUFFIX;
@@ -52,4 +54,13 @@ public class PromptTemplate {
             "Question: ${parameters." + QUESTION + "}\n" +
             "Thought: ${parameters." + SCRATCHPAD + "}\n" +
             "${parameters." + PROMPT_SUFFIX + "}\n" ;
+
+    public static final String DEFAULT_LLM_PROMPT = "${parameters." + LLM_TOOL_PROMPT_PREFIX + "}\n" +
+            "Answer the following questions as best you can. Always try to find answer from Context or Chat History first.\n" +
+            "${parameters." + CHAT_HISTORY + "}\n" +
+            "${parameters." + CONTEXT + "}\n" +
+            "Begin!\n\n" +
+            "Question: ${parameters." + QUESTION + "}\n" +
+            "Thought: ${parameters." + SCRATCHPAD + "}\n" +
+            "${parameters." + LLM_TOOL_PROMPT_SUFFIX + "}\n" ;
 }

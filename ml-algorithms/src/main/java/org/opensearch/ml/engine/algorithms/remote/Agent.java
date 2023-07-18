@@ -20,11 +20,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static org.opensearch.ml.engine.algorithms.remote.PromptTemplate.DEFAULT_LLM_PROMPT;
 import static org.opensearch.ml.engine.utils.ScriptUtils.gson;
 
 @Log4j2
@@ -36,6 +38,8 @@ public class Agent {
     private String defaultPrompt;
     public static final String SESSION_ID = "session_id";
     public static final String PROMPT_PREFIX = "prompt_prefix";
+    public static final String LLM_TOOL_PROMPT_PREFIX = "LanguageModelTool.prompt_prefix";
+    public static final String LLM_TOOL_PROMPT_SUFFIX = "LanguageModelTool.prompt_suffix";
     public static final String PROMPT_SUFFIX = "prompt_suffix";
     public static final String TOOLS = "tools";
     public static final String TOOL_DESCRIPTIONS = "tool_descriptions";
@@ -67,7 +71,7 @@ public class Agent {
                                  MLTask mlTask,
                                  Function<Map<String, String>, ModelTensorOutput> executeDirectly,
                                  Consumer<Map<String, Object>> saveSessionMessageConsumer) {
-        String question = parameters.get("question");
+        String question = parameters.get(QUESTION);
         String taskId = mlTask.getTaskId();
         Map<String, String> tmpParameters = new HashMap<>();
         tmpParameters.putAll(parameters);
@@ -122,8 +126,16 @@ public class Agent {
             StringBuilder sessionMsgAnswerBuilder = new StringBuilder("");
 
             ModelTensorOutput tmpModelTensorOutput = executeDirectly.apply(tmpParameters);
-            String thought = (String) tmpModelTensorOutput.getMlModelOutputs().get(0).getMlModelTensors().get(0).getDataAsMap().get("response");
-            if (i == 0) {
+            Object response = tmpModelTensorOutput.getMlModelOutputs().get(0).getMlModelTensors().get(0).getDataAsMap().get("response");
+
+            String thought = "";
+            if (response instanceof String) {
+                thought = (String) response;
+            } else if (response instanceof List) {
+                Object value = ((List) response).get(0);
+                thought = value instanceof String? (String)value : gson.toJson(value);
+            }
+            if (i == 0 && !thought.contains("Thought:")) {
                 sessionMsgAnswerBuilder.append("Thought: ");
             }
             sessionMsgAnswerBuilder.append(thought);
@@ -131,7 +143,8 @@ public class Agent {
                 modelTensors.addAll(tmpModelTensorOutput.getMlModelOutputs());
             }
             if (thought != null && thought.toLowerCase(Locale.ROOT).contains("final answer:")) {
-                String finalAnswer = thought.substring(thought.indexOf("Final Answer:") + 14, thought.length());
+                int indexOfFinalAnswer = thought.indexOf("Final Answer:");
+                String finalAnswer = indexOfFinalAnswer >= 0? thought.substring(indexOfFinalAnswer + 13) : thought;
                 if (finalAnswer.contains("\n\nQuestion:")) {
                     finalAnswer = finalAnswer.substring(0, finalAnswer.indexOf("\n\nQuestion:"));
                 }
@@ -194,9 +207,22 @@ public class Agent {
                     if (toolsMap.get(action) instanceof LanguageModelTool) {
                         Map<String, String> llmToolTmpParameters = new HashMap<>();
                         llmToolTmpParameters.putAll(tmpParameters);
-                        String llmToolPrompt = tmpParameters.containsKey("LanguageModelTool.prompt")? tmpParameters.get("LanguageModelTool.prompt") : "Try your best to answer this question: ${parameters.question}";
+
+                        String llmToolPrompt = tmpParameters.containsKey("LanguageModelTool.prompt")? tmpParameters.get("LanguageModelTool.prompt") : DEFAULT_LLM_PROMPT;
                         llmToolTmpParameters.put(PROMPT, llmToolPrompt);
                         llmToolTmpParameters.put(QUESTION, actionInput);
+                        llmToolTmpParameters.put(LLM_TOOL_PROMPT_PREFIX, Optional.ofNullable(parameters.get(LLM_TOOL_PROMPT_PREFIX)).orElse(""));
+                        llmToolTmpParameters.put(LLM_TOOL_PROMPT_SUFFIX, Optional.ofNullable(parameters.get(LLM_TOOL_PROMPT_SUFFIX)).orElse(""));
+                        llmToolTmpParameters.put(SCRATCHPAD, scratchpadBuilder.toString());
+                        if (parameters.containsKey("cot.step_interval_millis")) {
+                            Long interval = Long.parseLong(parameters.get("cot.step_interval_millis"));
+                            try {
+                                Thread.sleep(interval);
+                            } catch (InterruptedException e) {
+                                log.error("Failed to sleep", e);
+                                throw new MLException(e);
+                            }
+                        }
                         ((LanguageModelTool) toolsMap.get(action)).setSupplier(() -> executeDirectly.apply(llmToolTmpParameters));
                     }
                     actionResult = toolsMap.get(action).run(actionInput, toolParams);
@@ -216,6 +242,30 @@ public class Agent {
                     actionResult = "no access to this tool ";
                     scratchpadBuilder.append(thought).append("\nObservation: no access to this tool ").append(action).append("\n\n");
                 } else {
+                    log.info("tools not found, end this cot earlier");
+                    String stopWhenNoToolFound = parameters.get("cot.stop_when_no_tool_found");
+                    if ("true".equalsIgnoreCase(stopWhenNoToolFound)) {
+                        int indexOfFinalAnswer = thought.indexOf("Final Answer:");
+                        String finalAnswer = indexOfFinalAnswer >= 0? thought.substring(indexOfFinalAnswer + 13) : thought;
+                        if (finalAnswer.contains("\n\nQuestion:")) {
+                            finalAnswer = finalAnswer.substring(0, finalAnswer.indexOf("\n\nQuestion:"));
+                        }
+                        if (finalAnswer.contains("\nHuman:")) {
+                            finalAnswer = finalAnswer.substring(0, finalAnswer.indexOf("\nHuman:"));
+                        }
+                        cotModelTensors.add(ModelTensors.builder().mlModelTensors(Arrays.asList(ModelTensor.builder().name("response").result(finalAnswer).build())).build());
+                        if (saveSessionMessageConsumer != null) {
+                            saveSessionMessageConsumer.accept(ImmutableMap.of(SESSION_ID, tmpParameters.get(SESSION_ID),
+                                    "question", question,
+                                    "answer", finalAnswer,
+                                    "final_answer", true,
+                                    "created_time", Instant.now().toEpochMilli(),
+                                    "task_id", taskId));
+                        }
+                        List<ModelTensors> finalModelTensors = new ArrayList<>();
+                        finalModelTensors.add(ModelTensors.builder().mlModelTensors(Arrays.asList(ModelTensor.builder().name("response").dataAsMap(ImmutableMap.of("response", finalAnswer)).build())).build());
+                        return verbose ? ModelTensorOutput.builder().mlModelOutputs(cotModelTensors).build() : ModelTensorOutput.builder().mlModelOutputs(finalModelTensors).build();
+                    }
                     actionResult = "tool not found";
                     scratchpadBuilder.append(thought).append("\nObservation: tool not found").append("\n\n");
                 }
@@ -270,13 +320,19 @@ public class Agent {
         StringBuilder toolsBuilder = new StringBuilder();
         StringBuilder toolNamesBuilder = new StringBuilder();
 
+        String toolsPrefix = Optional.ofNullable(parameters.get("agent.tools.prefix")).orElse("You have access to the following tools defined in <tools>: \n" + "<tools>\n");
+        String toolsSuffix = Optional.ofNullable(parameters.get("agent.tools.suffix")).orElse("</tools>\n");
+        String toolPrefix = Optional.ofNullable(parameters.get("agent.tools.tool.prefix")).orElse("<tool>\n");
+        String toolSuffix = Optional.ofNullable(parameters.get("agent.tools.tool.suffix")).orElse("\n</tool>\n");
+        toolsBuilder.append(toolsPrefix);
         for (String toolName : inputTools) {
             if (!toolsMap.containsKey(toolName)) {
                 throw new IllegalArgumentException("Tool ["+toolName+"] not registered for model");
             }
-            toolsBuilder.append(toolName).append(": ").append(toolsMap.get(toolName).getDescription()).append("\n");
+            toolsBuilder.append(toolPrefix).append(toolName).append(": ").append(toolsMap.get(toolName).getDescription()).append(toolSuffix);
             toolNamesBuilder.append(toolName).append(", ");
         }
+        toolsBuilder.append(toolsSuffix);
         Map<String, String> toolsPromptMap = new HashMap<>();
         toolsPromptMap.put(TOOL_DESCRIPTIONS, toolsBuilder.toString());
         toolsPromptMap.put(TOOL_NAMES, toolNamesBuilder.substring(0, toolNamesBuilder.length() - 1));
@@ -296,11 +352,16 @@ public class Agent {
         if (parameters.containsKey(OS_INDICES)) {
             String indices = parameters.get(OS_INDICES);
             List<String> indicesList = gson.fromJson(indices, List.class);
-            StringBuilder indicesBuilder = new StringBuilder("You have access to the following OpenSearch Index: \n");
+            StringBuilder indicesBuilder = new StringBuilder();
+            String indicesPrefix = Optional.ofNullable(parameters.get("opensearch_indices.prefix")).orElse("You have access to the following OpenSearch Index defined in <opensearch_indexes>: \n" + "<opensearch_indexes>\n");
+            String indicesSuffix = Optional.ofNullable(parameters.get("opensearch_indices.suffix")).orElse("</opensearch_indexes>\n");
+            String indexPrefix = Optional.ofNullable(parameters.get("opensearch_indices.index.prefix")).orElse("<index>\n");
+            String indexSuffix = Optional.ofNullable(parameters.get("opensearch_indices.index.suffix")).orElse("\n</index>\n");
+            indicesBuilder.append(indicesPrefix);
             for (String e : indicesList) {
-                indicesBuilder.append(e).append("\n");
+                indicesBuilder.append(indexPrefix).append(e).append(indexSuffix);
             }
-            indicesBuilder.append("\nEnd of OpenSearch Index\n");
+            indicesBuilder.append(indicesSuffix);
             indicesMap.put(OS_INDICES, indicesBuilder.toString());
         } else {
             indicesMap.put(OS_INDICES, "");
@@ -314,12 +375,18 @@ public class Agent {
         if (parameters.containsKey(EXAMPLES)) {
             String examples = parameters.get(EXAMPLES);
             List<String> exampleList = gson.fromJson(examples, List.class);
-            StringBuilder exampleBuilder = new StringBuilder("\nExamples: \n\n");
+            StringBuilder exampleBuilder = new StringBuilder();
+            String examplesPrefix = Optional.ofNullable(parameters.get("examples.prefix")).orElse("You should follow and learn from examples defined in <examples>: \n" + "<examples>\n");
+            String examplesSuffix = Optional.ofNullable(parameters.get("examples.suffix")).orElse("</examples>\n");
+            exampleBuilder.append(examplesPrefix);
+
+            String examplePrefix = Optional.ofNullable(parameters.get("examples.example.prefix")).orElse("<example>\n");
+            String exampleSuffix = Optional.ofNullable(parameters.get("examples.example.suffix")).orElse("\n</example>\n");
             for (int i = 0; i< exampleList.size(); i++) {
                 String example = exampleList.get(i);
-                exampleBuilder.append("Example ").append(i + 1).append(":\n").append(example).append("\n");
+                exampleBuilder.append(examplePrefix).append(example).append(exampleSuffix);
             }
-            exampleBuilder.append("\nEnd of Examples\n");
+            exampleBuilder.append(examplesSuffix);
             examplesMap.put(EXAMPLES, exampleBuilder.toString());
         } else {
             examplesMap.put(EXAMPLES, "");

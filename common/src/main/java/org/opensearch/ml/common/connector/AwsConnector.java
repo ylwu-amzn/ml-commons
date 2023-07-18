@@ -23,6 +23,7 @@ public class AwsConnector extends HttpConnector {
 
     public static final String ACCESS_KEY_FIELD = "access_key";
     public static final String SECRET_KEY_FIELD = "secret_key";
+    public static final String SESSION_TOKEN_FIELD = "session_token";
     public static final String SERVICE_NAME_FIELD = "service_name";
     public static final String REGION_FIELD = "region";
 
@@ -60,6 +61,10 @@ public class AwsConnector extends HttpConnector {
 
     public String getSecretKey() {
         return decryptedCredential.get(SECRET_KEY_FIELD);
+    }
+
+    public String getSessionToken() {
+        return decryptedCredential.get(SESSION_TOKEN_FIELD);
     }
     public String getServiceName() {
         if (parameters == null) {

@@ -7,6 +7,7 @@ package org.opensearch.ml.engine.algorithms.remote;
 
 import com.google.common.collect.ImmutableMap;
 import com.jayway.jsonpath.JsonPath;
+import lombok.extern.log4j.Log4j2;
 import org.opensearch.ml.common.connector.Connector;
 import org.opensearch.ml.common.dataset.TextDocsInputDataSet;
 import org.opensearch.ml.common.dataset.remote.RemoteInferenceInputDataSet;
@@ -15,6 +16,8 @@ import org.opensearch.ml.common.output.model.ModelTensor;
 import org.opensearch.ml.common.output.model.ModelTensors;
 import org.opensearch.script.ScriptService;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
+import software.amazon.awssdk.auth.credentials.AwsCredentials;
+import software.amazon.awssdk.auth.credentials.AwsSessionCredentials;
 import software.amazon.awssdk.auth.signer.Aws4Signer;
 import software.amazon.awssdk.auth.signer.params.Aws4SignerParams;
 import software.amazon.awssdk.http.SdkHttpFullRequest;
@@ -24,16 +27,19 @@ import java.io.IOException;
 import java.security.AccessController;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import static org.apache.commons.text.StringEscapeUtils.escapeJson;
 import static org.opensearch.ml.common.connector.HttpConnector.RESPONSE_FILTER_FIELD;
 import static org.opensearch.ml.engine.utils.ScriptUtils.executePostprocessFunction;
 import static org.opensearch.ml.engine.utils.ScriptUtils.executePreprocessFunction;
 import static org.opensearch.ml.engine.utils.ScriptUtils.gson;
 
+@Log4j2
 public class ConnectorUtils {
 
     private static final Aws4Signer signer;
@@ -45,7 +51,11 @@ public class ConnectorUtils {
         RemoteInferenceInputDataSet inputData;
         if (mlInput.getInputDataset() instanceof TextDocsInputDataSet) {
             TextDocsInputDataSet inputDataSet = (TextDocsInputDataSet)mlInput.getInputDataset();
-            Map<String, Object> params = ImmutableMap.of("text_docs", inputDataSet.getDocs());
+            List<String> docs = new ArrayList<>();
+            for (String doc : inputDataSet.getDocs()) {
+                docs.add(escapeJson(doc));
+            }
+            Map<String, Object> params = ImmutableMap.of("text_docs", docs);
             String preProcessFunction = connector.getPreProcessFunction();
             Optional<String> processedResponse = executePreprocessFunction(scriptService, preProcessFunction, params);
             if (!processedResponse.isPresent()) {
@@ -58,7 +68,7 @@ public class ConnectorUtils {
                 try {
                     AccessController.doPrivileged((PrivilegedExceptionAction<Void>) () -> {
                         if (parametersMap.get(key) instanceof String) {
-                            processedParameters.put(key, (String)parametersMap.get(key));
+                            processedParameters.put(key, escapeJson((String)parametersMap.get(key)));
                         } else {
                             processedParameters.put(key, gson.toJson(parametersMap.get(key)));
                         }
@@ -94,8 +104,8 @@ public class ConnectorUtils {
         return tensors;
     }
 
-    public static SdkHttpFullRequest signRequest(SdkHttpFullRequest request, String accessKey, String secretKey, String signingName, String region) {
-        AwsBasicCredentials credentials = AwsBasicCredentials.create(accessKey, secretKey);
+    public static SdkHttpFullRequest signRequest(SdkHttpFullRequest request, String accessKey, String secretKey, String sessionToken, String signingName, String region) {
+        AwsCredentials credentials = sessionToken == null || sessionToken.trim().length() == 0 ? AwsBasicCredentials.create(accessKey, secretKey) : AwsSessionCredentials.create(accessKey, secretKey, sessionToken);
 
         Aws4SignerParams params = Aws4SignerParams.builder()
                 .awsCredentials(credentials)

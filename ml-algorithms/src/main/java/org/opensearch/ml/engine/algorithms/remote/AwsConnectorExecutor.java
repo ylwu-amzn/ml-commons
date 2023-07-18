@@ -21,6 +21,8 @@ import org.opensearch.ml.common.output.model.ModelTensors;
 import org.opensearch.ml.engine.annotation.ConnectorExecutor;
 import org.opensearch.script.ScriptService;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
+import software.amazon.awssdk.auth.credentials.AwsCredentials;
+import software.amazon.awssdk.auth.credentials.AwsSessionCredentials;
 import software.amazon.awssdk.auth.signer.Aws4Signer;
 import software.amazon.awssdk.auth.signer.params.Aws4SignerParams;
 import software.amazon.awssdk.core.internal.http.loader.DefaultSdkHttpClientBuilder;
@@ -149,16 +151,10 @@ public class AwsConnectorExecutor implements RemoteConnectorExecutor{
     private SdkHttpFullRequest signRequest(SdkHttpFullRequest request) {
         String accessKey = connector.getAccessKey();
         String secretKey = connector.getSecretKey();
+        String sessionToken = connector.getSessionToken();
         String signingName = connector.getServiceName();
         String region = connector.getRegion();
-        AwsBasicCredentials credentials = AwsBasicCredentials.create(accessKey, secretKey);
 
-        Aws4SignerParams params = Aws4SignerParams.builder()
-                .awsCredentials(credentials)
-                .signingName(signingName)
-                .signingRegion(Region.of(region))
-                .build();
-
-        return signer.sign(request, params);
+        return ConnectorUtils.signRequest(request, accessKey, secretKey, sessionToken, signingName, region);
     }
 }
