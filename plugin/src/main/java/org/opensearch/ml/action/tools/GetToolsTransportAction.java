@@ -29,11 +29,7 @@ public class GetToolsTransportAction extends HandledTransportAction<ActionReques
     ) {
         super(MLGetToolsAction.NAME, transportService, actionFilters, MLToolsGetRequest::new);
     }
-    /**
-     * @param task
-     * @param request
-     * @param listener
-     */
+
     @Override
     protected void doExecute(Task task, ActionRequest request, ActionListener<MLToolsGetResponse> listener) {
         MLToolsGetRequest mlToolsGetRequest = MLToolsGetRequest.fromActionRequest(request);
