@@ -15,11 +15,13 @@ import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.client.Client;
 import org.opensearch.ml.common.FunctionName;
+import org.opensearch.ml.common.ToolMetadata;
 import org.opensearch.ml.common.input.MLInput;
 import org.opensearch.ml.common.MLModel;
 import org.opensearch.ml.common.input.parameter.MLAlgoParams;
 import org.opensearch.ml.common.output.MLOutput;
 import org.opensearch.ml.common.MLTask;
+import org.opensearch.ml.common.spi.tools.Tool;
 import org.opensearch.ml.common.transport.MLTaskResponse;
 import org.opensearch.ml.common.transport.model.MLModelGetRequest;
 import org.opensearch.ml.common.transport.model.MLModelGetResponse;
@@ -30,10 +32,15 @@ import org.opensearch.ml.common.transport.model.MLModelSearchAction;
 import org.opensearch.ml.common.transport.prediction.MLPredictionTaskAction;
 import org.opensearch.ml.common.transport.prediction.MLPredictionTaskRequest;
 import org.opensearch.ml.common.transport.task.*;
+import org.opensearch.ml.common.transport.tools.MLGetToolsAction;
+import org.opensearch.ml.common.transport.tools.MLToolsGetRequest;
+import org.opensearch.ml.common.transport.tools.MLToolsGetResponse;
 import org.opensearch.ml.common.transport.training.MLTrainingTaskAction;
 import org.opensearch.ml.common.transport.training.MLTrainingTaskRequest;
 import org.opensearch.ml.common.transport.trainpredict.MLTrainAndPredictionTaskAction;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 
@@ -182,6 +189,30 @@ public class MachineLearningNodeClient implements MachineLearningClient {
             listener.onResponse(searchResponse);
         }, listener::onFailure));
     }
+
+    /**
+     * Get ToolMetadata and return a list of ToolMetadata in listener
+     * For more info on get tools, refer: https://opensearch.org/docs/latest/ml-commons-plugin/api/#get-tools
+     * @param listener      action listener
+     */
+    @Override
+    public void getTools(ActionListener<List<ToolMetadata>> listener) {
+        MLToolsGetRequest mlToolsGetRequest = MLToolsGetRequest.builder().build();
+
+        client.execute(MLGetToolsAction.INSTANCE, mlToolsGetRequest, getMlGetToolsResponseActionListener(listener));
+    }
+
+    private ActionListener<MLToolsGetResponse> getMlGetToolsResponseActionListener(ActionListener<List<ToolMetadata>> listener) {
+        ActionListener<MLToolsGetResponse> internalListener = ActionListener.wrap(mlModelGetResponse -> {
+            listener.onResponse(mlModelGetResponse.getToolMetadataList());
+        }, listener::onFailure);
+        ActionListener<MLToolsGetResponse> actionListener = wrapActionListener(internalListener, res -> {
+            MLToolsGetResponse getResponse = MLToolsGetResponse.fromActionResponse(res);
+            return getResponse;
+        });
+        return actionListener;
+    }
+
 
     private ActionListener<MLTaskResponse> getMlPredictionTaskResponseActionListener(ActionListener<MLOutput> listener) {
         ActionListener<MLTaskResponse> internalListener = ActionListener.wrap(predictionResponse -> {

@@ -12,11 +12,14 @@ import org.opensearch.action.delete.DeleteResponse;
 import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.action.support.PlainActionFuture;
+import org.opensearch.ml.common.ToolMetadata;
 import org.opensearch.ml.common.input.MLInput;
 import org.opensearch.ml.common.MLModel;
 import org.opensearch.ml.common.output.MLOutput;
 import org.opensearch.ml.common.MLTask;
+import org.opensearch.ml.common.spi.tools.Tool;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -224,4 +227,22 @@ public interface MachineLearningClient {
      * @param listener action listener
      */
     void searchTask(SearchRequest searchRequest, ActionListener<SearchResponse> listener);
+
+    /**
+     * Get ToolMetadata and return ActionFuture.
+     * For more info on get model, refer: https://opensearch.org/docs/latest/ml-commons-plugin/api/#get-tools
+     * @return ActionFuture of ml model
+     */
+    default ActionFuture<List<ToolMetadata>> getTools() {
+        PlainActionFuture<List<ToolMetadata>> actionFuture = PlainActionFuture.newFuture();
+        getTools(actionFuture);
+        return actionFuture;
+    }
+
+    /**
+     * Get ToolMetadata and return ToolMetadata in listener
+     * For more info on get tools, refer: https://opensearch.org/docs/latest/ml-commons-plugin/api/#get-tools
+     * @param listener action listener
+     */
+    void getTools(ActionListener<List<ToolMetadata>> listener);
 }

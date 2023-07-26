@@ -27,15 +27,12 @@ import org.opensearch.core.xcontent.ToXContentObject;
 import org.opensearch.core.xcontent.XContentBuilder;
 import org.opensearch.index.Index;
 import org.opensearch.index.shard.ShardId;
+import org.opensearch.ml.common.*;
 import org.opensearch.ml.common.dataframe.DataFrame;
 import org.opensearch.ml.common.dataset.MLInputDataset;
-import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.common.input.MLInput;
-import org.opensearch.ml.common.MLModel;
 import org.opensearch.ml.common.output.MLOutput;
 import org.opensearch.ml.common.output.MLPredictionOutput;
-import org.opensearch.ml.common.MLTask;
-import org.opensearch.ml.common.MLTaskState;
 import org.opensearch.ml.common.output.MLTrainingOutput;
 import org.opensearch.ml.common.transport.MLTaskResponse;
 import org.opensearch.ml.common.transport.model.MLModelDeleteAction;
@@ -52,6 +49,9 @@ import org.opensearch.ml.common.transport.task.MLTaskGetAction;
 import org.opensearch.ml.common.transport.task.MLTaskGetRequest;
 import org.opensearch.ml.common.transport.task.MLTaskGetResponse;
 import org.opensearch.ml.common.transport.task.MLTaskSearchAction;
+import org.opensearch.ml.common.transport.tools.MLGetToolsAction;
+import org.opensearch.ml.common.transport.tools.MLToolsGetRequest;
+import org.opensearch.ml.common.transport.tools.MLToolsGetResponse;
 import org.opensearch.ml.common.transport.training.MLTrainingTaskAction;
 import org.opensearch.ml.common.transport.training.MLTrainingTaskRequest;
 import org.opensearch.ml.common.transport.trainpredict.MLTrainAndPredictionTaskAction;
@@ -63,11 +63,10 @@ import org.opensearch.search.profile.SearchProfileShardResults;
 import org.opensearch.search.suggest.Suggest;
 
 import java.io.IOException;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.Answers.RETURNS_DEEP_STUBS;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -117,6 +116,9 @@ public class MachineLearningNodeClientTest {
 
     @Mock
     ActionListener<SearchResponse> searchTaskActionListener;
+
+    @Mock
+    ActionListener<List<ToolMetadata>> getToolsActionListener;
 
     @InjectMocks
     MachineLearningNodeClient machineLearningNodeClient;
@@ -588,4 +590,27 @@ public class MachineLearningNodeClientTest {
                 SearchResponse.Clusters.EMPTY
         );
     }
+
+    @Test
+    public void getTools() {
+        List<ToolMetadata> toolMetadataList = new ArrayList<>();
+        ToolMetadata toolMetadata = ToolMetadata.builder()
+                .name("SearchWikipediaTool")
+                .description("Useful when you need to use this tool to search general knowledge on wikipedia.")
+                .build();
+        toolMetadataList.add(toolMetadata);
+        doAnswer(invocation -> {
+            ActionListener<MLToolsGetResponse> actionListener = invocation.getArgument(2);
+
+            actionListener.onResponse(MLToolsGetResponse.builder().toolMetadata(toolMetadataList).build());
+            return null;
+        }).when(client).execute(eq(MLGetToolsAction.INSTANCE), any(), any());
+        ArgumentCaptor<List> argumentCaptor = ArgumentCaptor.forClass(List.class);
+        machineLearningNodeClient.getTools(getToolsActionListener);
+
+        verify(client).execute(eq(MLGetToolsAction.INSTANCE), isA(MLToolsGetRequest.class), any());
+        verify(getToolsActionListener).onResponse(argumentCaptor.capture());
+        assertEquals(toolMetadataList, argumentCaptor.getValue());
+    }
+
 }

@@ -15,6 +15,7 @@ import org.opensearch.action.ActionListener;
 import org.opensearch.action.delete.DeleteResponse;
 import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.search.SearchResponse;
+import org.opensearch.ml.common.ToolMetadata;
 import org.opensearch.ml.common.dataframe.DataFrame;
 import org.opensearch.ml.common.dataset.DataFrameInputDataset;
 import org.opensearch.ml.common.input.MLInput;
@@ -26,6 +27,7 @@ import org.opensearch.ml.common.MLTask;
 import org.opensearch.ml.common.output.MLTrainingOutput;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.Assert.assertEquals;
@@ -131,6 +133,17 @@ public class MachineLearningClientTest {
             @Override
             public void searchTask(SearchRequest searchRequest, ActionListener<SearchResponse> listener) {
                 listener.onResponse(searchResponse);
+            }
+
+            /**
+             * Get ToolMetadata and return ToolMetadata in listener
+             * For more info on get tools, refer: https://opensearch.org/docs/latest/ml-commons-plugin/api/#get-tools
+             *
+             * @param listener action listener
+             */
+            @Override
+            public void getTools(ActionListener<List<ToolMetadata>> listener) {
+
             }
         };
     }
