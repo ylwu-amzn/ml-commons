@@ -142,7 +142,7 @@ public class MachineLearningClientTest {
              * @param listener action listener
              */
             @Override
-            public void getTools(ActionListener<List<ToolMetadata>> listener) {
+            public void listTools(ActionListener<List<ToolMetadata>> listener) {
 
             }
         };

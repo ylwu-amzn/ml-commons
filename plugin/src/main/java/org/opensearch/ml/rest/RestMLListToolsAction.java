@@ -4,8 +4,8 @@ import com.google.common.collect.ImmutableList;
 import org.opensearch.client.node.NodeClient;
 import org.opensearch.ml.common.ToolMetadata;
 import org.opensearch.ml.common.spi.tools.Tool;
-import org.opensearch.ml.common.transport.tools.MLGetToolsAction;
-import org.opensearch.ml.common.transport.tools.MLToolsGetRequest;
+import org.opensearch.ml.common.transport.tools.MLListToolsAction;
+import org.opensearch.ml.common.transport.tools.MLToolsListRequest;
 import org.opensearch.rest.BaseRestHandler;
 import org.opensearch.rest.RestRequest;
 import org.opensearch.rest.action.RestToXContentListener;
@@ -17,14 +17,13 @@ import java.util.Locale;
 import java.util.Map;
 
 import static org.opensearch.ml.plugin.MachineLearningPlugin.ML_BASE_URI;
-import static org.opensearch.ml.utils.RestActionUtils.PARAMETER_MODEL_ID;
 
-public class RestMLGetToolsAction extends BaseRestHandler {
+public class RestMLListToolsAction extends BaseRestHandler {
     private static final String ML_GET_MODEL_ACTION = "ml_get_tools_action";
 
     private Map<String, Tool> externalTools;
 
-    public RestMLGetToolsAction(Map<String, Tool> externalTools) {
+    public RestMLListToolsAction(Map<String, Tool> externalTools) {
         this.externalTools = externalTools;
     }
 
@@ -60,7 +59,7 @@ public class RestMLGetToolsAction extends BaseRestHandler {
                         .name(value.getName())
                         .description(value.getDescription())
                         .build()));
-        MLToolsGetRequest mlToolsGetRequest = MLToolsGetRequest.builder().externalTools(toolList).build();
-        return channel -> client.execute(MLGetToolsAction.INSTANCE, mlToolsGetRequest, new RestToXContentListener<>(channel));
+        MLToolsListRequest mlToolsListRequest = MLToolsListRequest.builder().externalTools(toolList).build();
+        return channel -> client.execute(MLListToolsAction.INSTANCE, mlToolsListRequest, new RestToXContentListener<>(channel));
     }
 }

@@ -18,15 +18,15 @@ import java.util.List;
 
 @Getter
 @ToString
-public class MLToolsGetResponse extends ActionResponse implements ToXContentObject {
+public class MLToolsListResponse extends ActionResponse implements ToXContentObject {
 
     List<ToolMetadata> toolMetadataList;
 
     @Builder
-    public MLToolsGetResponse(List<ToolMetadata> toolMetadata) {
+    public MLToolsListResponse(List<ToolMetadata> toolMetadata) {
         this.toolMetadataList = toolMetadata;
     }
-    public MLToolsGetResponse(StreamInput in) throws IOException {
+    public MLToolsListResponse(StreamInput in) throws IOException {
         super(in);
         this.toolMetadataList = in.readList(ToolMetadata::new);
     }
@@ -46,16 +46,16 @@ public class MLToolsGetResponse extends ActionResponse implements ToXContentObje
         return xContentBuilder;
     }
 
-    public static MLToolsGetResponse fromActionResponse(ActionResponse actionResponse) {
-        if (actionResponse instanceof MLToolsGetResponse) {
-            return (MLToolsGetResponse) actionResponse;
+    public static MLToolsListResponse fromActionResponse(ActionResponse actionResponse) {
+        if (actionResponse instanceof MLToolsListResponse) {
+            return (MLToolsListResponse) actionResponse;
         }
 
         try (ByteArrayOutputStream baos = new ByteArrayOutputStream();
              OutputStreamStreamOutput osso = new OutputStreamStreamOutput(baos)) {
             actionResponse.writeTo(osso);
             try (StreamInput input = new InputStreamStreamInput(new ByteArrayInputStream(baos.toByteArray()))) {
-                return new MLToolsGetResponse(input);
+                return new MLToolsListResponse(input);
             }
         }
         catch (IOException e) {

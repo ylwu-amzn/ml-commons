@@ -233,9 +233,9 @@ public interface MachineLearningClient {
      * For more info on get model, refer: https://opensearch.org/docs/latest/ml-commons-plugin/api/#get-tools
      * @return ActionFuture of ml model
      */
-    default ActionFuture<List<ToolMetadata>> getTools() {
+    default ActionFuture<List<ToolMetadata>> listTools() {
         PlainActionFuture<List<ToolMetadata>> actionFuture = PlainActionFuture.newFuture();
-        getTools(actionFuture);
+        listTools(actionFuture);
         return actionFuture;
     }
 
@@ -244,5 +244,5 @@ public interface MachineLearningClient {
      * For more info on get tools, refer: https://opensearch.org/docs/latest/ml-commons-plugin/api/#get-tools
      * @param listener action listener
      */
-    void getTools(ActionListener<List<ToolMetadata>> listener);
+    void listTools(ActionListener<List<ToolMetadata>> listener);
 }

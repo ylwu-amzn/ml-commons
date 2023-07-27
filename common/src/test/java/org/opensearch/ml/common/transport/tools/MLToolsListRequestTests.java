@@ -16,7 +16,7 @@ import java.util.List;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotSame;
 
-public class MLToolsGetRequestTests {
+public class MLToolsListRequestTests {
     private List<ToolMetadata> externalTools;
 
     @Before
@@ -32,19 +32,19 @@ public class MLToolsGetRequestTests {
     @Test
     public void writeTo_success() throws IOException {
 
-        MLToolsGetRequest mlToolsGetRequest = MLToolsGetRequest.builder()
+        MLToolsListRequest mlToolsListRequest = MLToolsListRequest.builder()
                 .externalTools(externalTools)
                 .build();
         BytesStreamOutput bytesStreamOutput = new BytesStreamOutput();
-        mlToolsGetRequest.writeTo(bytesStreamOutput);
-        MLToolsGetRequest parsedToolMetadata = new MLToolsGetRequest(bytesStreamOutput.bytes().streamInput());
+        mlToolsListRequest.writeTo(bytesStreamOutput);
+        MLToolsListRequest parsedToolMetadata = new MLToolsListRequest(bytesStreamOutput.bytes().streamInput());
         assertEquals(parsedToolMetadata.getExternalTools().get(0).getName(), externalTools.get(0).getName());
         assertEquals(parsedToolMetadata.getExternalTools().get(0).getDescription(), externalTools.get(0).getDescription());
     }
 
     @Test
     public void fromActionRequest_success() {
-        MLToolsGetRequest mlToolsGetRequest = MLToolsGetRequest.builder().externalTools(externalTools).build();
+        MLToolsListRequest mlToolsListRequest = MLToolsListRequest.builder().externalTools(externalTools).build();
         ActionRequest actionRequest = new ActionRequest() {
             @Override
             public ActionRequestValidationException validate() {
@@ -53,12 +53,12 @@ public class MLToolsGetRequestTests {
 
             @Override
             public void writeTo(StreamOutput out) throws IOException {
-                mlToolsGetRequest.writeTo(out);
+                mlToolsListRequest.writeTo(out);
             }
         };
-        MLToolsGetRequest result = MLToolsGetRequest.fromActionRequest(actionRequest);
-        assertNotSame(result, mlToolsGetRequest);
-        assertEquals(result.getExternalTools().get(0).getName(), mlToolsGetRequest.getExternalTools().get(0).getName());
+        MLToolsListRequest result = MLToolsListRequest.fromActionRequest(actionRequest);
+        assertNotSame(result, mlToolsListRequest);
+        assertEquals(result.getExternalTools().get(0).getName(), mlToolsListRequest.getExternalTools().get(0).getName());
     }
 
     @Test(expected = UncheckedIOException.class)
@@ -74,6 +74,6 @@ public class MLToolsGetRequestTests {
                 throw new IOException("test");
             }
         };
-        MLToolsGetRequest.fromActionRequest(actionRequest);
+        MLToolsListRequest.fromActionRequest(actionRequest);
     }
 }

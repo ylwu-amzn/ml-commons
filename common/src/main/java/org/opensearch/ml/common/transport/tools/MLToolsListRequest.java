@@ -23,16 +23,16 @@ import java.util.List;
 @Getter
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @ToString
-public class MLToolsGetRequest extends ActionRequest {
+public class MLToolsListRequest extends ActionRequest {
 
     List<ToolMetadata> externalTools;
 
     @Builder
-    public MLToolsGetRequest(List<ToolMetadata> externalTools) {
+    public MLToolsListRequest(List<ToolMetadata> externalTools) {
         this.externalTools = externalTools;
     }
 
-    public MLToolsGetRequest(StreamInput in) throws IOException {
+    public MLToolsListRequest(StreamInput in) throws IOException {
         super(in);
         this.externalTools = in.readList(ToolMetadata::new);
     }
@@ -48,16 +48,16 @@ public class MLToolsGetRequest extends ActionRequest {
         return null;
     }
 
-    public static MLToolsGetRequest fromActionRequest(ActionRequest actionRequest) {
-        if (actionRequest instanceof  MLToolsGetRequest) {
-            return (MLToolsGetRequest)actionRequest;
+    public static MLToolsListRequest fromActionRequest(ActionRequest actionRequest) {
+        if (actionRequest instanceof MLToolsListRequest) {
+            return (MLToolsListRequest)actionRequest;
         }
 
         try (ByteArrayOutputStream baos = new ByteArrayOutputStream();
              OutputStreamStreamOutput osso = new OutputStreamStreamOutput(baos)) {
             actionRequest.writeTo(osso);
             try (StreamInput input = new InputStreamStreamInput(new ByteArrayInputStream(baos.toByteArray()))) {
-                return new MLToolsGetRequest(input);
+                return new MLToolsListRequest(input);
             }
         } catch (IOException e) {
             throw new UncheckedIOException("failed to parse ActionRequest into MLToolsGetRequest", e);
