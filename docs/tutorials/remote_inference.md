@@ -65,7 +65,8 @@ A connector consists of 7 parts
     * use "http" for any non-AWS services which support http, for example openAI , Cohere
     * use "aws_sigv4" for any AWS services which supports SigV4. For example, Amazon Sagemaker
 5. `credential`: map<string, string>,  all variables in this block will be encrypted with "AES/GCM/NoPadding" symmetric encryption algorithm. The encryption key will be generated when the cluster first start and persisted in system index. User has no way to read/set that encryption key.  Credentials can only be used by `headers` of action.
-6. `parameters`: map<string, object>. all variables in this block will be overridable in predict request. In predict request, user can provide same name parameter to override the default parameter value defined in connector.  Parameters can be used by `url` , `headers` and `request_body` of action.
+6. `parameters`: map<string, object>. all variables in this block will be overridable in predict request. In predict request, user can provide same name parameter to override the default parameter value defined in connector.  Parameters can be used by `url` , `headers` and `request_body` of action. 
+User can use variable `${parameters.<variable_name>}` without predefining it in connector `parameters` part, refer to [create connector](#step1-create-connector) step. 
 7. `actions`: list,  it contains a list of action. For one action, it consists of 7 parts:
     * `action_type`: string,  we only support predict in 2.9
     * `method`: string, http method, we only support POST and GET in 2.9
@@ -235,6 +236,9 @@ POST /_plugins/_ml/connectors/_create
     ]
 }
 ```
+You can see we are using a parameter `${parameters.messages}` in `"request_body"` without defining it in `parameters`.
+That means this parameter `messages` should be from predict request.
+
 Sample response
 ```
 {
