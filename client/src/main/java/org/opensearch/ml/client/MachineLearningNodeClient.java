@@ -31,9 +31,7 @@ import org.opensearch.ml.common.transport.model.MLModelSearchAction;
 import org.opensearch.ml.common.transport.prediction.MLPredictionTaskAction;
 import org.opensearch.ml.common.transport.prediction.MLPredictionTaskRequest;
 import org.opensearch.ml.common.transport.task.*;
-import org.opensearch.ml.common.transport.tools.MLListToolsAction;
-import org.opensearch.ml.common.transport.tools.MLToolsListRequest;
-import org.opensearch.ml.common.transport.tools.MLToolsListResponse;
+import org.opensearch.ml.common.transport.tools.*;
 import org.opensearch.ml.common.transport.training.MLTrainingTaskAction;
 import org.opensearch.ml.common.transport.training.MLTrainingTaskRequest;
 import org.opensearch.ml.common.transport.trainpredict.MLTrainAndPredictionTaskAction;
@@ -188,11 +186,6 @@ public class MachineLearningNodeClient implements MachineLearningClient {
         }, listener::onFailure));
     }
 
-    /**
-     * Get ToolMetadata and return a list of ToolMetadata in listener
-     * For more info on get tools, refer: https://opensearch.org/docs/latest/ml-commons-plugin/api/#get-tools
-     * @param listener      action listener
-     */
     @Override
     public void listTools(ActionListener<List<ToolMetadata>> listener) {
         MLToolsListRequest mlToolsListRequest = MLToolsListRequest.builder().build();
@@ -200,12 +193,30 @@ public class MachineLearningNodeClient implements MachineLearningClient {
         client.execute(MLListToolsAction.INSTANCE, mlToolsListRequest, getMlListToolsResponseActionListener(listener));
     }
 
+    @Override
+    public void getTool(String toolName, ActionListener<ToolMetadata> listener) {
+        MLToolGetRequest mlToolGetRequest = MLToolGetRequest.builder().toolName(toolName).build();
+
+        client.execute(MLGetToolAction.INSTANCE, mlToolGetRequest, getMlGetToolResponseActionListener(listener));
+    }
+
     private ActionListener<MLToolsListResponse> getMlListToolsResponseActionListener(ActionListener<List<ToolMetadata>> listener) {
-        ActionListener<MLToolsListResponse> internalListener = ActionListener.wrap(mlModelGetResponse -> {
-            listener.onResponse(mlModelGetResponse.getToolMetadataList());
+        ActionListener<MLToolsListResponse> internalListener = ActionListener.wrap(mlModelListResponse -> {
+            listener.onResponse(mlModelListResponse.getToolMetadataList());
         }, listener::onFailure);
         ActionListener<MLToolsListResponse> actionListener = wrapActionListener(internalListener, res -> {
             MLToolsListResponse getResponse = MLToolsListResponse.fromActionResponse(res);
+            return getResponse;
+        });
+        return actionListener;
+    }
+
+    private ActionListener<MLToolGetResponse> getMlGetToolResponseActionListener(ActionListener<ToolMetadata> listener) {
+        ActionListener<MLToolGetResponse> internalListener = ActionListener.wrap(mlModelGetResponse -> {
+            listener.onResponse(mlModelGetResponse.getToolMetadata());
+        }, listener::onFailure);
+        ActionListener<MLToolGetResponse> actionListener = wrapActionListener(internalListener, res -> {
+            MLToolGetResponse getResponse = MLToolGetResponse.fromActionResponse(res);
             return getResponse;
         });
         return actionListener;

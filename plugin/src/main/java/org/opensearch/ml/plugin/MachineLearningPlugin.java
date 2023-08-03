@@ -54,6 +54,7 @@ import org.opensearch.ml.action.syncup.TransportSyncUpOnNodeAction;
 import org.opensearch.ml.action.tasks.DeleteTaskTransportAction;
 import org.opensearch.ml.action.tasks.GetTaskTransportAction;
 import org.opensearch.ml.action.tasks.SearchTaskTransportAction;
+import org.opensearch.ml.action.tools.GetToolTransportAction;
 import org.opensearch.ml.action.tools.ListToolsTransportAction;
 import org.opensearch.ml.action.training.TransportTrainingTaskAction;
 import org.opensearch.ml.action.trainpredict.TransportTrainAndPredictionTaskAction;
@@ -93,6 +94,7 @@ import org.opensearch.ml.common.transport.sync.MLSyncUpAction;
 import org.opensearch.ml.common.transport.task.MLTaskDeleteAction;
 import org.opensearch.ml.common.transport.task.MLTaskGetAction;
 import org.opensearch.ml.common.transport.task.MLTaskSearchAction;
+import org.opensearch.ml.common.transport.tools.MLGetToolAction;
 import org.opensearch.ml.common.transport.tools.MLListToolsAction;
 import org.opensearch.ml.common.transport.training.MLTrainingTaskAction;
 import org.opensearch.ml.common.transport.trainpredict.MLTrainAndPredictionTaskAction;
@@ -112,25 +114,7 @@ import org.opensearch.ml.indices.MLIndicesHandler;
 import org.opensearch.ml.indices.MLInputDatasetHandler;
 import org.opensearch.ml.model.MLModelCacheHelper;
 import org.opensearch.ml.model.MLModelManager;
-import org.opensearch.ml.rest.RestMLDeleteModelAction;
-import org.opensearch.ml.rest.RestMLDeleteTaskAction;
-import org.opensearch.ml.rest.RestMLDeployModelAction;
-import org.opensearch.ml.rest.RestMLExecuteAction;
-import org.opensearch.ml.rest.RestMLGetModelAction;
-import org.opensearch.ml.rest.RestMLGetTaskAction;
-import org.opensearch.ml.rest.RestMLListToolsAction;
-import org.opensearch.ml.rest.RestMLPredictionAction;
-import org.opensearch.ml.rest.RestMLProfileAction;
-import org.opensearch.ml.rest.RestMLRegisterModelAction;
-import org.opensearch.ml.rest.RestMLRegisterModelMetaAction;
-import org.opensearch.ml.rest.RestMLSearchModelAction;
-import org.opensearch.ml.rest.RestMLSearchTaskAction;
-import org.opensearch.ml.rest.RestMLStatsAction;
-import org.opensearch.ml.rest.RestMLTrainAndPredictAction;
-import org.opensearch.ml.rest.RestMLTrainingAction;
-import org.opensearch.ml.rest.RestMLUndeployModelAction;
-import org.opensearch.ml.rest.RestMLUpdateModelAction;
-import org.opensearch.ml.rest.RestMLUploadModelChunkAction;
+import org.opensearch.ml.rest.*;
 import org.opensearch.ml.settings.MLCommonsSettings;
 import org.opensearch.ml.stats.MLClusterLevelStat;
 import org.opensearch.ml.stats.MLNodeLevelStat;
@@ -223,7 +207,8 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin, Exten
                 new ActionHandler<>(MLUploadModelChunkAction.INSTANCE, TransportUploadModelChunkAction.class),
                 new ActionHandler<>(MLForwardAction.INSTANCE, TransportForwardAction.class),
                 new ActionHandler<>(MLSyncUpAction.INSTANCE, TransportSyncUpOnNodeAction.class),
-                new ActionHandler<>(MLListToolsAction.INSTANCE, ListToolsTransportAction.class)
+                new ActionHandler<>(MLListToolsAction.INSTANCE, ListToolsTransportAction.class),
+                new ActionHandler<>(MLGetToolAction.INSTANCE, GetToolTransportAction.class)
             );
     }
 
@@ -433,6 +418,8 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin, Exten
         RestMLRegisterModelMetaAction restMLRegisterModelMetaAction = new RestMLRegisterModelMetaAction();
         RestMLUploadModelChunkAction restMLUploadModelChunkAction = new RestMLUploadModelChunkAction();
         RestMLListToolsAction restMLListToolsAction = new RestMLListToolsAction(externalTools);
+        RestMLGetToolAction restMLGetToolAction = new RestMLGetToolAction(externalTools);
+
 
 
         return ImmutableList
@@ -455,7 +442,8 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin, Exten
                 restMLUndeployModelAction,
                 restMLRegisterModelMetaAction,
                 restMLUploadModelChunkAction,
-                    restMLListToolsAction
+                restMLListToolsAction,
+                restMLGetToolAction
             );
     }
 

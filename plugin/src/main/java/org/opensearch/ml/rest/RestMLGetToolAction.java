@@ -4,8 +4,8 @@ import com.google.common.collect.ImmutableList;
 import org.opensearch.client.node.NodeClient;
 import org.opensearch.ml.common.ToolMetadata;
 import org.opensearch.ml.common.spi.tools.Tool;
-import org.opensearch.ml.common.transport.tools.MLListToolsAction;
-import org.opensearch.ml.common.transport.tools.MLToolsListRequest;
+import org.opensearch.ml.common.transport.tools.MLGetToolAction;
+import org.opensearch.ml.common.transport.tools.MLToolGetRequest;
 import org.opensearch.rest.BaseRestHandler;
 import org.opensearch.rest.RestRequest;
 import org.opensearch.rest.action.RestToXContentListener;
@@ -17,25 +17,27 @@ import java.util.Locale;
 import java.util.Map;
 
 import static org.opensearch.ml.plugin.MachineLearningPlugin.ML_BASE_URI;
+import static org.opensearch.ml.utils.RestActionUtils.*;
 
-public class RestMLListToolsAction extends BaseRestHandler {
-    private static final String ML_LIST_TOOLS_ACTION = "ml_list_tools_action";
+public class RestMLGetToolAction extends BaseRestHandler {
+
+    private static final String ML_GET_TOOL_ACTION = "ml_get_tool_action";
 
     private Map<String, Tool> externalTools;
 
-    public RestMLListToolsAction(Map<String, Tool> externalTools) {
+    public RestMLGetToolAction(Map<String, Tool> externalTools) {
         this.externalTools = externalTools;
     }
 
     @Override
     public String getName() {
-        return ML_LIST_TOOLS_ACTION;
+        return ML_GET_TOOL_ACTION;
     }
 
     @Override
     public List<Route> routes() {
         return ImmutableList
-                .of(new Route(RestRequest.Method.GET, String.format(Locale.ROOT, "%s/tools", ML_BASE_URI)));
+                .of(new Route(RestRequest.Method.GET, String.format(Locale.ROOT, "%s/tool/{%s}", ML_BASE_URI, PARAMETER_TOOL_NAME)));
     }
 
     /**
@@ -59,7 +61,8 @@ public class RestMLListToolsAction extends BaseRestHandler {
                         .name(value.getName())
                         .description(value.getDescription())
                         .build()));
-        MLToolsListRequest mlToolsListRequest = MLToolsListRequest.builder().externalTools(toolList).build();
-        return channel -> client.execute(MLListToolsAction.INSTANCE, mlToolsListRequest, new RestToXContentListener<>(channel));
+        String toolName = getParameterId(request, PARAMETER_TOOL_NAME);
+        MLToolGetRequest mlToolGetRequest = MLToolGetRequest.builder().toolName(toolName).externalTools(toolList).build();
+        return channel -> client.execute(MLGetToolAction.INSTANCE, mlToolGetRequest, new RestToXContentListener<>(channel));
     }
 }
