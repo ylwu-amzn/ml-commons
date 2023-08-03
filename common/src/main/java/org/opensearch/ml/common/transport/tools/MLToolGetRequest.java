@@ -50,6 +50,7 @@ public class MLToolGetRequest extends ActionRequest {
     public void writeTo(StreamOutput out) throws IOException {
         super.writeTo(out);
         out.writeString(this.toolName);
+        out.writeList(this.externalTools);
     }
 
     @Override

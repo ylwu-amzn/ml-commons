@@ -1,8 +1,3 @@
-/*
- * Copyright OpenSearch Contributors
- * SPDX-License-Identifier: Apache-2.0
- */
-
 package org.opensearch.ml.common.transport.tools;
 
 import org.junit.Before;
@@ -21,7 +16,7 @@ import java.util.List;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotSame;
 
-public class MLToolsListRequestTests {
+public class MLToolGetRequestTests {
     private List<ToolMetadata> externalTools;
 
     @Before
@@ -36,20 +31,24 @@ public class MLToolsListRequestTests {
 
     @Test
     public void writeTo_success() throws IOException {
-
-        MLToolsListRequest mlToolsListRequest = MLToolsListRequest.builder()
+        MLToolGetRequest mlToolGetRequest = MLToolGetRequest.builder()
+                .toolName("MathTool")
                 .externalTools(externalTools)
                 .build();
+
         BytesStreamOutput bytesStreamOutput = new BytesStreamOutput();
-        mlToolsListRequest.writeTo(bytesStreamOutput);
-        MLToolsListRequest parsedToolMetadata = new MLToolsListRequest(bytesStreamOutput.bytes().streamInput());
+        mlToolGetRequest.writeTo(bytesStreamOutput);
+        MLToolGetRequest parsedToolMetadata = new MLToolGetRequest(bytesStreamOutput.bytes().streamInput());
+        assertEquals(parsedToolMetadata.getToolName(), "MathTool");
         assertEquals(parsedToolMetadata.getExternalTools().get(0).getName(), externalTools.get(0).getName());
-        assertEquals(parsedToolMetadata.getExternalTools().get(0).getDescription(), externalTools.get(0).getDescription());
     }
 
     @Test
     public void fromActionRequest_success() {
-        MLToolsListRequest mlToolsListRequest = MLToolsListRequest.builder().externalTools(externalTools).build();
+        MLToolGetRequest mlToolGetRequest = MLToolGetRequest.builder()
+                .toolName("MathTool")
+                .externalTools(externalTools)
+                .build();
         ActionRequest actionRequest = new ActionRequest() {
             @Override
             public ActionRequestValidationException validate() {
@@ -58,12 +57,13 @@ public class MLToolsListRequestTests {
 
             @Override
             public void writeTo(StreamOutput out) throws IOException {
-                mlToolsListRequest.writeTo(out);
+                mlToolGetRequest.writeTo(out);
             }
         };
-        MLToolsListRequest result = MLToolsListRequest.fromActionRequest(actionRequest);
-        assertNotSame(result, mlToolsListRequest);
-        assertEquals(result.getExternalTools().get(0).getName(), mlToolsListRequest.getExternalTools().get(0).getName());
+        MLToolGetRequest result = MLToolGetRequest.fromActionRequest(actionRequest);
+        assertNotSame(result, mlToolGetRequest);
+        assertEquals(result.getToolName(), "MathTool");
+        assertEquals(result.getExternalTools().get(0).getName(), mlToolGetRequest.getExternalTools().get(0).getName());
     }
 
     @Test(expected = UncheckedIOException.class)
@@ -79,6 +79,6 @@ public class MLToolsListRequestTests {
                 throw new IOException("test");
             }
         };
-        MLToolsListRequest.fromActionRequest(actionRequest);
+        MLToolGetRequest.fromActionRequest(actionRequest);
     }
 }
