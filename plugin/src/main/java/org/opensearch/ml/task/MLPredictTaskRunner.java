@@ -112,10 +112,15 @@ public class MLPredictTaskRunner extends MLTaskRunner<MLPredictionTaskRequest, M
     }
 
     @Override
-    public void dispatchTask(MLPredictionTaskRequest request, TransportService transportService, ActionListener<MLTaskResponse> listener) {
+    public void dispatchTask(
+        FunctionName functionName,
+        MLPredictionTaskRequest request,
+        TransportService transportService,
+        ActionListener<MLTaskResponse> listener
+    ) {
         String modelId = request.getModelId();
         MLInput input = request.getMlInput();
-        FunctionName algorithm = input.getAlgorithm();
+        functionName = input.getAlgorithm();
         try {
             ActionListener<DiscoveryNode> actionListener = ActionListener.wrap(node -> {
                 if (clusterService.localNode().getId().equals(node.getId())) {
@@ -128,9 +133,9 @@ public class MLPredictTaskRunner extends MLTaskRunner<MLPredictionTaskRequest, M
                     transportService.sendRequest(node, getTransportActionName(), request, getResponseHandler(listener));
                 }
             }, e -> { listener.onFailure(e); });
-            String[] workerNodes = mlModelManager.getWorkerNodes(modelId, true);
+            String[] workerNodes = mlModelManager.getWorkerNodes(modelId, functionName, true);
             if (workerNodes == null || workerNodes.length == 0) {
-                if (algorithm == FunctionName.TEXT_EMBEDDING || algorithm == FunctionName.REMOTE) {
+                if (functionName == FunctionName.TEXT_EMBEDDING || functionName == FunctionName.REMOTE) {
                     listener
                         .onFailure(
                             new IllegalArgumentException(
@@ -139,7 +144,7 @@ public class MLPredictTaskRunner extends MLTaskRunner<MLPredictionTaskRequest, M
                         );
                     return;
                 } else {
-                    workerNodes = nodeHelper.getEligibleNodeIds();
+                    workerNodes = nodeHelper.getEligibleNodeIds(functionName);
                 }
             }
             mlTaskDispatcher.dispatchPredictTask(workerNodes, actionListener);

@@ -14,6 +14,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.opensearch.ml.settings.MLCommonsSettings.ML_COMMONS_DISABLED_FEATURE;
 import static org.opensearch.ml.settings.MLCommonsSettings.ML_COMMONS_TRUSTED_CONNECTOR_ENDPOINTS_REGEX;
 import static org.opensearch.ml.settings.MLCommonsSettings.ML_COMMONS_TRUSTED_URL_REGEX;
 import static org.opensearch.ml.utils.TestHelper.clusterSetting;
@@ -148,12 +149,14 @@ public class TransportRegisterModelActionTests extends OpenSearchTestCase {
         settings = Settings
             .builder()
             .put(ML_COMMONS_TRUSTED_URL_REGEX.getKey(), trustedUrlRegex)
+            .putList(ML_COMMONS_DISABLED_FEATURE.getKey(), FunctionName.TEXT_EMBEDDING.name())
             .putList(ML_COMMONS_TRUSTED_CONNECTOR_ENDPOINTS_REGEX.getKey(), TRUSTED_CONNECTOR_ENDPOINTS_REGEXES)
             .build();
         threadContext = new ThreadContext(settings);
         ClusterSettings clusterSettings = clusterSetting(
             settings,
             ML_COMMONS_TRUSTED_URL_REGEX,
+            ML_COMMONS_DISABLED_FEATURE,
             ML_COMMONS_TRUSTED_CONNECTOR_ENDPOINTS_REGEX
         );
         when(clusterService.getClusterSettings()).thenReturn(clusterSettings);
@@ -193,10 +196,10 @@ public class TransportRegisterModelActionTests extends OpenSearchTestCase {
         }).when(mlTaskManager).createMLTask(any(), any());
 
         doAnswer(invocation -> {
-            ActionListener<DiscoveryNode> listener = invocation.getArgument(0);
+            ActionListener<DiscoveryNode> listener = invocation.getArgument(1);
             listener.onResponse(node1);
             return null;
-        }).when(mlTaskDispatcher).dispatch(any());
+        }).when(mlTaskDispatcher).dispatch(any(), any());
 
         when(clusterService.localNode()).thenReturn(node2);
         when(node2.getId()).thenReturn("node2Id");
@@ -233,6 +236,32 @@ public class TransportRegisterModelActionTests extends OpenSearchTestCase {
         transportRegisterModelAction.doExecute(task, prepareRequest("http://test_url", "modelGroupID"), actionListener);
         ArgumentCaptor<MLRegisterModelResponse> argumentCaptor = ArgumentCaptor.forClass(MLRegisterModelResponse.class);
         verify(actionListener).onResponse(argumentCaptor.capture());
+    }
+
+    public void testDisabledFeature() {
+        exceptionRule.expect(IllegalArgumentException.class);
+        exceptionRule.expectMessage("Feature disabled: TEXT_EMBEDDING");
+        MLRegisterModelInput registerModelInput = MLRegisterModelInput
+            .builder()
+            .functionName(FunctionName.TEXT_EMBEDDING)
+            .deployModel(true)
+            .modelName("Test Model")
+            .modelConfig(
+                new TextEmbeddingModelConfig(
+                    "CUSTOM",
+                    123,
+                    TextEmbeddingModelConfig.FrameworkType.SENTENCE_TRANSFORMERS,
+                    "all config",
+                    TextEmbeddingModelConfig.PoolingMode.MEAN,
+                    true,
+                    512
+                )
+            )
+            .modelFormat(MLModelFormat.TORCH_SCRIPT)
+            .url("https://test.com")
+            .build();
+        MLRegisterModelRequest request = new MLRegisterModelRequest(registerModelInput);
+        transportRegisterModelAction.doExecute(task, request, actionListener);
     }
 
     public void testDoExecute_successWithCreateModelGroup() {
@@ -305,10 +334,10 @@ public class TransportRegisterModelActionTests extends OpenSearchTestCase {
 
     public void testTransportRegisterModelActionDoExecuteWithDispatchException() {
         doAnswer(invocation -> {
-            ActionListener<Exception> listener = invocation.getArgument(0);
+            ActionListener<Exception> listener = invocation.getArgument(1);
             listener.onFailure(new Exception("Failed to dispatch register model task "));
             return null;
-        }).when(mlTaskDispatcher).dispatch(any());
+        }).when(mlTaskDispatcher).dispatch(any(), any());
         when(node1.getId()).thenReturn("NodeId1");
         when(clusterService.localNode()).thenReturn(node1);
         transportRegisterModelAction.doExecute(task, prepareRequest("http://test_url", "modelGroupID"), actionListener);

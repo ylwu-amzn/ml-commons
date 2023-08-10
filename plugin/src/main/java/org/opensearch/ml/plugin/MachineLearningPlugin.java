@@ -331,7 +331,14 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin {
         mlInputDatasetHandler = new MLInputDatasetHandler(client);
         modelAccessControlHelper = new ModelAccessControlHelper(clusterService, settings);
         connectorAccessControlHelper = new ConnectorAccessControlHelper(clusterService, settings);
-        mlModelChunkUploader = new MLModelChunkUploader(mlIndicesHandler, client, xContentRegistry, modelAccessControlHelper);
+        mlModelChunkUploader = new MLModelChunkUploader(
+            mlIndicesHandler,
+            client,
+            xContentRegistry,
+            modelAccessControlHelper,
+            clusterService,
+            settings
+        );
 
         MLTaskDispatcher mlTaskDispatcher = new MLTaskDispatcher(clusterService, client, settings, nodeHelper);
         mlTrainingTaskRunner = new MLTrainingTaskRunner(
@@ -612,7 +619,10 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin {
                 MLCommonsSettings.ML_COMMONS_ALLOW_LOCAL_FILE_UPLOAD,
                 MLCommonsSettings.ML_COMMONS_MODEL_ACCESS_CONTROL_ENABLED,
                 MLCommonsSettings.ML_COMMONS_CONNECTOR_ACCESS_CONTROL_ENABLED,
-                MLCommonsSettings.ML_COMMONS_TRUSTED_CONNECTOR_ENDPOINTS_REGEX
+                MLCommonsSettings.ML_COMMONS_TRUSTED_CONNECTOR_ENDPOINTS_REGEX,
+                MLCommonsSettings.ML_COMMONS_TASK_DISPATCHER_REMOTE_MODEL,
+                MLCommonsSettings.ML_COMMONS_TASK_DISPATCHER_LOCAL_MODEL,
+                MLCommonsSettings.ML_COMMONS_DISABLED_FEATURE
             );
         return settings;
     }

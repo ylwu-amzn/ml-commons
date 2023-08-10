@@ -10,6 +10,7 @@ import static org.opensearch.ml.common.MLTask.STATE_FIELD;
 import static org.opensearch.ml.common.MLTaskState.FAILED;
 import static org.opensearch.ml.plugin.MachineLearningPlugin.DEPLOY_THREAD_POOL;
 import static org.opensearch.ml.settings.MLCommonsSettings.ML_COMMONS_ALLOW_CUSTOM_DEPLOYMENT_PLAN;
+import static org.opensearch.ml.settings.MLCommonsSettings.ML_COMMONS_DISABLED_FEATURE;
 import static org.opensearch.ml.task.MLTaskManager.TASK_SEMAPHORE_TIMEOUT;
 
 import java.time.Instant;
@@ -83,6 +84,7 @@ public class TransportDeployModelAction extends HandledTransportAction<ActionReq
 
     private volatile boolean allowCustomDeploymentPlan;
     private ModelAccessControlHelper modelAccessControlHelper;
+    private volatile List<String> disabledFeatures;
 
     @Inject
     public TransportDeployModelAction(
@@ -118,6 +120,8 @@ public class TransportDeployModelAction extends HandledTransportAction<ActionReq
         clusterService
             .getClusterSettings()
             .addSettingsUpdateConsumer(ML_COMMONS_ALLOW_CUSTOM_DEPLOYMENT_PLAN, it -> allowCustomDeploymentPlan = it);
+        disabledFeatures = ML_COMMONS_DISABLED_FEATURE.get(settings);
+        clusterService.getClusterSettings().addSettingsUpdateConsumer(ML_COMMONS_DISABLED_FEATURE, it -> disabledFeatures = it);
     }
 
     @Override
@@ -129,6 +133,10 @@ public class TransportDeployModelAction extends HandledTransportAction<ActionReq
 
         try (ThreadContext.StoredContext context = client.threadPool().getThreadContext().stashContext()) {
             mlModelManager.getModel(modelId, null, excludes, ActionListener.wrap(mlModel -> {
+                FunctionName functionName = mlModel.getAlgorithm();
+                if (disabledFeatures.contains(functionName.name())) {
+                    throw new IllegalArgumentException("Feature disabled: " + functionName);
+                }
                 modelAccessControlHelper.validateModelGroupAccess(user, mlModel.getModelGroupId(), client, ActionListener.wrap(access -> {
                     if (!access) {
                         listener
@@ -141,7 +149,7 @@ public class TransportDeployModelAction extends HandledTransportAction<ActionReq
                         }
                         // mlStats.getStat(MLNodeLevelStat.ML_NODE_EXECUTING_TASK_COUNT).increment();
                         mlStats.getStat(MLNodeLevelStat.ML_NODE_TOTAL_REQUEST_COUNT).increment();
-                        DiscoveryNode[] allEligibleNodes = nodeFilter.getEligibleNodes();
+                        DiscoveryNode[] allEligibleNodes = nodeFilter.getEligibleNodes(functionName);
                         Map<String, DiscoveryNode> nodeMapping = new HashMap<>();
                         for (DiscoveryNode node : allEligibleNodes) {
                             nodeMapping.put(node.getId(), node);
@@ -161,7 +169,7 @@ public class TransportDeployModelAction extends HandledTransportAction<ActionReq
                                     nodeIds.add(nodeId);
                                 }
                             }
-                            String[] workerNodes = mlModelManager.getWorkerNodes(modelId);
+                            String[] workerNodes = mlModelManager.getWorkerNodes(modelId, functionName);
                             if (workerNodes != null && workerNodes.length > 0) {
                                 Set<String> difference = new HashSet<String>(Arrays.asList(workerNodes));
                                 difference.removeAll(Arrays.asList(targetNodeIds));

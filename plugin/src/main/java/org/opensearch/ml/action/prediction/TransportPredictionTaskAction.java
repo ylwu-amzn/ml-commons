@@ -5,6 +5,10 @@
 
 package org.opensearch.ml.action.prediction;
 
+import static org.opensearch.ml.settings.MLCommonsSettings.ML_COMMONS_DISABLED_FEATURE;
+
+import java.util.List;
+
 import org.opensearch.action.ActionListener;
 import org.opensearch.action.ActionRequest;
 import org.opensearch.action.support.ActionFilters;
@@ -12,9 +16,11 @@ import org.opensearch.action.support.HandledTransportAction;
 import org.opensearch.client.Client;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.inject.Inject;
+import org.opensearch.common.settings.Settings;
 import org.opensearch.common.util.concurrent.ThreadContext;
 import org.opensearch.commons.authuser.User;
 import org.opensearch.core.xcontent.NamedXContentRegistry;
+import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.common.exception.MLValidationException;
 import org.opensearch.ml.common.transport.MLTaskResponse;
 import org.opensearch.ml.common.transport.prediction.MLPredictionTaskAction;
@@ -33,7 +39,7 @@ import lombok.experimental.FieldDefaults;
 import lombok.extern.log4j.Log4j2;
 
 @Log4j2
-@FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+@FieldDefaults(level = AccessLevel.PRIVATE)
 public class TransportPredictionTaskAction extends HandledTransportAction<ActionRequest, MLTaskResponse> {
     MLTaskRunner<MLPredictionTaskRequest, MLTaskResponse> mlPredictTaskRunner;
     TransportService transportService;
@@ -48,6 +54,7 @@ public class TransportPredictionTaskAction extends HandledTransportAction<Action
     MLModelManager mlModelManager;
 
     ModelAccessControlHelper modelAccessControlHelper;
+    volatile List<String> disabledFeatures;
 
     @Inject
     public TransportPredictionTaskAction(
@@ -59,7 +66,8 @@ public class TransportPredictionTaskAction extends HandledTransportAction<Action
         Client client,
         NamedXContentRegistry xContentRegistry,
         MLModelManager mlModelManager,
-        ModelAccessControlHelper modelAccessControlHelper
+        ModelAccessControlHelper modelAccessControlHelper,
+        Settings settings
     ) {
         super(MLPredictionTaskAction.NAME, transportService, actionFilters, MLPredictionTaskRequest::new);
         this.mlPredictTaskRunner = mlPredictTaskRunner;
@@ -70,6 +78,8 @@ public class TransportPredictionTaskAction extends HandledTransportAction<Action
         this.xContentRegistry = xContentRegistry;
         this.mlModelManager = mlModelManager;
         this.modelAccessControlHelper = modelAccessControlHelper;
+        disabledFeatures = ML_COMMONS_DISABLED_FEATURE.get(settings);
+        clusterService.getClusterSettings().addSettingsUpdateConsumer(ML_COMMONS_DISABLED_FEATURE, it -> disabledFeatures = it);
     }
 
     @Override
@@ -86,6 +96,10 @@ public class TransportPredictionTaskAction extends HandledTransportAction<Action
 
         try (ThreadContext.StoredContext context = client.threadPool().getThreadContext().stashContext()) {
             mlModelManager.getModel(modelId, ActionListener.wrap(mlModel -> {
+                FunctionName functionName = mlModel.getAlgorithm();
+                if (disabledFeatures.contains(functionName.name())) {
+                    throw new IllegalArgumentException("Feature disabled: " + functionName);
+                }
                 modelAccessControlHelper
                     .validateModelGroupAccess(userInfo, mlModel.getModelGroupId(), client, ActionListener.wrap(access -> {
                         if (!access) {
@@ -97,12 +111,13 @@ public class TransportPredictionTaskAction extends HandledTransportAction<Action
                             String requestId = mlPredictionTaskRequest.getRequestID();
                             log.debug("receive predict request " + requestId + " for model " + mlPredictionTaskRequest.getModelId());
                             long startTime = System.nanoTime();
-                            mlPredictTaskRunner.run(mlPredictionTaskRequest, transportService, ActionListener.runAfter(listener, () -> {
-                                long endTime = System.nanoTime();
-                                double durationInMs = (endTime - startTime) / 1e6;
-                                modelCacheHelper.addPredictRequestDuration(modelId, durationInMs);
-                                log.debug("completed predict request " + requestId + " for model " + modelId);
-                            }));
+                            mlPredictTaskRunner
+                                .run(functionName, mlPredictionTaskRequest, transportService, ActionListener.runAfter(listener, () -> {
+                                    long endTime = System.nanoTime();
+                                    double durationInMs = (endTime - startTime) / 1e6;
+                                    modelCacheHelper.addPredictRequestDuration(modelId, durationInMs);
+                                    log.debug("completed predict request " + requestId + " for model " + modelId);
+                                }));
                         }
                     }, e -> {
                         log.error("Failed to Validate Access for ModelId " + modelId, e);

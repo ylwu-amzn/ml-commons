@@ -21,6 +21,7 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.opensearch.ml.settings.MLCommonsSettings.ML_COMMONS_ALLOW_CUSTOM_DEPLOYMENT_PLAN;
+import static org.opensearch.ml.settings.MLCommonsSettings.ML_COMMONS_DISABLED_FEATURE;
 
 import java.lang.reflect.Field;
 import java.nio.file.Path;
@@ -138,8 +139,15 @@ public class TransportDeployModelActionTests extends OpenSearchTestCase {
     @Before
     public void setup() {
         MockitoAnnotations.openMocks(this);
-        settings = Settings.builder().put(ML_COMMONS_ALLOW_CUSTOM_DEPLOYMENT_PLAN.getKey(), true).build();
-        clusterSettings = new ClusterSettings(settings, new HashSet<>(Arrays.asList(ML_COMMONS_ALLOW_CUSTOM_DEPLOYMENT_PLAN)));
+        settings = Settings
+            .builder()
+            .put(ML_COMMONS_ALLOW_CUSTOM_DEPLOYMENT_PLAN.getKey(), true)
+            .putList(ML_COMMONS_DISABLED_FEATURE.getKey(), FunctionName.KMEANS.name())
+            .build();
+        clusterSettings = new ClusterSettings(
+            settings,
+            new HashSet<>(Arrays.asList(ML_COMMONS_ALLOW_CUSTOM_DEPLOYMENT_PLAN, ML_COMMONS_DISABLED_FEATURE))
+        );
         when(clusterService.getClusterSettings()).thenReturn(clusterSettings);
 
         encryptor = new EncryptorImpl("m+dWmfmnNRiNlOdej/QelEkvMTyH//frS2TBeS2BP4w=");
@@ -149,7 +157,7 @@ public class TransportDeployModelActionTests extends OpenSearchTestCase {
         when(mlDeployModelRequest.getModelNodeIds()).thenReturn(new String[] { "node1" });
         DiscoveryNode discoveryNode = mock(DiscoveryNode.class);
         DiscoveryNode[] discoveryNodes = new DiscoveryNode[] { discoveryNode };
-        when(nodeFilter.getEligibleNodes()).thenReturn(discoveryNodes);
+        when(nodeFilter.getEligibleNodes(any())).thenReturn(discoveryNodes);
         when(discoveryNode.getId()).thenReturn("node1");
 
         when(clusterService.localNode()).thenReturn(discoveryNode);
@@ -185,6 +193,30 @@ public class TransportDeployModelActionTests extends OpenSearchTestCase {
             settings,
             modelAccessControlHelper
         );
+    }
+
+    public void testDisabledFeature() {
+        MLModel mlModel = mock(MLModel.class);
+        when(mlModel.getAlgorithm()).thenReturn(FunctionName.KMEANS);
+        doAnswer(invocation -> {
+            ActionListener<MLModel> listener = invocation.getArgument(3);
+            listener.onResponse(mlModel);
+            return null;
+        }).when(mlModelManager).getModel(anyString(), isNull(), any(String[].class), Mockito.isA(ActionListener.class));
+
+        IndexResponse indexResponse = mock(IndexResponse.class);
+        when(indexResponse.getId()).thenReturn("mockIndexId");
+        doAnswer(invocation -> {
+            ActionListener<IndexResponse> listener = invocation.getArgument(1);
+            listener.onResponse(indexResponse);
+            return null;
+        }).when(mlTaskManager).createMLTask(any(MLTask.class), Mockito.isA(ActionListener.class));
+
+        ActionListener<MLDeployModelResponse> deployModelResponseListener = mock(ActionListener.class);
+        transportDeployModelAction.doExecute(mock(Task.class), mlDeployModelRequest, deployModelResponseListener);
+        ArgumentCaptor<Exception> argumentCaptor = ArgumentCaptor.forClass(Exception.class);
+        verify(deployModelResponseListener).onFailure(argumentCaptor.capture());
+        assertTrue(argumentCaptor.getValue().getMessage().contains("Feature disabled: KMEANS"));
     }
 
     public void testDoExecute_success() {
@@ -286,7 +318,7 @@ public class TransportDeployModelActionTests extends OpenSearchTestCase {
     @Ignore
     public void testDoExecute_whenDeployModelRequestNodeIdsEmpty_thenMLResourceNotFoundException() {
         DiscoveryNodeHelper nodeHelper = mock(DiscoveryNodeHelper.class);
-        when(nodeHelper.getEligibleNodes()).thenReturn(new DiscoveryNode[] {});
+        when(nodeHelper.getEligibleNodes(FunctionName.REMOTE)).thenReturn(new DiscoveryNode[] {});
         TransportDeployModelAction deployModelAction = spy(
             new TransportDeployModelAction(
                 transportService,

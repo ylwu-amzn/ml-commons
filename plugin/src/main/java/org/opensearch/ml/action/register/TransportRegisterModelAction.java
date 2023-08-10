@@ -7,6 +7,7 @@ package org.opensearch.ml.action.register;
 
 import static org.opensearch.ml.common.MLTask.STATE_FIELD;
 import static org.opensearch.ml.common.MLTaskState.FAILED;
+import static org.opensearch.ml.settings.MLCommonsSettings.ML_COMMONS_DISABLED_FEATURE;
 import static org.opensearch.ml.settings.MLCommonsSettings.ML_COMMONS_TRUSTED_CONNECTOR_ENDPOINTS_REGEX;
 import static org.opensearch.ml.settings.MLCommonsSettings.ML_COMMONS_TRUSTED_URL_REGEX;
 import static org.opensearch.ml.task.MLTaskManager.TASK_SEMAPHORE_TIMEOUT;
@@ -90,6 +91,7 @@ public class TransportRegisterModelAction extends HandledTransportAction<ActionR
 
     ConnectorAccessControlHelper connectorAccessControlHelper;
     MLModelGroupManager mlModelGroupManager;
+    private volatile List<String> disabledFeatures;
 
     @Inject
     public TransportRegisterModelAction(
@@ -133,6 +135,8 @@ public class TransportRegisterModelAction extends HandledTransportAction<ActionR
         clusterService
             .getClusterSettings()
             .addSettingsUpdateConsumer(ML_COMMONS_TRUSTED_CONNECTOR_ENDPOINTS_REGEX, it -> trustedConnectorEndpointsRegex = it);
+        disabledFeatures = ML_COMMONS_DISABLED_FEATURE.get(settings);
+        clusterService.getClusterSettings().addSettingsUpdateConsumer(ML_COMMONS_DISABLED_FEATURE, it -> disabledFeatures = it);
     }
 
     @Override
@@ -140,6 +144,10 @@ public class TransportRegisterModelAction extends HandledTransportAction<ActionR
         User user = RestActionUtils.getUserContext(client);
         MLRegisterModelRequest registerModelRequest = MLRegisterModelRequest.fromActionRequest(request);
         MLRegisterModelInput registerModelInput = registerModelRequest.getRegisterModelInput();
+        FunctionName functionName = registerModelInput.getFunctionName();
+        if (disabledFeatures.contains(functionName.name())) {
+            throw new IllegalArgumentException("Feature disabled: " + functionName);
+        }
         modelAccessControlHelper
             .validateModelGroupAccess(user, registerModelInput.getModelGroupId(), client, ActionListener.wrap(access -> {
                 if (!access) {
@@ -240,12 +248,13 @@ public class TransportRegisterModelAction extends HandledTransportAction<ActionR
         // mlStats.createCounterStatIfAbsent(FunctionName.TEXT_EMBEDDING,
         // ActionName.REGISTER,
         // MLActionLevelStat.ML_ACTION_REQUEST_COUNT).increment();
-        boolean isAsync = registerModelInput.getFunctionName() != FunctionName.REMOTE;
+        FunctionName functionName = registerModelInput.getFunctionName();
+        boolean isAsync = functionName != FunctionName.REMOTE;
         MLTask mlTask = MLTask
             .builder()
             .async(isAsync)
             .taskType(MLTaskType.REGISTER_MODEL)
-            .functionName(registerModelInput.getFunctionName())
+            .functionName(functionName)
             .createTime(Instant.now())
             .lastUpdateTime(Instant.now())
             .state(MLTaskState.CREATED)
@@ -264,7 +273,7 @@ public class TransportRegisterModelAction extends HandledTransportAction<ActionR
             }));
             return;
         }
-        mlTaskDispatcher.dispatch(ActionListener.wrap(node -> {
+        mlTaskDispatcher.dispatch(functionName, ActionListener.wrap(node -> {
             String nodeId = node.getId();
             mlTask.setWorkerNodes(ImmutableList.of(nodeId));
 

@@ -10,6 +10,12 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.opensearch.ml.settings.MLCommonsSettings.ML_COMMONS_DISABLED_FEATURE;
+import static org.opensearch.ml.settings.MLCommonsSettings.ML_COMMONS_EXCLUDE_NODE_NAMES;
+import static org.opensearch.ml.settings.MLCommonsSettings.ML_COMMONS_ONLY_RUN_ON_ML_NODE;
+import static org.opensearch.ml.settings.MLCommonsSettings.ML_COMMONS_TASK_DISPATCHER_LOCAL_MODEL;
+import static org.opensearch.ml.settings.MLCommonsSettings.ML_COMMONS_TASK_DISPATCHER_REMOTE_MODEL;
+import static org.opensearch.ml.utils.TestHelper.clusterSetting;
 
 import java.io.IOException;
 import java.util.concurrent.ExecutorService;
@@ -23,7 +29,9 @@ import org.opensearch.action.ActionListener;
 import org.opensearch.action.get.GetResponse;
 import org.opensearch.action.index.IndexResponse;
 import org.opensearch.client.Client;
+import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.bytes.BytesReference;
+import org.opensearch.common.settings.ClusterSettings;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.common.util.concurrent.ThreadContext;
 import org.opensearch.common.xcontent.XContentFactory;
@@ -77,10 +85,14 @@ public class MLModelChunkUploaderTests extends OpenSearchTestCase {
     @Mock
     private ModelAccessControlHelper modelAccessControlHelper;
 
+    @Mock
+    private ClusterService clusterService;
+    private Settings settings;
+
     @Before
     public void setup() throws IOException {
         MockitoAnnotations.openMocks(this);
-        Settings settings = Settings.builder().build();
+        mockSettings(true);
         threadContext = new ThreadContext(settings);
         when(client.threadPool()).thenReturn(threadPool);
         when(threadPool.getThreadContext()).thenReturn(threadContext);
@@ -117,7 +129,14 @@ public class MLModelChunkUploaderTests extends OpenSearchTestCase {
 
         threadContext.putTransient(ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT, "alex|IT,HR|engineering,operations");
 
-        mlModelChunkUploader = new MLModelChunkUploader(mlIndicesHandler, client, xContentRegistry, modelAccessControlHelper);
+        mlModelChunkUploader = new MLModelChunkUploader(
+            mlIndicesHandler,
+            client,
+            xContentRegistry,
+            modelAccessControlHelper,
+            clusterService,
+            settings
+        );
 
         MLModel mlModel = MLModel
             .builder()
@@ -138,6 +157,25 @@ public class MLModelChunkUploaderTests extends OpenSearchTestCase {
             actionListener.onResponse(getResponse);
             return null;
         }).when(client).get(any(), any());
+    }
+
+    private void mockSettings(boolean onlyRunOnMLNode) {
+        settings = Settings
+            .builder()
+            .putList(ML_COMMONS_DISABLED_FEATURE.getKey(), FunctionName.KMEANS.name())
+            .put(ML_COMMONS_ONLY_RUN_ON_ML_NODE.getKey(), onlyRunOnMLNode)
+            .putList(ML_COMMONS_TASK_DISPATCHER_REMOTE_MODEL.getKey(), "data", "ml")
+            .putList(ML_COMMONS_TASK_DISPATCHER_LOCAL_MODEL.getKey(), "data")
+            .build();
+        ClusterSettings clusterSettings = clusterSetting(
+            settings,
+            ML_COMMONS_DISABLED_FEATURE,
+            ML_COMMONS_ONLY_RUN_ON_ML_NODE,
+            ML_COMMONS_EXCLUDE_NODE_NAMES,
+            ML_COMMONS_TASK_DISPATCHER_REMOTE_MODEL,
+            ML_COMMONS_TASK_DISPATCHER_LOCAL_MODEL
+        );
+        when(clusterService.getClusterSettings()).thenReturn(clusterSettings);
     }
 
     public void testConstructor() {

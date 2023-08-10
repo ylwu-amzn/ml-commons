@@ -5,7 +5,10 @@
 
 package org.opensearch.ml.action.upload_chunk;
 
+import static org.opensearch.ml.settings.MLCommonsSettings.ML_COMMONS_DISABLED_FEATURE;
 import static org.opensearch.ml.utils.MLExceptionUtils.logException;
+
+import java.util.List;
 
 import org.apache.commons.lang3.StringUtils;
 import org.opensearch.action.ActionListener;
@@ -13,8 +16,11 @@ import org.opensearch.action.ActionRequest;
 import org.opensearch.action.support.ActionFilters;
 import org.opensearch.action.support.HandledTransportAction;
 import org.opensearch.client.Client;
+import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.inject.Inject;
+import org.opensearch.common.settings.Settings;
 import org.opensearch.commons.authuser.User;
+import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.common.MLTaskState;
 import org.opensearch.ml.common.transport.model_group.MLRegisterModelGroupInput;
 import org.opensearch.ml.common.transport.upload_chunk.MLRegisterModelMetaAction;
@@ -39,6 +45,7 @@ public class TransportRegisterModelMetaAction extends HandledTransportAction<Act
     Client client;
     ModelAccessControlHelper modelAccessControlHelper;
     MLModelGroupManager mlModelGroupManager;
+    volatile List<String> disabledFeatures;
 
     @Inject
     public TransportRegisterModelMetaAction(
@@ -47,7 +54,9 @@ public class TransportRegisterModelMetaAction extends HandledTransportAction<Act
         MLModelManager mlModelManager,
         Client client,
         ModelAccessControlHelper modelAccessControlHelper,
-        MLModelGroupManager mlModelGroupManager
+        MLModelGroupManager mlModelGroupManager,
+        ClusterService clusterService,
+        Settings settings
     ) {
         super(MLRegisterModelMetaAction.NAME, transportService, actionFilters, MLRegisterModelMetaRequest::new);
         this.transportService = transportService;
@@ -56,12 +65,19 @@ public class TransportRegisterModelMetaAction extends HandledTransportAction<Act
         this.client = client;
         this.modelAccessControlHelper = modelAccessControlHelper;
         this.mlModelGroupManager = mlModelGroupManager;
+        disabledFeatures = ML_COMMONS_DISABLED_FEATURE.get(settings);
+        clusterService.getClusterSettings().addSettingsUpdateConsumer(ML_COMMONS_DISABLED_FEATURE, it -> disabledFeatures = it);
     }
 
     @Override
     protected void doExecute(Task task, ActionRequest request, ActionListener<MLRegisterModelMetaResponse> listener) {
         MLRegisterModelMetaRequest registerModelMetaRequest = MLRegisterModelMetaRequest.fromActionRequest(request);
         MLRegisterModelMetaInput mlUploadInput = registerModelMetaRequest.getMlRegisterModelMetaInput();
+
+        FunctionName functionName = mlUploadInput.getFunctionName();
+        if (disabledFeatures.contains(functionName.name())) {
+            throw new IllegalArgumentException("Feature disabled: " + functionName);
+        }
 
         User user = RestActionUtils.getUserContext(client);
 

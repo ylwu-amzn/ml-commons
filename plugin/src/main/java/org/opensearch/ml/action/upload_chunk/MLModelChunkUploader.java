@@ -7,10 +7,12 @@ package org.opensearch.ml.action.upload_chunk;
 import static org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken;
 import static org.opensearch.ml.common.CommonValue.ML_MODEL_INDEX;
 import static org.opensearch.ml.common.MLModel.ALGORITHM_FIELD;
+import static org.opensearch.ml.settings.MLCommonsSettings.ML_COMMONS_DISABLED_FEATURE;
 import static org.opensearch.ml.utils.MLExceptionUtils.logException;
 import static org.opensearch.ml.utils.MLNodeUtils.createXContentParserFromRegistry;
 
 import java.util.Base64;
+import java.util.List;
 import java.util.concurrent.Semaphore;
 
 import org.opensearch.action.ActionListener;
@@ -19,7 +21,9 @@ import org.opensearch.action.get.GetResponse;
 import org.opensearch.action.index.IndexRequest;
 import org.opensearch.action.support.WriteRequest;
 import org.opensearch.client.Client;
+import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.inject.Inject;
+import org.opensearch.common.settings.Settings;
 import org.opensearch.common.util.concurrent.ThreadContext;
 import org.opensearch.common.xcontent.XContentType;
 import org.opensearch.commons.authuser.User;
@@ -28,6 +32,7 @@ import org.opensearch.core.xcontent.ToXContent;
 import org.opensearch.core.xcontent.XContentBuilder;
 import org.opensearch.core.xcontent.XContentParser;
 import org.opensearch.index.IndexNotFoundException;
+import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.common.MLModel;
 import org.opensearch.ml.common.exception.MLResourceNotFoundException;
 import org.opensearch.ml.common.model.MLModelState;
@@ -47,18 +52,23 @@ public class MLModelChunkUploader {
     private final Client client;
     private final NamedXContentRegistry xContentRegistry;
     ModelAccessControlHelper modelAccessControlHelper;
+    private volatile List<String> disabledFeatures;
 
     @Inject
     public MLModelChunkUploader(
         MLIndicesHandler mlIndicesHandler,
         Client client,
         final NamedXContentRegistry xContentRegistry,
-        ModelAccessControlHelper modelAccessControlHelper
+        ModelAccessControlHelper modelAccessControlHelper,
+        ClusterService clusterService,
+        Settings settings
     ) {
         this.mlIndicesHandler = mlIndicesHandler;
         this.client = client;
         this.xContentRegistry = xContentRegistry;
         this.modelAccessControlHelper = modelAccessControlHelper;
+        disabledFeatures = ML_COMMONS_DISABLED_FEATURE.get(settings);
+        clusterService.getClusterSettings().addSettingsUpdateConsumer(ML_COMMONS_DISABLED_FEATURE, it -> disabledFeatures = it);
     }
 
     public void uploadModelChunk(MLUploadModelChunkInput uploadModelChunkInput, ActionListener<MLUploadModelChunkResponse> listener) {
@@ -77,6 +87,10 @@ public class MLModelChunkUploader {
                         String algorithmName = getResponse.getSource().get(ALGORITHM_FIELD).toString();
 
                         MLModel existingModel = MLModel.parse(parser, algorithmName);
+                        FunctionName functionName = existingModel.getAlgorithm();
+                        if (disabledFeatures.contains(functionName.name())) {
+                            throw new IllegalArgumentException("Feature disabled: " + functionName);
+                        }
 
                         modelAccessControlHelper
                             .validateModelGroupAccess(user, existingModel.getModelGroupId(), client, ActionListener.wrap(access -> {
