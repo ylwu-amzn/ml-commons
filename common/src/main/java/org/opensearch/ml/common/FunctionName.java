@@ -18,7 +18,8 @@ public enum FunctionName {
     LOGISTIC_REGRESSION,
     TEXT_EMBEDDING,
     METRICS_CORRELATION,
-    REMOTE;
+    REMOTE,
+    AGENT;
 
     public static FunctionName from(String value) {
         try {

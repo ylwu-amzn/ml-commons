@@ -51,6 +51,10 @@ public class MLPredictionTaskRequest extends MLTaskRequest {
         this(modelId, mlInput, true, user);
     }
 
+    public MLPredictionTaskRequest(String modelId, MLInput mlInput) {
+        this(modelId, mlInput, true, null);
+    }
+
     public MLPredictionTaskRequest(StreamInput in) throws IOException {
         super(in);
         this.modelId = in.readOptionalString();

@@ -3,56 +3,84 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-//TODO: cleanup gradle config file, some overlap
+import com.github.jengelman.gradle.plugins.shadow.ShadowBasePlugin
+import org.opensearch.gradle.test.RestIntegTestTask
+
 plugins {
-    id 'java'
     id 'com.github.johnrengelman.shadow'
     id 'jacoco'
-    id "io.freefair.lombok"
     id 'maven-publish'
     id 'signing'
 }
 
-dependencies {
-    compileOnly group: 'org.opensearch', name: 'opensearch', version: "${opensearch_version}"
-    compileOnly group: 'org.reflections', name: 'reflections', version: '0.9.12'
-    testImplementation group: 'junit', name: 'junit', version: '4.13.2'
-    compileOnly "org.opensearch.client:opensearch-rest-client:${opensearch_version}"
-    compileOnly "org.opensearch:common-utils:${common_utils_version}"
-    testImplementation group: 'org.mockito', name: 'mockito-core', version: '4.4.0'
+apply plugin: 'opensearch.java'
+apply plugin: 'opensearch.testclusters'
+apply plugin: 'opensearch.java-rest-test'
 
-    compileOnly group: 'org.apache.commons', name: 'commons-text', version: '1.10.0'
-    compileOnly group: 'com.google.code.gson', name: 'gson', version: '2.10.1'
-    compileOnly group: 'org.json', name: 'json', version: '20230227'
+repositories {
+    mavenLocal()
+    mavenCentral()
+    maven { url "https://aws.oss.sonatype.org/content/repositories/snapshots" }
+}
+
+ext {
+    projectSubstitutions = [:]
+    licenseFile = rootProject.file('LICENSE.txt')
+    noticeFile = rootProject.file('NOTICE')
+}
+
+jacoco {
+    toolVersion = '0.8.7'
+    reportsDirectory = file("$buildDir/JacocoReport")
 }
 
 jacocoTestReport {
     reports {
-        html.required = true
+        xml.required = false
+        csv.required = false
+        html.destination file("${buildDir}/jacoco/")
     }
+}
+check.dependsOn jacocoTestReport
 
-    dependsOn test
+def slf4j_version_of_cronutils = "1.7.36"
+dependencies {
+    compileOnly "org.opensearch:opensearch:${opensearch_version}"
+
+    testImplementation "org.opensearch.test:framework:${opensearch_version}"
+    testImplementation "org.apache.logging.log4j:log4j-core:${versions.log4j}"
 }
 
-jacocoTestCoverageVerification {
-    violationRules {
-        rule {
-            limit {
-                counter = 'LINE'
-                minimum = 0.8 //TODO: add more test to meet the coverage bar 0.9
-            }
-            limit {
-                counter = 'BRANCH'
-                minimum = 0.7 //TODO: add more test to meet the coverage bar 0.9
-            }
-        }
+configurations.all {
+    if (it.state != Configuration.State.UNRESOLVED) return
+    resolutionStrategy {
+        force "org.slf4j:slf4j-api:${slf4j_version_of_cronutils}"
     }
-    dependsOn jacocoTestReport
 }
-check.dependsOn jacocoTestCoverageVerification
 
 shadowJar {
-    archiveClassifier.set(null)
+    archiveClassifier = null
+}
+
+test {
+    doFirst {
+        test.classpath -= project.files(project.tasks.named('shadowJar'))
+        test.classpath -= project.configurations.getByName(ShadowBasePlugin.CONFIGURATION_NAME)
+        test.classpath += project.extensions.getByType(SourceSetContainer).getByName(SourceSet.MAIN_SOURCE_SET_NAME).runtimeClasspath
+    }
+    systemProperty 'tests.security.manager', 'false'
+}
+
+task integTest(type: RestIntegTestTask) {
+    description 'Run integ test with opensearch test framework'
+    group 'verification'
+    systemProperty 'tests.security.manager', 'false'
+    dependsOn test
+}
+check.dependsOn integTest
+
+testClusters.javaRestTest {
+    testDistribution = 'INTEG_TEST'
 }
 
 task sourcesJar(type: Jar) {
@@ -88,10 +116,10 @@ publishing {
             artifact javadocJar
 
             pom {
-                name = "OpenSearch ML Commons Comm"
+                name = "OpenSearch ML Commons SPI"
                 packaging = "jar"
                 url = "https://github.com/opensearch-project/ml-commons"
-                description = "OpenSearch ML Common"
+                description = "OpenSearch ML spi"
                 scm {
                     connection = "scm:git@github.com:opensearch-project/ml-commons.git"
                     developerConnection = "scm:git@github.com:opensearch-project/ml-commons.git"
@@ -112,9 +140,4 @@ publishing {
             }
         }
     }
-
-    // TODO - enabled debug logging for the time being, remove this eventually
-    gradle.startParameter.setShowStacktrace(ShowStacktrace.ALWAYS)
-    gradle.startParameter.setLogLevel(LogLevel.DEBUG)
 }
-publishShadowPublicationToMavenLocal.mustRunAfter jar

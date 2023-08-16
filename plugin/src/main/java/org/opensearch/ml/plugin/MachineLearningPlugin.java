@@ -5,13 +5,12 @@
 
 package org.opensearch.ml.plugin;
 
-import static org.opensearch.ml.common.CommonValue.ML_CONFIG_INDEX;
-import static org.opensearch.ml.common.CommonValue.ML_CONNECTOR_INDEX;
 import static org.opensearch.ml.common.CommonValue.ML_MODEL_INDEX;
 import static org.opensearch.ml.common.CommonValue.ML_TASK_INDEX;
 
 import java.nio.file.Path;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -34,6 +33,7 @@ import org.opensearch.common.util.concurrent.OpenSearchExecutors;
 import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.env.Environment;
 import org.opensearch.env.NodeEnvironment;
+import org.opensearch.ml.action.agents.TransportRegisterAgentAction;
 import org.opensearch.ml.action.connector.DeleteConnectorTransportAction;
 import org.opensearch.ml.action.connector.GetConnectorTransportAction;
 import org.opensearch.ml.action.connector.SearchConnectorTransportAction;
@@ -85,6 +85,11 @@ import org.opensearch.ml.common.input.parameter.regression.LinearRegressionParam
 import org.opensearch.ml.common.input.parameter.regression.LogisticRegressionParams;
 import org.opensearch.ml.common.input.parameter.sample.SampleAlgoParams;
 import org.opensearch.ml.common.model.TextEmbeddingModelConfig;
+import org.opensearch.ml.common.spi.MLCommonsExtension;
+import org.opensearch.ml.common.spi.memory.Memory;
+import org.opensearch.ml.common.spi.tools.Tool;
+import org.opensearch.ml.common.spi.tools.ToolAnnotation;
+import org.opensearch.ml.common.transport.agent.MLRegisterAgentAction;
 import org.opensearch.ml.common.transport.connector.MLConnectorDeleteAction;
 import org.opensearch.ml.common.transport.connector.MLConnectorGetAction;
 import org.opensearch.ml.common.transport.connector.MLConnectorSearchAction;
@@ -115,11 +120,17 @@ import org.opensearch.ml.common.transport.upload_chunk.MLUploadModelChunkAction;
 import org.opensearch.ml.engine.MLEngine;
 import org.opensearch.ml.engine.MLEngineClassLoader;
 import org.opensearch.ml.engine.ModelHelper;
+import org.opensearch.ml.engine.algorithms.agent.MLAgentExecutor;
 import org.opensearch.ml.engine.algorithms.anomalylocalization.AnomalyLocalizerImpl;
 import org.opensearch.ml.engine.algorithms.metrics_correlation.MetricsCorrelation;
 import org.opensearch.ml.engine.algorithms.sample.LocalSampleCalculator;
 import org.opensearch.ml.engine.encryptor.Encryptor;
 import org.opensearch.ml.engine.encryptor.EncryptorImpl;
+import org.opensearch.ml.engine.memory.ConversationBufferWindowMemory;
+import org.opensearch.ml.engine.tools.AgentTool;
+import org.opensearch.ml.engine.tools.MLModelTool;
+import org.opensearch.ml.engine.tools.MathTool;
+import org.opensearch.ml.engine.tools.VectorDBTool;
 import org.opensearch.ml.helper.ConnectorAccessControlHelper;
 import org.opensearch.ml.helper.ModelAccessControlHelper;
 import org.opensearch.ml.indices.MLIndicesHandler;
@@ -138,6 +149,7 @@ import org.opensearch.ml.rest.RestMLGetModelAction;
 import org.opensearch.ml.rest.RestMLGetTaskAction;
 import org.opensearch.ml.rest.RestMLPredictionAction;
 import org.opensearch.ml.rest.RestMLProfileAction;
+import org.opensearch.ml.rest.RestMLRegisterAgentAction;
 import org.opensearch.ml.rest.RestMLRegisterModelAction;
 import org.opensearch.ml.rest.RestMLRegisterModelGroupAction;
 import org.opensearch.ml.rest.RestMLRegisterModelMetaAction;
@@ -168,6 +180,7 @@ import org.opensearch.ml.utils.IndexUtils;
 import org.opensearch.monitor.jvm.JvmService;
 import org.opensearch.monitor.os.OsService;
 import org.opensearch.plugins.ActionPlugin;
+import org.opensearch.plugins.ExtensiblePlugin;
 import org.opensearch.plugins.Plugin;
 import org.opensearch.repositories.RepositoriesService;
 import org.opensearch.rest.RestController;
@@ -182,7 +195,7 @@ import com.google.common.collect.ImmutableList;
 
 import lombok.SneakyThrows;
 
-public class MachineLearningPlugin extends Plugin implements ActionPlugin {
+public class MachineLearningPlugin extends Plugin implements ActionPlugin, ExtensiblePlugin {
     public static final String ML_THREAD_POOL_PREFIX = "thread_pool.ml_commons.";
     public static final String GENERAL_THREAD_POOL = "opensearch_ml_general";
     public static final String EXECUTE_THREAD_POOL = "opensearch_ml_execute";
@@ -221,6 +234,10 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin {
 
     private ConnectorAccessControlHelper connectorAccessControlHelper;
 
+    private Map<String, Tool> externalTools;
+    private Map<String, Tool.Factory> externalToolFactories;
+    private Map<String, Tool.Factory> toolFactories;
+
     @Override
     public List<ActionHandler<? extends ActionRequest, ? extends ActionResponse>> getActions() {
         return ImmutableList
@@ -238,6 +255,7 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin {
                 new ActionHandler<>(MLTaskSearchAction.INSTANCE, SearchTaskTransportAction.class),
                 new ActionHandler<>(MLProfileAction.INSTANCE, MLProfileTransportAction.class),
                 new ActionHandler<>(MLRegisterModelAction.INSTANCE, TransportRegisterModelAction.class),
+                new ActionHandler<>(MLRegisterAgentAction.INSTANCE, TransportRegisterAgentAction.class),
                 new ActionHandler<>(MLDeployModelAction.INSTANCE, TransportDeployModelAction.class),
                 new ActionHandler<>(MLDeployModelOnNodeAction.INSTANCE, TransportDeployModelOnNodeAction.class),
                 new ActionHandler<>(MLUndeployModelAction.INSTANCE, TransportUndeployModelAction.class),
@@ -295,12 +313,8 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin {
         Map<Enum, MLStat<?>> stats = new ConcurrentHashMap<>();
         // cluster level stats
         stats.put(MLClusterLevelStat.ML_MODEL_INDEX_STATUS, new MLStat<>(true, new IndexStatusSupplier(indexUtils, ML_MODEL_INDEX)));
-        stats
-            .put(MLClusterLevelStat.ML_CONNECTOR_INDEX_STATUS, new MLStat<>(true, new IndexStatusSupplier(indexUtils, ML_CONNECTOR_INDEX)));
-        stats.put(MLClusterLevelStat.ML_CONFIG_INDEX_STATUS, new MLStat<>(true, new IndexStatusSupplier(indexUtils, ML_CONFIG_INDEX)));
         stats.put(MLClusterLevelStat.ML_TASK_INDEX_STATUS, new MLStat<>(true, new IndexStatusSupplier(indexUtils, ML_TASK_INDEX)));
         stats.put(MLClusterLevelStat.ML_MODEL_COUNT, new MLStat<>(true, new CounterSupplier()));
-        stats.put(MLClusterLevelStat.ML_CONNECTOR_COUNT, new MLStat<>(true, new CounterSupplier()));
         // node level stats
         stats.put(MLNodeLevelStat.ML_NODE_EXECUTING_TASK_COUNT, new MLStat<>(false, new CounterSupplier()));
         stats.put(MLNodeLevelStat.ML_NODE_TOTAL_REQUEST_COUNT, new MLStat<>(false, new CounterSupplier()));
@@ -388,7 +402,24 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin {
 
         // Register thread-safe ML objects here.
         LocalSampleCalculator localSampleCalculator = new LocalSampleCalculator(client, settings);
+        toolFactories = new HashMap<>();
+
+        MLModelTool.Factory.getInstance().init(client);
+        MathTool.Factory.getInstance().init(scriptService);
+        VectorDBTool.Factory.getInstance().init(client, xContentRegistry);
+        AgentTool.Factory.getInstance().init(client);
+        toolFactories.put(MLModelTool.NAME, MLModelTool.Factory.getInstance());
+        toolFactories.put(MathTool.NAME, MathTool.Factory.getInstance());
+        toolFactories.put(VectorDBTool.NAME, VectorDBTool.Factory.getInstance());
+        toolFactories.put(AgentTool.NAME, AgentTool.Factory.getInstance());
+
+        toolFactories.putAll(externalToolFactories);
+
+        Map<String, Memory> memoryMap = new HashMap<>();
+        memoryMap.put(ConversationBufferWindowMemory.TYPE, new ConversationBufferWindowMemory());
+        MLAgentExecutor agentExecutor = new MLAgentExecutor(client, settings, clusterService, xContentRegistry, toolFactories, memoryMap);
         MLEngineClassLoader.register(FunctionName.LOCAL_SAMPLE_CALCULATOR, localSampleCalculator);
+        MLEngineClassLoader.register(FunctionName.AGENT, agentExecutor);
 
         AnomalyLocalizerImpl anomalyLocalizer = new AnomalyLocalizerImpl(client, settings, clusterService, indexNameExpressionResolver);
         MLEngineClassLoader.register(FunctionName.ANOMALY_LOCALIZATION, anomalyLocalizer);
@@ -471,6 +502,7 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin {
         RestMLSearchTaskAction restMLSearchTaskAction = new RestMLSearchTaskAction();
         RestMLProfileAction restMLProfileAction = new RestMLProfileAction(clusterService);
         RestMLRegisterModelAction restMLRegisterModelAction = new RestMLRegisterModelAction(clusterService, settings);
+        RestMLRegisterAgentAction restMLRegisterAgentAction = new RestMLRegisterAgentAction();
         RestMLDeployModelAction restMLDeployModelAction = new RestMLDeployModelAction();
         RestMLUndeployModelAction restMLUndeployModelAction = new RestMLUndeployModelAction(clusterService, settings);
         RestMLRegisterModelMetaAction restMLRegisterModelMetaAction = new RestMLRegisterModelMetaAction(clusterService, settings);
@@ -498,6 +530,7 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin {
                 restMLSearchTaskAction,
                 restMLProfileAction,
                 restMLRegisterModelAction,
+                restMLRegisterAgentAction,
                 restMLDeployModelAction,
                 restMLUndeployModelAction,
                 restMLRegisterModelMetaAction,
@@ -617,5 +650,31 @@ public class MachineLearningPlugin extends Plugin implements ActionPlugin {
                 MLCommonsSettings.ML_COMMONS_LOCAL_MODEL_ELIGIBLE_NODE_ROLES
             );
         return settings;
+    }
+
+    @Override
+    public void loadExtensions(ExtensionLoader loader) {
+        externalTools = new HashMap<>();
+        externalToolFactories = new HashMap<>();
+        for (MLCommonsExtension extension : loader.loadExtensions(MLCommonsExtension.class)) {
+            List<Tool> tools = extension.getTools();
+            if (tools != null) {
+                for (Tool tool : tools) {
+                    externalTools.put(tool.getName(), tool);
+                }
+            }
+
+            List<Tool.Factory> toolFactories = extension.getToolFactories();
+            for (Tool.Factory toolFactory : toolFactories) {
+                ToolAnnotation toolAnnotation = toolFactory.getClass().getDeclaringClass().getAnnotation(ToolAnnotation.class);
+                if (toolAnnotation == null) {
+                    throw new IllegalArgumentException(
+                        "Missing ToolAnnotation for Tool " + toolFactory.getClass().getDeclaringClass().getSimpleName()
+                    );
+                }
+                String annotationValue = toolAnnotation.value();
+                externalToolFactories.put(annotationValue, toolFactory);
+            }
+        }
     }
 }
