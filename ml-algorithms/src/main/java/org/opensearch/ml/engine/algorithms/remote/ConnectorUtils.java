@@ -81,7 +81,12 @@ public class ConnectorUtils {
         return inputData;
     }
     private static RemoteInferenceInputDataSet processTextDocsInput(TextDocsInputDataSet inputDataSet, Connector connector, Map<String, String> parameters, ScriptService scriptService) {
-        List<String> docs = new ArrayList<>(inputDataSet.getDocs());
+        List<String> docs = new ArrayList<>();
+        for (String doc : inputDataSet.getDocs()) {
+            if (doc != null) {
+                docs.add(gson.toJson(doc));
+            }
+        }
         Optional<ConnectorAction> predictAction = connector.findPredictAction();
         if (predictAction.isEmpty()) {
             throw new IllegalArgumentException("no predict action found");
