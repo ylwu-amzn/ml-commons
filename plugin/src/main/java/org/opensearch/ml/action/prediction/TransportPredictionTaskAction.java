@@ -86,7 +86,7 @@ public class TransportPredictionTaskAction extends HandledTransportAction<Action
         final User userInfo = user;
 
         try (ThreadContext.StoredContext context = client.threadPool().getThreadContext().stashContext()) {
-            mlModelManager.getModel(modelId, ActionListener.wrap(mlModel -> {
+            mlModelManager.getModel(modelId, ActionListener.runBefore(ActionListener.wrap(mlModel -> {
                 FunctionName functionName = mlModel.getAlgorithm();
                 mlPredictionTaskRequest.getMlInput().setAlgorithm(functionName);
                 modelAccessControlHelper
@@ -115,7 +115,7 @@ public class TransportPredictionTaskAction extends HandledTransportAction<Action
             }, e -> {
                 log.error("Failed to find model " + modelId, e);
                 listener.onFailure(e);
-            }));
+            }), () -> context.restore()));
 
         }
     }
