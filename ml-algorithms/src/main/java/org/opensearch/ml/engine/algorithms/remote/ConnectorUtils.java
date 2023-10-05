@@ -73,6 +73,11 @@ public class ConnectorUtils {
             if (!processedResponse.isPresent()) {
                 throw new IllegalArgumentException("Wrong input");
             }
+            try {
+                gson.fromJson(processedResponse.get(), Map.class);
+            } catch (Exception e) {
+                System.out.println("---------------aaa\n" + processedResponse.get());
+            }
             Map<String, Object> map = gson.fromJson(processedResponse.get(), Map.class);
             Map<String, Object> parametersMap = (Map<String, Object>) map.get("parameters");
             Map<String, String> processedParameters = new HashMap<>();
