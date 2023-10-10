@@ -34,6 +34,10 @@ import org.opensearch.transport.TransportService;
 
 import lombok.extern.log4j.Log4j2;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
 @Log4j2
 public class DeleteConnectorTransportAction extends HandledTransportAction<ActionRequest, DeleteResponse> {
 
@@ -70,6 +74,7 @@ public class DeleteConnectorTransportAction extends HandledTransportAction<Actio
                     searchRequest.source(sourceBuilder);
                     client.search(searchRequest, ActionListener.runBefore(ActionListener.wrap(searchResponse -> {
                         SearchHit[] searchHits = searchResponse.getHits().getHits();
+
                         if (searchHits.length == 0) {
                             deleteConnector(deleteRequest, connectorId, actionListener);
                         } else {
@@ -77,11 +82,15 @@ public class DeleteConnectorTransportAction extends HandledTransportAction<Actio
                                 .error(
                                     searchHits.length + " models are still using this connector, please delete or update the models first!"
                                 );
+                            List<String> modelIds = new ArrayList<>();
+                            for (SearchHit hit : searchHits) {
+                                modelIds.add(hit.getId());
+                            }
                             actionListener
                                 .onFailure(
                                     new MLValidationException(
-                                        searchHits.length
-                                            + " models are still using this connector, please delete or update the models first!"
+                                            searchHits.length
+                                            + " models are still using this connector, please delete or update the models first: " + Arrays.toString(modelIds.toArray(new String[0]))
                                     )
                                 );
                         }

@@ -56,6 +56,7 @@ public class MLCreateConnectorInput implements ToXContentObject, Writeable {
     private Boolean addAllBackendRoles;
     private AccessMode access;
     private boolean dryRun = false;
+    private boolean updateConnector = false;
 
     @Builder(toBuilder = true)
     public MLCreateConnectorInput(String name,
@@ -68,9 +69,10 @@ public class MLCreateConnectorInput implements ToXContentObject, Writeable {
                                   List<String> backendRoles,
                                   Boolean addAllBackendRoles,
                                   AccessMode access,
-                                  boolean dryRun
+                                  boolean dryRun,
+                                  boolean updateConnector
     ) {
-        if (!dryRun) {
+        if (!dryRun && !updateConnector) {
             if (name == null) {
                 throw new IllegalArgumentException("Connector name is null");
             }
@@ -95,6 +97,10 @@ public class MLCreateConnectorInput implements ToXContentObject, Writeable {
     }
 
     public static MLCreateConnectorInput parse(XContentParser parser) throws IOException {
+        return parse(parser, false);
+    }
+
+    public static MLCreateConnectorInput parse(XContentParser parser, boolean updateConnector) throws IOException {
         String name = null;
         String description = null;
         String version = null;
@@ -159,7 +165,7 @@ public class MLCreateConnectorInput implements ToXContentObject, Writeable {
                     break;
             }
         }
-        return new MLCreateConnectorInput(name, description, version, protocol, parameters, credential, actions, backendRoles, addAllBackendRoles, access, dryRun);
+        return new MLCreateConnectorInput(name, description, version, protocol, parameters, credential, actions, backendRoles, addAllBackendRoles, access, dryRun, updateConnector);
     }
 
     @Override
@@ -201,10 +207,10 @@ public class MLCreateConnectorInput implements ToXContentObject, Writeable {
 
     @Override
     public void writeTo(StreamOutput output) throws IOException {
-        output.writeString(name);
+        output.writeOptionalString(name);
         output.writeOptionalString(description);
-        output.writeString(version);
-        output.writeString(protocol);
+        output.writeOptionalString(version);
+        output.writeOptionalString(protocol);
         if (parameters != null) {
             output.writeBoolean(true);
             output.writeMap(parameters, StreamOutput::writeString, StreamOutput::writeString);
@@ -243,10 +249,10 @@ public class MLCreateConnectorInput implements ToXContentObject, Writeable {
     }
 
     public MLCreateConnectorInput(StreamInput input) throws IOException {
-        name = input.readString();
+        name = input.readOptionalString();
         description = input.readOptionalString();
-        version = input.readString();
-        protocol = input.readString();
+        version = input.readOptionalString();
+        protocol = input.readOptionalString();
         if (input.readBoolean()) {
             parameters = input.readMap(s -> s.readString(), s -> s.readString());
         }

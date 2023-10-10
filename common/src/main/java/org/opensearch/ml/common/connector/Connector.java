@@ -30,6 +30,7 @@ import org.opensearch.core.xcontent.XContentParser;
 import org.opensearch.ml.common.AccessMode;
 import org.opensearch.ml.common.MLCommonsClassLoader;
 import org.opensearch.ml.common.output.model.ModelTensor;
+import org.opensearch.ml.common.transport.connector.MLCreateConnectorInput;
 
 import java.io.IOException;
 import java.security.AccessController;
@@ -80,6 +81,7 @@ public interface Connector extends ToXContentObject, Writeable {
 
     void writeTo(StreamOutput out) throws IOException;
 
+    void update(MLCreateConnectorInput updateContent);
 
     <T> void parseResponse(T orElse, List<ModelTensor> modelTensors, boolean b) throws IOException;
 

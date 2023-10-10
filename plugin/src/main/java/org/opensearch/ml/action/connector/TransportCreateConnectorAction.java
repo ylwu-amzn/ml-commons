@@ -94,7 +94,7 @@ public class TransportCreateConnectorAction extends HandledTransportAction<Actio
             XContentBuilder builder = XContentFactory.jsonBuilder();
             mlCreateConnectorInput.toXContent(builder, ToXContent.EMPTY_PARAMS);
             Connector connector = Connector.createConnector(builder, mlCreateConnectorInput.getProtocol());
-            connector.validateConnectorURL(trustedConnectorEndpointsRegex);
+            connector.validateConnectorURL(trustedConnectorEndpointsRegex);//
 
             User user = RestActionUtils.getUserContext(client);
             if (connectorAccessControlHelper.accessControlNotEnabled(user)) {

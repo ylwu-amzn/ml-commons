@@ -26,25 +26,28 @@ import static org.opensearch.action.ValidateActions.addValidationError;
 @Getter
 public class MLUpdateConnectorRequest extends ActionRequest {
     String connectorId;
-    Map<String, Object> updateContent;
+    MLCreateConnectorInput updateContent;
 
     @Builder
-    public MLUpdateConnectorRequest(String connectorId, Map<String, Object> updateContent) {
+    public MLUpdateConnectorRequest(String connectorId, MLCreateConnectorInput updateContent) {
         this.connectorId = connectorId;
+        if (updateContent == null) {
+            throw new IllegalArgumentException("wrong update connector content");
+        }
         this.updateContent = updateContent;
     }
 
     public MLUpdateConnectorRequest(StreamInput in) throws IOException {
         super(in);
         this.connectorId = in.readString();
-        this.updateContent = in.readMap();
+        this.updateContent = new MLCreateConnectorInput(in);
     }
 
     @Override
     public void writeTo(StreamOutput out) throws IOException {
         super.writeTo(out);
         out.writeString(this.connectorId);
-        out.writeMap(this.getUpdateContent());
+        this.updateContent.writeTo(out);
     }
 
     @Override
@@ -59,10 +62,9 @@ public class MLUpdateConnectorRequest extends ActionRequest {
     }
 
     public static MLUpdateConnectorRequest parse(XContentParser parser, String connectorId) throws IOException {
-        Map<String, Object> dataAsMap = null;
-        dataAsMap = parser.map();
+        MLCreateConnectorInput updateContent = MLCreateConnectorInput.parse(parser, true);
 
-        return MLUpdateConnectorRequest.builder().connectorId(connectorId).updateContent(dataAsMap).build();
+        return MLUpdateConnectorRequest.builder().connectorId(connectorId).updateContent(updateContent).build();
     }
 
     public static MLUpdateConnectorRequest fromActionRequest(ActionRequest actionRequest) {
