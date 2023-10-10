@@ -250,7 +250,7 @@ public class HttpConnector extends AbstractConnector {
     }
 
     @Override
-    public void update(MLCreateConnectorInput updateContent) {
+    public void update(MLCreateConnectorInput updateContent, Function<String, String> function) {
         if (updateContent.getName() != null) {
             this.name = updateContent.getName();
         }
@@ -268,6 +268,7 @@ public class HttpConnector extends AbstractConnector {
         }
         if (updateContent.getCredential() != null && updateContent.getCredential().size() > 0) {
             this.credential = updateContent.getCredential();
+            encrypt(function);
         }
         if (updateContent.getActions() != null) {
             this.actions = updateContent.getActions();

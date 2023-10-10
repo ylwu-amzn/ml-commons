@@ -98,9 +98,8 @@ public class UpdateConnectorTransportAction extends HandledTransportAction<Actio
 //                    connectorBuilder.toString();
 //                    updateBuilder.toString();
 
-                    connector.update(mlUpdateConnectorAction.getUpdateContent());
+                    connector.update(mlUpdateConnectorAction.getUpdateContent(), mlEngine::encrypt);
                     connector.validateConnectorURL(trustedConnectorEndpointsRegex);
-                    connector.encrypt(mlEngine::encrypt);
 
                     XContentBuilder connectorBuilder = XContentFactory.jsonBuilder();
                     connectorBuilder = connector.toXContent(connectorBuilder, ToXContent.EMPTY_PARAMS);
