@@ -263,10 +263,10 @@ public class HttpConnector extends AbstractConnector {
         if (updateContent.getProtocol() != null) {
             this.protocol = updateContent.getProtocol();
         }
-        if (updateContent.getParameters() != null) {
+        if (updateContent.getParameters() != null && updateContent.getParameters().size() > 0) {
             this.parameters = updateContent.getParameters();
         }
-        if (updateContent.getCredential() != null) {
+        if (updateContent.getCredential() != null && updateContent.getCredential().size() > 0) {
             this.credential = updateContent.getCredential();
         }
         if (updateContent.getActions() != null) {
