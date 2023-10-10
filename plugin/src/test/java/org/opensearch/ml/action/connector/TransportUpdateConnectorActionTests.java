@@ -145,7 +145,10 @@ public class TransportUpdateConnectorActionTests extends OpenSearchTestCase {
             actionFilters,
             client,
             connectorAccessControlHelper,
-            mlModelManager
+            mlModelManager,
+                settings,
+                clusterService,
+                mlEngine
         );
 
         when(mlModelManager.getAllModelIds()).thenReturn(new String[] {});

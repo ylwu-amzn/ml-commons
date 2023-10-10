@@ -57,7 +57,7 @@ public class UpdateConnectorTransportAction extends HandledTransportAction<Actio
 
     ConnectorAccessControlHelper connectorAccessControlHelper;
     MLModelManager mlModelManager;
-    MLEngine mlEngine
+    MLEngine mlEngine;
     volatile List<String> trustedConnectorEndpointsRegex;
 
     @Inject
@@ -75,6 +75,7 @@ public class UpdateConnectorTransportAction extends HandledTransportAction<Actio
         this.client = client;
         this.connectorAccessControlHelper = connectorAccessControlHelper;
         this.mlModelManager = mlModelManager;
+        this.mlEngine = mlEngine;
         trustedConnectorEndpointsRegex = ML_COMMONS_TRUSTED_CONNECTOR_ENDPOINTS_REGEX.get(settings);
         clusterService
                 .getClusterSettings()
