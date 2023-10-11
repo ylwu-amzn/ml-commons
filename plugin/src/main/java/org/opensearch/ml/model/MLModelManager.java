@@ -934,7 +934,7 @@ public class MLModelManager {
                             clusterService
                         );
                     // deploy remote model or model trained by built-in algorithm like kmeans
-                    if (mlModel.getConnector() != null) {
+                    if (mlModel.getConnector() != null || FunctionName.REMOTE != mlModel.getAlgorithm()) {
                         setupPredictable(modelId, mlModel, params);
                         wrappedListener.onResponse("successful");
                         return;

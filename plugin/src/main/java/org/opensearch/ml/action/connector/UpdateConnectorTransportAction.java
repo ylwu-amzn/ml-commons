@@ -22,6 +22,7 @@ import org.opensearch.common.inject.Inject;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.common.util.concurrent.ThreadContext;
 import org.opensearch.common.xcontent.XContentFactory;
+import org.opensearch.common.xcontent.XContentType;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.xcontent.ToXContent;
 import org.opensearch.core.xcontent.XContentBuilder;
@@ -87,7 +88,8 @@ public class UpdateConnectorTransportAction extends HandledTransportAction<Actio
         MLUpdateConnectorRequest mlUpdateConnectorAction = MLUpdateConnectorRequest.fromActionRequest(request);
         String connectorId = mlUpdateConnectorAction.getConnectorId();
 
-        try (ThreadContext.StoredContext context = client.threadPool().getThreadContext().stashContext()) {
+        try ( XContentBuilder connectorBuilder = XContentBuilder.builder(XContentType.JSON.xContent());
+              ThreadContext.StoredContext context = client.threadPool().getThreadContext().stashContext()) {
             connectorAccessControlHelper.getConnector(client, connectorId, ActionListener.wrap(connector -> {
                 boolean hasPermission = connectorAccessControlHelper.validateConnectorAccess(client, connector);
                 if (Boolean.TRUE.equals(hasPermission)) {
@@ -101,11 +103,15 @@ public class UpdateConnectorTransportAction extends HandledTransportAction<Actio
                     connector.update(mlUpdateConnectorAction.getUpdateContent(), mlEngine::encrypt);
                     connector.validateConnectorURL(trustedConnectorEndpointsRegex);
 
-                    XContentBuilder connectorBuilder = XContentFactory.jsonBuilder();
-                    connectorBuilder = connector.toXContent(connectorBuilder, ToXContent.EMPTY_PARAMS);
+//                    XContentBuilder connectorBuilder = XContentFactory.jsonBuilder();
+
+//                    connectorBuilder.startObject();
+//                    connector.toXContent(connectorBuilder, ToXContent.EMPTY_PARAMS);
+//                    connectorBuilder.endObject();
 
                     UpdateRequest updateRequest = new UpdateRequest(ML_CONNECTOR_INDEX, connectorId);
-                    updateRequest.doc(connectorBuilder);
+//                    updateRequest.doc(connectorBuilder);
+                    updateRequest.doc(connector.toXContent(XContentBuilder.builder(XContentType.JSON.xContent()), ToXContent.EMPTY_PARAMS));
                     updateUndeployedConnector(connectorId, updateRequest, listener, context);
                 } else {
                     listener
