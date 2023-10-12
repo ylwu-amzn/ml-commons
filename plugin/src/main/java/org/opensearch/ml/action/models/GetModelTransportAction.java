@@ -38,21 +38,33 @@ import org.opensearch.ml.helper.ModelAccessControlHelper;
 import org.opensearch.ml.utils.RestActionUtils;
 import org.opensearch.search.fetch.subphase.FetchSourceContext;
 import org.opensearch.tasks.Task;
+import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.transport.TransportService;
 
 import lombok.AccessLevel;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.log4j.Log4j2;
 
+import javax.naming.InvalidNameException;
+import javax.naming.ldap.LdapName;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
 @Log4j2
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class GetModelTransportAction extends HandledTransportAction<ActionRequest, MLModelGetResponse> {
-
+    public static final String SECURITY_AUTHCZ_ADMIN_DN = "plugins.security.authcz.admin_dn";
+    public static final String OPENDISTRO_SECURITY_CONFIG_PREFIX = "_opendistro_security_";
+    public static final String OPENDISTRO_SECURITY_SSL_PRINCIPAL = OPENDISTRO_SECURITY_CONFIG_PREFIX + "ssl_principal";
     Client client;
     NamedXContentRegistry xContentRegistry;
     ClusterService clusterService;
 
     ModelAccessControlHelper modelAccessControlHelper;
+    final Set<LdapName> adminDn = new HashSet<LdapName>();
+    ThreadPool threadPool;
 
     @Inject
     public GetModelTransportAction(
@@ -61,13 +73,15 @@ public class GetModelTransportAction extends HandledTransportAction<ActionReques
         Client client,
         NamedXContentRegistry xContentRegistry,
         ClusterService clusterService,
-        ModelAccessControlHelper modelAccessControlHelper
+        ModelAccessControlHelper modelAccessControlHelper,
+        ThreadPool threadPool
     ) {
         super(MLModelGetAction.NAME, transportService, actionFilters, MLModelGetRequest::new);
         this.client = client;
         this.xContentRegistry = xContentRegistry;
         this.clusterService = clusterService;
         this.modelAccessControlHelper = modelAccessControlHelper;
+        this.threadPool = threadPool;
     }
 
     @Override
@@ -77,6 +91,10 @@ public class GetModelTransportAction extends HandledTransportAction<ActionReques
         FetchSourceContext fetchSourceContext = getFetchSourceContext(mlModelGetRequest.isReturnContent());
         GetRequest getRequest = new GetRequest(ML_MODEL_INDEX).id(modelId).fetchSourceContext(fetchSourceContext);
         User user = RestActionUtils.getUserContext(client);
+
+        if (!isAdminDN()) {
+            actionListener.onFailure(new OpenSearchStatusException("You don't have permission to access this model", RestStatus.FORBIDDEN));
+        }
 
         try (ThreadContext.StoredContext context = client.threadPool().getThreadContext().stashContext()) {
             ActionListener<MLModelGetResponse> wrappedListener = ActionListener.runBefore(actionListener, () -> context.restore());
@@ -134,5 +152,46 @@ public class GetModelTransportAction extends HandledTransportAction<ActionReques
             actionListener.onFailure(e);
         }
 
+    }
+
+    public boolean isAdminDN() {
+        final List<String> adminDnsA = clusterService.getSettings().getAsList(SECURITY_AUTHCZ_ADMIN_DN, Collections.emptyList());
+
+        for (String dn : adminDnsA) {
+            try {
+                log.debug("{} is registered as an admin dn", dn);
+                adminDn.add(new LdapName(dn));
+            } catch (final InvalidNameException e) {
+                log.error("Unable to parse admin dn {}", dn, e);
+            }
+        }
+
+        ThreadContext threadContext = this.threadPool.getThreadContext();
+        final String sslPrincipal = (String) threadContext.getTransient(OPENDISTRO_SECURITY_SSL_PRINCIPAL);
+        boolean adminDN = isAdminDN(sslPrincipal);
+        return adminDN;
+    }
+
+    public boolean isAdminDN(String dn) {
+
+        if (dn == null) return false;
+
+        try {
+            return isAdminDN(new LdapName(dn));
+        } catch (InvalidNameException e) {
+            return false;
+        }
+    }
+
+    private boolean isAdminDN(LdapName dn) {
+        if (dn == null) return false;
+
+        boolean isAdmin = adminDn.contains(dn);
+
+        if (log.isTraceEnabled()) {
+            log.trace("Is principal {} an admin cert? {}", dn.toString(), isAdmin);
+        }
+
+        return isAdmin;
     }
 }
