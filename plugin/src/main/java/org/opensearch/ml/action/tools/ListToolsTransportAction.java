@@ -9,9 +9,9 @@ import org.opensearch.action.support.ActionFilters;
 import org.opensearch.action.support.HandledTransportAction;
 import org.opensearch.common.inject.Inject;
 import org.opensearch.ml.common.ToolMetadata;
-import org.opensearch.ml.common.transport.tools.MLGetToolsAction;
-import org.opensearch.ml.common.transport.tools.MLToolsGetRequest;
-import org.opensearch.ml.common.transport.tools.MLToolsGetResponse;
+import org.opensearch.ml.common.transport.tools.MLListToolsAction;
+import org.opensearch.ml.common.transport.tools.MLToolsListRequest;
+import org.opensearch.ml.common.transport.tools.MLToolsListResponse;
 import org.opensearch.tasks.Task;
 import org.opensearch.transport.TransportService;
 
@@ -21,20 +21,20 @@ import java.util.List;
 
 @Log4j2
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-public class GetToolsTransportAction extends HandledTransportAction<ActionRequest, MLToolsGetResponse> {
+public class ListToolsTransportAction extends HandledTransportAction<ActionRequest, MLToolsListResponse> {
     @Inject
-    public GetToolsTransportAction(
+    public ListToolsTransportAction(
             TransportService transportService,
             ActionFilters actionFilters
     ) {
-        super(MLGetToolsAction.NAME, transportService, actionFilters, MLToolsGetRequest::new);
+        super(MLListToolsAction.NAME, transportService, actionFilters, MLToolsListRequest::new);
     }
 
     @Override
-    protected void doExecute(Task task, ActionRequest request, ActionListener<MLToolsGetResponse> listener) {
-        MLToolsGetRequest mlToolsGetRequest = MLToolsGetRequest.fromActionRequest(request);
+    protected void doExecute(Task task, ActionRequest request, ActionListener<MLToolsListResponse> listener) {
+        MLToolsListRequest mlToolsListRequest = MLToolsListRequest.fromActionRequest(request);
 
-        List<ToolMetadata> externalTools = mlToolsGetRequest.getExternalTools();
+        List<ToolMetadata> externalTools = mlToolsListRequest.getExternalTools();
         List<ToolMetadata> toolsList = new ArrayList<>(
                 Arrays.asList(
                         ToolMetadata.builder()
@@ -57,7 +57,7 @@ public class GetToolsTransportAction extends HandledTransportAction<ActionReques
         );
         toolsList.addAll(externalTools);
         try {
-            listener.onResponse(MLToolsGetResponse.builder()
+            listener.onResponse(MLToolsListResponse.builder()
                     .toolMetadata(toolsList)
                     .build());
         } catch (Exception e) {

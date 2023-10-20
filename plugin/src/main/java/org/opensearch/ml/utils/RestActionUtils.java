@@ -43,6 +43,8 @@ public class RestActionUtils {
     public static final String OPENSEARCH_DASHBOARDS_USER_AGENT = "OpenSearch Dashboards";
     public static final String[] UI_METADATA_EXCLUDE = new String[] { "ui_metadata" };
 
+    public static final String PARAMETER_TOOL_NAME = "tool_name";
+
     public static String getAlgorithm(RestRequest request) {
         String algorithm = request.param(PARAMETER_ALGORITHM);
         if (Strings.isNullOrEmpty(algorithm)) {

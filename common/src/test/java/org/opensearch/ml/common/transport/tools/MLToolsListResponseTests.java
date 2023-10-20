@@ -1,3 +1,8 @@
+/*
+ * Copyright OpenSearch Contributors
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 package org.opensearch.ml.common.transport.tools;
 
 import org.junit.Before;
@@ -16,7 +21,7 @@ import java.util.List;
 
 import static org.junit.Assert.*;
 
-public class MLToolsGetResponseTests {
+public class MLToolsListResponseTests {
     List<ToolMetadata> toolMetadataList;
 
     @Before
@@ -32,9 +37,9 @@ public class MLToolsGetResponseTests {
     @Test
     public void writeTo_success() throws IOException {
         BytesStreamOutput bytesStreamOutput = new BytesStreamOutput();
-        MLToolsGetResponse response = MLToolsGetResponse.builder().toolMetadata(toolMetadataList).build();
+        MLToolsListResponse response = MLToolsListResponse.builder().toolMetadata(toolMetadataList).build();
         response.writeTo(bytesStreamOutput);
-        MLToolsGetResponse parsedResponse = new MLToolsGetResponse(bytesStreamOutput.bytes().streamInput());
+        MLToolsListResponse parsedResponse = new MLToolsListResponse(bytesStreamOutput.bytes().streamInput());
         assertNotEquals(response.toolMetadataList, parsedResponse.toolMetadataList);
         assertEquals(response.toolMetadataList.get(0).getName(), parsedResponse.toolMetadataList.get(0).getName());
         assertEquals(response.toolMetadataList.get(0).getDescription(), parsedResponse.toolMetadataList.get(0).getDescription());
@@ -42,9 +47,9 @@ public class MLToolsGetResponseTests {
 
     @Test
     public void toXContentTest() throws IOException {
-        MLToolsGetResponse mlToolsGetResponse = MLToolsGetResponse.builder().toolMetadata(toolMetadataList).build();
+        MLToolsListResponse mlToolsListResponse = MLToolsListResponse.builder().toolMetadata(toolMetadataList).build();
         XContentBuilder builder = XContentFactory.contentBuilder(XContentType.JSON);
-        mlToolsGetResponse.toXContent(builder, ToXContent.EMPTY_PARAMS);
+        mlToolsListResponse.toXContent(builder, ToXContent.EMPTY_PARAMS);
         assertNotNull(builder);
         String jsonStr = Strings.toString(builder);
         assertEquals("{\"SearchWikipediaTool\":\"Useful when you need to use this tool to search general knowledge on wikipedia.\"}", jsonStr);

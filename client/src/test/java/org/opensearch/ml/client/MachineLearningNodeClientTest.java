@@ -49,9 +49,7 @@ import org.opensearch.ml.common.transport.task.MLTaskGetAction;
 import org.opensearch.ml.common.transport.task.MLTaskGetRequest;
 import org.opensearch.ml.common.transport.task.MLTaskGetResponse;
 import org.opensearch.ml.common.transport.task.MLTaskSearchAction;
-import org.opensearch.ml.common.transport.tools.MLGetToolsAction;
-import org.opensearch.ml.common.transport.tools.MLToolsGetRequest;
-import org.opensearch.ml.common.transport.tools.MLToolsGetResponse;
+import org.opensearch.ml.common.transport.tools.*;
 import org.opensearch.ml.common.transport.training.MLTrainingTaskAction;
 import org.opensearch.ml.common.transport.training.MLTrainingTaskRequest;
 import org.opensearch.ml.common.transport.trainpredict.MLTrainAndPredictionTaskAction;
@@ -118,7 +116,10 @@ public class MachineLearningNodeClientTest {
     ActionListener<SearchResponse> searchTaskActionListener;
 
     @Mock
-    ActionListener<List<ToolMetadata>> getToolsActionListener;
+    ActionListener<List<ToolMetadata>> listToolsActionListener;
+
+    @Mock
+    ActionListener<ToolMetadata> getToolActionListener;
 
     @InjectMocks
     MachineLearningNodeClient machineLearningNodeClient;
@@ -592,7 +593,7 @@ public class MachineLearningNodeClientTest {
     }
 
     @Test
-    public void getTools() {
+    public void listTools() {
         List<ToolMetadata> toolMetadataList = new ArrayList<>();
         ToolMetadata toolMetadata = ToolMetadata.builder()
                 .name("SearchWikipediaTool")
@@ -600,17 +601,39 @@ public class MachineLearningNodeClientTest {
                 .build();
         toolMetadataList.add(toolMetadata);
         doAnswer(invocation -> {
-            ActionListener<MLToolsGetResponse> actionListener = invocation.getArgument(2);
+            ActionListener<MLToolsListResponse> actionListener = invocation.getArgument(2);
 
-            actionListener.onResponse(MLToolsGetResponse.builder().toolMetadata(toolMetadataList).build());
+            actionListener.onResponse(MLToolsListResponse.builder().toolMetadata(toolMetadataList).build());
             return null;
-        }).when(client).execute(eq(MLGetToolsAction.INSTANCE), any(), any());
+        }).when(client).execute(eq(MLListToolsAction.INSTANCE), any(), any());
         ArgumentCaptor<List> argumentCaptor = ArgumentCaptor.forClass(List.class);
-        machineLearningNodeClient.getTools(getToolsActionListener);
+        machineLearningNodeClient.listTools(listToolsActionListener);
 
-        verify(client).execute(eq(MLGetToolsAction.INSTANCE), isA(MLToolsGetRequest.class), any());
-        verify(getToolsActionListener).onResponse(argumentCaptor.capture());
+        verify(client).execute(eq(MLListToolsAction.INSTANCE), isA(MLToolsListRequest.class), any());
+        verify(listToolsActionListener).onResponse(argumentCaptor.capture());
         assertEquals(toolMetadataList, argumentCaptor.getValue());
+    }
+
+    @Test
+    public void getTool() {
+        ToolMetadata toolMetadata = ToolMetadata.builder()
+                .name("SearchWikipediaTool")
+                .description("Useful when you need to use this tool to search general knowledge on wikipedia.")
+                .build();
+        doAnswer(invocation -> {
+            ActionListener<MLToolGetResponse> actionListener = invocation.getArgument(2);
+
+            actionListener.onResponse(MLToolGetResponse.builder().toolMetadata(toolMetadata).build());
+            return null;
+        }).when(client).execute(eq(MLGetToolAction.INSTANCE), any(), any());
+        ArgumentCaptor<ToolMetadata> argumentCaptor = ArgumentCaptor.forClass(ToolMetadata.class);
+        machineLearningNodeClient.getTool("SearchWikipediaTool", getToolActionListener);
+
+        verify(client).execute(eq(MLGetToolAction.INSTANCE), isA(MLToolGetRequest.class), any());
+        verify(getToolActionListener).onResponse(argumentCaptor.capture());
+        assertEquals("SearchWikipediaTool", argumentCaptor.getValue().getName());
+        assertEquals("Useful when you need to use this tool to search general knowledge on wikipedia.", argumentCaptor.getValue().getDescription());
+
     }
 
 }

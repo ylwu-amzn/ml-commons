@@ -79,4 +79,9 @@ public class ToolMetadata implements ToXContentObject, Writeable {
                 .description(description)
                 .build();
     }
+
+    public static ToolMetadata fromStream(StreamInput in) throws IOException {
+        ToolMetadata toolMetadata = new ToolMetadata(in);
+        return toolMetadata;
+    }
 }
