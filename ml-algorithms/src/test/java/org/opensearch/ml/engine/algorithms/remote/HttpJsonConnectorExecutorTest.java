@@ -227,10 +227,11 @@ public class HttpJsonConnectorExecutorTest {
         when(response.getEntity()).thenReturn(entity);
         when(executor.getHttpClient()).thenReturn(httpClient);
         when(executor.getConnector()).thenReturn(connector);
-        MLInputDataset inputDataSet = TextDocsInputDataSet.builder().docs(Arrays.asList("test doc1", "test doc2")).build();
+        MLInputDataset inputDataSet = TextDocsInputDataSet.builder().docs(Arrays.asList("test doc1", "test doc2", "test doc3", "test doc4")).build();
         ModelTensorOutput modelTensorOutput = executor.executePredict(MLInput.builder().algorithm(FunctionName.REMOTE).inputDataset(inputDataSet).build());
-        Assert.assertEquals(1, modelTensorOutput.getMlModelOutputs().size());
+        Assert.assertEquals(2, modelTensorOutput.getMlModelOutputs().size());
         Assert.assertEquals(1, modelTensorOutput.getMlModelOutputs().get(0).getMlModelTensors().size());
+        Assert.assertEquals(1, modelTensorOutput.getMlModelOutputs().get(1).getMlModelTensors().size());
         Assert.assertEquals("sentence_embedding", modelTensorOutput.getMlModelOutputs().get(0).getMlModelTensors().get(0).getName());
         Assert.assertArrayEquals(new Number[] {-0.014555434, -0.002135904, 0.0035105038}, modelTensorOutput.getMlModelOutputs().get(0).getMlModelTensors().get(0).getData());
     }
