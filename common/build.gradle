@@ -13,6 +13,16 @@ plugins {
     id 'signing'
 }
 
+apply plugin: 'opensearch.java'
+apply plugin: 'opensearch.testclusters'
+apply plugin: 'opensearch.java-rest-test'
+
+repositories {
+    mavenLocal()
+    mavenCentral()
+    maven { url "https://aws.oss.sonatype.org/content/repositories/snapshots" }
+}
+
 dependencies {
     compileOnly group: 'org.opensearch', name: 'opensearch', version: "${opensearch_version}"
     compileOnly group: 'org.reflections', name: 'reflections', version: '0.9.12'
@@ -65,10 +75,6 @@ shadowJar {
     exclude 'META-INF/maven/com.google.guava/**'
     exclude 'com/google/thirdparty/**'
     relocate 'com.google.common', 'org.opensearch.ml.repackage.com.google.common' // dependency of cron-utils
-}
-
-jar {
-    enabled false
 }
 
 task sourcesJar(type: Jar) {
