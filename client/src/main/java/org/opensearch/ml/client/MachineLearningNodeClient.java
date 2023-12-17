@@ -26,11 +26,18 @@ import org.opensearch.core.action.ActionResponse;
 import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.common.MLModel;
 import org.opensearch.ml.common.MLTask;
-import org.opensearch.ml.common.input.Input;
+import org.opensearch.ml.common.agent.MLAgent;
 import org.opensearch.ml.common.input.MLInput;
 import org.opensearch.ml.common.input.parameter.MLAlgoParams;
 import org.opensearch.ml.common.output.MLOutput;
 import org.opensearch.ml.common.transport.MLTaskResponse;
+import org.opensearch.ml.common.transport.agent.MLAgentDeleteAction;
+import org.opensearch.ml.common.transport.agent.MLAgentDeleteRequest;
+import org.opensearch.ml.common.transport.agent.MLRegisterAgentAction;
+import org.opensearch.ml.common.transport.agent.MLRegisterAgentRequest;
+import org.opensearch.ml.common.transport.agent.MLRegisterAgentResponse;
+import org.opensearch.ml.common.transport.connector.MLConnectorDeleteAction;
+import org.opensearch.ml.common.transport.connector.MLConnectorDeleteRequest;
 import org.opensearch.ml.common.transport.connector.MLCreateConnectorAction;
 import org.opensearch.ml.common.transport.connector.MLCreateConnectorInput;
 import org.opensearch.ml.common.transport.connector.MLCreateConnectorRequest;
@@ -38,9 +45,6 @@ import org.opensearch.ml.common.transport.connector.MLCreateConnectorResponse;
 import org.opensearch.ml.common.transport.deploy.MLDeployModelAction;
 import org.opensearch.ml.common.transport.deploy.MLDeployModelRequest;
 import org.opensearch.ml.common.transport.deploy.MLDeployModelResponse;
-import org.opensearch.ml.common.transport.execute.MLExecuteTaskAction;
-import org.opensearch.ml.common.transport.execute.MLExecuteTaskRequest;
-import org.opensearch.ml.common.transport.execute.MLExecuteTaskResponse;
 import org.opensearch.ml.common.transport.model.MLModelDeleteAction;
 import org.opensearch.ml.common.transport.model.MLModelDeleteRequest;
 import org.opensearch.ml.common.transport.model.MLModelGetAction;
@@ -66,6 +70,9 @@ import org.opensearch.ml.common.transport.task.MLTaskSearchAction;
 import org.opensearch.ml.common.transport.training.MLTrainingTaskAction;
 import org.opensearch.ml.common.transport.training.MLTrainingTaskRequest;
 import org.opensearch.ml.common.transport.trainpredict.MLTrainAndPredictionTaskAction;
+import org.opensearch.ml.common.transport.undeploy.MLUndeployModelsAction;
+import org.opensearch.ml.common.transport.undeploy.MLUndeployModelsRequest;
+import org.opensearch.ml.common.transport.undeploy.MLUndeployModelsResponse;
 
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -191,19 +198,6 @@ public class MachineLearningNodeClient implements MachineLearningClient {
             );
     }
 
-    /**
-     * Execute an algorithm
-     *
-     * @param name     function name
-     * @param input    an algorithm input
-     * @param listener a listener to be notified of the result
-     */
-    @Override
-    public void execute(FunctionName name, Input input, ActionListener<MLExecuteTaskResponse> listener) {
-        MLExecuteTaskRequest mlExecuteTaskRequest = new MLExecuteTaskRequest(name, input);
-        client.execute(MLExecuteTaskAction.INSTANCE, mlExecuteTaskRequest, listener);
-    }
-
     @Override
     public void getTask(String taskId, ActionListener<MLTask> listener) {
         MLTaskGetRequest mlTaskGetRequest = MLTaskGetRequest.builder().taskId(taskId).build();
@@ -243,9 +237,47 @@ public class MachineLearningNodeClient implements MachineLearningClient {
     }
 
     @Override
+    public void undeploy(String[] modelIds, String[] nodeIds, ActionListener<MLUndeployModelsResponse> listener) {
+        MLUndeployModelsRequest undeployModelRequest = new MLUndeployModelsRequest(modelIds, nodeIds);
+        client.execute(MLUndeployModelsAction.INSTANCE, undeployModelRequest, getMlUndeployModelsResponseActionListener(listener));
+    }
+
+    @Override
     public void createConnector(MLCreateConnectorInput mlCreateConnectorInput, ActionListener<MLCreateConnectorResponse> listener) {
         MLCreateConnectorRequest createConnectorRequest = new MLCreateConnectorRequest(mlCreateConnectorInput);
         client.execute(MLCreateConnectorAction.INSTANCE, createConnectorRequest, getMlCreateConnectorResponseActionListener(listener));
+    }
+
+    @Override
+    public void deleteConnector(String connectorId, ActionListener<DeleteResponse> listener) {
+        MLConnectorDeleteRequest connectorDeleteRequest = new MLConnectorDeleteRequest(connectorId);
+        client.execute(MLConnectorDeleteAction.INSTANCE, connectorDeleteRequest, ActionListener.wrap(deleteResponse -> {
+            listener.onResponse(deleteResponse);
+        }, listener::onFailure));
+    }
+
+    @Override
+    public void registerAgent(MLAgent mlAgent, ActionListener<MLRegisterAgentResponse> listener) {
+        MLRegisterAgentRequest mlRegisterAgentRequest = MLRegisterAgentRequest.builder().mlAgent(mlAgent).build();
+        client.execute(MLRegisterAgentAction.INSTANCE, mlRegisterAgentRequest, getMLRegisterAgentResponseActionListener(listener));
+    }
+
+    @Override
+    public void deleteAgent(String agentId, ActionListener<DeleteResponse> listener) {
+        MLAgentDeleteRequest agentDeleteRequest = new MLAgentDeleteRequest(agentId);
+        client.execute(MLAgentDeleteAction.INSTANCE, agentDeleteRequest, ActionListener.wrap(deleteResponse -> {
+            listener.onResponse(deleteResponse);
+        }, listener::onFailure));
+    }
+
+    private ActionListener<MLRegisterAgentResponse> getMLRegisterAgentResponseActionListener(
+        ActionListener<MLRegisterAgentResponse> listener
+    ) {
+        ActionListener<MLRegisterAgentResponse> actionListener = wrapActionListener(listener, res -> {
+            MLRegisterAgentResponse mlRegisterAgentResponse = MLRegisterAgentResponse.fromActionResponse(res);
+            return mlRegisterAgentResponse;
+        });
+        return actionListener;
     }
 
     private ActionListener<MLTaskGetResponse> getMLTaskResponseActionListener(ActionListener<MLTask> listener) {
@@ -261,6 +293,16 @@ public class MachineLearningNodeClient implements MachineLearningClient {
     private ActionListener<MLDeployModelResponse> getMlDeployModelResponseActionListener(ActionListener<MLDeployModelResponse> listener) {
         ActionListener<MLDeployModelResponse> actionListener = wrapActionListener(listener, response -> {
             MLDeployModelResponse deployModelResponse = MLDeployModelResponse.fromActionResponse(response);
+            return deployModelResponse;
+        });
+        return actionListener;
+    }
+
+    private ActionListener<MLUndeployModelsResponse> getMlUndeployModelsResponseActionListener(
+        ActionListener<MLUndeployModelsResponse> listener
+    ) {
+        ActionListener<MLUndeployModelsResponse> actionListener = wrapActionListener(listener, response -> {
+            MLUndeployModelsResponse deployModelResponse = MLUndeployModelsResponse.fromActionResponse(response);
             return deployModelResponse;
         });
         return actionListener;

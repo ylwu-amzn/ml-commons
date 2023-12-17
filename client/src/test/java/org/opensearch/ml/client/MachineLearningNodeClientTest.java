@@ -6,6 +6,7 @@
 package org.opensearch.ml.client;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Answers.RETURNS_DEEP_STUBS;
 import static org.mockito.ArgumentMatchers.any;
@@ -23,7 +24,6 @@ import static org.opensearch.ml.common.input.Constants.TRAIN;
 import static org.opensearch.ml.common.input.Constants.TRAINANDPREDICT;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -44,6 +44,7 @@ import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.action.search.ShardSearchFailure;
 import org.opensearch.client.node.NodeClient;
+import org.opensearch.cluster.ClusterName;
 import org.opensearch.common.xcontent.XContentFactory;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.common.bytes.BytesReference;
@@ -58,22 +59,24 @@ import org.opensearch.ml.common.MLModel;
 import org.opensearch.ml.common.MLTask;
 import org.opensearch.ml.common.MLTaskState;
 import org.opensearch.ml.common.MLTaskType;
+import org.opensearch.ml.common.agent.MLAgent;
 import org.opensearch.ml.common.dataframe.DataFrame;
 import org.opensearch.ml.common.dataset.MLInputDataset;
-import org.opensearch.ml.common.input.Input;
 import org.opensearch.ml.common.input.MLInput;
-import org.opensearch.ml.common.input.execute.metricscorrelation.MetricsCorrelationInput;
 import org.opensearch.ml.common.model.MLModelConfig;
 import org.opensearch.ml.common.model.MLModelFormat;
 import org.opensearch.ml.common.model.TextEmbeddingModelConfig;
 import org.opensearch.ml.common.output.MLOutput;
 import org.opensearch.ml.common.output.MLPredictionOutput;
 import org.opensearch.ml.common.output.MLTrainingOutput;
-import org.opensearch.ml.common.output.Output;
-import org.opensearch.ml.common.output.execute.metrics_correlation.MCorrModelTensor;
-import org.opensearch.ml.common.output.execute.metrics_correlation.MCorrModelTensors;
-import org.opensearch.ml.common.output.execute.metrics_correlation.MetricsCorrelationOutput;
 import org.opensearch.ml.common.transport.MLTaskResponse;
+import org.opensearch.ml.common.transport.agent.MLAgentDeleteAction;
+import org.opensearch.ml.common.transport.agent.MLAgentDeleteRequest;
+import org.opensearch.ml.common.transport.agent.MLRegisterAgentAction;
+import org.opensearch.ml.common.transport.agent.MLRegisterAgentRequest;
+import org.opensearch.ml.common.transport.agent.MLRegisterAgentResponse;
+import org.opensearch.ml.common.transport.connector.MLConnectorDeleteAction;
+import org.opensearch.ml.common.transport.connector.MLConnectorDeleteRequest;
 import org.opensearch.ml.common.transport.connector.MLCreateConnectorAction;
 import org.opensearch.ml.common.transport.connector.MLCreateConnectorInput;
 import org.opensearch.ml.common.transport.connector.MLCreateConnectorRequest;
@@ -81,9 +84,6 @@ import org.opensearch.ml.common.transport.connector.MLCreateConnectorResponse;
 import org.opensearch.ml.common.transport.deploy.MLDeployModelAction;
 import org.opensearch.ml.common.transport.deploy.MLDeployModelRequest;
 import org.opensearch.ml.common.transport.deploy.MLDeployModelResponse;
-import org.opensearch.ml.common.transport.execute.MLExecuteTaskAction;
-import org.opensearch.ml.common.transport.execute.MLExecuteTaskRequest;
-import org.opensearch.ml.common.transport.execute.MLExecuteTaskResponse;
 import org.opensearch.ml.common.transport.model.MLModelDeleteAction;
 import org.opensearch.ml.common.transport.model.MLModelDeleteRequest;
 import org.opensearch.ml.common.transport.model.MLModelGetAction;
@@ -109,6 +109,10 @@ import org.opensearch.ml.common.transport.task.MLTaskSearchAction;
 import org.opensearch.ml.common.transport.training.MLTrainingTaskAction;
 import org.opensearch.ml.common.transport.training.MLTrainingTaskRequest;
 import org.opensearch.ml.common.transport.trainpredict.MLTrainAndPredictionTaskAction;
+import org.opensearch.ml.common.transport.undeploy.MLUndeployModelNodesResponse;
+import org.opensearch.ml.common.transport.undeploy.MLUndeployModelsAction;
+import org.opensearch.ml.common.transport.undeploy.MLUndeployModelsRequest;
+import org.opensearch.ml.common.transport.undeploy.MLUndeployModelsResponse;
 import org.opensearch.search.SearchHit;
 import org.opensearch.search.SearchHits;
 import org.opensearch.search.aggregations.InternalAggregations;
@@ -158,13 +162,22 @@ public class MachineLearningNodeClientTest {
     ActionListener<MLDeployModelResponse> deployModelActionListener;
 
     @Mock
+    ActionListener<MLUndeployModelsResponse> undeployModelsActionListener;
+
+    @Mock
     ActionListener<MLCreateConnectorResponse> createConnectorActionListener;
+
+    @Mock
+    ActionListener<DeleteResponse> deleteConnectorActionListener;
 
     @Mock
     ActionListener<MLRegisterModelGroupResponse> registerModelGroupResponseActionListener;
 
     @Mock
-    ActionListener<MLExecuteTaskResponse> executeTaskResponseActionListener;
+    ActionListener<MLRegisterAgentResponse> registerAgentResponseActionListener;
+
+    @Mock
+    ActionListener<DeleteResponse> deleteAgentActionListener;
 
     @InjectMocks
     MachineLearningNodeClient machineLearningNodeClient;
@@ -650,6 +663,33 @@ public class MachineLearningNodeClientTest {
     }
 
     @Test
+    public void undeploy() {
+        ClusterName clusterName = new ClusterName("clusterName");
+        String[] modelIds = new String[] { "modelId" };
+        String[] nodeIds = new String[] { "nodeId" };
+        doAnswer(invocation -> {
+            ActionListener<MLUndeployModelsResponse> actionListener = invocation.getArgument(2);
+            MLUndeployModelNodesResponse mlUndeployModelNodesResponse = new MLUndeployModelNodesResponse(
+                clusterName,
+                Collections.emptyList(),
+                Collections.emptyList()
+            );
+            MLUndeployModelsResponse output = new MLUndeployModelsResponse(mlUndeployModelNodesResponse);
+            actionListener.onResponse(output);
+            return null;
+        }).when(client).execute(eq(MLUndeployModelsAction.INSTANCE), any(), any());
+
+        ArgumentCaptor<MLUndeployModelsResponse> argumentCaptor = ArgumentCaptor.forClass(MLUndeployModelsResponse.class);
+        machineLearningNodeClient.undeploy(modelIds, nodeIds, undeployModelsActionListener);
+
+        verify(client).execute(eq(MLUndeployModelsAction.INSTANCE), isA(MLUndeployModelsRequest.class), any());
+        verify(undeployModelsActionListener).onResponse(argumentCaptor.capture());
+        assertEquals(clusterName, (argumentCaptor.getValue()).getResponse().getClusterName());
+        assertTrue((argumentCaptor.getValue()).getResponse().getNodes().isEmpty());
+        assertFalse((argumentCaptor.getValue()).getResponse().hasFailures());
+    }
+
+    @Test
     public void createConnector() {
 
         String connectorId = "connectorId";
@@ -691,82 +731,68 @@ public class MachineLearningNodeClientTest {
     }
 
     @Test
-    public void executeMetricsCorrelation() {
-        Output metricsCorrelationOutput;
-        List<MCorrModelTensors> outputs = new ArrayList<>();
-        MCorrModelTensor mCorrModelTensor = MCorrModelTensor
-            .builder()
-            .event_pattern(new float[] { 1.0f, 2.0f, 3.0f })
-            .event_window(new float[] { 4.0f, 5.0f, 6.0f })
-            .suspected_metrics(new long[] { 1, 2 })
-            .build();
-        List<MCorrModelTensor> mlModelTensors = Arrays.asList(mCorrModelTensor);
-        MCorrModelTensors modelTensors = MCorrModelTensors.builder().mCorrModelTensors(mlModelTensors).build();
-        outputs.add(modelTensors);
-        metricsCorrelationOutput = MetricsCorrelationOutput.builder().modelOutput(outputs).build();
+    public void deleteConnector() {
+
+        String connectorId = "connectorId";
 
         doAnswer(invocation -> {
-            ActionListener<MLExecuteTaskResponse> actionListener = invocation.getArgument(2);
-            MLExecuteTaskResponse output = new MLExecuteTaskResponse(FunctionName.METRICS_CORRELATION, metricsCorrelationOutput);
+            ActionListener<DeleteResponse> actionListener = invocation.getArgument(2);
+            ShardId shardId = new ShardId(new Index("indexName", "uuid"), 1);
+            DeleteResponse output = new DeleteResponse(shardId, connectorId, 1, 1, 1, true);
             actionListener.onResponse(output);
             return null;
-        }).when(client).execute(eq(MLExecuteTaskAction.INSTANCE), any(), any());
+        }).when(client).execute(eq(MLConnectorDeleteAction.INSTANCE), any(), any());
 
-        ArgumentCaptor<MLExecuteTaskResponse> argumentCaptor = ArgumentCaptor.forClass(MLExecuteTaskResponse.class);
+        ArgumentCaptor<DeleteResponse> argumentCaptor = ArgumentCaptor.forClass(DeleteResponse.class);
 
-        List<float[]> inputData = new ArrayList<>(
-            Arrays
-                .asList(
-                    new float[] {
-                        0.89451003f,
-                        4.2006273f,
-                        0.3697659f,
-                        2.2458954f,
-                        -4.671612f,
-                        -1.5076426f,
-                        1.635445f,
-                        -1.1394824f,
-                        -0.7503817f,
-                        0.98424894f,
-                        -0.38896716f,
-                        1.0328646f,
-                        1.9543738f,
-                        -0.5236269f,
-                        0.14298044f,
-                        3.2963762f,
-                        8.1641035f,
-                        5.717064f,
-                        7.4869685f,
-                        2.5987444f,
-                        11.018798f,
-                        9.151356f,
-                        5.7354255f,
-                        6.862203f,
-                        3.0524514f,
-                        4.431755f,
-                        5.1481285f,
-                        7.9548607f,
-                        7.4519925f,
-                        6.09533f,
-                        7.634116f,
-                        8.898271f,
-                        3.898491f,
-                        9.447067f,
-                        8.197385f,
-                        5.8284273f,
-                        5.804283f,
-                        7.089733f,
-                        9.140584f }
-                )
-        );
-        Input metricsCorrelationInput = MetricsCorrelationInput.builder().inputData(inputData).build();
+        machineLearningNodeClient.deleteConnector(connectorId, deleteConnectorActionListener);
 
-        machineLearningNodeClient.execute(FunctionName.METRICS_CORRELATION, metricsCorrelationInput, executeTaskResponseActionListener);
+        verify(client).execute(eq(MLConnectorDeleteAction.INSTANCE), isA(MLConnectorDeleteRequest.class), any());
+        verify(deleteConnectorActionListener).onResponse(argumentCaptor.capture());
+        assertEquals(connectorId, (argumentCaptor.getValue()).getId());
+    }
 
-        verify(client).execute(eq(MLExecuteTaskAction.INSTANCE), isA(MLExecuteTaskRequest.class), any());
-        verify(executeTaskResponseActionListener).onResponse(argumentCaptor.capture());
-        assertEquals(FunctionName.METRICS_CORRELATION, argumentCaptor.getValue().getFunctionName());
-        assertTrue(argumentCaptor.getValue().getOutput() instanceof MetricsCorrelationOutput);
+    @Test
+    public void testRegisterAgent() {
+        String agentId = "agentId";
+
+        doAnswer(invocation -> {
+            ActionListener<MLRegisterAgentResponse> actionListener = invocation.getArgument(2);
+            MLRegisterAgentResponse output = new MLRegisterAgentResponse(agentId);
+            actionListener.onResponse(output);
+            return null;
+        }).when(client).execute(eq(MLRegisterAgentAction.INSTANCE), any(), any());
+
+        ArgumentCaptor<MLRegisterAgentResponse> argumentCaptor = ArgumentCaptor.forClass(MLRegisterAgentResponse.class);
+        MLAgent mlAgent = MLAgent.builder().name("Agent name").build();
+
+        machineLearningNodeClient.registerAgent(mlAgent, registerAgentResponseActionListener);
+
+        verify(client).execute(eq(MLRegisterAgentAction.INSTANCE), isA(MLRegisterAgentRequest.class), any());
+        verify(registerAgentResponseActionListener).onResponse(argumentCaptor.capture());
+        assertEquals(agentId, (argumentCaptor.getValue()).getAgentId());
+    }
+
+    @Test
+    public void deleteAgent() {
+
+        String agentId = "agentId";
+
+        doAnswer(invocation -> {
+            ActionListener<DeleteResponse> actionListener = invocation.getArgument(2);
+            ShardId shardId = new ShardId(new Index("indexName", "uuid"), 1);
+            DeleteResponse output = new DeleteResponse(shardId, agentId, 1, 1, 1, true);
+            actionListener.onResponse(output);
+            return null;
+        }).when(client).execute(eq(MLAgentDeleteAction.INSTANCE), any(), any());
+
+        ArgumentCaptor<DeleteResponse> argumentCaptor = ArgumentCaptor.forClass(DeleteResponse.class);
+
+        machineLearningNodeClient.deleteAgent(agentId, deleteAgentActionListener);
+
+        verify(client).execute(eq(MLAgentDeleteAction.INSTANCE), isA(MLAgentDeleteRequest.class), any());
+        verify(deleteAgentActionListener).onResponse(argumentCaptor.capture());
+        assertEquals(agentId, (argumentCaptor.getValue()).getId());
     }
 
     private SearchResponse createSearchResponse(ToXContentObject o) throws IOException {
@@ -794,4 +820,5 @@ public class MachineLearningNodeClientTest {
             SearchResponse.Clusters.EMPTY
         );
     }
+
 }

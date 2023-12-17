@@ -12,7 +12,6 @@ import static org.opensearch.ml.common.input.Constants.ALGORITHM;
 import static org.opensearch.ml.common.input.Constants.KMEANS;
 import static org.opensearch.ml.common.input.Constants.TRAIN;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -31,25 +30,25 @@ import org.opensearch.ml.common.AccessMode;
 import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.common.MLModel;
 import org.opensearch.ml.common.MLTask;
+import org.opensearch.ml.common.agent.MLAgent;
 import org.opensearch.ml.common.dataframe.DataFrame;
 import org.opensearch.ml.common.dataset.DataFrameInputDataset;
-import org.opensearch.ml.common.input.Input;
 import org.opensearch.ml.common.input.MLInput;
-import org.opensearch.ml.common.input.execute.metricscorrelation.MetricsCorrelationInput;
 import org.opensearch.ml.common.input.parameter.MLAlgoParams;
 import org.opensearch.ml.common.model.MLModelConfig;
 import org.opensearch.ml.common.model.MLModelFormat;
 import org.opensearch.ml.common.model.TextEmbeddingModelConfig;
 import org.opensearch.ml.common.output.MLOutput;
 import org.opensearch.ml.common.output.MLTrainingOutput;
+import org.opensearch.ml.common.transport.agent.MLRegisterAgentResponse;
 import org.opensearch.ml.common.transport.connector.MLCreateConnectorInput;
 import org.opensearch.ml.common.transport.connector.MLCreateConnectorResponse;
 import org.opensearch.ml.common.transport.deploy.MLDeployModelResponse;
-import org.opensearch.ml.common.transport.execute.MLExecuteTaskResponse;
 import org.opensearch.ml.common.transport.model_group.MLRegisterModelGroupInput;
 import org.opensearch.ml.common.transport.model_group.MLRegisterModelGroupResponse;
 import org.opensearch.ml.common.transport.register.MLRegisterModelInput;
 import org.opensearch.ml.common.transport.register.MLRegisterModelResponse;
+import org.opensearch.ml.common.transport.undeploy.MLUndeployModelsResponse;
 
 public class MachineLearningClientTest {
 
@@ -80,13 +79,16 @@ public class MachineLearningClientTest {
     MLDeployModelResponse deployModelResponse;
 
     @Mock
+    MLUndeployModelsResponse undeployModelsResponse;
+
+    @Mock
     MLCreateConnectorResponse createConnectorResponse;
 
     @Mock
     MLRegisterModelGroupResponse registerModelGroupResponse;
 
     @Mock
-    MLExecuteTaskResponse mlExecuteTaskResponse;
+    MLRegisterAgentResponse registerAgentResponse;
 
     private String modekId = "test_model_id";
     private MLModel mlModel;
@@ -164,13 +166,18 @@ public class MachineLearningClientTest {
             }
 
             @Override
+            public void undeploy(String[] modelIds, String[] nodeIds, ActionListener<MLUndeployModelsResponse> listener) {
+                listener.onResponse(undeployModelsResponse);
+            }
+
+            @Override
             public void createConnector(MLCreateConnectorInput mlCreateConnectorInput, ActionListener<MLCreateConnectorResponse> listener) {
                 listener.onResponse(createConnectorResponse);
             }
 
             @Override
-            public void execute(FunctionName name, Input input, ActionListener<MLExecuteTaskResponse> listener) {
-                listener.onResponse(mlExecuteTaskResponse);
+            public void deleteConnector(String connectorId, ActionListener<DeleteResponse> listener) {
+                listener.onResponse(deleteResponse);
             }
 
             public void registerModelGroup(
@@ -178,6 +185,16 @@ public class MachineLearningClientTest {
                 ActionListener<MLRegisterModelGroupResponse> listener
             ) {
                 listener.onResponse(registerModelGroupResponse);
+            }
+
+            @Override
+            public void registerAgent(MLAgent mlAgent, ActionListener<MLRegisterAgentResponse> listener) {
+                listener.onResponse(registerAgentResponse);
+            }
+
+            @Override
+            public void deleteAgent(String agentId, ActionListener<DeleteResponse> listener) {
+                listener.onResponse(deleteResponse);
             }
         };
     }
@@ -345,6 +362,11 @@ public class MachineLearningClientTest {
     }
 
     @Test
+    public void undeploy() {
+        assertEquals(undeployModelsResponse, machineLearningClient.undeploy(new String[] { "modelId" }, null).actionGet());
+    }
+
+    @Test
     public void createConnector() {
         Map<String, String> params = Map.ofEntries(Map.entry("endpoint", "endpoint"), Map.entry("temp", "7"));
         Map<String, String> credentials = Map.ofEntries(Map.entry("key1", "key1"), Map.entry("key2", "key2"));
@@ -368,56 +390,18 @@ public class MachineLearningClientTest {
     }
 
     @Test
-    public void executeMetricsCorrelation() {
-        List<float[]> inputData = new ArrayList<>(
-            Arrays
-                .asList(
-                    new float[] {
-                        0.89451003f,
-                        4.2006273f,
-                        0.3697659f,
-                        2.2458954f,
-                        -4.671612f,
-                        -1.5076426f,
-                        1.635445f,
-                        -1.1394824f,
-                        -0.7503817f,
-                        0.98424894f,
-                        -0.38896716f,
-                        1.0328646f,
-                        1.9543738f,
-                        -0.5236269f,
-                        0.14298044f,
-                        3.2963762f,
-                        8.1641035f,
-                        5.717064f,
-                        7.4869685f,
-                        2.5987444f,
-                        11.018798f,
-                        9.151356f,
-                        5.7354255f,
-                        6.862203f,
-                        3.0524514f,
-                        4.431755f,
-                        5.1481285f,
-                        7.9548607f,
-                        7.4519925f,
-                        6.09533f,
-                        7.634116f,
-                        8.898271f,
-                        3.898491f,
-                        9.447067f,
-                        8.197385f,
-                        5.8284273f,
-                        5.804283f,
-                        7.089733f,
-                        9.140584f }
-                )
-        );
-        Input metricsCorrelationInput = MetricsCorrelationInput.builder().inputData(inputData).build();
-        assertEquals(
-            mlExecuteTaskResponse,
-            machineLearningClient.execute(FunctionName.METRICS_CORRELATION, metricsCorrelationInput).actionGet()
-        );
+    public void deleteConnector() {
+        assertEquals(deleteResponse, machineLearningClient.deleteConnector("connectorId").actionGet());
+    }
+
+    @Test
+    public void testRegisterAgent() {
+        MLAgent mlAgent = MLAgent.builder().name("Agent name").build();
+        assertEquals(registerAgentResponse, machineLearningClient.registerAgent(mlAgent).actionGet());
+    }
+
+    @Test
+    public void deleteAgent() {
+        assertEquals(deleteResponse, machineLearningClient.deleteAgent("agentId").actionGet());
     }
 }
