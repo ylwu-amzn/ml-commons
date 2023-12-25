@@ -183,6 +183,21 @@ public class MLChatAgentRunner implements MLAgentRunner {
         runReAct(mlAgent.getLlm(), tools, toolSpecMap, params, memory, sessionId, listener);
     }
 
+    private static String extractJson(String text) {
+        // Define the regex pattern to match the JSON part
+        Pattern pattern = Pattern.compile("```json\\s*([\\s\\S]+?)\\s*```");
+        Matcher matcher = pattern.matcher(text);
+
+        // Find the first match
+        if (matcher.find()) {
+            // Extract the JSON part from the matched group
+            return matcher.group(1);
+        } else {
+            // No match found
+            return null;
+        }
+    }
+
     private void runReAct(
         LLMSpec llm,
         Map<String, Tool> tools,
@@ -315,6 +330,11 @@ public class MLChatAgentRunner implements MLAgentRunner {
                     MLTaskResponse llmResponse = (MLTaskResponse) output;
                     ModelTensorOutput tmpModelTensorOutput = (ModelTensorOutput) llmResponse.getOutput();
                     Map<String, ?> dataAsMap = tmpModelTensorOutput.getMlModelOutputs().get(0).getMlModelTensors().get(0).getDataAsMap();
+                    if (dataAsMap.size() == 1 && dataAsMap.containsKey("response")) {
+                        String response = (String) dataAsMap.get("response");
+                        String thoughtResponse = extractJson(response);
+                        dataAsMap = gson.fromJson(thoughtResponse, Map.class);
+                    }
                     String thought = String.valueOf(dataAsMap.get("thought"));
                     String action = String.valueOf(dataAsMap.get("action"));
                     String actionInput = String.valueOf(dataAsMap.get("action_input"));
