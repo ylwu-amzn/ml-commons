@@ -41,7 +41,7 @@ public class RestMLGetModelControllerAction extends BaseRestHandler {
     public List<Route> routes() {
         return ImmutableList
             .of(
-                new Route(RestRequest.Method.GET, String.format(Locale.ROOT, "%s/model_controllers/{%s}", ML_BASE_URI, PARAMETER_MODEL_ID))
+                new Route(RestRequest.Method.GET, String.format(Locale.ROOT, "%s/controllers/{%s}", ML_BASE_URI, PARAMETER_MODEL_ID))
             );
     }
 

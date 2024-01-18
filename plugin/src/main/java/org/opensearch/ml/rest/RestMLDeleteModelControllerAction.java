@@ -40,7 +40,7 @@ public class RestMLDeleteModelControllerAction extends BaseRestHandler {
             .of(
                 new Route(
                     RestRequest.Method.DELETE,
-                    String.format(Locale.ROOT, "%s/model_controllers/{%s}", ML_BASE_URI, PARAMETER_MODEL_ID)
+                    String.format(Locale.ROOT, "%s/controllers/{%s}", ML_BASE_URI, PARAMETER_MODEL_ID)
                 )
             );
     }

@@ -171,7 +171,6 @@ public class CreateModelControllerTransportAction extends HandledTransportAction
         MLModelController modelController,
         ActionListener<MLCreateModelControllerResponse> actionListener
     ) {
-        log.info("Indexing the model controller into system index");
         mlIndicesHandler.initMLModelControllerIndex(ActionListener.wrap(indexCreated -> {
             if (!indexCreated) {
                 actionListener.onFailure(new RuntimeException("Failed to create model controller index."));

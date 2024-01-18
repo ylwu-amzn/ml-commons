@@ -32,7 +32,7 @@ import static org.opensearch.ml.common.utils.StringUtils.getParameterMap;
 public class MLModelController implements ToXContentObject, Writeable {
 
     public static final String MODEL_ID_FIELD = "model_id"; // mandatory
-    public static final String USER_RATE_LIMITER_CONFIG = "user_rate_limiter_config";
+    public static final String USER_RATE_LIMITER_CONFIG = "user_rate_limiter";
 
     @Getter
     private String modelId;

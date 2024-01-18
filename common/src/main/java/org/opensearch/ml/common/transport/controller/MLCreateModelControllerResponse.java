@@ -22,7 +22,7 @@ import java.io.UncheckedIOException;
 @Getter
 public class MLCreateModelControllerResponse extends ActionResponse implements ToXContentObject {
 
-    public static final String MODEL_ID_FIELD = "model_id";
+    public static final String CONTROLLER_ID_FIELD = "controller_id";
     public static final String STATUS_FIELD = "status";
 
     @Getter
@@ -50,7 +50,7 @@ public class MLCreateModelControllerResponse extends ActionResponse implements T
     @Override
     public XContentBuilder toXContent(XContentBuilder builder, Params params) throws IOException {
         builder.startObject();
-        builder.field(MODEL_ID_FIELD, modelId);
+        builder.field(CONTROLLER_ID_FIELD, modelId);
         builder.field(STATUS_FIELD, status);
         builder.endObject();
         return builder;

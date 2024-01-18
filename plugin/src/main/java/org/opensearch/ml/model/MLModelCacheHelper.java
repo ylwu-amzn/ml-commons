@@ -7,6 +7,7 @@ package org.opensearch.ml.model;
 
 import static org.opensearch.ml.settings.MLCommonsSettings.ML_COMMONS_MONITORING_REQUEST_COUNT;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -298,6 +299,11 @@ public class MLModelCacheHelper {
      */
     public synchronized boolean isModelDeployed(String modelId) {
         MLModelCache modelCache = modelCaches.get(modelId);
+        if (modelCache != null) {
+            log.info("ylwudebug1 ---------  model cache state: {}", modelCache.getModelState(), Arrays.toString(modelCache.getWorkerNodes()));
+        } else {
+            log.info("ylwudebug1 -------- model cache is null");
+        }
         return modelCache != null && modelCache.getModelState() == MLModelState.DEPLOYED;
     }
 
