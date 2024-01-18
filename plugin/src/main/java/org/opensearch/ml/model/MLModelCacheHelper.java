@@ -532,7 +532,7 @@ public class MLModelCacheHelper {
         MLModelProfile.MLModelProfileBuilder builder = MLModelProfile.builder();
         builder.modelState(modelCache.getModelState());
         if (modelCache.getPredictor() != null) {
-            builder.predictor(modelCache.getPredictor().toString());
+            builder.predictor(modelCache.getPredictor().toString() + ", " + modelCache.getIsModelEnabled() + ", " + modelCache.getModelRateLimiter() + ", " + modelCache.getUserRateLimiterMap());
         }
         String[] targetWorkerNodes = modelCache.getTargetWorkerNodes();
         if (targetWorkerNodes.length > 0) {
