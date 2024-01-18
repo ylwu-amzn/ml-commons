@@ -9,11 +9,13 @@ import java.io.IOException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
+import java.util.concurrent.TimeUnit;
 
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.opensearch.common.io.stream.BytesStreamOutput;
+import org.opensearch.common.util.TokenBucket;
 import org.opensearch.common.xcontent.XContentType;
 import org.opensearch.core.xcontent.ToXContent;
 import org.opensearch.core.xcontent.XContentBuilder;
@@ -71,5 +73,20 @@ public class MLTaskTests {
         task.toXContent(builder, ToXContent.EMPTY_PARAMS);
         String taskContent = TestHelper.xContentBuilderToString(builder);
         Assert.assertEquals("{\"is_async\":false}", taskContent);
+    }
+
+    @Test
+    public void test() {
+        long limit1 = 1;
+        long l = TimeUnit.MINUTES.toNanos(limit1);
+        long l2 = TimeUnit.MINUTES.toNanos(limit1 * 2);
+        double l3 = 16.0 / 2 / 4;
+        System.out.println(l);
+        double lt = limit1 / (double)l ;
+        TokenBucket bucket = new TokenBucket(System::nanoTime, lt, 1);
+        boolean request = bucket.request();
+        request = bucket.request();
+        request = bucket.request();
+        request = bucket.request();
     }
 }

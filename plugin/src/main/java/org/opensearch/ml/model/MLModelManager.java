@@ -1346,7 +1346,6 @@ public class MLModelManager {
         if (rateLimiter.isValid()) {
             double limit = rateLimiter.getLimit();
             TimeUnit unit = rateLimiter.getUnit();
-            limit = limit / unit.toNanos(1) / eligibleNodeCount;
             log
                 .info(
                     "Initializing the rate limiter with setting {} per {}, evenly distributed on {} nodes",
@@ -1354,7 +1353,7 @@ public class MLModelManager {
                     unit,
                     eligibleNodeCount
                 );
-            return new TokenBucket(System::nanoTime, limit, limit);
+            return new TokenBucket(System::nanoTime, limit / unit.toNanos(1) / eligibleNodeCount, limit, limit / eligibleNodeCount);
         }
         return null;
     }
