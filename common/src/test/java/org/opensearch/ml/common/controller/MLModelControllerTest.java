@@ -50,8 +50,8 @@ public class MLModelControllerTest {
     @Before
     public void setUp() throws Exception {
         rateLimiter = MLRateLimiter.builder()
-                .rateLimitNumber("1")
-                .rateLimitUnit(TimeUnit.MILLISECONDS)
+                .limit(1.0)
+                .unit(TimeUnit.MILLISECONDS)
                 .build();
 
         modelControllerNull = MLModelController.builder()
@@ -65,8 +65,8 @@ public class MLModelControllerTest {
     public void readInputStreamSuccess() throws IOException {
         readInputStream(modelController, parsedInput -> {
             assertEquals("testModelId", parsedInput.getModelId());
-            assertEquals(modelController.getUserRateLimiterConfig().get("testUser").getRateLimitNumber(),
-                    parsedInput.getUserRateLimiterConfig().get("testUser").getRateLimitNumber());
+            assertEquals(modelController.getUserRateLimiterConfig().get("testUser").getLimit(),
+                    parsedInput.getUserRateLimiterConfig().get("testUser").getLimit());
         });
     }
 
@@ -219,7 +219,7 @@ public class MLModelControllerTest {
 
     @Test
     public void testUserRateLimiterConfigUpdate() {
-        MLRateLimiter rateLimiterWithNumber = MLRateLimiter.builder().rateLimitNumber("1").build();
+        MLRateLimiter rateLimiterWithNumber = MLRateLimiter.builder().limit(1.0).build();
 
         MLModelController modelControllerWithEmptyUserRateLimiterConfig = MLModelControllerGenerator();
         MLModelController modelControllerWithTestUserAndRateLimiterWithNumber = MLModelControllerGenerator("testUser", rateLimiterWithNumber);
@@ -232,12 +232,12 @@ public class MLModelControllerTest {
         assertTrue(modelControllerWithEmptyUserRateLimiterConfig.getUserRateLimiterConfig().isEmpty());
 
         modelControllerWithEmptyUserRateLimiterConfig.update(modelControllerWithTestUserAndRateLimiterWithNumber);
-        assertEquals("1", modelControllerWithEmptyUserRateLimiterConfig.getUserRateLimiterConfig().get("testUser").getRateLimitNumber());
-        assertNull(modelControllerWithEmptyUserRateLimiterConfig.getUserRateLimiterConfig().get("testUser").getRateLimitUnit());
+        assertEquals("1", modelControllerWithEmptyUserRateLimiterConfig.getUserRateLimiterConfig().get("testUser").getLimit());
+        assertNull(modelControllerWithEmptyUserRateLimiterConfig.getUserRateLimiterConfig().get("testUser").getUnit());
 
         modelControllerWithEmptyUserRateLimiterConfig.update(modelController);
-        assertEquals("1", modelControllerWithEmptyUserRateLimiterConfig.getUserRateLimiterConfig().get("testUser").getRateLimitNumber());
-        assertEquals(TimeUnit.MILLISECONDS, modelControllerWithEmptyUserRateLimiterConfig.getUserRateLimiterConfig().get("testUser").getRateLimitUnit());
+        assertEquals("1", modelControllerWithEmptyUserRateLimiterConfig.getUserRateLimiterConfig().get("testUser").getLimit());
+        assertEquals(TimeUnit.MILLISECONDS, modelControllerWithEmptyUserRateLimiterConfig.getUserRateLimiterConfig().get("testUser").getUnit());
 
         modelControllerWithEmptyUserRateLimiterConfig.update(modelControllerWithNewUserAndEmptyRateLimiter);
         assertTrue(modelControllerWithEmptyUserRateLimiterConfig.getUserRateLimiterConfig().get("newUser").isEmpty());
@@ -245,7 +245,7 @@ public class MLModelControllerTest {
 
     @Test
     public void testUserRateLimiterConfigIsUpdatable() {
-        MLRateLimiter rateLimiterWithNumber = MLRateLimiter.builder().rateLimitNumber("1").build();
+        MLRateLimiter rateLimiterWithNumber = MLRateLimiter.builder().limit(1.0).build();
 
         MLModelController modelControllerWithEmptyUserRateLimiterConfig = MLModelControllerGenerator();
         MLModelController modelControllerWithTestUserAndRateLimiterWithNumber = MLModelControllerGenerator("testUser", rateLimiterWithNumber);

@@ -231,7 +231,7 @@ public class CommonValue {
             + MLModel.IS_MODEL_CONTROLLER_ENABLED_FIELD
             + "\" : {\"type\": \"boolean\"},\n"
             + "      \""
-            + MLModel.MODEL_RATE_LIMITER_CONFIG_FIELD
+            + MLModel.MODEL_RATE_LIMITER_FIELD
             + "\" : {\"type\": \"flat_object\"},\n"
             + "      \""
             + MLModel.MODEL_CONTENT_HASH_VALUE_FIELD

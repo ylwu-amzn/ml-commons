@@ -56,7 +56,7 @@ public class MLModel implements ToXContentObject {
 
     // Model level quota and throttling control
     public static final String IS_ENABLED_FIELD = "is_enabled";
-    public static final String MODEL_RATE_LIMITER_CONFIG_FIELD = "model_rate_limiter_config";
+    public static final String MODEL_RATE_LIMITER_FIELD = "rate_limiter";
     public static final String IS_MODEL_CONTROLLER_ENABLED_FIELD = "is_model_controller_enabled";
     public static final String MODEL_CONFIG_FIELD = "model_config";
     public static final String CREATED_TIME_FIELD = "created_time";
@@ -355,7 +355,7 @@ public class MLModel implements ToXContentObject {
             builder.field(IS_MODEL_CONTROLLER_ENABLED_FIELD, isModelControllerEnabled);
         }
         if (modelRateLimiterConfig != null) {
-            builder.field(MODEL_RATE_LIMITER_CONFIG_FIELD, modelRateLimiterConfig);
+            builder.field(MODEL_RATE_LIMITER_FIELD, modelRateLimiterConfig);
         }
         if (createdTime != null) {
             builder.field(CREATED_TIME_FIELD, createdTime.toEpochMilli());
@@ -519,7 +519,7 @@ public class MLModel implements ToXContentObject {
                 case IS_MODEL_CONTROLLER_ENABLED_FIELD:
                     isModelControllerEnabled = parser.booleanValue();
                     break;
-                case MODEL_RATE_LIMITER_CONFIG_FIELD:
+                case MODEL_RATE_LIMITER_FIELD:
                     modelRateLimiterConfig = MLRateLimiter.parse(parser);
                     break;
                 case PLANNING_WORKER_NODE_COUNT_FIELD:

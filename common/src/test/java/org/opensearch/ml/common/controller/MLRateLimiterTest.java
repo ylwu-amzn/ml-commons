@@ -43,7 +43,7 @@ public class MLRateLimiterTest {
 
     private MLRateLimiter rateLimiterNull;
 
-    private final String expectedInputStr = "{\"rate_limit_number\":\"1\",\"rate_limit_unit\":\"MILLISECONDS\"}";
+    private final String expectedInputStr = "{\"limit\":\"1\",\"unit\":\"MILLISECONDS\"}";
 
     @Rule
     public ExpectedException exceptionRule = ExpectedException.none();
@@ -51,15 +51,15 @@ public class MLRateLimiterTest {
     @Before
     public void setUp() throws Exception {
         rateLimiter = MLRateLimiter.builder()
-                .rateLimitNumber("1")
-                .rateLimitUnit(TimeUnit.MILLISECONDS)
+                .limit(1.0)
+                .unit(TimeUnit.MILLISECONDS)
                 .build();
         rateLimiterWithNumber = MLRateLimiter.builder()
-                .rateLimitNumber("1")
+                .limit(1.0)
                 .build();
 
         rateLimiterWithUnit = MLRateLimiter.builder()
-                .rateLimitUnit(TimeUnit.MILLISECONDS)
+                .unit(TimeUnit.MILLISECONDS)
                 .build();
 
         rateLimiterNull = MLRateLimiter.builder().build();
@@ -69,15 +69,15 @@ public class MLRateLimiterTest {
     @Test
     public void readInputStreamSuccess() throws IOException {
         readInputStream(rateLimiter, parsedInput -> {
-            assertEquals("1", parsedInput.getRateLimitNumber());
-            assertEquals(TimeUnit.MILLISECONDS, parsedInput.getRateLimitUnit());
+            assertEquals("1", parsedInput.getLimit());
+            assertEquals(TimeUnit.MILLISECONDS, parsedInput.getUnit());
         });
     }
 
     @Test
     public void readInputStreamSuccessWithNullFields() throws IOException {
         readInputStream(rateLimiterWithNumber, parsedInput -> {
-            assertNull(parsedInput.getRateLimitUnit());
+            assertNull(parsedInput.getUnit());
         });
     }
 
@@ -98,8 +98,8 @@ public class MLRateLimiterTest {
     @Test
     public void parseSuccess() throws Exception {
         testParseFromJsonString(expectedInputStr, parsedInput -> {
-            assertEquals("1", parsedInput.getRateLimitNumber());
-            assertEquals(TimeUnit.MILLISECONDS, parsedInput.getRateLimitUnit());
+            assertEquals("1", parsedInput.getLimit());
+            assertEquals(TimeUnit.MILLISECONDS, parsedInput.getUnit());
         });
     }
 
@@ -148,27 +148,13 @@ public class MLRateLimiterTest {
     }
 
     @Test
-    public void testRateLimiterUpdate() {
-        MLRateLimiter updatedRateLimiter = MLRateLimiter.update(rateLimiterNull, rateLimiter);
-        assertEquals("1", updatedRateLimiter.getRateLimitNumber());
-        assertEquals(TimeUnit.MILLISECONDS, updatedRateLimiter.getRateLimitUnit());
-    }
-
-    @Test
     public void testRateLimiterPartiallyUpdate() {
         rateLimiterNull.update(rateLimiterWithNumber);
-        assertEquals("1", rateLimiterNull.getRateLimitNumber());
-        assertNull(rateLimiterNull.getRateLimitUnit());
+        assertEquals("1", rateLimiterNull.getLimit());
+        assertNull(rateLimiterNull.getUnit());
         rateLimiterNull.update(rateLimiterWithUnit);
-        assertEquals("1", rateLimiterNull.getRateLimitNumber());
-        assertEquals(TimeUnit.MILLISECONDS, rateLimiterNull.getRateLimitUnit());
-    }
-
-    @Test
-    public void testRateLimiterUpdateNull() {
-        MLRateLimiter updatedRateLimiter = MLRateLimiter.update(null, rateLimiter);
-        assertEquals("1", updatedRateLimiter.getRateLimitNumber());
-        assertEquals(TimeUnit.MILLISECONDS, updatedRateLimiter.getRateLimitUnit());
+        assertEquals("1", rateLimiterNull.getLimit());
+        assertEquals(TimeUnit.MILLISECONDS, rateLimiterNull.getUnit());
     }
 
     @Test
@@ -191,11 +177,11 @@ public class MLRateLimiterTest {
     @Test
     public void testRateLimiterIsDeployRequiredAfterUpdate() {
         MLRateLimiter rateLimiterWithNumber2 = MLRateLimiter.builder()
-                .rateLimitNumber("2")
+                .limit(2.0)
                 .build();
 
         MLRateLimiter rateLimiterWithUnit2 = MLRateLimiter.builder()
-                .rateLimitUnit(TimeUnit.NANOSECONDS)
+                .unit(TimeUnit.NANOSECONDS)
                 .build();
 
         assertTrue(MLRateLimiter.isDeployRequiredAfterUpdate(rateLimiter, rateLimiterWithNumber2));
@@ -231,11 +217,4 @@ public class MLRateLimiterTest {
         return builder.toString();
     }
 
-    @Ignore
-    @Test
-    public void testRateLimiterRemove() {
-        MLRateLimiter updatedRateLimiter = MLRateLimiter.update(rateLimiter, rateLimiterNull);
-        assertNull(updatedRateLimiter.getRateLimitUnit());
-        assertNull(updatedRateLimiter.getRateLimitNumber());
-    }
 }

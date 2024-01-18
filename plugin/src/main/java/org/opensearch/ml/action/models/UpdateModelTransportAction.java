@@ -211,10 +211,10 @@ public class UpdateModelTransportAction extends HandledTransportAction<ActionReq
         boolean isPredictorUpdate = (updateModelInput.getConnector() != null)
             || (newConnectorId != null)
             || !Objects.equals(updateModelInput.getIsEnabled(), mlModel.getIsEnabled());
-        if (MLRateLimiter.updateValidityPreCheck(mlModel.getModelRateLimiterConfig(), updateModelInput.getModelRateLimiterConfig())) {
+        if (MLRateLimiter.updateValidityPreCheck(mlModel.getModelRateLimiterConfig(), updateModelInput.getRateLimiter())) {
             MLRateLimiter updatedRateLimiterConfig = MLRateLimiter
-                .update(mlModel.getModelRateLimiterConfig(), updateModelInput.getModelRateLimiterConfig());
-            updateModelInput.setModelRateLimiterConfig(updatedRateLimiterConfig);
+                .update(mlModel.getModelRateLimiterConfig(), updateModelInput.getRateLimiter());
+            updateModelInput.setRateLimiter(updatedRateLimiterConfig);
             // An un-constructable updatedRateLimiterConfig does not require predictor to be re-deployed.
             isPredictorUpdate = isPredictorUpdate || (updatedRateLimiterConfig.isValid());
         }

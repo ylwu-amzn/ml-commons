@@ -34,7 +34,7 @@ public class MLUpdateModelInput implements ToXContentObject, Writeable {
     public static final String MODEL_NAME_FIELD = "name"; // optional
     public static final String MODEL_GROUP_ID_FIELD = "model_group_id"; // optional
     public static final String IS_ENABLED_FIELD = "is_enabled"; // optional
-    public static final String MODEL_RATE_LIMITER_CONFIG_FIELD = "model_rate_limiter_config"; // optional
+    public static final String RATE_LIMITER_FIELD = "rate_limiter"; // optional
     public static final String MODEL_CONFIG_FIELD = "model_config"; // optional
     public static final String UPDATED_CONNECTOR_FIELD = "updated_connector"; // passively set when updating the internal connector
     public static final String CONNECTOR_ID_FIELD = "connector_id"; // optional
@@ -48,7 +48,7 @@ public class MLUpdateModelInput implements ToXContentObject, Writeable {
     private String name;
     private String modelGroupId;
     private Boolean isEnabled;
-    private MLRateLimiter modelRateLimiterConfig;
+    private MLRateLimiter rateLimiter;
     private MLModelConfig modelConfig;
     private Connector updatedConnector;
     private String connectorId;
@@ -57,7 +57,7 @@ public class MLUpdateModelInput implements ToXContentObject, Writeable {
 
     @Builder(toBuilder = true)
     public MLUpdateModelInput(String modelId, String description, String version, String name, String modelGroupId,
-                              Boolean isEnabled, MLRateLimiter modelRateLimiterConfig, MLModelConfig modelConfig,
+                              Boolean isEnabled, MLRateLimiter rateLimiter, MLModelConfig modelConfig,
                               Connector updatedConnector, String connectorId, MLCreateConnectorInput connector, Instant lastUpdateTime) {
         this.modelId = modelId;
         this.description = description;
@@ -65,7 +65,7 @@ public class MLUpdateModelInput implements ToXContentObject, Writeable {
         this.name = name;
         this.modelGroupId = modelGroupId;
         this.isEnabled = isEnabled;
-        this.modelRateLimiterConfig = modelRateLimiterConfig;
+        this.rateLimiter = rateLimiter;
         this.modelConfig = modelConfig;
         this.updatedConnector = updatedConnector;
         this.connectorId = connectorId;
@@ -81,7 +81,7 @@ public class MLUpdateModelInput implements ToXContentObject, Writeable {
         modelGroupId = in.readOptionalString();
         isEnabled = in.readOptionalBoolean();
         if (in.readBoolean()) {
-            modelRateLimiterConfig = new MLRateLimiter(in);
+            rateLimiter = new MLRateLimiter(in);
         }
         if (in.readBoolean()) {
             modelConfig = new TextEmbeddingModelConfig(in);
@@ -115,8 +115,8 @@ public class MLUpdateModelInput implements ToXContentObject, Writeable {
         if (isEnabled != null) {
             builder.field(IS_ENABLED_FIELD, isEnabled);
         }
-        if (modelRateLimiterConfig != null) {
-            builder.field(MODEL_RATE_LIMITER_CONFIG_FIELD, modelRateLimiterConfig);
+        if (rateLimiter != null) {
+            builder.field(RATE_LIMITER_FIELD, rateLimiter);
         }
         if (modelConfig != null) {
             builder.field(MODEL_CONFIG_FIELD, modelConfig);
@@ -145,9 +145,9 @@ public class MLUpdateModelInput implements ToXContentObject, Writeable {
         out.writeOptionalString(name);
         out.writeOptionalString(modelGroupId);
         out.writeOptionalBoolean(isEnabled);
-        if (modelRateLimiterConfig != null) {
+        if (rateLimiter != null) {
             out.writeBoolean(true);
-            modelRateLimiterConfig.writeTo(out);
+            rateLimiter.writeTo(out);
         } else {
             out.writeBoolean(false);
         }
@@ -204,7 +204,7 @@ public class MLUpdateModelInput implements ToXContentObject, Writeable {
                 case IS_ENABLED_FIELD:
                     isEnabled = parser.booleanValue();
                     break;
-                case MODEL_RATE_LIMITER_CONFIG_FIELD:
+                case RATE_LIMITER_FIELD:
                     modelRateLimiterConfig = MLRateLimiter.parse(parser);
                     break;
                 case MODEL_CONFIG_FIELD:

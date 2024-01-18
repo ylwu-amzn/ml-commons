@@ -104,8 +104,8 @@ public class MLUpdateModelInputTest {
                 .build();
 
         MLRateLimiter rateLimiter = MLRateLimiter.builder()
-                .rateLimitNumber("1")
-                .rateLimitUnit(TimeUnit.MILLISECONDS)
+                .limit(1.0)
+                .unit(TimeUnit.MILLISECONDS)
                 .build();
 
         updateModelInput = MLUpdateModelInput.builder()
@@ -115,7 +115,7 @@ public class MLUpdateModelInputTest {
                 .name("name")
                 .description("description")
                 .isEnabled(false)
-                .modelRateLimiterConfig(rateLimiter)
+                .rateLimiter(rateLimiter)
                 .modelConfig(config)
                 .updatedConnector(updatedConnector)
                 .connectorId("test-connector_id")

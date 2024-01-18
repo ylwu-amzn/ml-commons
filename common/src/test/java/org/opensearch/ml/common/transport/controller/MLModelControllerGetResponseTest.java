@@ -38,8 +38,8 @@ public class MLModelControllerGetResponseTest {
     @Before
     public void setUp() {
         MLRateLimiter rateLimiter = MLRateLimiter.builder()
-                .rateLimitNumber("1")
-                .rateLimitUnit(TimeUnit.MILLISECONDS)
+                .limit(1.0)
+                .unit(TimeUnit.MILLISECONDS)
                 .build();
         modelController = MLModelController.builder()
                 .modelId("testModelId")
@@ -57,8 +57,8 @@ public class MLModelControllerGetResponseTest {
         MLModelControllerGetResponse parsedResponse = new MLModelControllerGetResponse(bytesStreamOutput.bytes().streamInput());
         assertNotEquals(response.getModelController(), parsedResponse.getModelController());
         assertEquals(response.getModelController().getModelId(), parsedResponse.getModelController().getModelId());
-        assertEquals(response.getModelController().getUserRateLimiterConfig().get("testUser").getRateLimitNumber(), parsedResponse.getModelController().getUserRateLimiterConfig().get("testUser").getRateLimitNumber());
-        assertEquals(response.getModelController().getUserRateLimiterConfig().get("testUser").getRateLimitUnit(), parsedResponse.getModelController().getUserRateLimiterConfig().get("testUser").getRateLimitUnit());
+        assertEquals(response.getModelController().getUserRateLimiterConfig().get("testUser").getLimit(), parsedResponse.getModelController().getUserRateLimiterConfig().get("testUser").getLimit());
+        assertEquals(response.getModelController().getUserRateLimiterConfig().get("testUser").getUnit(), parsedResponse.getModelController().getUserRateLimiterConfig().get("testUser").getUnit());
     }
 
     @Test

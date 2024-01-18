@@ -1314,7 +1314,7 @@ public class MLModelManager {
 
     private void setupModelRateLimiter(String modelId, Integer eligibleNodeCount, MLRateLimiter modelRateLimiter) {
         if (modelRateLimiter != null) {
-            modelCacheHelper.setModelRateLimiter(modelId, rateLimiterConstructor(eligibleNodeCount, modelRateLimiter));
+            modelCacheHelper.setModelRateLimiter(modelId, createTokenBucket(eligibleNodeCount, modelRateLimiter));
         } else {
             modelCacheHelper.removeModelRateLimiter(modelId);
         }
@@ -1324,7 +1324,7 @@ public class MLModelManager {
         if (userRateLimiterConfig != null && !userRateLimiterConfig.isEmpty()) {
             Map<String, TokenBucket> userRateLimiterMap = new HashMap<>();
             userRateLimiterConfig
-                .forEach((user, rateLimiter) -> userRateLimiterMap.put(user, rateLimiterConstructor(eligibleNodeCount, rateLimiter)));
+                .forEach((user, rateLimiter) -> userRateLimiterMap.put(user, createTokenBucket(eligibleNodeCount, rateLimiter)));
             modelCacheHelper.setUserRateLimiterMap(modelId, userRateLimiterMap);
         } else {
             modelCacheHelper.removeUserRateLimiterMap(modelId);
@@ -1339,22 +1339,22 @@ public class MLModelManager {
      * Construct a TokenBucket object from its rate limiter config.
      * 
      * @param eligibleNodeCount eligible node count
-     * @param modelRateLimiter model rate limiter config
+     * @param rateLimiter model rate limiter config
      * @return a TokenBucket object to enable throttling
      */
-    private TokenBucket rateLimiterConstructor(Integer eligibleNodeCount, MLRateLimiter modelRateLimiter) {
-        if (modelRateLimiter.isValid()) {
-            double rateLimitNumber = Double.parseDouble(modelRateLimiter.getRateLimitNumber());
-            TimeUnit rateLimitUnit = modelRateLimiter.getRateLimitUnit();
+    private TokenBucket createTokenBucket(Integer eligibleNodeCount, MLRateLimiter rateLimiter) {
+        if (rateLimiter.isValid()) {
+            double limit = rateLimiter.getLimit();
+            TimeUnit unit = rateLimiter.getUnit();
+            limit = limit / unit.toNanos(1) / eligibleNodeCount;
             log
                 .info(
-                    "Initializing the rate limiter with setting {} per {} (TPS limit {}), evenly distributed on {} nodes",
-                    rateLimitNumber,
-                    rateLimitUnit,
-                    rateLimitNumber / rateLimitUnit.toSeconds(1),
+                    "Initializing the rate limiter with setting {} per {}, evenly distributed on {} nodes",
+                    limit,
+                    unit,
                     eligibleNodeCount
                 );
-            return new TokenBucket(System::nanoTime, rateLimitNumber / rateLimitUnit.toNanos(1) / eligibleNodeCount, rateLimitNumber);
+            return new TokenBucket(System::nanoTime, limit, limit);
         }
         return null;
     }

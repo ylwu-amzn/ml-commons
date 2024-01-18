@@ -35,8 +35,8 @@ public class MLCreateModelControllerRequestTest {
 	public void setUp() throws Exception {
 
 	MLRateLimiter rateLimiter = MLRateLimiter.builder()
-          .rateLimitNumber("1")
-          .rateLimitUnit(TimeUnit.MILLISECONDS)
+          .limit(1.0)
+          .unit(TimeUnit.MILLISECONDS)
           .build();
 	modelControllerInput = MLModelController.builder()
 			.modelId("testModelId")
@@ -56,8 +56,8 @@ public class MLCreateModelControllerRequestTest {
 		MLCreateModelControllerRequest parsedRequest = new MLCreateModelControllerRequest(bytesStreamOutput.bytes().streamInput());
 		assertEquals("testModelId", parsedRequest.getModelControllerInput().getModelId());
 		assertTrue(parsedRequest.getModelControllerInput().getUserRateLimiterConfig().containsKey("testUser"));
-		assertEquals("1", parsedRequest.getModelControllerInput().getUserRateLimiterConfig().get("testUser").getRateLimitNumber());
-		assertEquals(TimeUnit.MILLISECONDS, parsedRequest.getModelControllerInput().getUserRateLimiterConfig().get("testUser").getRateLimitUnit());
+		assertEquals("1", parsedRequest.getModelControllerInput().getUserRateLimiterConfig().get("testUser").getLimit());
+		assertEquals(TimeUnit.MILLISECONDS, parsedRequest.getModelControllerInput().getUserRateLimiterConfig().get("testUser").getUnit());
 	}
 
 	@Test
