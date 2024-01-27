@@ -31,8 +31,8 @@ public class ScriptUtils {
     }
 
     public static List<ModelTensor> executeBuildInPostProcessFunction(
-        List<List<Float>> vectors,
-        Function<List<List<Float>>, List<ModelTensor>> function
+        Object vectors,
+        Function<Object, List<ModelTensor>> function
     ) {
         return function.apply(vectors);
     }

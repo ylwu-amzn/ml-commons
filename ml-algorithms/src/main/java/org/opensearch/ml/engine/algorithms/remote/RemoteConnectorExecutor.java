@@ -24,6 +24,7 @@ import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.common.connector.Connector;
 import org.opensearch.ml.common.dataset.MLInputDataset;
 import org.opensearch.ml.common.dataset.TextDocsInputDataSet;
+import org.opensearch.ml.common.dataset.TextSimilarityInputDataSet;
 import org.opensearch.ml.common.dataset.remote.RemoteInferenceInputDataSet;
 import org.opensearch.ml.common.input.MLInput;
 import org.opensearch.ml.common.output.model.ModelTensorOutput;
@@ -70,6 +71,21 @@ public interface RemoteConnectorExecutor {
                 }
                 tensorOutputs.addAll(tempTensorOutputs);
             }
+        } else if (mlInput.getInputDataset() instanceof TextSimilarityInputDataSet) {
+            TextSimilarityInputDataSet inputDataset = (TextSimilarityInputDataSet) mlInput.getInputDataset();
+            String query = inputDataset.getQueryText();
+            List<String> textDocs = inputDataset.getTextDocs();
+            System.out.println(query);
+            List<ModelTensors> tempTensorOutputs = new ArrayList<>();
+            preparePayloadAndInvokeRemoteModel(
+                    MLInput
+                            .builder()
+                            .algorithm(FunctionName.TEXT_SIMILARITY)
+                            .inputDataset(TextSimilarityInputDataSet.builder().textDocs(textDocs).queryText(query).build())
+                            .build(),
+                    tempTensorOutputs
+            );
+            tensorOutputs.addAll(tempTensorOutputs);
         } else {
             preparePayloadAndInvokeRemoteModel(mlInput, tensorOutputs);
         }

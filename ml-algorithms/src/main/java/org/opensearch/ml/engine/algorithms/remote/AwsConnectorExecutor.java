@@ -121,7 +121,7 @@ public class AwsConnectorExecutor implements RemoteConnectorExecutor {
                 throw new OpenSearchStatusException(REMOTE_SERVICE_ERROR + modelResponse, RestStatus.fromCode(statusCode));
             }
 
-            ModelTensors tensors = processOutput(modelResponse, connector, scriptService, parameters);
+            ModelTensors tensors = processOutput(mlInput.getFunctionName(), modelResponse, connector, scriptService, parameters);
             tensors.setStatusCode(statusCode);
             tensorOutputs.add(tensors);
         } catch (RuntimeException exception) {

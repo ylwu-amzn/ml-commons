@@ -11,6 +11,7 @@ import static org.opensearch.ml.common.utils.StringUtils.gson;
 import static org.opensearch.ml.engine.utils.ScriptUtils.executeBuildInPostProcessFunction;
 import static org.opensearch.ml.engine.utils.ScriptUtils.executePostProcessFunction;
 import static org.opensearch.ml.engine.utils.ScriptUtils.executePreprocessFunction;
+import static org.opensearch.ml.engine.utils.ScriptUtils.executeScript;
 
 import java.io.IOException;
 import java.security.AccessController;
@@ -21,14 +22,19 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
 
+import kotlin.jvm.functions.FunctionN;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.text.StringSubstitutor;
+import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.common.connector.Connector;
 import org.opensearch.ml.common.connector.ConnectorAction;
 import org.opensearch.ml.common.connector.MLPostProcessFunction;
 import org.opensearch.ml.common.connector.MLPreProcessFunction;
+import org.opensearch.ml.common.dataset.MLInputDataset;
 import org.opensearch.ml.common.dataset.TextDocsInputDataSet;
+import org.opensearch.ml.common.dataset.TextSimilarityInputDataSet;
 import org.opensearch.ml.common.dataset.remote.RemoteInferenceInputDataSet;
 import org.opensearch.ml.common.input.MLInput;
 import org.opensearch.ml.common.output.model.ModelTensor;
@@ -66,6 +72,8 @@ public class ConnectorUtils {
         RemoteInferenceInputDataSet inputData;
         if (mlInput.getInputDataset() instanceof TextDocsInputDataSet) {
             inputData = processTextDocsInput((TextDocsInputDataSet) mlInput.getInputDataset(), connector, parameters, scriptService);
+        } else if (mlInput.getInputDataset() instanceof TextSimilarityInputDataSet) {
+            inputData = processTextSimilarityInput((TextSimilarityInputDataSet) mlInput.getInputDataset(), connector, parameters, scriptService);
         } else if (mlInput.getInputDataset() instanceof RemoteInferenceInputDataSet) {
             inputData = (RemoteInferenceInputDataSet) mlInput.getInputDataset();
         } else {
@@ -101,7 +109,8 @@ public class ConnectorUtils {
         String preProcessFunction = predictAction.get().getPreProcessFunction();
         preProcessFunction = preProcessFunction == null ? MLPreProcessFunction.TEXT_DOCS_TO_DEFAULT_EMBEDDING_INPUT : preProcessFunction;
         if (MLPreProcessFunction.contains(preProcessFunction)) {
-            Map<String, Object> buildInFunctionResult = MLPreProcessFunction.get(preProcessFunction).apply(inputDataSet.getDocs());
+            Function<?, Map<String, Object>> function = MLPreProcessFunction.get(preProcessFunction);
+            Map<String, Object> buildInFunctionResult = ((Function<List<String>, Map<String, Object>>) function).apply(inputDataSet.getDocs());
             return RemoteInferenceInputDataSet.builder().parameters(convertScriptStringToJsonString(buildInFunctionResult)).build();
         } else {
             List<String> docs = new ArrayList<>();
@@ -128,6 +137,49 @@ public class ConnectorUtils {
         }
     }
 
+    private static RemoteInferenceInputDataSet processTextSimilarityInput(
+            TextSimilarityInputDataSet inputDataSet,
+            Connector connector,
+            Map<String, String> parameters,
+            ScriptService scriptService
+    ) {
+        Optional<ConnectorAction> predictAction = connector.findPredictAction();
+        if (predictAction.isEmpty()) {
+            throw new IllegalArgumentException("no predict action found");
+        }
+        String preProcessFunction = predictAction.get().getPreProcessFunction();
+        preProcessFunction = preProcessFunction == null ? MLPreProcessFunction.TEXT_SIMILARITY_TO_DEFAULT_INPUT : preProcessFunction;
+        if (MLPreProcessFunction.contains(preProcessFunction)) {
+            Function<?, Map<String, Object>> function = MLPreProcessFunction.get(preProcessFunction);
+            Map<String, Object> buildInFunctionResult = ((Function<MLInputDataset, Map<String, Object>>) function).apply(inputDataSet);
+            return RemoteInferenceInputDataSet.builder().parameters(convertScriptStringToJsonString(buildInFunctionResult)).build();
+        } else {
+            List<String> docs = new ArrayList<>();
+            for (String doc : inputDataSet.getTextDocs()) {
+                if (doc != null) {
+                    String gsonString = gson.toJson(doc);
+                    // in 2.9, user will add " before and after string
+                    // gson.toString(string) will add extra " before after string, so need to remove
+                    docs.add(gsonString.substring(1, gsonString.length() - 1));
+                } else {
+                    docs.add(null);
+                }
+            }
+            String query = gson.toJson(inputDataSet.getQueryText());
+            query = query.substring(1, query.length() - 1);
+            if (preProcessFunction.contains("${parameters.")) {
+                StringSubstitutor substitutor = new StringSubstitutor(parameters, "${parameters.", "}");
+                preProcessFunction = substitutor.replace(preProcessFunction);
+            }
+            String processedInput = executeScript(scriptService, preProcessFunction, Map.of("query_text", query, "text_docs", docs));
+            if (processedInput == null) {
+                throw new IllegalArgumentException("Wrong input");
+            }
+            Map<String, Object> map = gson.fromJson(processedInput, Map.class);
+            return RemoteInferenceInputDataSet.builder().parameters(convertScriptStringToJsonString(map)).build();
+        }
+    }
+
     private static Map<String, String> convertScriptStringToJsonString(Map<String, Object> processedInput) {
         Map<String, String> parameterStringMap = new HashMap<>();
         try {
@@ -150,6 +202,7 @@ public class ConnectorUtils {
     }
 
     public static ModelTensors processOutput(
+        FunctionName functionName,
         String modelResponse,
         Connector connector,
         ScriptService scriptService,
@@ -175,11 +228,27 @@ public class ConnectorUtils {
             // in this case, we can use jsonpath to build a List<List<Float>> result from model response.
             if (StringUtils.isBlank(responseFilter))
                 responseFilter = MLPostProcessFunction.getResponseFilter(postProcessFunction);
-            List<List<Float>> vectors = JsonPath.read(modelResponse, responseFilter);
+
+            Object filteredOutput = JsonPath.read(modelResponse, responseFilter);
             List<ModelTensor> processedResponse = executeBuildInPostProcessFunction(
-                vectors,
-                MLPostProcessFunction.get(postProcessFunction)
-            );
+                    filteredOutput,
+                    MLPostProcessFunction.get(postProcessFunction)
+                );
+//            if (functionName == FunctionName.TEXT_EMBEDDING) {
+//                if (responseFilter == null) {
+//                    throw new IllegalArgumentException("null response filter");
+//                }
+//                List<List<Float>> vectors = JsonPath.read(modelResponse, responseFilter);
+//                List<ModelTensor> processedOutput = executeBuildInPostProcessFunction(
+//                        vectors,
+//                        (Function<List<List<Float>>, List<ModelTensor>>)MLPostProcessFunction.get(postProcessFunction)
+//                );
+//                processedResponse.addAll(processedOutput);
+//            } if (functionName == FunctionName.TEXT_SIMILARITY) {
+//                Object read = JsonPath.read(modelResponse, responseFilter);
+//                System.out.println(read);
+//            }
+
             return ModelTensors.builder().mlModelTensors(processedResponse).build();
         }
 
