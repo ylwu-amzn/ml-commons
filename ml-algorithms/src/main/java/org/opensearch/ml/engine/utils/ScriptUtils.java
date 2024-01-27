@@ -30,10 +30,7 @@ public class ScriptUtils {
         return Optional.ofNullable(executeScript(scriptService, preProcessFunction, ImmutableMap.of("text_docs", inputSentences)));
     }
 
-    public static List<ModelTensor> executeBuildInPostProcessFunction(
-        Object vectors,
-        Function<Object, List<ModelTensor>> function
-    ) {
+    public static List<ModelTensor> executeBuildInPostProcessFunction(Object vectors, Function<Object, List<ModelTensor>> function) {
         return function.apply(vectors);
     }
 

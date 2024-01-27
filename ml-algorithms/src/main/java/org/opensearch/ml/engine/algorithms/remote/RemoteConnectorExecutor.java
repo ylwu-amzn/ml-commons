@@ -75,15 +75,14 @@ public interface RemoteConnectorExecutor {
             TextSimilarityInputDataSet inputDataset = (TextSimilarityInputDataSet) mlInput.getInputDataset();
             String query = inputDataset.getQueryText();
             List<String> textDocs = inputDataset.getTextDocs();
-            System.out.println(query);
             List<ModelTensors> tempTensorOutputs = new ArrayList<>();
             preparePayloadAndInvokeRemoteModel(
-                    MLInput
-                            .builder()
-                            .algorithm(FunctionName.TEXT_SIMILARITY)
-                            .inputDataset(TextSimilarityInputDataSet.builder().textDocs(textDocs).queryText(query).build())
-                            .build(),
-                    tempTensorOutputs
+                MLInput
+                    .builder()
+                    .algorithm(FunctionName.TEXT_SIMILARITY)
+                    .inputDataset(TextSimilarityInputDataSet.builder().textDocs(textDocs).queryText(query).build())
+                    .build(),
+                tempTensorOutputs
             );
             tensorOutputs.addAll(tempTensorOutputs);
         } else {

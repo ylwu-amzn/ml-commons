@@ -87,7 +87,6 @@ public class StringUtilsTest {
         parameters.put("key4", new int[]{10, 20});
         parameters.put("key5", new Object[]{1.01, "abc"});
         Map<String, String> parameterMap = StringUtils.getParameterMap(parameters);
-        System.out.println(parameterMap);
         Assert.assertEquals(5, parameterMap.size());
         Assert.assertEquals("value1", parameterMap.get("key1"));
         Assert.assertEquals("2", parameterMap.get("key2"));

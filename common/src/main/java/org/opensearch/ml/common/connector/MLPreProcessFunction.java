@@ -29,8 +29,13 @@ public class MLPreProcessFunction {
     private static Function<List<String>, Map<String, Object>> openAiTextEmbeddingPreProcess() {
         return inputs -> Map.of("parameters", Map.of("input", inputs));
     }
+
     private static Function<TextSimilarityInputDataSet, Map<String, Object>> cohereRerankPreProcess() {
-        return input -> Map.of("parameters", Map.of("query", input.getQueryText(), "documents", input.getTextDocs(), "top_n", input.getTextDocs().size()));
+        return input -> Map.of("parameters", Map.of(
+                "query", input.getQueryText(),
+                "documents", input.getTextDocs(),
+                "top_n", input.getTextDocs().size()
+        ));
     }
 
     static {
@@ -45,7 +50,7 @@ public class MLPreProcessFunction {
         return PRE_PROCESS_FUNCTIONS.containsKey(functionName);
     }
 
-    public static Function<?, Map<String, Object>> get(String postProcessFunction) {
-        return PRE_PROCESS_FUNCTIONS.get(postProcessFunction);
+    public static <T> Function<T, Map<String, Object>> get(String postProcessFunction) {
+        return (Function<T, Map<String, Object>>) PRE_PROCESS_FUNCTIONS.get(postProcessFunction);
     }
 }

@@ -43,11 +43,11 @@ public class MLPostProcessFunction {
 
     public static Function<Object, List<ModelTensor>> buildModelTensorList() {
         return input -> {
-            List<List<Float>> embeddings = (List<List<Float>>) input;
-            List<ModelTensor> modelTensors = new ArrayList<>();
-            if (embeddings == null) {
+            if (input == null) {
                 throw new IllegalArgumentException("The list of embeddings is null when using the built-in post-processing function.");
             }
+            List<List<Float>> embeddings = (List<List<Float>>) input;
+            List<ModelTensor> modelTensors = new ArrayList<>();
             embeddings.forEach(embedding -> modelTensors.add(
                 ModelTensor
                     .builder()
@@ -63,7 +63,9 @@ public class MLPostProcessFunction {
 
     public static Function<Object, List<ModelTensor>> buildCohereRerankModelTensorList() {
         return input -> {
-            System.out.println(input);
+            if (input == null) {
+                throw new IllegalArgumentException("The Cohere rerank result is null when using the built-in post-processing function.");
+            }
             List<Map<String,Object>> rerankResults = ((List<Map<String,Object>>)input);
 
             Double[] scores = new Double[rerankResults.size()];
@@ -84,20 +86,6 @@ public class MLPostProcessFunction {
             }
 
             return modelTensors;
-//            List<Map<>> embeddings = (List<List<Float>>) input;
-//            if (embeddings == null) {
-//                throw new IllegalArgumentException("The list of embeddings is null when using the built-in post-processing function.");
-//            }
-//            embeddings.forEach(embedding -> modelTensors.add(
-//                    ModelTensor
-//                            .builder()
-//                            .name("sentence_embedding")
-//                            .dataType(MLResultDataType.FLOAT32)
-//                            .shape(new long[]{embedding.size()})
-//                            .data(embedding.toArray(new Number[0]))
-//                            .build()
-//            ));
-//            return modelTensors;
         };
     }
 

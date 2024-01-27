@@ -24,15 +24,12 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
 
-import kotlin.jvm.functions.FunctionN;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.text.StringSubstitutor;
-import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.common.connector.Connector;
 import org.opensearch.ml.common.connector.ConnectorAction;
 import org.opensearch.ml.common.connector.MLPostProcessFunction;
 import org.opensearch.ml.common.connector.MLPreProcessFunction;
-import org.opensearch.ml.common.dataset.MLInputDataset;
 import org.opensearch.ml.common.dataset.TextDocsInputDataSet;
 import org.opensearch.ml.common.dataset.TextSimilarityInputDataSet;
 import org.opensearch.ml.common.dataset.remote.RemoteInferenceInputDataSet;
@@ -73,7 +70,12 @@ public class ConnectorUtils {
         if (mlInput.getInputDataset() instanceof TextDocsInputDataSet) {
             inputData = processTextDocsInput((TextDocsInputDataSet) mlInput.getInputDataset(), connector, parameters, scriptService);
         } else if (mlInput.getInputDataset() instanceof TextSimilarityInputDataSet) {
-            inputData = processTextSimilarityInput((TextSimilarityInputDataSet) mlInput.getInputDataset(), connector, parameters, scriptService);
+            inputData = processTextSimilarityInput(
+                (TextSimilarityInputDataSet) mlInput.getInputDataset(),
+                connector,
+                parameters,
+                scriptService
+            );
         } else if (mlInput.getInputDataset() instanceof RemoteInferenceInputDataSet) {
             inputData = (RemoteInferenceInputDataSet) mlInput.getInputDataset();
         } else {
@@ -110,7 +112,8 @@ public class ConnectorUtils {
         preProcessFunction = preProcessFunction == null ? MLPreProcessFunction.TEXT_DOCS_TO_DEFAULT_EMBEDDING_INPUT : preProcessFunction;
         if (MLPreProcessFunction.contains(preProcessFunction)) {
             Function<?, Map<String, Object>> function = MLPreProcessFunction.get(preProcessFunction);
-            Map<String, Object> buildInFunctionResult = ((Function<List<String>, Map<String, Object>>) function).apply(inputDataSet.getDocs());
+            Map<String, Object> buildInFunctionResult = ((Function<List<String>, Map<String, Object>>) function)
+                .apply(inputDataSet.getDocs());
             return RemoteInferenceInputDataSet.builder().parameters(convertScriptStringToJsonString(buildInFunctionResult)).build();
         } else {
             List<String> docs = new ArrayList<>();
@@ -138,10 +141,10 @@ public class ConnectorUtils {
     }
 
     private static RemoteInferenceInputDataSet processTextSimilarityInput(
-            TextSimilarityInputDataSet inputDataSet,
-            Connector connector,
-            Map<String, String> parameters,
-            ScriptService scriptService
+        TextSimilarityInputDataSet inputDataSet,
+        Connector connector,
+        Map<String, String> parameters,
+        ScriptService scriptService
     ) {
         Optional<ConnectorAction> predictAction = connector.findPredictAction();
         if (predictAction.isEmpty()) {
@@ -150,8 +153,8 @@ public class ConnectorUtils {
         String preProcessFunction = predictAction.get().getPreProcessFunction();
         preProcessFunction = preProcessFunction == null ? MLPreProcessFunction.TEXT_SIMILARITY_TO_DEFAULT_INPUT : preProcessFunction;
         if (MLPreProcessFunction.contains(preProcessFunction)) {
-            Function<?, Map<String, Object>> function = MLPreProcessFunction.get(preProcessFunction);
-            Map<String, Object> buildInFunctionResult = ((Function<MLInputDataset, Map<String, Object>>) function).apply(inputDataSet);
+            Function<TextSimilarityInputDataSet, Map<String, Object>> function = MLPreProcessFunction.get(preProcessFunction);
+            Map<String, Object> buildInFunctionResult = function.apply(inputDataSet);
             return RemoteInferenceInputDataSet.builder().parameters(convertScriptStringToJsonString(buildInFunctionResult)).build();
         } else {
             List<String> docs = new ArrayList<>();
@@ -202,7 +205,6 @@ public class ConnectorUtils {
     }
 
     public static ModelTensors processOutput(
-        FunctionName functionName,
         String modelResponse,
         Connector connector,
         ScriptService scriptService,
@@ -231,24 +233,9 @@ public class ConnectorUtils {
 
             Object filteredOutput = JsonPath.read(modelResponse, responseFilter);
             List<ModelTensor> processedResponse = executeBuildInPostProcessFunction(
-                    filteredOutput,
-                    MLPostProcessFunction.get(postProcessFunction)
-                );
-//            if (functionName == FunctionName.TEXT_EMBEDDING) {
-//                if (responseFilter == null) {
-//                    throw new IllegalArgumentException("null response filter");
-//                }
-//                List<List<Float>> vectors = JsonPath.read(modelResponse, responseFilter);
-//                List<ModelTensor> processedOutput = executeBuildInPostProcessFunction(
-//                        vectors,
-//                        (Function<List<List<Float>>, List<ModelTensor>>)MLPostProcessFunction.get(postProcessFunction)
-//                );
-//                processedResponse.addAll(processedOutput);
-//            } if (functionName == FunctionName.TEXT_SIMILARITY) {
-//                Object read = JsonPath.read(modelResponse, responseFilter);
-//                System.out.println(read);
-//            }
-
+                filteredOutput,
+                MLPostProcessFunction.get(postProcessFunction)
+            );
             return ModelTensors.builder().mlModelTensors(processedResponse).build();
         }
 
