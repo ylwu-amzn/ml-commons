@@ -5,6 +5,8 @@
 
 package org.opensearch.ml.common.connector;
 
+import org.opensearch.ml.common.connector.functions.postprocess.CohereRerankPostProcessFunction;
+import org.opensearch.ml.common.connector.functions.postprocess.EmbeddingPostProcessFunction;
 import org.opensearch.ml.common.output.model.MLResultDataType;
 import org.opensearch.ml.common.output.model.ModelTensor;
 
@@ -29,65 +31,70 @@ public class MLPostProcessFunction {
 
 
     static {
+        EmbeddingPostProcessFunction embeddingPostProcessFunction = new EmbeddingPostProcessFunction();
+        CohereRerankPostProcessFunction cohereRerankPostProcessFunction = new CohereRerankPostProcessFunction();
         JSON_PATH_EXPRESSION.put(OPENAI_EMBEDDING, "$.data[*].embedding");
         JSON_PATH_EXPRESSION.put(COHERE_EMBEDDING, "$.embeddings");
         JSON_PATH_EXPRESSION.put(DEFAULT_EMBEDDING, "$[*]");
         JSON_PATH_EXPRESSION.put(COHERE_RERANK, "$.results");
         JSON_PATH_EXPRESSION.put(DEFAULT_RERANK, "$[*]");
-        POST_PROCESS_FUNCTIONS.put(OPENAI_EMBEDDING, buildModelTensorList());
-        POST_PROCESS_FUNCTIONS.put(COHERE_EMBEDDING, buildModelTensorList());
-        POST_PROCESS_FUNCTIONS.put(DEFAULT_EMBEDDING, buildModelTensorList());
-        POST_PROCESS_FUNCTIONS.put(COHERE_RERANK, buildCohereRerankModelTensorList());
-        POST_PROCESS_FUNCTIONS.put(DEFAULT_RERANK, buildCohereRerankModelTensorList());
+        POST_PROCESS_FUNCTIONS.put(OPENAI_EMBEDDING, embeddingPostProcessFunction);
+        POST_PROCESS_FUNCTIONS.put(COHERE_EMBEDDING, embeddingPostProcessFunction);
+        POST_PROCESS_FUNCTIONS.put(DEFAULT_EMBEDDING, embeddingPostProcessFunction);
+        POST_PROCESS_FUNCTIONS.put(COHERE_RERANK, cohereRerankPostProcessFunction);
+        POST_PROCESS_FUNCTIONS.put(DEFAULT_RERANK, cohereRerankPostProcessFunction);
     }
 
-    public static Function<Object, List<ModelTensor>> buildModelTensorList() {
-        return input -> {
-            if (input == null) {
-                throw new IllegalArgumentException("The list of embeddings is null when using the built-in post-processing function.");
-            }
-            List<List<Float>> embeddings = (List<List<Float>>) input;
-            List<ModelTensor> modelTensors = new ArrayList<>();
-            embeddings.forEach(embedding -> modelTensors.add(
-                ModelTensor
-                    .builder()
-                    .name("sentence_embedding")
-                    .dataType(MLResultDataType.FLOAT32)
-                    .shape(new long[]{embedding.size()})
-                    .data(embedding.toArray(new Number[0]))
-                    .build()
-            ));
-            return modelTensors;
-        };
-    }
-
-    public static Function<Object, List<ModelTensor>> buildCohereRerankModelTensorList() {
-        return input -> {
-            if (input == null) {
-                throw new IllegalArgumentException("The Cohere rerank result is null when using the built-in post-processing function.");
-            }
-            List<Map<String,Object>> rerankResults = ((List<Map<String,Object>>)input);
-
-            Double[] scores = new Double[rerankResults.size()];
-            for (int i = 0; i<rerankResults.size(); i++) {
-                Integer index = (Integer)rerankResults.get(i).get("index");
-                scores[index] = (Double) rerankResults.get(i).get("relevance_score");
-            }
-
-            List<ModelTensor> modelTensors = new ArrayList<>();
-
-            for (int i = 0; i<scores.length; i++) {
-                modelTensors.add(ModelTensor.builder()
-                        .name("similarity")
-                                .shape(new long[]{1})
-                                .data(new Number[]{scores[i]})
-                                .dataType(MLResultDataType.FLOAT32)
-                        .build());
-            }
-
-            return modelTensors;
-        };
-    }
+//    public static Function<Object, List<ModelTensor>> buildEmbeddingModelTensorList() {
+//        return input -> {
+//            if (input == null) {
+//                throw new IllegalArgumentException("The list of embeddings is null when using the built-in post-processing function.");
+//            }
+//            List<List<Float>> embeddings = (List<List<Float>>) input;
+//            List<ModelTensor> modelTensors = new ArrayList<>();
+//            embeddings.forEach(embedding -> modelTensors.add(
+//                ModelTensor
+//                    .builder()
+//                    .name("sentence_embedding")
+//                    .dataType(MLResultDataType.FLOAT32)
+//                    .shape(new long[]{embedding.size()})
+//                    .data(embedding.toArray(new Number[0]))
+//                    .build()
+//            ));
+//            return modelTensors;
+//        };
+//    }
+//
+//    public static Function<Object, List<ModelTensor>> buildCohereRerankModelTensorList() {
+//        return input -> {
+//            if (input == null) {
+//                throw new IllegalArgumentException("The Cohere rerank result is null when using the built-in post-processing function.");
+//            }
+//            List<ModelTensor> modelTensors = new ArrayList<>();
+//
+//            List<Map<String,Object>> rerankResults = ((List<Map<String,Object>>)input);
+//
+//            if (rerankResults.size() > 0) {
+//                Double[] scores = new Double[rerankResults.size()];
+//                for (int i = 0; i < rerankResults.size(); i++) {
+//                    Integer index = (Integer) rerankResults.get(i).get("index");
+//                    scores[index] = (Double) rerankResults.get(i).get("relevance_score");
+//                }
+//
+//                for (int i = 0; i < scores.length; i++) {
+//                    modelTensors.add(ModelTensor.builder()
+//                            .name("similarity")
+//                            .shape(new long[]{1})
+//                            .data(new Number[]{scores[i]})
+//                            .dataType(MLResultDataType.FLOAT32)
+//                            .build());
+//                }
+//            }
+//
+//
+//            return modelTensors;
+//        };
+//    }
 
     public static String getResponseFilter(String postProcessFunction) {
         return JSON_PATH_EXPRESSION.get(postProcessFunction);

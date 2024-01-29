@@ -40,7 +40,6 @@ public class RemoteInferencePreProcessFunction extends ConnectorPreProcessFuncti
 
     @Override
     public RemoteInferenceInputDataSet process(MLInput mlInput) {
-//        Map<String, Object> inputParams = ((RemoteInferenceInputDataSet)mlInput.getInputDataset()).getRawParameters();
         Map<String, Object> inputParams = new HashMap<>();
         inputParams.putAll(((RemoteInferenceInputDataSet)mlInput.getInputDataset()).getParameters());
         String processedInput = executeScript(scriptService, preProcessFunction, inputParams);

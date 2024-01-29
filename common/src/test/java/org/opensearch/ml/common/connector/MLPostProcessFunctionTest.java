@@ -41,15 +41,15 @@ public class MLPostProcessFunctionTest {
 
     @Test
     public void test_buildModelTensorList() {
-        Assert.assertNotNull(MLPostProcessFunction.buildModelTensorList());
+        Assert.assertNotNull(MLPostProcessFunction.buildEmbeddingModelTensorList());
         List<List<Float>> numbersList = new ArrayList<>();
         numbersList.add(Collections.singletonList(1.0f));
-        Assert.assertNotNull(MLPostProcessFunction.buildModelTensorList().apply(numbersList));
+        Assert.assertNotNull(MLPostProcessFunction.buildEmbeddingModelTensorList().apply(numbersList));
     }
 
     @Test
     public void test_buildModelTensorList_exception() {
         exceptionRule.expect(IllegalArgumentException.class);
-        MLPostProcessFunction.buildModelTensorList().apply(null);
+        MLPostProcessFunction.buildEmbeddingModelTensorList().apply(null);
     }
 }

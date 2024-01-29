@@ -2,11 +2,9 @@ package org.opensearch.ml.common.connector.functions.preprocess;
 
 import lombok.AccessLevel;
 import lombok.Builder;
-import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.opensearch.common.xcontent.XContentFactory;
 import org.opensearch.core.xcontent.XContentBuilder;
-import org.opensearch.ml.common.dataset.TextSimilarityInputDataSet;
 import org.opensearch.ml.common.dataset.remote.RemoteInferenceInputDataSet;
 import org.opensearch.ml.common.input.MLInput;
 import org.opensearch.script.Script;
@@ -27,14 +25,12 @@ public class DefaultPreProcessFunction extends ConnectorPreProcessFunction {
 
     ScriptService scriptService;
     String preProcessFunction;
-    XContentBuilder builder;
 
     @Builder
-    public DefaultPreProcessFunction(ScriptService scriptService, String preProcessFunction, XContentBuilder builder) {
+    public DefaultPreProcessFunction(ScriptService scriptService, String preProcessFunction) {
         this.returnDirectlyForRemoteInferenceInput = false;
         this.scriptService = scriptService;
         this.preProcessFunction = preProcessFunction;
-        this.builder = builder;
     }
 
     @Override
@@ -43,11 +39,11 @@ public class DefaultPreProcessFunction extends ConnectorPreProcessFunction {
 
     @Override
     public RemoteInferenceInputDataSet process(MLInput mlInput) {
-        try {
+        try (XContentBuilder builder = XContentFactory.jsonBuilder()) {
             mlInput.toXContent(builder, EMPTY_PARAMS);
             String inputStr = builder.toString();
-            Map inputParams = gson.fromJson(inputStr, Map.class);
-            String processedInput = executeScript(scriptService, preProcessFunction, inputParams);
+            Map inputParams = Map.of("parameters", gson.fromJson(inputStr, Map.class));
+            String processedInput = executeScript(scriptService, preProcessFunction, convertScriptStringToJsonString(inputParams));
             if (processedInput == null) {
                 throw new IllegalArgumentException("Wrong input");
             }
@@ -58,7 +54,7 @@ public class DefaultPreProcessFunction extends ConnectorPreProcessFunction {
         }
     }
 
-    String executeScript(ScriptService scriptService, String painlessScript, Map<String, Object> params) {
+    private String executeScript(ScriptService scriptService, String painlessScript, Map<String, Object> params) {
         Script script = new Script(ScriptType.INLINE, "painless", painlessScript, Collections.emptyMap());
         TemplateScript templateScript = scriptService.compile(script, TemplateScript.CONTEXT).newInstance(params);
         return templateScript.execute();
