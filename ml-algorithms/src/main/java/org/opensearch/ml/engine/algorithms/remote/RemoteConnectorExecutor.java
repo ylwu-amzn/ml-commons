@@ -24,7 +24,6 @@ import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.common.connector.Connector;
 import org.opensearch.ml.common.dataset.MLInputDataset;
 import org.opensearch.ml.common.dataset.TextDocsInputDataSet;
-import org.opensearch.ml.common.dataset.TextSimilarityInputDataSet;
 import org.opensearch.ml.common.dataset.remote.RemoteInferenceInputDataSet;
 import org.opensearch.ml.common.input.MLInput;
 import org.opensearch.ml.common.output.model.ModelTensorOutput;
@@ -71,21 +70,21 @@ public interface RemoteConnectorExecutor {
                 }
                 tensorOutputs.addAll(tempTensorOutputs);
             }
-        } else if (mlInput.getInputDataset() instanceof TextSimilarityInputDataSet) {
-            TextSimilarityInputDataSet inputDataset = (TextSimilarityInputDataSet) mlInput.getInputDataset();
-            String query = inputDataset.getQueryText();
-            List<String> textDocs = inputDataset.getTextDocs();
-            List<ModelTensors> tempTensorOutputs = new ArrayList<>();
-            preparePayloadAndInvokeRemoteModel(
+        } else /*if (mlInput.getInputDataset() instanceof TextSimilarityInputDataSet) {
+               TextSimilarityInputDataSet inputDataset = (TextSimilarityInputDataSet) mlInput.getInputDataset();
+               String query = inputDataset.getQueryText();
+               List<String> textDocs = inputDataset.getTextDocs();
+               List<ModelTensors> tempTensorOutputs = new ArrayList<>();
+               preparePayloadAndInvokeRemoteModel(
                 MLInput
                     .builder()
                     .algorithm(FunctionName.TEXT_SIMILARITY)
                     .inputDataset(TextSimilarityInputDataSet.builder().textDocs(textDocs).queryText(query).build())
                     .build(),
                 tempTensorOutputs
-            );
-            tensorOutputs.addAll(tempTensorOutputs);
-        } else {
+               );
+               tensorOutputs.addAll(tempTensorOutputs);
+               } else*/ {
             preparePayloadAndInvokeRemoteModel(mlInput, tensorOutputs);
         }
         return new ModelTensorOutput(tensorOutputs);
@@ -120,15 +119,19 @@ public interface RemoteConnectorExecutor {
         if (connector.getParameters() != null) {
             parameters.putAll(connector.getParameters());
         }
-        MLInputDataset inputDataset = mlInput.getInputDataset();
-        if (inputDataset instanceof RemoteInferenceInputDataSet && ((RemoteInferenceInputDataSet) inputDataset).getParameters() != null) {
-            parameters.putAll(((RemoteInferenceInputDataSet) inputDataset).getParameters());
-        }
 
+        MLInputDataset inputDataset = mlInput.getInputDataset();
+        Map<String, String> inputParameters = new HashMap<>();
+        if (inputDataset instanceof RemoteInferenceInputDataSet && ((RemoteInferenceInputDataSet) inputDataset).getParameters() != null) {
+            inputParameters.putAll(((RemoteInferenceInputDataSet) inputDataset).getParameters());
+        }
+        parameters.putAll(inputParameters);
         RemoteInferenceInputDataSet inputData = processInput(mlInput, connector, parameters, getScriptService());
         if (inputData.getParameters() != null) {
             parameters.putAll(inputData.getParameters());
         }
+        // override again to always prioritize the input parameter
+        parameters.putAll(inputParameters);
         String payload = connector.createPredictPayload(parameters);
         connector.validatePayload(payload);
         String userStr = getClient()

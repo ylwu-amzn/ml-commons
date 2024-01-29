@@ -44,6 +44,11 @@ public class RemoteInferenceMLInput extends MLInput {
                     Map<String, String> parameters = StringUtils.getParameterMap(parser.map());
                     inputDataset = new RemoteInferenceInputDataSet(parameters);
                     break;
+//                    Map<String, Object> rawParameters = parser.map();
+//                    Map<String, String> parameters = StringUtils.getParameterMap(rawParameters);
+//                    inputDataset = new RemoteInferenceInputDataSet(parameters);
+//                    ((RemoteInferenceInputDataSet)inputDataset).setRawParameters(rawParameters);
+//                    break;
                 default:
                     parser.skipChildren();
                     break;
