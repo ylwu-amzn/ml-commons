@@ -7,6 +7,7 @@ package org.opensearch.ml.engine.algorithms.remote;
 
 import static org.apache.commons.text.StringEscapeUtils.escapeJson;
 import static org.opensearch.ml.common.connector.HttpConnector.RESPONSE_FILTER_FIELD;
+import static org.opensearch.ml.common.connector.MLPreProcessFunction.CONVERT_INPUT_TO_JSON_STRING;
 import static org.opensearch.ml.common.connector.MLPreProcessFunction.PROCESS_REMOTE_INFERENCE_INPUT;
 import static org.opensearch.ml.common.utils.StringUtils.gson;
 import static org.opensearch.ml.engine.utils.ScriptUtils.executeBuildInPostProcessFunction;
@@ -111,7 +112,12 @@ public class ConnectorUtils {
                     return (RemoteInferenceInputDataSet) mlInput.getInputDataset();
                 }
             } else {
-                DefaultPreProcessFunction function = DefaultPreProcessFunction.builder().scriptService(scriptService).preProcessFunction(preProcessFunction).build();
+                boolean convertInputToJsonString = parameters.containsKey(CONVERT_INPUT_TO_JSON_STRING) && Boolean.parseBoolean(parameters.get(CONVERT_INPUT_TO_JSON_STRING));
+                DefaultPreProcessFunction function = DefaultPreProcessFunction.builder()
+                        .scriptService(scriptService)
+                        .preProcessFunction(preProcessFunction)
+                        .convertInputToJsonString(convertInputToJsonString)
+                        .build();
                 return function.apply(mlInput);
             }
         }

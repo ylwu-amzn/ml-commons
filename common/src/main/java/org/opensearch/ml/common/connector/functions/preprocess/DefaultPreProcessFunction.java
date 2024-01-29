@@ -25,12 +25,14 @@ public class DefaultPreProcessFunction extends ConnectorPreProcessFunction {
 
     ScriptService scriptService;
     String preProcessFunction;
+    boolean convertInputToJsonString;
 
     @Builder
-    public DefaultPreProcessFunction(ScriptService scriptService, String preProcessFunction) {
+    public DefaultPreProcessFunction(ScriptService scriptService, String preProcessFunction, boolean convertInputToJsonString) {
         this.returnDirectlyForRemoteInferenceInput = false;
         this.scriptService = scriptService;
         this.preProcessFunction = preProcessFunction;
+        this.convertInputToJsonString = convertInputToJsonString;
     }
 
     @Override
@@ -42,15 +44,18 @@ public class DefaultPreProcessFunction extends ConnectorPreProcessFunction {
         try (XContentBuilder builder = XContentFactory.jsonBuilder()) {
             mlInput.toXContent(builder, EMPTY_PARAMS);
             String inputStr = builder.toString();
-            Map inputParams = Map.of("parameters", gson.fromJson(inputStr, Map.class));
-            String processedInput = executeScript(scriptService, preProcessFunction, convertScriptStringToJsonString(inputParams));
+            Map inputParams = gson.fromJson(inputStr, Map.class);
+            if (convertInputToJsonString) {
+                inputParams = convertScriptStringToJsonString(Map.of("parameters", gson.fromJson(inputStr, Map.class)));
+            }
+            String processedInput = executeScript(scriptService, preProcessFunction, inputParams);
             if (processedInput == null) {
-                throw new IllegalArgumentException("Wrong input");
+                throw new IllegalArgumentException("Pre-process function output is null");
             }
             Map<String, Object> map = gson.fromJson(processedInput, Map.class);
             return RemoteInferenceInputDataSet.builder().parameters(convertScriptStringToJsonString(map)).build();
         } catch (IOException e) {
-            throw new IllegalArgumentException("wrong ML input");
+            throw new IllegalArgumentException("Failed to run pre-process function: Wrong input");
         }
     }
 
