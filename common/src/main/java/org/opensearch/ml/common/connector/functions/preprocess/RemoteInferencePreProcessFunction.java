@@ -26,18 +26,18 @@ import static org.opensearch.ml.common.utils.StringUtils.isJson;
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 public class RemoteInferencePreProcessFunction extends ConnectorPreProcessFunction {
 
-    public static final String PARSE_REMOTE_INFERENCE_INPUT_TO_MAP = "pre_process_function.convert_remote_inference_param_to_object";
+    public static final String CONVERT_REMOTE_INFERENCE_PARAM_TO_OBJECT = "pre_process_function.convert_remote_inference_param_to_object";
     ScriptService scriptService;
     String preProcessFunction;
 
-    Map<String, String> predictParameter;
+    Map<String, String> params;
 
     @Builder
-    public RemoteInferencePreProcessFunction(ScriptService scriptService, String preProcessFunction, Map<String, String> predictParameter) {
+    public RemoteInferencePreProcessFunction(ScriptService scriptService, String preProcessFunction, Map<String, String> params) {
         this.returnDirectlyForRemoteInferenceInput = false;
         this.scriptService = scriptService;
         this.preProcessFunction = preProcessFunction;
-        this.predictParameter = predictParameter;
+        this.params = params;
     }
 
     @Override
@@ -51,8 +51,8 @@ public class RemoteInferencePreProcessFunction extends ConnectorPreProcessFuncti
     public RemoteInferenceInputDataSet process(MLInput mlInput) {
         Map<String, Object> inputParams = new HashMap<>();
         Map<String, String> parameters = ((RemoteInferenceInputDataSet) mlInput.getInputDataset()).getParameters();
-        if (predictParameter.containsKey(PARSE_REMOTE_INFERENCE_INPUT_TO_MAP) &&
-                Boolean.parseBoolean(predictParameter.get(PARSE_REMOTE_INFERENCE_INPUT_TO_MAP))) {
+        if (params.containsKey(CONVERT_REMOTE_INFERENCE_PARAM_TO_OBJECT) &&
+                Boolean.parseBoolean(params.get(CONVERT_REMOTE_INFERENCE_PARAM_TO_OBJECT))) {
             for (String key : parameters.keySet()) {
                 if (isJson(parameters.get(key))) {
                     inputParams.put(key, gson.fromJson(parameters.get(key), Object.class));

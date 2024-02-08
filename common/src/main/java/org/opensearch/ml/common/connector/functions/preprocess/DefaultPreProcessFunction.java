@@ -22,6 +22,7 @@ import java.util.Collections;
 import java.util.Map;
 
 import static org.opensearch.core.xcontent.ToXContent.EMPTY_PARAMS;
+import static org.opensearch.ml.common.utils.StringUtils.addDefaultMethod;
 import static org.opensearch.ml.common.utils.StringUtils.convertScriptStringToJsonString;
 import static org.opensearch.ml.common.utils.StringUtils.gson;
 
@@ -65,7 +66,7 @@ public class DefaultPreProcessFunction extends ConnectorPreProcessFunction {
     }
 
     private String executeScript(ScriptService scriptService, String painlessScript, Map<String, Object> params) {
-        Script script = new Script(ScriptType.INLINE, "painless", painlessScript, Collections.emptyMap());
+        Script script = new Script(ScriptType.INLINE, "painless", addDefaultMethod(painlessScript), Collections.emptyMap());
         TemplateScript templateScript = scriptService.compile(script, TemplateScript.CONTEXT).newInstance(params);
         return templateScript.execute();
     }

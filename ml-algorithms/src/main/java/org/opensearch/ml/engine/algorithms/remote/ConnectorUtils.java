@@ -96,13 +96,13 @@ public class ConnectorUtils {
             } else if (mlInput.getInputDataset() instanceof RemoteInferenceInputDataSet) {
                 if (parameters.containsKey(PROCESS_REMOTE_INFERENCE_INPUT)
                     && Boolean.parseBoolean(parameters.get(PROCESS_REMOTE_INFERENCE_INPUT))) {
-                    Map<String, String> predictParams = new HashMap<>();
-                    predictParams.putAll(connector.getParameters());
-                    predictParams.putAll(parameters);
+                    Map<String, String> params = new HashMap<>();
+                    params.putAll(connector.getParameters());
+                    params.putAll(parameters);
                     RemoteInferencePreProcessFunction function = new RemoteInferencePreProcessFunction(
                         scriptService,
                         preProcessFunction,
-                        predictParams
+                        params
                     );
                     return function.apply(mlInput);
                 } else {
@@ -205,14 +205,6 @@ public class ConnectorUtils {
         }
 
         // execute user defined painless script.
-//        Optional<String> processedResponse = Optional.empty();
-//        if (parameters.containsKey("post_process_function.convert_model_response_to_object")
-//                && Boolean.parseBoolean(parameters.get("post_process_function.convert_model_response_to_object"))) {
-//            Object responseObj = gson.fromJson(modelResponse, Object.class);
-//            processedResponse = executePostProcessFunction(scriptService, postProcessFunction, responseObj);
-//        } else {
-//            processedResponse = executePostProcessFunction(scriptService, postProcessFunction, modelResponse);
-//        }
         Optional<String> processedResponse = executePostProcessFunction(scriptService, postProcessFunction, modelResponse);
         String response = processedResponse.orElse(modelResponse);
         boolean scriptReturnModelTensor = postProcessFunction != null
