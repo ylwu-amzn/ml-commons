@@ -21,18 +21,23 @@ import java.util.Map;
 
 import static org.opensearch.ml.common.utils.StringUtils.convertScriptStringToJsonString;
 import static org.opensearch.ml.common.utils.StringUtils.gson;
+import static org.opensearch.ml.common.utils.StringUtils.isJson;
 
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 public class RemoteInferencePreProcessFunction extends ConnectorPreProcessFunction {
 
+    public static final String PARSE_REMOTE_INFERENCE_INPUT_TO_MAP = "pre_process_function.convert_remote_inference_param_to_object";
     ScriptService scriptService;
     String preProcessFunction;
 
+    Map<String, String> predictParameter;
+
     @Builder
-    public RemoteInferencePreProcessFunction(ScriptService scriptService, String preProcessFunction) {
+    public RemoteInferencePreProcessFunction(ScriptService scriptService, String preProcessFunction, Map<String, String> predictParameter) {
         this.returnDirectlyForRemoteInferenceInput = false;
         this.scriptService = scriptService;
         this.preProcessFunction = preProcessFunction;
+        this.predictParameter = predictParameter;
     }
 
     @Override
@@ -45,7 +50,19 @@ public class RemoteInferencePreProcessFunction extends ConnectorPreProcessFuncti
     @Override
     public RemoteInferenceInputDataSet process(MLInput mlInput) {
         Map<String, Object> inputParams = new HashMap<>();
-        inputParams.putAll(((RemoteInferenceInputDataSet)mlInput.getInputDataset()).getParameters());
+        Map<String, String> parameters = ((RemoteInferenceInputDataSet) mlInput.getInputDataset()).getParameters();
+        if (predictParameter.containsKey(PARSE_REMOTE_INFERENCE_INPUT_TO_MAP) &&
+                Boolean.parseBoolean(predictParameter.get(PARSE_REMOTE_INFERENCE_INPUT_TO_MAP))) {
+            for (String key : parameters.keySet()) {
+                if (isJson(parameters.get(key))) {
+                    inputParams.put(key, gson.fromJson(parameters.get(key), Object.class));
+                } else {
+                    inputParams.put(key, parameters.get(key));
+                }
+            }
+        } else {
+            inputParams.putAll(parameters);
+        }
         String processedInput = executeScript(scriptService, preProcessFunction, inputParams);
         if (processedInput == null) {
             throw new IllegalArgumentException("Preprocess function output is null");
