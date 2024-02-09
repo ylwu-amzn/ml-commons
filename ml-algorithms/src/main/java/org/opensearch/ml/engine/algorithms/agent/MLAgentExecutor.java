@@ -282,6 +282,8 @@ public class MLAgentExecutor implements Executable {
         switch (mlAgent.getType()) {
             case "flow":
                 return new MLFlowAgentRunner(client, settings, clusterService, xContentRegistry, toolFactories, memoryFactoryMap);
+            case "conversational_flow":
+                return new MLConversationalFlowAgentRunner(client, settings, clusterService, xContentRegistry, toolFactories, memoryFactoryMap);
             case "conversational":
                 return new MLChatAgentRunner(client, settings, clusterService, xContentRegistry, toolFactories, memoryFactoryMap);
             default:
