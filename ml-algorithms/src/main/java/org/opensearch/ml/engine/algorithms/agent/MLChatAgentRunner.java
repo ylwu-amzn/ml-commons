@@ -379,7 +379,7 @@ public class MLChatAgentRunner implements MLAgentRunner {
                     if (conversationIndexMemory != null) {
                         ConversationIndexMessage msgTemp = ConversationIndexMessage
                             .conversationIndexMessageBuilder()
-                            .type(memory.getType()  )
+                            .type(memory.getType())
                             .question(question)
                             .response(thought)
                             .finalAnswer(false)
