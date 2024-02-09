@@ -179,16 +179,17 @@ public class MLFlowAgentRunner implements MLAgentRunner {
                 StepListener<Object> nextStepListener = new StepListener<>();
                 int finalI = i;
                 previousStepListener.whenComplete(output -> {
-                    processOutput(params, listener, memory, memoryId, parentInteractionId, toolSpecs, flowAgentOutput, additionalInfo, traceNumber, memorySpec, previousToolSpec, finalI, output);
-                    if (finalI == toolSpecs.size()) {
-                        return;
-                    }
-
-                    MLToolSpec toolSpec = toolSpecs.get(finalI);
-                    Tool tool = createTool(toolSpec);
-                    if (finalI < toolSpecs.size()) {
-                        tool.run(getToolExecuteParams(toolSpec, params), nextStepListener);
-                    }
+                    processOutput(params, listener, memory, memoryId, parentInteractionId, toolSpecs, flowAgentOutput, additionalInfo, traceNumber, memorySpec, previousToolSpec, finalI, output,
+                            nextStepListener);
+//                    if (finalI == toolSpecs.size()) {
+//                        return;
+//                    }
+//
+//                    MLToolSpec toolSpec = toolSpecs.get(finalI);
+//                    Tool tool = createTool(toolSpec);
+//                    if (finalI < toolSpecs.size()) {
+//                        tool.run(getToolExecuteParams(toolSpec, params), nextStepListener);
+//                    }
 
                 }, e -> {
                     log.error("Failed to run flow agent", e);
@@ -201,7 +202,7 @@ public class MLFlowAgentRunner implements MLAgentRunner {
             firstTool.run(firstToolExecuteParams, ActionListener.wrap(output -> {
                 MLToolSpec toolSpec = toolSpecs.get(0);
                 processOutput(params, listener, memory, memoryId, parentInteractionId,
-                        toolSpecs, flowAgentOutput, additionalInfo, traceNumber, memorySpec, toolSpec, 1, output);
+                        toolSpecs, flowAgentOutput, additionalInfo, traceNumber, memorySpec, toolSpec, 1, output, null);
 
 //                String key = toolSpec.getName();
 //                String outputKey = toolSpec.getName() != null ? toolSpec.getName() + ".output" : toolSpec.getType() + ".output";
@@ -278,7 +279,8 @@ public class MLFlowAgentRunner implements MLAgentRunner {
                                   MLMemorySpec memorySpec,
                                   MLToolSpec previousToolSpec,
                                   int finalI,
-                                  Object output) throws IOException, PrivilegedActionException {
+                                  Object output,
+                               StepListener<Object> nextStepListener) throws IOException, PrivilegedActionException {
         String toolName = getToolName(previousToolSpec);
         String outputKey = toolName + ".output";
         String outputResponse = parseResponse(output);
@@ -315,15 +317,7 @@ public class MLFlowAgentRunner implements MLAgentRunner {
                     updateMemoryWithListener(additionalInfo, memorySpec, memoryId, parentInteractionId, updateListener);
                 }
             } else {
-                ConversationIndexMessage finalMessage = ConversationIndexMessage
-                    .conversationIndexMessageBuilder()
-                    .type(memory.getType())
-                    .question(params.get(QUESTION))
-                    .response(outputResponse)
-                    .finalAnswer(true)
-                    .sessionId(memoryId)
-                    .build();
-                memory.save(finalMessage, parentInteractionId, traceNumber.addAndGet(1), null, ActionListener.wrap(r -> {
+                saveMessage(params, memory, outputResponse, memoryId, parentInteractionId, toolName, traceNumber, ActionListener.wrap(r -> {
                     log.info("saved last trace for interaction " + parentInteractionId + " of flow agent");
                     Map<String, Object> updateContent = Map.of(AI_RESPONSE_FIELD, outputResponse, ADDITIONAL_INFO_FIELD, additionalInfo);
                     memory.update(parentInteractionId, updateContent, updateListener);
@@ -331,9 +325,63 @@ public class MLFlowAgentRunner implements MLAgentRunner {
                     log.error("Failed to update root interaction ", e);
                     listener.onFailure(e);
                 }));
+//                ConversationIndexMessage finalMessage = ConversationIndexMessage
+//                    .conversationIndexMessageBuilder()
+//                    .type(memory.getType())
+//                    .question(params.get(QUESTION))
+//                    .response(outputResponse)
+//                    .finalAnswer(true)
+//                    .sessionId(memoryId)
+//                    .build();
+//                memory.save(finalMessage, parentInteractionId, traceNumber.addAndGet(1), toolName, ActionListener.wrap(r -> {
+//                    log.info("saved last trace for interaction " + parentInteractionId + " of flow agent");
+//                    Map<String, Object> updateContent = Map.of(AI_RESPONSE_FIELD, outputResponse, ADDITIONAL_INFO_FIELD, additionalInfo);
+//                    memory.update(parentInteractionId, updateContent, updateListener);
+//                }, e -> {
+//                    log.error("Failed to update root interaction ", e);
+//                    listener.onFailure(e);
+//                }));
 
             }
+        } else {
+            if (memory == null) {
+                runNextStep(params, toolSpecs, finalI, nextStepListener);
+            } else {
+                saveMessage(params, memory, outputResponse, memoryId, parentInteractionId, toolName, traceNumber, ActionListener.wrap(r -> {
+                    runNextStep(params, toolSpecs, finalI, nextStepListener);
+                }, e -> {
+                    log.error("Failed to update root interaction ", e);
+                    listener.onFailure(e);
+                }));
+            }
         }
+    }
+
+    private void runNextStep(Map<String, String> params, List<MLToolSpec> toolSpecs, int finalI, StepListener<Object> nextStepListener) {
+        MLToolSpec toolSpec = toolSpecs.get(finalI);
+        Tool tool = createTool(toolSpec);
+        if (finalI < toolSpecs.size()) {
+            tool.run(getToolExecuteParams(toolSpec, params), nextStepListener);
+        }
+    }
+
+    private void saveMessage(Map<String, String> params,
+                             ConversationIndexMemory memory,
+                             String outputResponse,
+                             String memoryId,
+                             String parentInteractionId,
+                             String toolName,
+                             AtomicInteger traceNumber,
+                             ActionListener listener) {
+        ConversationIndexMessage finalMessage = ConversationIndexMessage
+                .conversationIndexMessageBuilder()
+                .type(memory.getType())
+                .question(params.get(QUESTION))
+                .response(outputResponse)
+                .finalAnswer(true)
+                .sessionId(memoryId)
+                .build();
+        memory.save(finalMessage, parentInteractionId, traceNumber.addAndGet(1), toolName, listener);
     }
 
     @VisibleForTesting
