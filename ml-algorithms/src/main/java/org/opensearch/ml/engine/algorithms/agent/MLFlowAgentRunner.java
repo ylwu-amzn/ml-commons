@@ -325,7 +325,7 @@ public class MLFlowAgentRunner implements MLAgentRunner {
                     .build();
                 memory.save(finalMessage, parentInteractionId, traceNumber.addAndGet(1), null, ActionListener.wrap(r -> {
                     log.info("saved last trace for interaction " + parentInteractionId + " of flow agent");
-                    Map<String, Object> updateContent = Map.of(AI_RESPONSE_FIELD, flowAgentOutput, ADDITIONAL_INFO_FIELD, additionalInfo);
+                    Map<String, Object> updateContent = Map.of(AI_RESPONSE_FIELD, outputResponse, ADDITIONAL_INFO_FIELD, additionalInfo);
                     memory.update(parentInteractionId, updateContent, updateListener);
                 }, e -> {
                     log.error("Failed to update root interaction ", e);
