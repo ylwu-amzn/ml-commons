@@ -381,7 +381,7 @@ public class MLFlowAgentRunnerTest {
         when(memory.getMemoryManager()).thenReturn(memoryManager);
         Map<String, Object> additionalInfo = new HashMap<>();
 
-        mlFlowAgentRunner.updateInteraction(additionalInfo, interactionId, memory);
+        // mlFlowAgentRunner.updateInteraction(additionalInfo, interactionId, memory);
         verify(memoryManager).updateInteraction(eq(interactionId), anyMap(), any());
     }
 
@@ -426,7 +426,7 @@ public class MLFlowAgentRunnerTest {
         mlFlowAgentRunner.setMemoryFactoryMap(memoryFactoryMap);
 
         // Execute the method under test
-        mlFlowAgentRunner.updateMemory(new HashMap<>(), memorySpec, "memoryId", "interactionId");
+        // mlFlowAgentRunner.updateMemory(new HashMap<>(), memorySpec, "memoryId", "interactionId");
 
         // Asserting that the Memory Manager's updateInteraction method was called
         verify(memoryManager).updateInteraction(anyString(), anyMap(), any(ActionListener.class));

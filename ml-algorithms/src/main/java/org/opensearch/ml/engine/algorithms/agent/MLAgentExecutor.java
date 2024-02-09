@@ -65,6 +65,7 @@ public class MLAgentExecutor implements Executable {
     public static final String QUESTION = "question";
     public static final String PARENT_INTERACTION_ID = "parent_interaction_id";
     public static final String REGENERATE_INTERACTION_ID = "regenerate_interaction_id";
+    public static final String MESSAGE_HISTORY_LIMIT = "message_history_limit";
 
     private Client client;
     private Settings settings;
