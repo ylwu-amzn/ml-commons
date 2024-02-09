@@ -110,11 +110,20 @@ public class MLChatAgentRunner implements MLAgentRunner {
         this.memoryFactoryMap = memoryFactoryMap;
     }
 
+    @Override
     public void run(MLAgent mlAgent, Map<String, String> params, ActionListener<Object> listener) {
         String memoryType = mlAgent.getMemory().getType();
         String memoryId = params.get(MLAgentExecutor.MEMORY_ID);
         String appType = mlAgent.getAppType();
         String title = params.get(MLAgentExecutor.QUESTION);
+
+        String messageHistoryLimitStr = params.get("message_history_limit");
+        int messageHistoryLimit;
+        if (messageHistoryLimitStr != null) {
+            messageHistoryLimit = Integer.parseInt(messageHistoryLimitStr);
+        } else {
+            messageHistoryLimit = 3;
+        }
 
         ConversationIndexMemory.Factory conversationIndexMemoryFactory = (ConversationIndexMemory.Factory) memoryFactoryMap.get(memoryType);
         conversationIndexMemoryFactory.create(title, memoryId, appType, ActionListener.<ConversationIndexMemory>wrap(memory -> {
@@ -152,7 +161,7 @@ public class MLChatAgentRunner implements MLAgentRunner {
             }, e -> {
                 log.error("Failed to get chat history", e);
                 listener.onFailure(e);
-            }));
+            }), messageHistoryLimit);
         }, listener::onFailure));
     }
 
@@ -370,7 +379,7 @@ public class MLChatAgentRunner implements MLAgentRunner {
                     if (conversationIndexMemory != null) {
                         ConversationIndexMessage msgTemp = ConversationIndexMessage
                             .conversationIndexMessageBuilder()
-                            .type("ReAct")
+                            .type(memory.getType()  )
                             .question(question)
                             .response(thought)
                             .finalAnswer(false)
@@ -443,7 +452,7 @@ public class MLChatAgentRunner implements MLAgentRunner {
                             // Create final trace message.
                             ConversationIndexMessage msgTemp = ConversationIndexMessage
                                 .conversationIndexMessageBuilder()
-                                .type("ReAct")
+                                .type(memory.getType())
                                 .question(question)
                                 .response(finalAnswer1)
                                 .finalAnswer(true)

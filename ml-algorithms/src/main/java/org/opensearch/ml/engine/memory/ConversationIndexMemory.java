@@ -140,6 +140,10 @@ public class ConversationIndexMemory implements Memory {
         memoryManager.getFinalInteractions(conversationId, LAST_N_INTERACTIONS, listener);
     }
 
+    public void getMessages(ActionListener listener, int size) {
+        memoryManager.getFinalInteractions(conversationId, size, listener);
+    }
+
     @Override
     public void clear() {
         throw new RuntimeException("clear method is not supported in ConversationIndexMemory");

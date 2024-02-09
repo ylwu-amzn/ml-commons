@@ -6,6 +6,10 @@
 package org.opensearch.ml.engine.algorithms.agent;
 
 import static org.apache.commons.text.StringEscapeUtils.escapeJson;
+import static org.opensearch.ml.common.conversation.ActionConstants.ADDITIONAL_INFO_FIELD;
+import static org.opensearch.ml.common.conversation.ActionConstants.AI_RESPONSE_FIELD;
+import static org.opensearch.ml.common.conversation.ActionConstants.MEMORY_ID;
+import static org.opensearch.ml.common.conversation.ActionConstants.PARENT_INTERACTION_ID_FIELD;
 
 import java.io.IOException;
 import java.security.AccessController;
@@ -15,6 +19,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.commons.text.StringSubstitutor;
 import org.opensearch.action.StepListener;
@@ -24,18 +29,23 @@ import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.common.xcontent.json.JsonXContent;
 import org.opensearch.core.action.ActionListener;
+import org.opensearch.core.common.Strings;
 import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.ml.common.agent.MLAgent;
 import org.opensearch.ml.common.agent.MLMemorySpec;
 import org.opensearch.ml.common.agent.MLToolSpec;
 import org.opensearch.ml.common.conversation.ActionConstants;
+import org.opensearch.ml.common.conversation.Interaction;
 import org.opensearch.ml.common.output.model.ModelTensor;
 import org.opensearch.ml.common.output.model.ModelTensorOutput;
 import org.opensearch.ml.common.output.model.ModelTensors;
 import org.opensearch.ml.common.spi.memory.Memory;
+import org.opensearch.ml.common.spi.memory.Message;
 import org.opensearch.ml.common.spi.tools.Tool;
 import org.opensearch.ml.common.utils.StringUtils;
 import org.opensearch.ml.engine.memory.ConversationIndexMemory;
+import org.opensearch.ml.engine.memory.ConversationIndexMessage;
+import org.opensearch.ml.memory.action.conversation.CreateInteractionResponse;
 import org.opensearch.ml.repackage.com.google.common.annotations.VisibleForTesting;
 import org.opensearch.ml.repackage.com.google.common.collect.ImmutableMap;
 
@@ -48,6 +58,7 @@ import lombok.extern.log4j.Log4j2;
 @NoArgsConstructor
 public class MLFlowAgentRunner implements MLAgentRunner {
 
+    public static final String CHAT_HISTORY = "chat_history";
     private Client client;
     private Settings settings;
     private ClusterService clusterService;
@@ -71,7 +82,88 @@ public class MLFlowAgentRunner implements MLAgentRunner {
         this.memoryFactoryMap = memoryFactoryMap;
     }
 
+    @Override
     public void run(MLAgent mlAgent, Map<String, String> params, ActionListener<Object> listener) {
+        String memoryType = mlAgent.getMemory().getType();
+        String memoryId = params.get(MLAgentExecutor.MEMORY_ID);
+        String parentInteractionId = params.get(MLAgentExecutor.PARENT_INTERACTION_ID);
+        String appType = mlAgent.getAppType();
+        String title = params.get(MLAgentExecutor.QUESTION);
+
+        String messageHistoryLimitStr = params.get("message_history_limit");
+        int messageHistoryLimit;
+        if (messageHistoryLimitStr != null) {
+            messageHistoryLimit = Integer.parseInt(messageHistoryLimitStr);
+        } else {
+            messageHistoryLimit = 3;
+        }
+
+        ConversationIndexMemory.Factory conversationIndexMemoryFactory = (ConversationIndexMemory.Factory) memoryFactoryMap.get(memoryType);
+        if (appType == null) {
+            runAgent(mlAgent, params, listener, null, memoryId, parentInteractionId);
+            return;
+        }
+        conversationIndexMemoryFactory.create(title, memoryId, appType, ActionListener.<ConversationIndexMemory>wrap(memory -> {
+            memory.getMessages(ActionListener.<List<Interaction>>wrap(r -> {
+                List<Message> messageList = new ArrayList<>();
+                for (Interaction next : r) {
+                    String question = next.getInput();
+                    String response = next.getResponse();
+                    // As we store the conversation with empty response first and then update when have final answer,
+                    // filter out those in-flight requests when run in parallel
+                    if (Strings.isNullOrEmpty(response)) {
+                        continue;
+                    }
+                    messageList
+                            .add(
+                                    ConversationIndexMessage
+                                            .conversationIndexMessageBuilder()
+                                            .sessionId(memory.getConversationId())
+                                            .question(question)
+                                            .response(response)
+                                            .build()
+                            );
+                }
+
+                StringBuilder chatHistoryBuilder = new StringBuilder();
+                if (messageList.size() > 0) {
+                    chatHistoryBuilder.append("Below is Chat History between Human and AI which sorted by time with asc order:\n");
+                    for (Message message : messageList) {
+                        chatHistoryBuilder.append(message.toString()).append("\n");
+                    }
+                    params.put(CHAT_HISTORY, chatHistoryBuilder.toString());
+                }
+
+                runAgent(mlAgent, params, listener, memory, memory.getConversationId(), parentInteractionId);
+            }, e -> {
+                log.error("Failed to get chat history", e);
+                listener.onFailure(e);
+            }), messageHistoryLimit);
+        }, listener::onFailure));
+    }
+
+//    public void runAgent(MLAgent mlAgent, Map<String, String> params, ActionListener<Object> listener, ConversationIndexMemory memory, String memoryId) {
+//        //String memoryId = params.get(MLAgentExecutor.MEMORY_ID);
+//        //String parentInteractionId = params.get(MLAgentExecutor.PARENT_INTERACTION_ID);
+//        if (memory != null) {
+//            ConversationIndexMessage msgTemp = ConversationIndexMessage
+//                    .conversationIndexMessageBuilder()
+//                    .type(memory.getType()  )
+//                    .question(params.get("question"))
+//                    .response("")
+//                    .sessionId(memoryId)
+//                    .build();
+//            memory.save(msgTemp, null, null, null, ActionListener.<CreateInteractionResponse>wrap(r-> {
+//                runAgent(mlAgent, params, listener, memory, memoryId, r.getId());
+//            }, e-> {
+//                listener.onFailure(e);
+//            }));
+//        } else {
+//            runAgent(mlAgent, params, listener, memory, memoryId, null);
+//        }
+//    }
+
+    private void runAgent(MLAgent mlAgent, Map<String, String> params, ActionListener<Object> listener,ConversationIndexMemory memory, String memoryId, String parentInteractionId) {
         List<MLToolSpec> toolSpecs = mlAgent.getTools();
         StepListener<Object> firstStepListener = null;
         Tool firstTool = null;
@@ -83,11 +175,13 @@ public class MLFlowAgentRunner implements MLAgentRunner {
             listener.onFailure(new IllegalArgumentException("no tool configured"));
             return;
         }
+        AtomicInteger traceNumber = new AtomicInteger(0);
+        if (memory != null) {
+            flowAgentOutput.add(ModelTensor.builder().name(MEMORY_ID).result(memoryId).build());
+            flowAgentOutput.add(ModelTensor.builder().name(PARENT_INTERACTION_ID_FIELD).result(parentInteractionId).build());
+        }
 
         MLMemorySpec memorySpec = mlAgent.getMemory();
-        String memoryId = params.get(MLAgentExecutor.MEMORY_ID);
-        String parentInteractionId = params.get(MLAgentExecutor.PARENT_INTERACTION_ID);
-
         for (int i = 0; i <= toolSpecs.size(); i++) {
             if (i == 0) {
                 MLToolSpec toolSpec = toolSpecs.get(i);
@@ -125,17 +219,51 @@ public class MLFlowAgentRunner implements MLAgentRunner {
                     }
 
                     if (finalI == toolSpecs.size()) {
-                        if (memoryId == null || parentInteractionId == null || memorySpec == null || memorySpec.getType() == null) {
-                            listener.onResponse(flowAgentOutput);
+                        if (memory == null) {
+                            if (memoryId == null || parentInteractionId == null || memorySpec == null || memorySpec.getType() == null) {
+                                listener.onResponse(flowAgentOutput);
+                            } else {
+                                ActionListener updateListener = ActionListener.<UpdateResponse>wrap(updateResponse -> {
+                                    log.info("Updated additional info for interaction ID: " + updateResponse.getId() + " in the flow agent.");
+                                    listener.onResponse(flowAgentOutput);
+                                }, e -> {
+                                    log.error("Failed to update root interaction", e);
+                                    listener.onResponse(flowAgentOutput);
+                                });
+                                updateMemoryWithListener(additionalInfo, memorySpec, memoryId, parentInteractionId, updateListener);
+                            }
                         } else {
-                            ActionListener updateListener = ActionListener.<UpdateResponse>wrap(updateResponse -> {
-                                log.info("Updated additional info for interaction ID: " + updateResponse.getId() + " in the flow agent.");
-                                listener.onResponse(flowAgentOutput);
-                            }, e -> {
-                                log.error("Failed to update root interaction", e);
-                                listener.onResponse(flowAgentOutput);
-                            });
-                            updateMemoryWithListener(additionalInfo, memorySpec, memoryId, parentInteractionId, updateListener);
+                            ConversationIndexMessage msgTemp = ConversationIndexMessage
+                                    .conversationIndexMessageBuilder()
+                                    .type(memory.getType()  )
+                                    .question(params.get("question"))
+                                    .response(outputResponse)
+                                    .finalAnswer(true)
+                                    .sessionId(memoryId)
+                                    .build();
+                            memory.save(msgTemp, parentInteractionId, traceNumber.addAndGet(1), null, ActionListener.wrap(r->{
+                                log.info("11111 saved last trace for interaction ID: " + parentInteractionId + " in the flow agent.");
+
+                                memory
+                                        .getMemoryManager()
+                                        .updateInteraction(
+                                                parentInteractionId,
+                                                ImmutableMap.of(AI_RESPONSE_FIELD, flowAgentOutput, ADDITIONAL_INFO_FIELD, additionalInfo),
+                                                ActionListener.<UpdateResponse>wrap(res -> {
+                                                    listener.onResponse(flowAgentOutput);
+                                                }, e-> {
+                                                    listener.onFailure(e);
+                                                })
+                                        );
+
+
+                            }, e->{
+                                log.error("11111 Failed to update root interaction ", e);
+//                                listener.onResponse(flowAgentOutput);
+                                listener.onFailure(e);
+                            }));
+
+
                         }
                         return;
                     }
@@ -154,28 +282,83 @@ public class MLFlowAgentRunner implements MLAgentRunner {
             }
         }
         if (toolSpecs.size() == 1) {
-            firstTool.run(firstToolExecuteParams, listener);
+            firstTool.run(firstToolExecuteParams, ActionListener.wrap(output ->{
+                MLToolSpec toolSpec = toolSpecs.get(0);
+                String key = toolSpec.getName();
+                String outputKey = toolSpec.getName() != null
+                        ? toolSpec.getName() + ".output"
+                        : toolSpec.getType() + ".output";
+
+                String outputResponse = parseResponse(output);
+                params.put(outputKey, escapeJson(outputResponse));
+
+//                if (toolSpec.isIncludeOutputInAgentResponse()) {
+                    if (output instanceof ModelTensorOutput) {
+                        flowAgentOutput.addAll(((ModelTensorOutput) output).getMlModelOutputs().get(0).getMlModelTensors());
+                    } else {
+                        String result = output instanceof String
+                                ? (String) output
+                                : AccessController.doPrivileged((PrivilegedExceptionAction<String>) () -> StringUtils.toJson(output));
+
+                        ModelTensor stepOutput = ModelTensor.builder().name(key).result(result).build();
+                        flowAgentOutput.add(stepOutput);
+                    }
+
+                if (toolSpec.isIncludeOutputInAgentResponse()) {
+                    additionalInfo.put(outputKey, outputResponse);
+                }
+//                }
+
+                if (memory == null) {
+                    if (memoryId == null || parentInteractionId == null || memorySpec == null || memorySpec.getType() == null) {
+                        listener.onResponse(flowAgentOutput);
+                    } else {
+                        ActionListener updateListener = ActionListener.<UpdateResponse>wrap(updateResponse -> {
+                            log.info("Updated additional info for interaction ID: " + updateResponse.getId() + " in the flow agent.");
+                            listener.onResponse(flowAgentOutput);
+                        }, e -> {
+                            log.error("Failed to update root interaction", e);
+                            listener.onResponse(flowAgentOutput);
+                        });
+                        updateMemoryWithListener(additionalInfo, memorySpec, memoryId, parentInteractionId, updateListener);
+                    }
+                } else {
+                    ConversationIndexMessage msgTemp = ConversationIndexMessage
+                            .conversationIndexMessageBuilder()
+                            .type(memory.getType()  )
+                            .question(params.get("question"))
+                            .response(outputResponse)
+                            .finalAnswer(true)
+                            .sessionId(memoryId)
+                            .build();
+                    memory.save(msgTemp, parentInteractionId, traceNumber.addAndGet(1), null, ActionListener.wrap(r->{
+                        log.info("11111 saved last trace for interaction ID: " + parentInteractionId + " in the flow agent.");
+
+                        memory
+                                .getMemoryManager()
+                                .updateInteraction(
+                                        parentInteractionId,
+                                        ImmutableMap.of(AI_RESPONSE_FIELD, outputResponse, ADDITIONAL_INFO_FIELD, additionalInfo),
+                                        ActionListener.<UpdateResponse>wrap(res -> {
+                                            listener.onResponse(flowAgentOutput);
+                                        }, e-> {
+                                            listener.onFailure(e);
+                                        })
+                                );
+
+
+                    }, e->{
+                        log.error("11111 Failed to update root interaction ", e);
+//                                listener.onResponse(flowAgentOutput);
+                        listener.onFailure(e);
+                    }));
+                }
+            }, e->{
+                listener.onFailure(e);
+            }));
         } else {
             firstTool.run(firstToolExecuteParams, firstStepListener);
         }
-    }
-
-    @VisibleForTesting
-    void updateMemory(Map<String, Object> additionalInfo, MLMemorySpec memorySpec, String memoryId, String interactionId) {
-        if (memoryId == null || interactionId == null || memorySpec == null || memorySpec.getType() == null) {
-            return;
-        }
-        ConversationIndexMemory.Factory conversationIndexMemoryFactory = (ConversationIndexMemory.Factory) memoryFactoryMap
-            .get(memorySpec.getType());
-        conversationIndexMemoryFactory
-            .create(
-                memoryId,
-                ActionListener
-                    .wrap(
-                        memory -> updateInteraction(additionalInfo, interactionId, memory),
-                        e -> log.error("Failed create memory from id: " + memoryId, e)
-                    )
-            );
     }
 
     @VisibleForTesting
@@ -191,40 +374,11 @@ public class MLFlowAgentRunner implements MLAgentRunner {
         }
         ConversationIndexMemory.Factory conversationIndexMemoryFactory = (ConversationIndexMemory.Factory) memoryFactoryMap
             .get(memorySpec.getType());
-        conversationIndexMemoryFactory
-            .create(
-                memoryId,
-                ActionListener
-                    .wrap(
-                        memory -> updateInteractionWithListener(additionalInfo, interactionId, memory, listener),
-                        e -> log.error("Failed create memory from id: " + memoryId, e)
-                    )
-            );
-    }
-
-    @VisibleForTesting
-    void updateInteraction(Map<String, Object> additionalInfo, String interactionId, ConversationIndexMemory memory) {
-        memory
-            .getMemoryManager()
-            .updateInteraction(
-                interactionId,
-                ImmutableMap.of(ActionConstants.ADDITIONAL_INFO_FIELD, additionalInfo),
-                ActionListener.<UpdateResponse>wrap(updateResponse -> {
-                    log.info("Updated additional info for interaction ID: " + interactionId);
-                }, e -> { log.error("Failed to update root interaction", e); })
-            );
-    }
-
-    @VisibleForTesting
-    void updateInteractionWithListener(
-        Map<String, Object> additionalInfo,
-        String interactionId,
-        ConversationIndexMemory memory,
-        ActionListener listener
-    ) {
-        memory
-            .getMemoryManager()
-            .updateInteraction(interactionId, ImmutableMap.of(ActionConstants.ADDITIONAL_INFO_FIELD, additionalInfo), listener);
+        conversationIndexMemoryFactory.create(memoryId, ActionListener.wrap(memory -> {
+            memory
+                .getMemoryManager()
+                .updateInteraction(interactionId, ImmutableMap.of(ActionConstants.ADDITIONAL_INFO_FIELD, additionalInfo), listener);
+        }, e -> log.error("Failed create memory from id: " + memoryId, e)));
     }
 
     @VisibleForTesting
