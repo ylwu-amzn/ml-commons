@@ -8,12 +8,12 @@ package org.opensearch.ml.engine.algorithms.agent;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
 import static org.mockito.Mockito.when;
+import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.PROMPT_PREFIX;
+import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.PROMPT_SUFFIX;
 import static org.opensearch.ml.engine.algorithms.agent.MLChatAgentRunner.CHAT_HISTORY;
 import static org.opensearch.ml.engine.algorithms.agent.MLChatAgentRunner.CONTEXT;
 import static org.opensearch.ml.engine.algorithms.agent.MLChatAgentRunner.EXAMPLES;
 import static org.opensearch.ml.engine.algorithms.agent.MLChatAgentRunner.OS_INDICES;
-import static org.opensearch.ml.engine.algorithms.agent.MLChatAgentRunner.PROMPT_PREFIX;
-import static org.opensearch.ml.engine.algorithms.agent.MLChatAgentRunner.PROMPT_SUFFIX;
 
 import java.util.Arrays;
 import java.util.HashMap;

@@ -12,6 +12,7 @@ import static org.opensearch.ml.common.conversation.ActionConstants.MEMORY_ID;
 import static org.opensearch.ml.common.conversation.ActionConstants.PARENT_INTERACTION_ID_FIELD;
 import static org.opensearch.ml.common.utils.StringUtils.gson;
 import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.getMessageHistoryLimit;
+import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.getMlToolSpecs;
 import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.getToolName;
 import static org.opensearch.ml.engine.algorithms.agent.MLAgentExecutor.QUESTION;
 
@@ -62,7 +63,7 @@ import lombok.extern.log4j.Log4j2;
 public class MLConversationalFlowAgentRunner implements MLAgentRunner {
 
     public static final String CHAT_HISTORY = "chat_history";
-    public static final String SELECTED_TOOLS = "selected_tools";
+
     private Client client;
     private Settings settings;
     private ClusterService clusterService;
@@ -156,8 +157,7 @@ public class MLConversationalFlowAgentRunner implements MLAgentRunner {
         Map<String, String> firstToolExecuteParams = null;
         StepListener<Object> previousStepListener = null;
         Map<String, Object> additionalInfo = new ConcurrentHashMap<>();
-        String selectedToolsStr = params.get(SELECTED_TOOLS);
-        List<MLToolSpec> toolSpecs = getMlToolSpecs(mlAgent, selectedToolsStr);
+        List<MLToolSpec> toolSpecs = getMlToolSpecs(mlAgent, params);
 
         if (toolSpecs == null || toolSpecs.size() == 0) {
             listener.onFailure(new IllegalArgumentException("no tool configured"));
@@ -229,25 +229,6 @@ public class MLConversationalFlowAgentRunner implements MLAgentRunner {
         } else {
             firstTool.run(firstToolExecuteParams, firstStepListener);
         }
-    }
-
-    private static List<MLToolSpec> getMlToolSpecs(MLAgent mlAgent, String selectedToolsStr) {
-        List<MLToolSpec> toolSpecs = mlAgent.getTools();
-        if (selectedToolsStr != null) {
-            List<String> selectedTools = gson.fromJson(selectedToolsStr, List.class);
-            Map<String, MLToolSpec> toolNameSpecMap = new HashMap<>();
-            for (MLToolSpec toolSpec : toolSpecs) {
-                toolNameSpecMap.put(getToolName(toolSpec), toolSpec);
-            }
-            List<MLToolSpec> selectedToolSpecs = new ArrayList<>();
-            for (String tool : selectedTools) {
-                if (toolNameSpecMap.containsKey(tool)) {
-                    selectedToolSpecs.add(toolNameSpecMap.get(tool));
-                }
-            }
-            toolSpecs = selectedToolSpecs;
-        }
-        return toolSpecs;
     }
 
     private void processOutput(

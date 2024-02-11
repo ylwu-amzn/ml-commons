@@ -8,8 +8,14 @@ package org.opensearch.ml.engine.algorithms.agent;
 import static org.opensearch.ml.common.conversation.ActionConstants.ADDITIONAL_INFO_FIELD;
 import static org.opensearch.ml.common.conversation.ActionConstants.AI_RESPONSE_FIELD;
 import static org.opensearch.ml.common.utils.StringUtils.gson;
+import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.PROMPT_PREFIX;
+import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.PROMPT_SUFFIX;
+import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.RESPONSE_FORMAT_INSTRUCTION;
+import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.TOOL_RESPONSE;
+import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.createTools;
 import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.extractModelResponseJson;
 import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.getMessageHistoryLimit;
+import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.getMlToolSpecs;
 import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.outputToOutputString;
 import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.parseInputFromLLMReturn;
 
@@ -73,10 +79,8 @@ import lombok.extern.log4j.Log4j2;
 public class MLChatAgentRunner implements MLAgentRunner {
 
     public static final String SESSION_ID = "session_id";
-    public static final String PROMPT_PREFIX = "prompt_prefix";
     public static final String LLM_TOOL_PROMPT_PREFIX = "LanguageModelTool.prompt_prefix";
     public static final String LLM_TOOL_PROMPT_SUFFIX = "LanguageModelTool.prompt_suffix";
-    public static final String PROMPT_SUFFIX = "prompt_suffix";
     public static final String TOOLS = "tools";
     public static final String TOOL_DESCRIPTIONS = "tool_descriptions";
     public static final String TOOL_NAMES = "tool_names";
@@ -121,6 +125,7 @@ public class MLChatAgentRunner implements MLAgentRunner {
 
         ConversationIndexMemory.Factory conversationIndexMemoryFactory = (ConversationIndexMemory.Factory) memoryFactoryMap.get(memoryType);
         conversationIndexMemoryFactory.create(title, memoryId, appType, ActionListener.<ConversationIndexMemory>wrap(memory -> {
+            //TODO: call runAgent directly if messageHistoryLimit == 0
             memory.getMessages(ActionListener.<List<Interaction>>wrap(r -> {
                 List<Message> messageList = new ArrayList<>();
                 for (Interaction next : r) {
@@ -160,34 +165,10 @@ public class MLChatAgentRunner implements MLAgentRunner {
     }
 
     private void runAgent(MLAgent mlAgent, Map<String, String> params, ActionListener<Object> listener, Memory memory, String sessionId) {
-        List<MLToolSpec> toolSpecs = mlAgent.getTools();
+        List<MLToolSpec> toolSpecs = getMlToolSpecs(mlAgent, params);
         Map<String, Tool> tools = new HashMap<>();
         Map<String, MLToolSpec> toolSpecMap = new HashMap<>();
-        for (MLToolSpec toolSpec : toolSpecs) {
-            Map<String, String> toolParams = new HashMap<>();
-            Map<String, String> executeParams = new HashMap<>();
-            if (toolSpec.getParameters() != null) {
-                toolParams.putAll(toolSpec.getParameters());
-                executeParams.putAll(toolSpec.getParameters());
-            }
-            for (String key : params.keySet()) {
-                if (key.startsWith(toolSpec.getType() + ".")) {
-                    executeParams.put(key.replace(toolSpec.getType() + ".", ""), params.get(key));
-                }
-            }
-            log.info("Fetching tool for type: " + toolSpec.getType());
-            Tool tool = toolFactories.get(toolSpec.getType()).create(executeParams);
-            if (toolSpec.getName() != null) {
-                tool.setName(toolSpec.getName());
-            }
-
-            if (toolSpec.getDescription() != null) {
-                tool.setDescription(toolSpec.getDescription());
-            }
-            String toolName = Optional.ofNullable(tool.getName()).orElse(toolSpec.getType());
-            tools.put(toolName, tool);
-            toolSpecMap.put(toolName, toolSpec);
-        }
+        createTools(toolFactories, params, toolSpecs, tools, toolSpecMap);
 
         runReAct(mlAgent.getLlm(), tools, toolSpecMap, params, memory, sessionId, listener);
     }
@@ -229,30 +210,25 @@ public class MLChatAgentRunner implements MLAgentRunner {
                 );
         }
 
-        String prompt = parameters.get(PROMPT);
-        if (prompt == null) {
-            prompt = PromptTemplate.PROMPT_TEMPLATE;
-        }
-        String promptPrefix = parameters.getOrDefault("prompt.prefix", PromptTemplate.PROMPT_TEMPLATE_PREFIX);
-        tmpParameters.put("prompt.prefix", promptPrefix);
+        String prompt = parameters.getOrDefault(PROMPT, PromptTemplate.PROMPT_TEMPLATE);
+        String promptPrefix = parameters.getOrDefault(PROMPT_PREFIX, PromptTemplate.PROMPT_TEMPLATE_PREFIX);
+        tmpParameters.put(PROMPT_PREFIX, promptPrefix);
 
-        String promptSuffix = parameters.getOrDefault("prompt.suffix", PromptTemplate.PROMPT_TEMPLATE_SUFFIX);
-        tmpParameters.put("prompt.suffix", promptSuffix);
+        String promptSuffix = parameters.getOrDefault(PROMPT_SUFFIX, PromptTemplate.PROMPT_TEMPLATE_SUFFIX);
+        tmpParameters.put(PROMPT_SUFFIX, promptSuffix);
 
-        String promptFormatInstruction = parameters.getOrDefault("prompt.format_instruction", PromptTemplate.PROMPT_FORMAT_INSTRUCTION);
-        tmpParameters.put("prompt.format_instruction", promptFormatInstruction);
-        if (!tmpParameters.containsKey("prompt.tool_response")) {
-            tmpParameters.put("prompt.tool_response", PromptTemplate.PROMPT_TEMPLATE_TOOL_RESPONSE);
-        }
-        String promptToolResponse = parameters.getOrDefault("prompt.tool_response", PromptTemplate.PROMPT_TEMPLATE_TOOL_RESPONSE);
-        tmpParameters.put("prompt.tool_response", promptToolResponse);
+        String promptFormatInstruction = parameters.getOrDefault(RESPONSE_FORMAT_INSTRUCTION, PromptTemplate.PROMPT_FORMAT_INSTRUCTION);
+        tmpParameters.put(RESPONSE_FORMAT_INSTRUCTION, promptFormatInstruction);
+
+        String promptToolResponse = parameters.getOrDefault(TOOL_RESPONSE, PromptTemplate.PROMPT_TEMPLATE_TOOL_RESPONSE);
+        tmpParameters.put(TOOL_RESPONSE, promptToolResponse);
 
         StringSubstitutor promptSubstitutor = new StringSubstitutor(tmpParameters, "${parameters.", "}");
         prompt = promptSubstitutor.replace(prompt);
 
         final List<String> inputTools = new ArrayList<>();
         for (Map.Entry<String, Tool> entry : tools.entrySet()) {
-            String toolName = Optional.ofNullable(entry.getValue().getName()).orElse(entry.getValue().getType());
+            String toolName = entry.getValue().getName();
             inputTools.add(toolName);
         }
 
@@ -325,16 +301,18 @@ public class MLChatAgentRunner implements MLAgentRunner {
                     MLTaskResponse llmResponse = (MLTaskResponse) output;
                     ModelTensorOutput tmpModelTensorOutput = (ModelTensorOutput) llmResponse.getOutput();
                     Map<String, ?> dataAsMap = tmpModelTensorOutput.getMlModelOutputs().get(0).getMlModelTensors().get(0).getDataAsMap();
+                    String thoughtResponse = "";
+                    String llmReasoningResponse = null;
                     if (dataAsMap.size() == 1 && dataAsMap.containsKey("response")) {
-                        String response = (String) dataAsMap.get("response");
-                        String thoughtResponse = extractModelResponseJson(response);
+                        llmReasoningResponse = (String) dataAsMap.get("response");
+                        thoughtResponse = extractModelResponseJson(llmReasoningResponse);
                         dataAsMap = gson.fromJson(thoughtResponse, Map.class);
                     }
                     String thought = String.valueOf(dataAsMap.get("thought"));
                     String action = String.valueOf(dataAsMap.get("action"));
                     String actionInput = parseInputFromLLMReturn(dataAsMap);
                     String finalAnswer = (String) dataAsMap.get("final_answer");
-                    if (!dataAsMap.containsKey("thought")) {
+                    if (!dataAsMap.containsKey("thought")) {//TODO: check if we can remove this if block
                         String response = (String) dataAsMap.get("response");
                         Pattern pattern = Pattern.compile("```json(.*?)```", Pattern.DOTALL);
                         Matcher matcher = pattern.matcher(response);
@@ -370,12 +348,12 @@ public class MLChatAgentRunner implements MLAgentRunner {
                     // TODO: check if verbose
                     modelTensors.addAll(tmpModelTensorOutput.getMlModelOutputs());
 
-                    if (conversationIndexMemory != null) {
+                    if (conversationIndexMemory != null && finalAnswer == null) {
                         ConversationIndexMessage msgTemp = ConversationIndexMessage
                             .conversationIndexMessageBuilder()
                             .type(memory.getType())
                             .question(question)
-                            .response(thought)
+                            .response(llmReasoningResponse)
                             .finalAnswer(false)
                             .sessionId(sessionId)
                             .build();

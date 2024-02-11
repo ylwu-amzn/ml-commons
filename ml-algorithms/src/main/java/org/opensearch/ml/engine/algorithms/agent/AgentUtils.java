@@ -11,8 +11,6 @@ import static org.opensearch.ml.engine.algorithms.agent.MLChatAgentRunner.CHAT_H
 import static org.opensearch.ml.engine.algorithms.agent.MLChatAgentRunner.CONTEXT;
 import static org.opensearch.ml.engine.algorithms.agent.MLChatAgentRunner.EXAMPLES;
 import static org.opensearch.ml.engine.algorithms.agent.MLChatAgentRunner.OS_INDICES;
-import static org.opensearch.ml.engine.algorithms.agent.MLChatAgentRunner.PROMPT_PREFIX;
-import static org.opensearch.ml.engine.algorithms.agent.MLChatAgentRunner.PROMPT_SUFFIX;
 import static org.opensearch.ml.engine.algorithms.agent.MLChatAgentRunner.TOOL_DESCRIPTIONS;
 import static org.opensearch.ml.engine.algorithms.agent.MLChatAgentRunner.TOOL_NAMES;
 import static org.opensearch.ml.engine.memory.ConversationIndexMemory.LAST_N_INTERACTIONS;
@@ -20,6 +18,7 @@ import static org.opensearch.ml.engine.memory.ConversationIndexMemory.LAST_N_INT
 import java.security.AccessController;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -28,12 +27,19 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.apache.commons.text.StringSubstitutor;
+import org.opensearch.ml.common.agent.MLAgent;
 import org.opensearch.ml.common.agent.MLToolSpec;
 import org.opensearch.ml.common.output.model.ModelTensor;
 import org.opensearch.ml.common.output.model.ModelTensorOutput;
 import org.opensearch.ml.common.spi.tools.Tool;
 
 public class AgentUtils {
+
+    public static final String SELECTED_TOOLS = "selected_tools";
+    public static final String PROMPT_PREFIX = "prompt.prefix";
+    public static final String PROMPT_SUFFIX = "prompt.suffix";
+    public static final String RESPONSE_FORMAT_INSTRUCTION = "prompt.format_instruction";
+    public static final String TOOL_RESPONSE = "prompt.tool_response";
 
     public static String addExamplesToPrompt(Map<String, String> parameters, String prompt) {
         Map<String, String> examplesMap = new HashMap<>();
@@ -196,5 +202,54 @@ public class AgentUtils {
 
     public static String getToolName(MLToolSpec toolSpec) {
         return toolSpec.getName() != null ? toolSpec.getName() : toolSpec.getType();
+    }
+
+    public static List<MLToolSpec> getMlToolSpecs(MLAgent mlAgent, Map<String, String> params) {
+        String selectedToolsStr = params.get(SELECTED_TOOLS);
+        List<MLToolSpec> toolSpecs = mlAgent.getTools();
+        if (selectedToolsStr != null) {
+            List<String> selectedTools = gson.fromJson(selectedToolsStr, List.class);
+            Map<String, MLToolSpec> toolNameSpecMap = new HashMap<>();
+            for (MLToolSpec toolSpec : toolSpecs) {
+                toolNameSpecMap.put(getToolName(toolSpec), toolSpec);
+            }
+            List<MLToolSpec> selectedToolSpecs = new ArrayList<>();
+            for (String tool : selectedTools) {
+                if (toolNameSpecMap.containsKey(tool)) {
+                    selectedToolSpecs.add(toolNameSpecMap.get(tool));
+                }
+            }
+            toolSpecs = selectedToolSpecs;
+        }
+        return toolSpecs;
+    }
+
+    public static void createTools(Map<String, Tool.Factory> toolFactories,
+                                   Map<String, String> params,
+                                   List<MLToolSpec> toolSpecs,
+                                   Map<String, Tool> tools,
+                                   Map<String, MLToolSpec> toolSpecMap) {
+        for (MLToolSpec toolSpec : toolSpecs) {
+            Map<String, String> executeParams = new HashMap<>();
+            if (toolSpec.getParameters() != null) {
+                executeParams.putAll(toolSpec.getParameters());
+            }
+            for (String key : params.keySet()) {
+                String toolNamePrefix = getToolName(toolSpec) + ".";
+                if (key.startsWith(toolNamePrefix)) {
+                    executeParams.put(key.replace(toolNamePrefix, ""), params.get(key));
+                }
+            }
+            Tool tool = toolFactories.get(toolSpec.getType()).create(executeParams);
+            String toolName = getToolName(toolSpec);
+            tool.setName(toolName);
+
+            if (toolSpec.getDescription() != null) {
+                tool.setDescription(toolSpec.getDescription());
+            }
+
+            tools.put(toolName, tool);
+            toolSpecMap.put(toolName, toolSpec);
+        }
     }
 }
