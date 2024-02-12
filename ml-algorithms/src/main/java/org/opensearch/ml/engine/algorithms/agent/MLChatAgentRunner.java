@@ -18,6 +18,7 @@ import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.getMessageHis
 import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.getMlToolSpecs;
 import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.outputToOutputString;
 import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.parseInputFromLLMReturn;
+import static org.opensearch.ml.engine.algorithms.agent.PromptTemplate.PROMPT_TEMPLATE_ASK_AGAIN;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -136,20 +137,12 @@ public class MLChatAgentRunner implements MLAgentRunner {
                     if (Strings.isNullOrEmpty(response)) {
                         continue;
                     }
-                    messageList
-                        .add(
-                            ConversationIndexMessage
-                                .conversationIndexMessageBuilder()
-                                .sessionId(memory.getConversationId())
-                                .question(question)
-                                .response(response)
-                                .build()
-                        );
+                    messageList.add(ConversationIndexMessage.conversationIndexMessageBuilder().sessionId(memory.getConversationId()).question(question).response(response).build());
                 }
 
                 StringBuilder chatHistoryBuilder = new StringBuilder();
                 if (messageList.size() > 0) {
-                    chatHistoryBuilder.append("Below is Chat History between Human and AI which sorted by time with asc order:\n");
+                    chatHistoryBuilder.append("Human:CONVERSATION HISTORY WITH AI ASSISTANT\n----------------------------\nBelow is Chat History between Human and AI which sorted by time with asc order:\n");
                     for (Message message : messageList) {
                         chatHistoryBuilder.append(message.toString()).append("\n");
                     }
@@ -194,20 +187,7 @@ public class MLChatAgentRunner implements MLAgentRunner {
             tmpParameters.put("stop", gson.toJson(new String[] { "\nObservation:", "\n\tObservation:" }));
         }
         if (!tmpParameters.containsKey("stop_sequences")) {
-            tmpParameters
-                .put(
-                    "stop_sequences",
-                    gson
-                        .toJson(
-                            new String[] {
-                                "\n\nHuman:",
-                                "\nObservation:",
-                                "\n\tObservation:",
-                                "\nObservation",
-                                "\n\tObservation",
-                                "\n\nQuestion" }
-                        )
-                );
+            tmpParameters.put("stop_sequences", gson.toJson(new String[] {"\n\nHuman:", "\nObservation:", "\n\tObservation:", "\nObservation", "\n\tObservation", "\n\nQuestion" }));
         }
 
         String prompt = parameters.getOrDefault(PROMPT, PromptTemplate.PROMPT_TEMPLATE);
@@ -244,26 +224,10 @@ public class MLChatAgentRunner implements MLAgentRunner {
         List<ModelTensors> modelTensors = new ArrayList<>();
 
         List<ModelTensors> cotModelTensors = new ArrayList<>();
-        cotModelTensors
-            .add(
-                ModelTensors
-                    .builder()
-                    .mlModelTensors(
-                        List
-                            .of(
-                                ModelTensor.builder().name(MLAgentExecutor.MEMORY_ID).result(sessionId).build(),
-                                ModelTensor.builder().name(MLAgentExecutor.PARENT_INTERACTION_ID).result(parentInteractionId).build()
-                            )
-                    )
-                    .build()
-            );
+        cotModelTensors.add(ModelTensors.builder().mlModelTensors(List.of(ModelTensor.builder().name(MLAgentExecutor.MEMORY_ID).result(sessionId).build(), ModelTensor.builder().name(MLAgentExecutor.PARENT_INTERACTION_ID).result(parentInteractionId).build())).build());
 
         StringBuilder scratchpadBuilder = new StringBuilder();
-        StringSubstitutor tmpSubstitutor = new StringSubstitutor(
-            ImmutableMap.of(SCRATCHPAD, scratchpadBuilder.toString()),
-            "${parameters.",
-            "}"
-        );
+        StringSubstitutor tmpSubstitutor = new StringSubstitutor(ImmutableMap.of(SCRATCHPAD, scratchpadBuilder.toString()), "${parameters.", "}");
         AtomicReference<String> newPrompt = new AtomicReference<>(tmpSubstitutor.replace(prompt));
         tmpParameters.put(PROMPT, newPrompt.get());
 
@@ -296,8 +260,17 @@ public class MLChatAgentRunner implements MLAgentRunner {
             StepListener<?> nextStepListener = new StepListener<>();
 
             lastStepListener.whenComplete(output -> {
+
+
+
+
+
+
+                //////////////////////////////////////////////////////////////////////////////////////////
+                // start
+                //////////////////////////////////////////////////////////////////////////////////////////
                 StringBuilder sessionMsgAnswerBuilder = new StringBuilder();
-                if (finalI % 2 == 0) {
+                if (finalI % 2 == 0) {// Reasoning which tool to use
                     MLTaskResponse llmResponse = (MLTaskResponse) output;
                     ModelTensorOutput tmpModelTensorOutput = (ModelTensorOutput) llmResponse.getOutput();
                     Map<String, ?> dataAsMap = tmpModelTensorOutput.getMlModelOutputs().get(0).getMlModelTensors().get(0).getDataAsMap();
@@ -312,51 +285,33 @@ public class MLChatAgentRunner implements MLAgentRunner {
                     String action = String.valueOf(dataAsMap.get("action"));
                     String actionInput = parseInputFromLLMReturn(dataAsMap);
                     String finalAnswer = (String) dataAsMap.get("final_answer");
-                    if (!dataAsMap.containsKey("thought")) {//TODO: check if we can remove this if block
-                        String response = (String) dataAsMap.get("response");
-                        Pattern pattern = Pattern.compile("```json(.*?)```", Pattern.DOTALL);
-                        Matcher matcher = pattern.matcher(response);
-                        if (matcher.find()) {
-                            String jsonBlock = matcher.group(1);
-                            Map map = gson.fromJson(jsonBlock, Map.class);
-                            thought = String.valueOf(map.get("thought"));
-                            action = String.valueOf(map.get("action"));
-                            actionInput = parseInputFromLLMReturn(map);
-                            finalAnswer = (String) map.get("final_answer");
-                        } else {
-                            finalAnswer = response;
-                        }
-                    }
+//                    if (!dataAsMap.containsKey("thought")) {//TODO: check if we can remove this if block
+//                        String response = (String) dataAsMap.get("response");
+//                        Pattern pattern = Pattern.compile("```json(.*?)```", Pattern.DOTALL);
+//                        Matcher matcher = pattern.matcher(response);
+//                        if (matcher.find()) {
+//                            String jsonBlock = matcher.group(1);
+//                            Map map = gson.fromJson(jsonBlock, Map.class);
+//                            thought = String.valueOf(map.get("thought"));
+//                            action = String.valueOf(map.get("action"));
+//                            actionInput = parseInputFromLLMReturn(map);
+//                            finalAnswer = (String) map.get("final_answer");
+//                        } else {
+//                            finalAnswer = response;
+//                        }
+//                    }
 
                     if (finalI == 0 && !thought.contains("Thought:")) {
                         sessionMsgAnswerBuilder.append("Thought: ");
                     }
                     sessionMsgAnswerBuilder.append(thought);
                     lastThought.set(thought);
-                    cotModelTensors
-                        .add(
-                            ModelTensors
-                                .builder()
-                                .mlModelTensors(
-                                    Collections
-                                        .singletonList(
-                                            ModelTensor.builder().name("response").result(sessionMsgAnswerBuilder.toString()).build()
-                                        )
-                                )
-                                .build()
-                        );
+                    cotModelTensors.add(ModelTensors.builder().mlModelTensors(Collections.singletonList(ModelTensor.builder().name("response").result(sessionMsgAnswerBuilder.toString()).build())).build());
                     // TODO: check if verbose
                     modelTensors.addAll(tmpModelTensorOutput.getMlModelOutputs());
 
                     if (conversationIndexMemory != null && finalAnswer == null) {
-                        ConversationIndexMessage msgTemp = ConversationIndexMessage
-                            .conversationIndexMessageBuilder()
-                            .type(memory.getType())
-                            .question(question)
-                            .response(llmReasoningResponse)
-                            .finalAnswer(false)
-                            .sessionId(sessionId)
-                            .build();
+                        ConversationIndexMessage msgTemp = ConversationIndexMessage.conversationIndexMessageBuilder().type(memory.getType()).question(question).response(llmReasoningResponse).finalAnswer(false).sessionId(sessionId).build();
                         conversationIndexMemory.save(msgTemp, parentInteractionId, traceNumber.addAndGet(1), null);
                     }
                     if (finalAnswer != null) {
@@ -422,30 +377,10 @@ public class MLChatAgentRunner implements MLAgentRunner {
                         if (conversationIndexMemory != null) {
                             String finalAnswer1 = finalAnswer;
                             // Create final trace message.
-                            ConversationIndexMessage msgTemp = ConversationIndexMessage
-                                .conversationIndexMessageBuilder()
-                                .type(memory.getType())
-                                .question(question)
-                                .response(finalAnswer1)
-                                .finalAnswer(true)
-                                .sessionId(sessionId)
-                                .build();
+                            ConversationIndexMessage msgTemp = ConversationIndexMessage.conversationIndexMessageBuilder().type(memory.getType()).question(question).response(finalAnswer1).finalAnswer(true).sessionId(sessionId).build();
                             // Save last trace and update final answer in parallel.
-                            conversationIndexMemory
-                                .save(
-                                    msgTemp,
-                                    parentInteractionId,
-                                    traceNumber.addAndGet(1),
-                                    null,
-                                    ActionListener.<CreateInteractionResponse>wrap(groupedListener::onResponse, groupedListener::onFailure)
-                                );
-                            conversationIndexMemory
-                                .getMemoryManager()
-                                .updateInteraction(
-                                    parentInteractionId,
-                                    ImmutableMap.of(AI_RESPONSE_FIELD, finalAnswer1, ADDITIONAL_INFO_FIELD, additionalInfo),
-                                    ActionListener.<UpdateResponse>wrap(groupedListener::onResponse, groupedListener::onFailure)
-                                );
+                            conversationIndexMemory.save(msgTemp, parentInteractionId, traceNumber.addAndGet(1), null, ActionListener.<CreateInteractionResponse>wrap(groupedListener::onResponse, groupedListener::onFailure));
+                            conversationIndexMemory.getMemoryManager().updateInteraction(parentInteractionId, ImmutableMap.of(AI_RESPONSE_FIELD, finalAnswer1, ADDITIONAL_INFO_FIELD, additionalInfo), ActionListener.<UpdateResponse>wrap(groupedListener::onResponse, groupedListener::onFailure));
                         }
                         return;
                     }
@@ -477,17 +412,10 @@ public class MLChatAgentRunner implements MLAgentRunner {
                             try {
                                 String finalAction = action;
                                 ActionListener<Object> toolListener = ActionListener
-                                    .wrap(r -> { ((ActionListener<Object>) nextStepListener).onResponse(r); }, e -> {
-                                        ((ActionListener<Object>) nextStepListener)
-                                            .onResponse(
-                                                String
-                                                    .format(
-                                                        Locale.ROOT,
-                                                        "Failed to run the tool %s with the error message %s.",
-                                                        finalAction,
-                                                        e.getMessage()
-                                                    )
-                                            );
+                                    .wrap(r -> {
+                                        ((ActionListener<Object>) nextStepListener).onResponse(r);
+                                        }, e -> {
+                                        ((ActionListener<Object>) nextStepListener).onResponse(String.format(Locale.ROOT, "Failed to run the tool %s with the error message %s.", finalAction, e.getMessage()));
                                     });
                                 if (tools.get(action) instanceof MLModelTool) {
                                     Map<String, String> llmToolTmpParameters = new HashMap<>();
@@ -500,38 +428,23 @@ public class MLChatAgentRunner implements MLAgentRunner {
                                     tools.get(action).run(toolParams, toolListener); // run tool
                                 }
                             } catch (Exception e) {
-                                ((ActionListener<Object>) nextStepListener)
-                                    .onResponse(
-                                        String
-                                            .format(
-                                                Locale.ROOT,
-                                                "Failed to run the tool %s with the error message %s.",
-                                                action,
-                                                e.getMessage()
-                                            )
-                                    );
+                                ((ActionListener<Object>) nextStepListener).onResponse(String.format(Locale.ROOT, "Failed to run the tool %s with the error message %s.", action, e.getMessage()));
                             }
                         } else {
-                            String res = String
-                                .format(Locale.ROOT, "Failed to run the tool %s due to wrong input %s.", action, actionInput);
+                            String res = String.format(Locale.ROOT, "Failed to run the tool %s due to wrong input %s.", action, actionInput);
                             ((ActionListener<Object>) nextStepListener).onResponse(res);
                         }
                     } else {
                         String res = String.format(Locale.ROOT, "Failed to run the tool %s which is unsupported.", action);
                         ((ActionListener<Object>) nextStepListener).onResponse(res);
-                        StringSubstitutor substitutor = new StringSubstitutor(
-                            ImmutableMap.of(SCRATCHPAD, scratchpadBuilder.toString()),
-                            "${parameters.",
-                            "}"
-                        );
+                        StringSubstitutor substitutor = new StringSubstitutor(ImmutableMap.of(SCRATCHPAD, scratchpadBuilder.toString()), "${parameters.", "}");
                         newPrompt.set(substitutor.replace(finalPrompt));
                         tmpParameters.put(PROMPT, newPrompt.get());
                     }
-                } else {
+                } else { // run tool
                     MLToolSpec toolSpec = toolSpecMap.get(lastAction.get());
                     if (toolSpec != null && toolSpec.isIncludeOutputInAgentResponse()) {
                         String outputString = outputToOutputString(output);
-
                         String toolOutputKey = String.format("%s.output", toolSpec.getType());
                         if (additionalInfo.get(toolOutputKey) != null) {
                             List<String> list = (List<String>) additionalInfo.get(toolOutputKey);
@@ -539,126 +452,43 @@ public class MLChatAgentRunner implements MLAgentRunner {
                         } else {
                             additionalInfo.put(toolOutputKey, Lists.newArrayList(outputString));
                         }
-
                     }
-                    modelTensors
-                        .add(
-                            ModelTensors
-                                .builder()
-                                .mlModelTensors(
-                                    Collections
-                                        .singletonList(
-                                            ModelTensor
-                                                .builder()
-                                                .dataAsMap(
-                                                    ImmutableMap
-                                                        .of(
-                                                            "response",
-                                                            lastThought.get() + "\nObservation: " + outputToOutputString(output)
-                                                        )
-                                                )
-                                                .build()
-                                        )
-                                )
-                                .build()
-                        );
+                    modelTensors.add(ModelTensors.builder().mlModelTensors(Collections.singletonList(ModelTensor.builder().dataAsMap(ImmutableMap.of("response", lastThought.get() + "\nObservation: " + outputToOutputString(output))).build())).build());
 
-                    String toolResponse = tmpParameters.get("prompt.tool_response");
-                    StringSubstitutor toolResponseSubstitutor = new StringSubstitutor(
-                        ImmutableMap.of("observation", outputToOutputString(output)),
-                        "${parameters.",
-                        "}"
-                    );
+                    String toolResponse = tmpParameters.get(TOOL_RESPONSE);
+                    StringSubstitutor toolResponseSubstitutor = new StringSubstitutor(Map.of("observation", outputToOutputString(output), "tool_name", lastAction.get()), "${parameters.", "}");
                     toolResponse = toolResponseSubstitutor.replace(toolResponse);
                     scratchpadBuilder.append(toolResponse).append("\n\n");
                     if (conversationIndexMemory != null) {
                         // String res = "Action: " + lastAction.get() + "\nAction Input: " + lastActionInput + "\nObservation: " + result;
-                        ConversationIndexMessage msgTemp = ConversationIndexMessage
-                            .conversationIndexMessageBuilder()
-                            .type("ReAct")
-                            .question(lastActionInput.get())
-                            .response(outputToOutputString(output))
-                            .finalAnswer(false)
-                            .sessionId(sessionId)
-                            .build();
+                        ConversationIndexMessage msgTemp = ConversationIndexMessage.conversationIndexMessageBuilder().type("ReAct").question(lastActionInput.get()).response(outputToOutputString(output)).finalAnswer(false).sessionId(sessionId).build();
                         conversationIndexMemory.save(msgTemp, parentInteractionId, traceNumber.addAndGet(1), lastAction.get());
-
                     }
-                    StringSubstitutor substitutor = new StringSubstitutor(
-                        ImmutableMap.of(SCRATCHPAD, scratchpadBuilder.toString()),
-                        "${parameters.",
-                        "}"
-                    );
+                    StringSubstitutor substitutor = new StringSubstitutor(Map.of(SCRATCHPAD, scratchpadBuilder + PROMPT_TEMPLATE_ASK_AGAIN), "${parameters.", "}");
                     newPrompt.set(substitutor.replace(finalPrompt));
                     tmpParameters.put(PROMPT, newPrompt.get());
 
                     sessionMsgAnswerBuilder.append("\nObservation: ").append(outputToOutputString(output));
-                    cotModelTensors
-                        .add(
-                            ModelTensors
-                                .builder()
-                                .mlModelTensors(
-                                    Collections
-                                        .singletonList(
-                                            ModelTensor.builder().name("response").result(sessionMsgAnswerBuilder.toString()).build()
-                                        )
-                                )
-                                .build()
-                        );
+                    cotModelTensors.add(ModelTensors.builder().mlModelTensors(Collections.singletonList(ModelTensor.builder().name("response").result(sessionMsgAnswerBuilder.toString()).build())).build());
 
-                    ActionRequest request = new MLPredictionTaskRequest(
-                        llm.getModelId(),
-                        RemoteInferenceMLInput
-                            .builder()
-                            .algorithm(FunctionName.REMOTE)
-                            .inputDataset(RemoteInferenceInputDataSet.builder().parameters(tmpParameters).build())
-                            .build()
-                    );
-                    client.execute(MLPredictionTaskAction.INSTANCE, request, (ActionListener<MLTaskResponse>) nextStepListener);
+                    //client.execute(MLPredictionTaskAction.INSTANCE, request, (ActionListener<MLTaskResponse>) nextStepListener);
                     if (finalI == maxIterations - 1) {
                         if (verbose) {
                             listener.onResponse(ModelTensorOutput.builder().mlModelOutputs(cotModelTensors).build());
                         } else {
                             List<ModelTensors> finalModelTensors = new ArrayList<>();
-                            finalModelTensors
-                                .add(
-                                    ModelTensors
-                                        .builder()
-                                        .mlModelTensors(
-                                            List
-                                                .of(
-                                                    ModelTensor.builder().name(MLAgentExecutor.MEMORY_ID).result(sessionId).build(),
-                                                    ModelTensor
-                                                        .builder()
-                                                        .name(MLAgentExecutor.PARENT_INTERACTION_ID)
-                                                        .result(parentInteractionId)
-                                                        .build()
-                                                )
-                                        )
-                                        .build()
-                                );
-                            finalModelTensors
-                                .add(
-                                    ModelTensors
-                                        .builder()
-                                        .mlModelTensors(
-                                            Collections
-                                                .singletonList(
-                                                    ModelTensor
-                                                        .builder()
-                                                        .name("response")
-                                                        .dataAsMap(ImmutableMap.of("response", lastThought.get()))
-                                                        .build()
-                                                )
-                                        )
-                                        .build()
-                                );
+                            finalModelTensors.add(ModelTensors.builder().mlModelTensors(List.of(ModelTensor.builder().name(MLAgentExecutor.MEMORY_ID).result(sessionId).build(), ModelTensor.builder().name(MLAgentExecutor.PARENT_INTERACTION_ID).result(parentInteractionId).build())).build());
+                            finalModelTensors.add(ModelTensors.builder().mlModelTensors(Collections.singletonList(ModelTensor.builder().name("response").dataAsMap(ImmutableMap.of("response", lastThought.get())).build())).build());
                             listener.onResponse(ModelTensorOutput.builder().mlModelOutputs(finalModelTensors).build());
                         }
                     } else {
+                        ActionRequest request = new MLPredictionTaskRequest(llm.getModelId(), RemoteInferenceMLInput.builder().algorithm(FunctionName.REMOTE).inputDataset(RemoteInferenceInputDataSet.builder().parameters(tmpParameters).build()).build());
                         client.execute(MLPredictionTaskAction.INSTANCE, request, (ActionListener<MLTaskResponse>) nextStepListener);
                     }
                 }
+                //////////////////////////////////////////////////////////////////////////////////////////
+                // end
+                //////////////////////////////////////////////////////////////////////////////////////////
             }, e -> {
                 log.error("Failed to run chat agent", e);
                 listener.onFailure(e);
@@ -668,14 +498,7 @@ public class MLChatAgentRunner implements MLAgentRunner {
             }
         }
 
-        ActionRequest request = new MLPredictionTaskRequest(
-            llm.getModelId(),
-            RemoteInferenceMLInput
-                .builder()
-                .algorithm(FunctionName.REMOTE)
-                .inputDataset(RemoteInferenceInputDataSet.builder().parameters(tmpParameters).build())
-                .build()
-        );
+        ActionRequest request = new MLPredictionTaskRequest(llm.getModelId(), RemoteInferenceMLInput.builder().algorithm(FunctionName.REMOTE).inputDataset(RemoteInferenceInputDataSet.builder().parameters(tmpParameters).build()).build());
         client.execute(MLPredictionTaskAction.INSTANCE, request, firstListener);
     }
 
