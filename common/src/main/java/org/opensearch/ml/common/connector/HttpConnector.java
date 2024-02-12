@@ -290,6 +290,9 @@ public class HttpConnector extends AbstractConnector {
             StringSubstitutor substitutor = new StringSubstitutor(parameters, "${parameters.", "}");
             payload = substitutor.replace(payload);
 
+            log.info("++++++++++++++++++++++++++++++++++++++++++++++++++");
+            System.out.println(payload);
+            log.info("--------------------------------------------------");
             if (!isJson(payload)) {
                 throw new IllegalArgumentException("Invalid payload: " + payload);
             }
