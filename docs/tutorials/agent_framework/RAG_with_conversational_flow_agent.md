@@ -142,7 +142,7 @@ POST _bulk
 
 Find more details on [Remote model](https://opensearch.org/docs/latest/ml-commons-plugin/remote-models/index/)
 
-We use [Bedrock Claude model](https://aws.amazon.com/bedrock/claude/) in this tutorial. You can also use OpenAI or other LLM.
+We use [Bedrock Claude model](https://aws.amazon.com/bedrock/claude/) in this tutorial. You can also use other LLM.
 
 1. Create connector
 ```
