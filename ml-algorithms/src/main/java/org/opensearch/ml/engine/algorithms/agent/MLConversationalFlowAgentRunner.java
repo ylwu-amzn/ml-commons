@@ -252,6 +252,7 @@ public class MLConversationalFlowAgentRunner implements MLAgentRunner {
         String outputKey = toolName + ".output";
         String outputResponse = parseResponse(output);
         params.put(outputKey, escapeJson(outputResponse));
+        boolean traceDisabled = params.containsKey("disable_trace") && Boolean.parseBoolean(params.get("disable_trace"));
 
         if (previousToolSpec.isIncludeOutputInAgentResponse() || finalI == toolSpecs.size()) {
             if (output instanceof ModelTensorOutput) {
@@ -284,7 +285,7 @@ public class MLConversationalFlowAgentRunner implements MLAgentRunner {
                     updateMemoryWithListener(additionalInfo, memorySpec, memoryId, parentInteractionId, updateListener);
                 }
             } else {
-                saveMessage(params, memory, outputResponse, memoryId, parentInteractionId, toolName, traceNumber, ActionListener.wrap(r -> {
+                saveMessage(params, memory, outputResponse, memoryId, parentInteractionId, toolName, traceNumber,traceDisabled, ActionListener.wrap(r -> {
                     log.info("saved last trace for interaction " + parentInteractionId + " of flow agent");
                     Map<String, Object> updateContent = Map.of(AI_RESPONSE_FIELD, outputResponse, ADDITIONAL_INFO_FIELD, additionalInfo);
                     memory.update(parentInteractionId, updateContent, updateListener);
@@ -297,7 +298,7 @@ public class MLConversationalFlowAgentRunner implements MLAgentRunner {
             if (memory == null) {
                 runNextStep(params, toolSpecs, finalI, nextStepListener);
             } else {
-                saveMessage(params, memory, outputResponse, memoryId, parentInteractionId, toolName, traceNumber, ActionListener.wrap(r -> {
+                saveMessage(params, memory, outputResponse, memoryId, parentInteractionId, toolName, traceNumber,traceDisabled, ActionListener.wrap(r -> {
                     runNextStep(params, toolSpecs, finalI, nextStepListener);
                 }, e -> {
                     log.error("Failed to update root interaction ", e);
@@ -323,6 +324,7 @@ public class MLConversationalFlowAgentRunner implements MLAgentRunner {
         String parentInteractionId,
         String toolName,
         AtomicInteger traceNumber,
+        boolean traceDisabled,
         ActionListener listener
     ) {
         ConversationIndexMessage finalMessage = ConversationIndexMessage
@@ -333,7 +335,11 @@ public class MLConversationalFlowAgentRunner implements MLAgentRunner {
             .finalAnswer(true)
             .sessionId(memoryId)
             .build();
-        memory.save(finalMessage, parentInteractionId, traceNumber.addAndGet(1), toolName, listener);
+        if (traceDisabled) {
+            listener.onResponse(true);
+        } else {
+            memory.save(finalMessage, parentInteractionId, traceNumber.addAndGet(1), toolName, listener);
+        }
     }
 
     @VisibleForTesting

@@ -163,6 +163,12 @@ public class AgentUtils {
         if (matcher.find()) {
             return matcher.group(1);
         } else {
+            Pattern pattern2 = Pattern.compile("\\{(?:[^{}]|\\{(?:[^{}]|\\{[^{}]*\\})*\\})*\\}");
+            Matcher matcher2 = pattern2.matcher(text);
+            // Find the JSON content
+            if (matcher2.find()) {
+                return matcher2.group();
+            }
             throw new IllegalArgumentException("Model output is invalid");
         }
     }
