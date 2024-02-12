@@ -156,19 +156,39 @@ public class AgentUtils {
         return prompt;
     }
 
+    public static List<String> MODEL_RESPONSE_PATTERNS = List.of(
+            "\\{\\s*\"thought\":.*?\\s*,\\s*\"action\":.*?\\s*,\\s*\"action_input\":.*?\\}",
+            "\\{\\s*\"thought\"\\s*:\\s*\".*?\"\\s*,\\s*\"action\"\\s*:\\s*\".*?\"\\s*,\\s*\"action_input\"\\s*:\\s*\".*?\"\\s*}",
+            "\\{\\s*\"thought\"\\s*:\\s*\".*?\"\\s*,\\s*\"final_answer\"\\s*:\\s*\".*?\"\\s*}"
+    );
     public static String extractModelResponseJson(String text) {
-        Pattern pattern = Pattern.compile("```json\\s*([\\s\\S]+?)\\s*```");
-        Matcher matcher = pattern.matcher(text);
+        Pattern pattern1 = Pattern.compile("```json\\s*([\\s\\S]+?)\\s*```");
+        Matcher matcher1 = pattern1.matcher(text);
 
-        if (matcher.find()) {
-            return matcher.group(1);
+        if (matcher1.find()) {
+            return matcher1.group(1);
         } else {
-            Pattern pattern2 = Pattern.compile("\\{(?:[^{}]|\\{(?:[^{}]|\\{[^{}]*\\})*\\})*\\}");
-            Matcher matcher2 = pattern2.matcher(text);
-            // Find the JSON content
-            if (matcher2.find()) {
-                return matcher2.group();
+            for (String p : MODEL_RESPONSE_PATTERNS) {
+                Pattern pattern = Pattern.compile(p);
+                Matcher matcher = pattern.matcher(text);
+                if (matcher.find()) {
+                    return matcher.group();
+                }
             }
+////            Pattern pattern2 = Pattern.compile("\\{(?:[^{}]|\\{(?:[^{}]|\\{[^{}]*\\})*\\})*\\}");
+//            Pattern pattern2 = Pattern.compile("\\{\\s*\"thought\":.*?\\s*,\\s*\"action\":.*?\\s*,\\s*\"action_input\":.*?\\}");
+//            Pattern pattern3 = Pattern.compile("\\{\\s*\"thought\"\\s*:\\s*\".*?\"\\s*,\\s*\"final_answer\"\\s*:\\s*\".*?\"\\s*}");
+//
+////            Pattern pattern2 = Pattern.compile("\\{\\s*(\"thought\":.*?\\s*,\\s*\"action\":.*?\\s*,\\s*\"action_input\":.*?|\"thought\":.*?\\s*,\\s*\"final_answer\":.*?)\\}");
+//            Matcher matcher2 = pattern2.matcher(text);
+//            Matcher matcher3 = pattern3.matcher(text);
+//            // Find the JSON content
+//            if (matcher2.find()) {
+//                return matcher2.group();
+//            }
+//            if (matcher3.find()) {
+//                return matcher3.group();
+//            }
             throw new IllegalArgumentException("Model output is invalid");
         }
     }

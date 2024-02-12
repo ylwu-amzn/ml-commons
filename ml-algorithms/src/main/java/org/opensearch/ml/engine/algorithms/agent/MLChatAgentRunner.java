@@ -8,6 +8,7 @@ package org.opensearch.ml.engine.algorithms.agent;
 import static org.opensearch.ml.common.conversation.ActionConstants.ADDITIONAL_INFO_FIELD;
 import static org.opensearch.ml.common.conversation.ActionConstants.AI_RESPONSE_FIELD;
 import static org.opensearch.ml.common.utils.StringUtils.gson;
+import static org.opensearch.ml.common.utils.StringUtils.isJson;
 import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.PROMPT_PREFIX;
 import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.PROMPT_SUFFIX;
 import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.RESPONSE_FORMAT_INSTRUCTION;
@@ -19,6 +20,8 @@ import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.getMlToolSpec
 import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.outputToOutputString;
 import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.parseInputFromLLMReturn;
 
+import java.security.AccessController;
+import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -272,33 +275,35 @@ public class MLChatAgentRunner implements MLAgentRunner {
                     MLTaskResponse llmResponse = (MLTaskResponse) output;
                     ModelTensorOutput tmpModelTensorOutput = (ModelTensorOutput) llmResponse.getOutput();
                     Map<String, ?> dataAsMap = tmpModelTensorOutput.getMlModelOutputs().get(0).getMlModelTensors().get(0).getDataAsMap();
-                    String thoughtResponse = "";
+                    String thoughtResponse = null;
+                    String finalAnswer = null;
                     if (dataAsMap.size() == 1 && dataAsMap.containsKey("response")) {
                         String llmReasoningResponse = (String) dataAsMap.get("response");
-                        thoughtResponse = extractModelResponseJson(llmReasoningResponse);
-                        dataAsMap = gson.fromJson(thoughtResponse, Map.class);
+                        try {
+                            thoughtResponse = extractModelResponseJson(llmReasoningResponse);
+                        } catch (IllegalArgumentException e) {
+                            thoughtResponse = llmReasoningResponse;
+                            finalAnswer = llmReasoningResponse;
+                            System.out.println("0000000000 ylwudddebug1: get final answer directly : " + finalAnswer);
+                        }
+                        if (isJson(thoughtResponse)) {
+                            dataAsMap = gson.fromJson(thoughtResponse, Map.class);
+                        }
+                    } else {
+                        try {
+                            Map<String, ?> finalDataAsMap = dataAsMap;
+                            thoughtResponse = AccessController.doPrivileged((PrivilegedExceptionAction<String>) () -> gson.toJson(finalDataAsMap));
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
                     }
-                    lastToolSelectionResponse.set(thoughtResponse);
                     String thought = String.valueOf(dataAsMap.get("thought"));
                     String action = String.valueOf(dataAsMap.get("action"));
                     String actionInput = parseInputFromLLMReturn(dataAsMap);
-                    String finalAnswer = (String) dataAsMap.get("final_answer");
-
-                    if (finalI == 0 && !thought.contains("Thought:")) {
-                        sessionMsgAnswerBuilder.append("Thought: ");
+                    if (dataAsMap.containsKey("final_answer")) {
+                        finalAnswer = String.valueOf(dataAsMap.get("final_answer"));
                     }
-                    sessionMsgAnswerBuilder.append(thought);
-                    lastThought.set(thought);
-                    cotModelTensors.add(ModelTensors.builder().mlModelTensors(Collections.singletonList(ModelTensor.builder().name("response").result(sessionMsgAnswerBuilder.toString()).build())).build());
-                    // TODO: check if verbose
-                    modelTensors.addAll(tmpModelTensorOutput.getMlModelOutputs());
 
-                    if (conversationIndexMemory != null && finalAnswer == null) {
-                        ConversationIndexMessage msgTemp = ConversationIndexMessage.conversationIndexMessageBuilder().type(memory.getType()).question(question).response(thoughtResponse).finalAnswer(false).sessionId(sessionId).build();
-                        if (!traceDisabled) {
-                            conversationIndexMemory.save(msgTemp, parentInteractionId, traceNumber.addAndGet(1), "LLM");
-                        }
-                    }
                     if (finalAnswer != null) {
                         finalAnswer = finalAnswer.trim();
                         if (conversationIndexMemory != null) {
@@ -315,35 +320,29 @@ public class MLChatAgentRunner implements MLAgentRunner {
                                 listener.onFailure(e);
                             });
                             saveMessage(conversationIndexMemory, question, finalAnswer, sessionId, parentInteractionId, traceNumber, true, traceDisabled, saveTraceListener);
-//                            // Create final trace message.
-//                            ConversationIndexMessage msgTemp = ConversationIndexMessage.conversationIndexMessageBuilder().type(memory.getType()).question(question).response(finalAnswer1).finalAnswer(true).sessionId(sessionId).build();
-//                            // Save last trace and update final answer in parallel.
-//                            if (!traceDisabled) {
-//                                conversationIndexMemory.save(msgTemp, parentInteractionId, traceNumber.addAndGet(1), "LLM", ActionListener.<CreateInteractionResponse>wrap(groupedListener::onResponse, groupedListener::onFailure));
-//                            }
-//                            conversationIndexMemory.getMemoryManager().updateInteraction(parentInteractionId, ImmutableMap.of(AI_RESPONSE_FIELD, finalAnswer1, ADDITIONAL_INFO_FIELD, additionalInfo), ActionListener.<UpdateResponse>wrap(groupedListener::onResponse, groupedListener::onFailure));
                         } else {
                             returnFinalResponse(sessionId, listener, parentInteractionId, verbose, cotModelTensors, getFinalAnswer, additionalInfo, finalAnswer);
                         }
                         return;
+                    }
 
-                        // Composite execution response and reply.
-//                        final ActionListener<Boolean> executionListener = ActionListener.notifyOnce(ActionListener.wrap(r -> {
-//                            extractedTmep(sessionId, listener, parentInteractionId, verbose, cotModelTensors, getFinalAnswer, additionalInfo, finalAnswer2);
-//                        }, listener::onFailure));
-//                        // Sending execution response by internalListener is after the trace and answer saving.
-//                        final GroupedActionListener<ActionResponse> groupedListener = createGroupedListener(traceDisabled? 1:2, executionListener);
-//                        if (conversationIndexMemory != null) {
-//                            String finalAnswer1 = finalAnswer;
-//                            // Create final trace message.
-//                            ConversationIndexMessage msgTemp = ConversationIndexMessage.conversationIndexMessageBuilder().type(memory.getType()).question(question).response(finalAnswer1).finalAnswer(true).sessionId(sessionId).build();
-//                            // Save last trace and update final answer in parallel.
-//                            if (!traceDisabled) {
-//                                conversationIndexMemory.save(msgTemp, parentInteractionId, traceNumber.addAndGet(1), "LLM", ActionListener.<CreateInteractionResponse>wrap(groupedListener::onResponse, groupedListener::onFailure));
-//                            }
-//                            conversationIndexMemory.getMemoryManager().updateInteraction(parentInteractionId, ImmutableMap.of(AI_RESPONSE_FIELD, finalAnswer1, ADDITIONAL_INFO_FIELD, additionalInfo), ActionListener.<UpdateResponse>wrap(groupedListener::onResponse, groupedListener::onFailure));
-//                        }
-//                        return;
+                    lastToolSelectionResponse.set(thoughtResponse);
+
+                    if (finalI == 0 && !thought.contains("Thought:")) {
+                        sessionMsgAnswerBuilder.append("Thought: ");
+                    }
+                    sessionMsgAnswerBuilder.append(thought);
+                    lastThought.set(thought);
+
+                    cotModelTensors.add(ModelTensors.builder().mlModelTensors(List.of(ModelTensor.builder().name("response").result(thoughtResponse).build())).build());
+                    // TODO: check if verbose
+                    modelTensors.addAll(tmpModelTensorOutput.getMlModelOutputs());
+
+                    if (conversationIndexMemory != null) {
+                        ConversationIndexMessage msgTemp = ConversationIndexMessage.conversationIndexMessageBuilder().type(memory.getType()).question(question).response(thoughtResponse).finalAnswer(false).sessionId(sessionId).build();
+                        if (!traceDisabled) {
+                            conversationIndexMemory.save(msgTemp, parentInteractionId, traceNumber.addAndGet(1), "LLM");
+                        }
                     }
 
                     lastAction.set(action);
@@ -466,11 +465,11 @@ public class MLChatAgentRunner implements MLAgentRunner {
     }
 
     private static void returnFinalResponse(String sessionId, ActionListener<Object> listener, String parentInteractionId, boolean verbose, List<ModelTensors> cotModelTensors, AtomicBoolean getFinalAnswer, Map<String, Object> additionalInfo, String finalAnswer2) {
-        cotModelTensors.add(ModelTensors.builder().mlModelTensors(Collections.singletonList(ModelTensor.builder().name("response").result(finalAnswer2).build())).build());
+        cotModelTensors.add(ModelTensors.builder().mlModelTensors(List.of(ModelTensor.builder().name("response").result(finalAnswer2).build())).build());
 
         List<ModelTensors> finalModelTensors = new ArrayList<>();
         finalModelTensors.add(ModelTensors.builder().mlModelTensors(List.of(ModelTensor.builder().name(MLAgentExecutor.MEMORY_ID).result(sessionId).build(), ModelTensor.builder().name(MLAgentExecutor.PARENT_INTERACTION_ID).result(parentInteractionId).build())).build());
-        finalModelTensors.add(ModelTensors.builder().mlModelTensors(Collections.singletonList(ModelTensor.builder().name("response").dataAsMap(ImmutableMap.of("response", finalAnswer2, ADDITIONAL_INFO_FIELD, additionalInfo)).build())).build());
+        finalModelTensors.add(ModelTensors.builder().mlModelTensors(List.of(ModelTensor.builder().name("response").dataAsMap(ImmutableMap.of("response", finalAnswer2, ADDITIONAL_INFO_FIELD, additionalInfo)).build())).build());
         getFinalAnswer.set(true);
         if (verbose) {
             listener.onResponse(ModelTensorOutput.builder().mlModelOutputs(cotModelTensors).build());
