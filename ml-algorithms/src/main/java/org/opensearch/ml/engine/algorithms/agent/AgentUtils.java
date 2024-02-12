@@ -175,20 +175,6 @@ public class AgentUtils {
                     return matcher.group();
                 }
             }
-////            Pattern pattern2 = Pattern.compile("\\{(?:[^{}]|\\{(?:[^{}]|\\{[^{}]*\\})*\\})*\\}");
-//            Pattern pattern2 = Pattern.compile("\\{\\s*\"thought\":.*?\\s*,\\s*\"action\":.*?\\s*,\\s*\"action_input\":.*?\\}");
-//            Pattern pattern3 = Pattern.compile("\\{\\s*\"thought\"\\s*:\\s*\".*?\"\\s*,\\s*\"final_answer\"\\s*:\\s*\".*?\"\\s*}");
-//
-////            Pattern pattern2 = Pattern.compile("\\{\\s*(\"thought\":.*?\\s*,\\s*\"action\":.*?\\s*,\\s*\"action_input\":.*?|\"thought\":.*?\\s*,\\s*\"final_answer\":.*?)\\}");
-//            Matcher matcher2 = pattern2.matcher(text);
-//            Matcher matcher3 = pattern3.matcher(text);
-//            // Find the JSON content
-//            if (matcher2.find()) {
-//                return matcher2.group();
-//            }
-//            if (matcher3.find()) {
-//                return matcher3.group();
-//            }
             throw new IllegalArgumentException("Model output is invalid");
         }
     }
@@ -256,26 +242,37 @@ public class AgentUtils {
                                    Map<String, Tool> tools,
                                    Map<String, MLToolSpec> toolSpecMap) {
         for (MLToolSpec toolSpec : toolSpecs) {
-            Map<String, String> executeParams = new HashMap<>();
-            if (toolSpec.getParameters() != null) {
-                executeParams.putAll(toolSpec.getParameters());
-            }
-            for (String key : params.keySet()) {
-                String toolNamePrefix = getToolName(toolSpec) + ".";
-                if (key.startsWith(toolNamePrefix)) {
-                    executeParams.put(key.replace(toolNamePrefix, ""), params.get(key));
-                }
-            }
-            Tool tool = toolFactories.get(toolSpec.getType()).create(executeParams);
-            String toolName = getToolName(toolSpec);
-            tool.setName(toolName);
-
-            if (toolSpec.getDescription() != null) {
-                tool.setDescription(toolSpec.getDescription());
-            }
-
-            tools.put(toolName, tool);
-            toolSpecMap.put(toolName, toolSpec);
+            Tool tool = createTool(toolFactories, params, toolSpec);
+            tools.put(tool.getName(), tool);
+            toolSpecMap.put(tool.getName(), toolSpec);
         }
+    }
+
+    public static Tool createTool(Map<String, Tool.Factory> toolFactories, Map<String, String> params, MLToolSpec toolSpec) {
+        if (!toolFactories.containsKey(toolSpec.getType())) {
+            throw new IllegalArgumentException("Tool not found: " + toolSpec.getType());
+        }
+        Map<String, String> executeParams = new HashMap<>();
+        if (toolSpec.getParameters() != null) {
+            executeParams.putAll(toolSpec.getParameters());
+        }
+        for (String key : params.keySet()) {
+            String toolNamePrefix = getToolName(toolSpec) + ".";
+            if (key.startsWith(toolNamePrefix)) {
+                executeParams.put(key.replace(toolNamePrefix, ""), params.get(key));
+            }
+        }
+        Tool tool = toolFactories.get(toolSpec.getType()).create(executeParams);
+        String toolName = getToolName(toolSpec);
+        tool.setName(toolName);
+
+        if (toolSpec.getDescription() != null) {
+            tool.setDescription(toolSpec.getDescription());
+        }
+        if (params.containsKey(toolName + ".description")) {
+            tool.setDescription(params.get(toolName + ".description"));
+        }
+
+        return tool;
     }
 }

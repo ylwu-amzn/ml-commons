@@ -38,8 +38,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.text.StringSubstitutor;
 import org.opensearch.action.ActionRequest;
 import org.opensearch.action.StepListener;
-import org.opensearch.action.support.GroupedActionListener;
-import org.opensearch.action.update.UpdateResponse;
 import org.opensearch.client.Client;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.settings.Settings;
@@ -66,7 +64,6 @@ import org.opensearch.ml.common.transport.prediction.MLPredictionTaskRequest;
 import org.opensearch.ml.engine.memory.ConversationIndexMemory;
 import org.opensearch.ml.engine.memory.ConversationIndexMessage;
 import org.opensearch.ml.engine.tools.MLModelTool;
-import org.opensearch.ml.memory.action.conversation.CreateInteractionResponse;
 import org.opensearch.ml.repackage.com.google.common.collect.ImmutableMap;
 import org.opensearch.ml.repackage.com.google.common.collect.Lists;
 
@@ -262,16 +259,8 @@ public class MLChatAgentRunner implements MLAgentRunner {
             StepListener<?> nextStepListener = new StepListener<>();
 
             lastStepListener.whenComplete(output -> {
-
-
-
-
-
-                //////////////////////////////////////////////////////////////////////////////////////////
-                // start
-                //////////////////////////////////////////////////////////////////////////////////////////
                 StringBuilder sessionMsgAnswerBuilder = new StringBuilder();
-                if (finalI % 2 == 0) {// Reasoning which tool to use
+                if (finalI % 2 == 0) {
                     MLTaskResponse llmResponse = (MLTaskResponse) output;
                     ModelTensorOutput tmpModelTensorOutput = (ModelTensorOutput) llmResponse.getOutput();
                     Map<String, ?> dataAsMap = tmpModelTensorOutput.getMlModelOutputs().get(0).getMlModelTensors().get(0).getDataAsMap();
@@ -284,7 +273,6 @@ public class MLChatAgentRunner implements MLAgentRunner {
                         } catch (IllegalArgumentException e) {
                             thoughtResponse = llmReasoningResponse;
                             finalAnswer = llmReasoningResponse;
-                            System.out.println("0000000000 ylwudddebug1: get final answer directly : " + finalAnswer);
                         }
                         if (isJson(thoughtResponse)) {
                             dataAsMap = gson.fromJson(thoughtResponse, Map.class);
@@ -401,7 +389,7 @@ public class MLChatAgentRunner implements MLAgentRunner {
                         newPrompt.set(substitutor.replace(finalPrompt));
                         tmpParameters.put(PROMPT, newPrompt.get());
                     }
-                } else { // run tool
+                } else {
                     MLToolSpec toolSpec = toolSpecMap.get(lastAction.get());
                     if (toolSpec != null && toolSpec.isIncludeOutputInAgentResponse()) {
                         String outputString = outputToOutputString(output);
@@ -430,7 +418,7 @@ public class MLChatAgentRunner implements MLAgentRunner {
                     newPrompt.set(substitutor.replace(finalPrompt));
                     tmpParameters.put(PROMPT, newPrompt.get());
 
-                    sessionMsgAnswerBuilder.append("\nObservation: ").append(outputToOutputString(output));
+                    sessionMsgAnswerBuilder.append(outputToOutputString(output));
                     cotModelTensors.add(ModelTensors.builder().mlModelTensors(Collections.singletonList(ModelTensor.builder().name("response").result(sessionMsgAnswerBuilder.toString()).build())).build());
 
                     //client.execute(MLPredictionTaskAction.INSTANCE, request, (ActionListener<MLTaskResponse>) nextStepListener);
@@ -448,9 +436,6 @@ public class MLChatAgentRunner implements MLAgentRunner {
                         client.execute(MLPredictionTaskAction.INSTANCE, request, (ActionListener<MLTaskResponse>) nextStepListener);
                     }
                 }
-                //////////////////////////////////////////////////////////////////////////////////////////
-                // end
-                //////////////////////////////////////////////////////////////////////////////////////////
             }, e -> {
                 log.error("Failed to run chat agent", e);
                 listener.onFailure(e);
@@ -495,25 +480,6 @@ public class MLChatAgentRunner implements MLAgentRunner {
         } else {
             memory.save(msgTemp, parentInteractionId, traceNumber.addAndGet(1), "LLM", listener);
         }
-    }
-
-    private GroupedActionListener<ActionResponse> createGroupedListener(final int size, final ActionListener<Boolean> listener) {
-        return new GroupedActionListener<>(new ActionListener<Collection<ActionResponse>>() {
-            @Override
-            public void onResponse(final Collection<ActionResponse> responses) {
-                CreateInteractionResponse createInteractionResponse = extractResponse(responses, CreateInteractionResponse.class);
-                log.info("saved message with interaction id: {}", createInteractionResponse.getId());
-                UpdateResponse updateResponse = extractResponse(responses, UpdateResponse.class);
-                log.info("Updated final answer into interaction id: {}", updateResponse.getId());
-
-                listener.onResponse(true);
-            }
-
-            @Override
-            public void onFailure(final Exception e) {
-                listener.onFailure(e);
-            }
-        }, size);
     }
 
     @SuppressWarnings("unchecked")

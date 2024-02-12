@@ -11,6 +11,7 @@ import static org.opensearch.ml.common.conversation.ActionConstants.AI_RESPONSE_
 import static org.opensearch.ml.common.conversation.ActionConstants.MEMORY_ID;
 import static org.opensearch.ml.common.conversation.ActionConstants.PARENT_INTERACTION_ID_FIELD;
 import static org.opensearch.ml.common.utils.StringUtils.gson;
+import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.createTool;
 import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.getMessageHistoryLimit;
 import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.getMlToolSpecs;
 import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.getToolName;
@@ -173,7 +174,7 @@ public class MLConversationalFlowAgentRunner implements MLAgentRunner {
         for (int i = 0; i <= toolSpecs.size(); i++) {
             if (i == 0) {
                 MLToolSpec toolSpec = toolSpecs.get(i);
-                Tool tool = createTool(toolSpec);
+                Tool tool = createTool(toolFactories, params, toolSpec);
                 firstStepListener = new StepListener<>();
                 previousStepListener = firstStepListener;
                 firstTool = tool;
@@ -310,7 +311,7 @@ public class MLConversationalFlowAgentRunner implements MLAgentRunner {
 
     private void runNextStep(Map<String, String> params, List<MLToolSpec> toolSpecs, int finalI, StepListener<Object> nextStepListener) {
         MLToolSpec toolSpec = toolSpecs.get(finalI);
-        Tool tool = createTool(toolSpec);
+        Tool tool = createTool(toolFactories, params, toolSpec);
         if (finalI < toolSpecs.size()) {
             tool.run(getToolExecuteParams(toolSpec, params), nextStepListener);
         }
@@ -382,26 +383,6 @@ public class MLConversationalFlowAgentRunner implements MLAgentRunner {
                 return StringUtils.toJson(output);
             }
         }
-    }
-
-    @VisibleForTesting
-    Tool createTool(MLToolSpec toolSpec) {
-        Map<String, String> toolParams = new HashMap<>();
-        if (toolSpec.getParameters() != null) {
-            toolParams.putAll(toolSpec.getParameters());
-        }
-        if (!toolFactories.containsKey(toolSpec.getType())) {
-            throw new IllegalArgumentException("Tool not found: " + toolSpec.getType());
-        }
-        Tool tool = toolFactories.get(toolSpec.getType()).create(toolParams);
-        if (toolSpec.getName() != null) {
-            tool.setName(toolSpec.getName());
-        }
-
-        if (toolSpec.getDescription() != null) {
-            tool.setDescription(toolSpec.getDescription());
-        }
-        return tool;
     }
 
     @VisibleForTesting

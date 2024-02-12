@@ -114,10 +114,10 @@ public class CatIndexTool implements Tool {
             StringBuilder sb = new StringBuilder(
                 // Currently using c.value which is short header matching _cat/indices
                 // May prefer to use c.attr.get("desc") for full description
-                table.getHeaders().stream().map(c -> c.value.toString()).collect(Collectors.joining(", ", "", "\n"))
+                table.getHeaders().stream().map(c -> c.value.toString()).collect(Collectors.joining(",", "", "\n"))
             );
             for (List<Cell> row : table.getRows()) {
-                sb.append(row.stream().map(c -> c.value == null ? null : c.value.toString()).collect(Collectors.joining(", ", "", "\n")));
+                sb.append(row.stream().map(c -> c.value == null ? null : c.value.toString()).collect(Collectors.joining(",", "", "\n")));
             }
             @SuppressWarnings("unchecked")
             T response = (T) sb.toString();
