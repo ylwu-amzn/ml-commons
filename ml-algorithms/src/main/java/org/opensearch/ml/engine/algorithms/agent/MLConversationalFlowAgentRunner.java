@@ -11,6 +11,7 @@ import static org.opensearch.ml.common.conversation.ActionConstants.AI_RESPONSE_
 import static org.opensearch.ml.common.conversation.ActionConstants.MEMORY_ID;
 import static org.opensearch.ml.common.conversation.ActionConstants.PARENT_INTERACTION_ID_FIELD;
 import static org.opensearch.ml.common.utils.StringUtils.gson;
+import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.DISABLE_TRACE;
 import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.createTool;
 import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.getMessageHistoryLimit;
 import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.getMlToolSpecs;
@@ -253,7 +254,7 @@ public class MLConversationalFlowAgentRunner implements MLAgentRunner {
         String outputKey = toolName + ".output";
         String outputResponse = parseResponse(output);
         params.put(outputKey, escapeJson(outputResponse));
-        boolean traceDisabled = params.containsKey("disable_trace") && Boolean.parseBoolean(params.get("disable_trace"));
+        boolean traceDisabled = params.containsKey(DISABLE_TRACE) && Boolean.parseBoolean(params.get(DISABLE_TRACE));
 
         if (previousToolSpec.isIncludeOutputInAgentResponse() || finalI == toolSpecs.size()) {
             if (output instanceof ModelTensorOutput) {

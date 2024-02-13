@@ -40,6 +40,8 @@ public class AgentUtils {
     public static final String PROMPT_SUFFIX = "prompt.suffix";
     public static final String RESPONSE_FORMAT_INSTRUCTION = "prompt.format_instruction";
     public static final String TOOL_RESPONSE = "prompt.tool_response";
+    public static final String DISABLE_TRACE = "disable_trace";
+    public static final String VERBOSE = "verbose";
 
     public static String addExamplesToPrompt(Map<String, String> parameters, String prompt) {
         Map<String, String> examplesMap = new HashMap<>();
@@ -161,22 +163,34 @@ public class AgentUtils {
             "\\{\\s*\"thought\"\\s*:\\s*\".*?\"\\s*,\\s*\"action\"\\s*:\\s*\".*?\"\\s*,\\s*\"action_input\"\\s*:\\s*\".*?\"\\s*}",
             "\\{\\s*\"thought\"\\s*:\\s*\".*?\"\\s*,\\s*\"final_answer\"\\s*:\\s*\".*?\"\\s*}"
     );
-    public static String extractModelResponseJson(String text) {
+
+    public static String extractModelResponseJson(String text, List<String> llmResponsePatterns) {
         Pattern pattern1 = Pattern.compile("```json\\s*([\\s\\S]+?)\\s*```");
         Matcher matcher1 = pattern1.matcher(text);
 
         if (matcher1.find()) {
             return matcher1.group(1);
         } else {
-            for (String p : MODEL_RESPONSE_PATTERNS) {
-                Pattern pattern = Pattern.compile(p);
-                Matcher matcher = pattern.matcher(text);
-                if (matcher.find()) {
-                    return matcher.group();
-                }
+            String matchedPart = findMatchedPart(text, MODEL_RESPONSE_PATTERNS);
+            if (matchedPart == null && llmResponsePatterns != null) {
+                matchedPart = findMatchedPart(text, llmResponsePatterns);
+            }
+            if (matchedPart != null) {
+                return matchedPart;
             }
             throw new IllegalArgumentException("Model output is invalid");
         }
+    }
+
+    public static String findMatchedPart(String text, List<String> llmResponsePatterns) {
+        for (String p : llmResponsePatterns) {
+            Pattern pattern = Pattern.compile(p);
+            Matcher matcher = pattern.matcher(text);
+            if (matcher.find()) {
+                return matcher.group();
+            }
+        }
+        return null;
     }
 
     public static String outputToOutputString(Object output) throws PrivilegedActionException {
@@ -195,16 +209,6 @@ public class AgentUtils {
             outputString = AccessController.doPrivileged((PrivilegedExceptionAction<String>) () -> gson.toJson(output));
         }
         return outputString;
-    }
-
-    public static String parseInputFromLLMReturn(Map<String, ?> retMap) {
-        Object actionInput = retMap.get("action_input");
-        if (actionInput instanceof Map) {
-            return gson.toJson(actionInput);
-        } else {
-            return String.valueOf(actionInput);
-        }
-
     }
 
     public static int getMessageHistoryLimit(Map<String, String> params) {
@@ -274,5 +278,14 @@ public class AgentUtils {
         }
 
         return tool;
+    }
+
+    public static List<String> getToolNames(Map<String, Tool> tools) {
+        final List<String> inputTools = new ArrayList<>();
+        for (Map.Entry<String, Tool> entry : tools.entrySet()) {
+            String toolName = entry.getValue().getName();
+            inputTools.add(toolName);
+        }
+        return inputTools;
     }
 }
