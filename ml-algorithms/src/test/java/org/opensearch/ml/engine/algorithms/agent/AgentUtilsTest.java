@@ -120,7 +120,7 @@ public class AgentUtilsTest {
     @Test
     public void testAddPrefixSuffixToPrompt_WithPrefixSuffix() {
         // Setup
-        String initialPrompt = "initial prompt ${parameters.prompt_prefix} main content ${parameters.prompt_suffix}";
+        String initialPrompt = "initial prompt ${parameters.prompt.prefix} main content ${parameters.prompt.suffix}";
         Map<String, String> parameters = new HashMap<>();
         parameters.put(PROMPT_PREFIX, "Prefix: ");
         parameters.put(PROMPT_SUFFIX, " :Suffix");
@@ -138,7 +138,7 @@ public class AgentUtilsTest {
     @Test
     public void testAddPrefixSuffixToPrompt_WithoutPrefixSuffix() {
         // Setup
-        String initialPrompt = "initial prompt ${parameters.prompt_prefix} main content ${parameters.prompt_suffix}";
+        String initialPrompt = "initial prompt ${parameters.prompt.prefix} main content ${parameters.prompt.suffix}";
         Map<String, String> parameters = new HashMap<>();
 
         // Expected output (should remain unchanged)
