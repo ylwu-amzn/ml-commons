@@ -269,36 +269,40 @@ public class AgentUtilsTest {
 
     @Test
     public void test() {
-        String text = "---------------------\n{\n  \"thought\": \"Unfortunately the tools did not provide the weather forecast directly. Let me check online sources:\",\n  \"final_answer\": \"After checking online weather forecasts, it looks like tomorrow will be sunny with a high of 25 degrees Celsius.\"\n}";
+        String text =
+            "---------------------\n{\n  \"thought\": \"Unfortunately the tools did not provide the weather forecast directly. Let me check online sources:\",\n  \"final_answer\": \"After checking online weather forecasts, it looks like tomorrow will be sunny with a high of 25 degrees Celsius.\"\n}";
         String result = AgentUtils.extractModelResponseJson(text);
-        String expectedResult = "{\n" +
-                "  \"thought\": \"Unfortunately the tools did not provide the weather forecast directly. Let me check online sources:\",\n" +
-                "  \"final_answer\": \"After checking online weather forecasts, it looks like tomorrow will be sunny with a high of 25 degrees Celsius.\"\n" +
-                "}";
+        String expectedResult = "{\n"
+            + "  \"thought\": \"Unfortunately the tools did not provide the weather forecast directly. Let me check online sources:\",\n"
+            + "  \"final_answer\": \"After checking online weather forecasts, it looks like tomorrow will be sunny with a high of 25 degrees Celsius.\"\n"
+            + "}";
         System.out.println(result);
         Assert.assertEquals(expectedResult, result);
     }
 
     @Test
     public void test2() {
-        String text = "---------------------```json\n{\n  \"thought\": \"Unfortunately the tools did not provide the weather forecast directly. Let me check online sources:\",\n  \"final_answer\": \"After checking online weather forecasts, it looks like tomorrow will be sunny with a high of 25 degrees Celsius.\"\n}\n```";
+        String text =
+            "---------------------```json\n{\n  \"thought\": \"Unfortunately the tools did not provide the weather forecast directly. Let me check online sources:\",\n  \"final_answer\": \"After checking online weather forecasts, it looks like tomorrow will be sunny with a high of 25 degrees Celsius.\"\n}\n```";
         String result = AgentUtils.extractModelResponseJson(text);
-        String expectedResult = "{\n" +
-                "  \"thought\": \"Unfortunately the tools did not provide the weather forecast directly. Let me check online sources:\",\n" +
-                "  \"final_answer\": \"After checking online weather forecasts, it looks like tomorrow will be sunny with a high of 25 degrees Celsius.\"\n" +
-                "}";
+        String expectedResult = "{\n"
+            + "  \"thought\": \"Unfortunately the tools did not provide the weather forecast directly. Let me check online sources:\",\n"
+            + "  \"final_answer\": \"After checking online weather forecasts, it looks like tomorrow will be sunny with a high of 25 degrees Celsius.\"\n"
+            + "}";
         System.out.println(result);
         Assert.assertEquals(expectedResult, result);
     }
+
     @Test
     public void test3() {
-        String text = "---------------------\n{\n  \"thought\": \"Let me search our index to find population projections\", \n  \"action\": \"VectorDBTool\",\n  \"action_input\": \"Seattle population projection 2023\"\n}";
+        String text =
+            "---------------------\n{\n  \"thought\": \"Let me search our index to find population projections\", \n  \"action\": \"VectorDBTool\",\n  \"action_input\": \"Seattle population projection 2023\"\n}";
         String result = AgentUtils.extractModelResponseJson(text);
-        String expectedResult = "{\n" +
-                "  \"thought\": \"Let me search our index to find population projections\", \n" +
-                "  \"action\": \"VectorDBTool\",\n" +
-                "  \"action_input\": \"Seattle population projection 2023\"\n" +
-                "}";
+        String expectedResult = "{\n"
+            + "  \"thought\": \"Let me search our index to find population projections\", \n"
+            + "  \"action\": \"VectorDBTool\",\n"
+            + "  \"action_input\": \"Seattle population projection 2023\"\n"
+            + "}";
         System.out.println(result);
         Assert.assertEquals(expectedResult, result);
     }

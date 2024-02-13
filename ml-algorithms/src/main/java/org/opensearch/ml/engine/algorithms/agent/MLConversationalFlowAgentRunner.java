@@ -10,7 +10,6 @@ import static org.opensearch.ml.common.conversation.ActionConstants.ADDITIONAL_I
 import static org.opensearch.ml.common.conversation.ActionConstants.AI_RESPONSE_FIELD;
 import static org.opensearch.ml.common.conversation.ActionConstants.MEMORY_ID;
 import static org.opensearch.ml.common.conversation.ActionConstants.PARENT_INTERACTION_ID_FIELD;
-import static org.opensearch.ml.common.utils.StringUtils.gson;
 import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.DISABLE_TRACE;
 import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.createTool;
 import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.getMessageHistoryLimit;
@@ -287,25 +286,46 @@ public class MLConversationalFlowAgentRunner implements MLAgentRunner {
                     updateMemoryWithListener(additionalInfo, memorySpec, memoryId, parentInteractionId, updateListener);
                 }
             } else {
-                saveMessage(params, memory, outputResponse, memoryId, parentInteractionId, toolName, traceNumber,traceDisabled, ActionListener.wrap(r -> {
-                    log.info("saved last trace for interaction " + parentInteractionId + " of flow agent");
-                    Map<String, Object> updateContent = Map.of(AI_RESPONSE_FIELD, outputResponse, ADDITIONAL_INFO_FIELD, additionalInfo);
-                    memory.update(parentInteractionId, updateContent, updateListener);
-                }, e -> {
-                    log.error("Failed to update root interaction ", e);
-                    listener.onFailure(e);
-                }));
+                saveMessage(
+                    params,
+                    memory,
+                    outputResponse,
+                    memoryId,
+                    parentInteractionId,
+                    toolName,
+                    traceNumber,
+                    traceDisabled,
+                    ActionListener.wrap(r -> {
+                        log.info("saved last trace for interaction " + parentInteractionId + " of flow agent");
+                        Map<String, Object> updateContent = Map
+                            .of(AI_RESPONSE_FIELD, outputResponse, ADDITIONAL_INFO_FIELD, additionalInfo);
+                        memory.update(parentInteractionId, updateContent, updateListener);
+                    }, e -> {
+                        log.error("Failed to update root interaction ", e);
+                        listener.onFailure(e);
+                    })
+                );
             }
         } else {
             if (memory == null) {
                 runNextStep(params, toolSpecs, finalI, nextStepListener);
             } else {
-                saveMessage(params, memory, outputResponse, memoryId, parentInteractionId, toolName, traceNumber,traceDisabled, ActionListener.wrap(r -> {
-                    runNextStep(params, toolSpecs, finalI, nextStepListener);
-                }, e -> {
-                    log.error("Failed to update root interaction ", e);
-                    listener.onFailure(e);
-                }));
+                saveMessage(
+                    params,
+                    memory,
+                    outputResponse,
+                    memoryId,
+                    parentInteractionId,
+                    toolName,
+                    traceNumber,
+                    traceDisabled,
+                    ActionListener.wrap(r -> {
+                        runNextStep(params, toolSpecs, finalI, nextStepListener);
+                    }, e -> {
+                        log.error("Failed to update root interaction ", e);
+                        listener.onFailure(e);
+                    })
+                );
             }
         }
     }

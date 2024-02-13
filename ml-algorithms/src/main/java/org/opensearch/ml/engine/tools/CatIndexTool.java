@@ -372,11 +372,23 @@ public class CatIndexTool implements Tool {
         table.addCell("status", "alias:s;desc:open/close status");
         table.addCell("index", "alias:i,idx;desc:index name");
         table.addCell("uuid", "alias:id,uuid;desc:index uuid");
-        table.addCell("pri(number of primary shards)", "alias:p,shards.primary,shardsPrimary;text-align:right;desc:number of primary shards");
-        table.addCell("rep(number of replica shards)", "alias:r,shards.replica,shardsReplica;text-align:right;desc:number of replica shards");
+        table
+            .addCell(
+                "pri(number of primary shards)",
+                "alias:p,shards.primary,shardsPrimary;text-align:right;desc:number of primary shards"
+            );
+        table
+            .addCell(
+                "rep(number of replica shards)",
+                "alias:r,shards.replica,shardsReplica;text-align:right;desc:number of replica shards"
+            );
         table.addCell("docs.count(number of available documents)", "alias:dc,docsCount;text-align:right;desc:available docs");
         table.addCell("docs.deleted(number of deleted documents)", "alias:dd,docsDeleted;text-align:right;desc:deleted docs");
-        table.addCell("store.size(store size of primary and replica shards)", "sibling:pri;alias:ss,storeSize;text-align:right;desc:store size of primaries & replicas");
+        table
+            .addCell(
+                "store.size(store size of primary and replica shards)",
+                "sibling:pri;alias:ss,storeSize;text-align:right;desc:store size of primaries & replicas"
+            );
         table.addCell("pri.store.size(store size of primary shards)", "text-align:right;desc:store size of primaries");
         // Above includes all the default fields for cat indices. See RestIndicesAction for a lot more that could be included.
         table.endHeaders();

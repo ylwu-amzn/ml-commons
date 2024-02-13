@@ -131,7 +131,7 @@ public class MLChatAgentRunner implements MLAgentRunner {
 
         ConversationIndexMemory.Factory conversationIndexMemoryFactory = (ConversationIndexMemory.Factory) memoryFactoryMap.get(memoryType);
         conversationIndexMemoryFactory.create(title, memoryId, appType, ActionListener.<ConversationIndexMemory>wrap(memory -> {
-            //TODO: call runAgent directly if messageHistoryLimit == 0
+            // TODO: call runAgent directly if messageHistoryLimit == 0
             memory.getMessages(ActionListener.<List<Interaction>>wrap(r -> {
                 List<Message> messageList = new ArrayList<>();
                 for (Interaction next : r) {
@@ -142,7 +142,15 @@ public class MLChatAgentRunner implements MLAgentRunner {
                     if (Strings.isNullOrEmpty(response)) {
                         continue;
                     }
-                    messageList.add(ConversationIndexMessage.conversationIndexMessageBuilder().sessionId(memory.getConversationId()).question(question).response(response).build());
+                    messageList
+                        .add(
+                            ConversationIndexMessage
+                                .conversationIndexMessageBuilder()
+                                .sessionId(memory.getConversationId())
+                                .question(question)
+                                .response(response)
+                                .build()
+                        );
                 }
 
                 StringBuilder chatHistoryBuilder = new StringBuilder();
@@ -216,7 +224,7 @@ public class MLChatAgentRunner implements MLAgentRunner {
         lastLlmListener.set(firstListener);
         StepListener<?> lastStepListener = firstListener;
 
-        //String maxIteration = Optional.ofNullable(tmpParameters.get(MAX_ITERATION)).orElse("3");
+        // String maxIteration = Optional.ofNullable(tmpParameters.get(MAX_ITERATION)).orElse("3");
         int maxIterations = Integer.parseInt(tmpParameters.getOrDefault(MAX_ITERATION, "3")) * 2;
         for (int i = 0; i < maxIterations; i++) {
             int finalI = i;
@@ -238,7 +246,19 @@ public class MLChatAgentRunner implements MLAgentRunner {
 
                     if (finalAnswer != null) {
                         finalAnswer = finalAnswer.trim();
-                        sendFinalAnswer(sessionId, listener, question, parentInteractionId, verbose, traceDisabled, traceTensors, conversationIndexMemory, traceNumber, additionalInfo, finalAnswer);
+                        sendFinalAnswer(
+                            sessionId,
+                            listener,
+                            question,
+                            parentInteractionId,
+                            verbose,
+                            traceDisabled,
+                            traceTensors,
+                            conversationIndexMemory,
+                            traceNumber,
+                            additionalInfo,
+                            finalAnswer
+                        );
                         return;
                     }
 
@@ -248,46 +268,118 @@ public class MLChatAgentRunner implements MLAgentRunner {
                     lastActionInput.set(actionInput);
                     lastToolSelectionResponse.set(thoughtResponse);
 
-                    traceTensors.add(ModelTensors.builder().mlModelTensors(List.of(ModelTensor.builder().name("response").result(thoughtResponse).build())).build());
+                    traceTensors
+                        .add(
+                            ModelTensors
+                                .builder()
+                                .mlModelTensors(List.of(ModelTensor.builder().name("response").result(thoughtResponse).build()))
+                                .build()
+                        );
 
-                    saveTraceData(conversationIndexMemory, memory.getType(), question, thoughtResponse, sessionId, traceDisabled, parentInteractionId, traceNumber, "LLM");
+                    saveTraceData(
+                        conversationIndexMemory,
+                        memory.getType(),
+                        question,
+                        thoughtResponse,
+                        sessionId,
+                        traceDisabled,
+                        parentInteractionId,
+                        traceNumber,
+                        "LLM"
+                    );
 
                     action = getMatchingTool(tools, action);
 
                     if (tools.containsKey(action) && inputTools.contains(action)) {
-                        Map<String, String> toolParams = constructToolParams(tools, toolSpecMap, question, lastActionInput, action, actionInput);
-                        runTool(tools, toolSpecMap, tmpParameters, (ActionListener<Object>) nextStepListener, action, actionInput, toolParams);
+                        Map<String, String> toolParams = constructToolParams(
+                            tools,
+                            toolSpecMap,
+                            question,
+                            lastActionInput,
+                            action,
+                            actionInput
+                        );
+                        runTool(
+                            tools,
+                            toolSpecMap,
+                            tmpParameters,
+                            (ActionListener<Object>) nextStepListener,
+                            action,
+                            actionInput,
+                            toolParams
+                        );
                     } else {
                         String res = String.format(Locale.ROOT, "Failed to run the tool %s which is unsupported.", action);
                         ((ActionListener<Object>) nextStepListener).onResponse(res);
-                        StringSubstitutor substitutor = new StringSubstitutor(Map.of(SCRATCHPAD, scratchpadBuilder.toString()), "${parameters.", "}");
+                        StringSubstitutor substitutor = new StringSubstitutor(
+                            Map.of(SCRATCHPAD, scratchpadBuilder.toString()),
+                            "${parameters.",
+                            "}"
+                        );
                         newPrompt.set(substitutor.replace(finalPrompt));
                         tmpParameters.put(PROMPT, newPrompt.get());
                     }
                 } else {
                     addToolOutputToAddtionalInfo(toolSpecMap, lastAction, additionalInfo, output);
 
-                    String toolResponse = constructToolResponse(tmpParameters, lastAction, lastActionInput, lastToolSelectionResponse, output);
+                    String toolResponse = constructToolResponse(
+                        tmpParameters,
+                        lastAction,
+                        lastActionInput,
+                        lastToolSelectionResponse,
+                        output
+                    );
                     scratchpadBuilder.append(toolResponse).append("\n\n");
 
-                    saveTraceData(conversationIndexMemory, "ReAct", lastActionInput.get(), outputToOutputString(output), sessionId, traceDisabled, parentInteractionId, traceNumber, lastAction.get());
+                    saveTraceData(
+                        conversationIndexMemory,
+                        "ReAct",
+                        lastActionInput.get(),
+                        outputToOutputString(output),
+                        sessionId,
+                        traceDisabled,
+                        parentInteractionId,
+                        traceNumber,
+                        lastAction.get()
+                    );
 
                     StringSubstitutor substitutor = new StringSubstitutor(Map.of(SCRATCHPAD, scratchpadBuilder), "${parameters.", "}");
                     newPrompt.set(substitutor.replace(finalPrompt));
                     tmpParameters.put(PROMPT, newPrompt.get());
 
                     sessionMsgAnswerBuilder.append(outputToOutputString(output));
-                    traceTensors.add(ModelTensors.builder().mlModelTensors(Collections.singletonList(ModelTensor.builder().name("response").result(sessionMsgAnswerBuilder.toString()).build())).build());
+                    traceTensors
+                        .add(
+                            ModelTensors
+                                .builder()
+                                .mlModelTensors(
+                                    Collections
+                                        .singletonList(
+                                            ModelTensor.builder().name("response").result(sessionMsgAnswerBuilder.toString()).build()
+                                        )
+                                )
+                                .build()
+                        );
 
                     if (finalI == maxIterations - 1) {
                         if (verbose) {
                             listener.onResponse(ModelTensorOutput.builder().mlModelOutputs(traceTensors).build());
                         } else {
-                            List<ModelTensors> finalModelTensors = createFinalAnswerTensors(createModelTensors(sessionId, parentInteractionId), List.of(ModelTensor.builder().name("response").dataAsMap(Map.of("response", lastThought.get())).build()));
+                            List<ModelTensors> finalModelTensors = createFinalAnswerTensors(
+                                createModelTensors(sessionId, parentInteractionId),
+                                List.of(ModelTensor.builder().name("response").dataAsMap(Map.of("response", lastThought.get())).build())
+                            );
                             listener.onResponse(ModelTensorOutput.builder().mlModelOutputs(finalModelTensors).build());
                         }
                     } else {
-                        ActionRequest request = new MLPredictionTaskRequest(llm.getModelId(), RemoteInferenceMLInput.builder().algorithm(FunctionName.REMOTE).inputDataset(RemoteInferenceInputDataSet.builder().parameters(tmpParameters).build()).build());
+                        ActionRequest request = new MLPredictionTaskRequest(
+                            llm.getModelId(),
+                            RemoteInferenceMLInput
+                                .builder()
+                                .algorithm(FunctionName.REMOTE)
+                                .inputDataset(RemoteInferenceInputDataSet.builder().parameters(tmpParameters).build())
+                                .build()
+                        );
                         client.execute(MLPredictionTaskAction.INSTANCE, request, (ActionListener<MLTaskResponse>) nextStepListener);
                     }
                 }
@@ -300,7 +392,14 @@ public class MLChatAgentRunner implements MLAgentRunner {
             }
         }
 
-        ActionRequest request = new MLPredictionTaskRequest(llm.getModelId(), RemoteInferenceMLInput.builder().algorithm(FunctionName.REMOTE).inputDataset(RemoteInferenceInputDataSet.builder().parameters(tmpParameters).build()).build());
+        ActionRequest request = new MLPredictionTaskRequest(
+            llm.getModelId(),
+            RemoteInferenceMLInput
+                .builder()
+                .algorithm(FunctionName.REMOTE)
+                .inputDataset(RemoteInferenceInputDataSet.builder().parameters(tmpParameters).build())
+                .build()
+        );
         client.execute(MLPredictionTaskAction.INSTANCE, request, firstListener);
     }
 
@@ -346,14 +445,39 @@ public class MLChatAgentRunner implements MLAgentRunner {
         return finalModelTensors;
     }
 
-    private static String constructToolResponse(Map<String, String> tmpParameters, AtomicReference<String> lastAction, AtomicReference<String> lastActionInput, AtomicReference<String> lastToolSelectionResponse, Object output) throws PrivilegedActionException {
+    private static String constructToolResponse(
+        Map<String, String> tmpParameters,
+        AtomicReference<String> lastAction,
+        AtomicReference<String> lastActionInput,
+        AtomicReference<String> lastToolSelectionResponse,
+        Object output
+    ) throws PrivilegedActionException {
         String toolResponse = tmpParameters.get(TOOL_RESPONSE);
-        StringSubstitutor toolResponseSubstitutor = new StringSubstitutor(Map.of("llm_tool_selection_response", lastToolSelectionResponse.get(), "tool_name", lastAction.get(),"tool_input", lastActionInput.get(),"observation", outputToOutputString(output)), "${parameters.", "}");
+        StringSubstitutor toolResponseSubstitutor = new StringSubstitutor(
+            Map
+                .of(
+                    "llm_tool_selection_response",
+                    lastToolSelectionResponse.get(),
+                    "tool_name",
+                    lastAction.get(),
+                    "tool_input",
+                    lastActionInput.get(),
+                    "observation",
+                    outputToOutputString(output)
+                ),
+            "${parameters.",
+            "}"
+        );
         toolResponse = toolResponseSubstitutor.replace(toolResponse);
         return toolResponse;
     }
 
-    private static void addToolOutputToAddtionalInfo(Map<String, MLToolSpec> toolSpecMap, AtomicReference<String> lastAction, Map<String, Object> additionalInfo, Object output) throws PrivilegedActionException {
+    private static void addToolOutputToAddtionalInfo(
+        Map<String, MLToolSpec> toolSpecMap,
+        AtomicReference<String> lastAction,
+        Map<String, Object> additionalInfo,
+        Object output
+    ) throws PrivilegedActionException {
         MLToolSpec toolSpec = toolSpecMap.get(lastAction.get());
         if (toolSpec != null && toolSpec.isIncludeOutputInAgentResponse()) {
             String outputString = outputToOutputString(output);
@@ -367,16 +491,24 @@ public class MLChatAgentRunner implements MLAgentRunner {
         }
     }
 
-    private static void runTool(Map<String, Tool> tools, Map<String, MLToolSpec> toolSpecMap, Map<String, String> tmpParameters, ActionListener<Object> nextStepListener, String action, String actionInput, Map<String, String> toolParams) {
+    private static void runTool(
+        Map<String, Tool> tools,
+        Map<String, MLToolSpec> toolSpecMap,
+        Map<String, String> tmpParameters,
+        ActionListener<Object> nextStepListener,
+        String action,
+        String actionInput,
+        Map<String, String> toolParams
+    ) {
         if (tools.get(action).validate(toolParams)) {
             try {
                 String finalAction = action;
-                ActionListener<Object> toolListener = ActionListener
-                    .wrap(r -> {
-                        nextStepListener.onResponse(r);
-                        }, e -> {
-                        nextStepListener.onResponse(String.format(Locale.ROOT, "Failed to run the tool %s with the error message %s.", finalAction, e.getMessage()));
-                    });
+                ActionListener<Object> toolListener = ActionListener.wrap(r -> { nextStepListener.onResponse(r); }, e -> {
+                    nextStepListener
+                        .onResponse(
+                            String.format(Locale.ROOT, "Failed to run the tool %s with the error message %s.", finalAction, e.getMessage())
+                        );
+                });
                 if (tools.get(action) instanceof MLModelTool) {
                     Map<String, String> llmToolTmpParameters = new HashMap<>();
                     llmToolTmpParameters.putAll(tmpParameters);
@@ -388,7 +520,8 @@ public class MLChatAgentRunner implements MLAgentRunner {
                     tools.get(action).run(toolParams, toolListener); // run tool
                 }
             } catch (Exception e) {
-                nextStepListener.onResponse(String.format(Locale.ROOT, "Failed to run the tool %s with the error message %s.", action, e.getMessage()));
+                nextStepListener
+                    .onResponse(String.format(Locale.ROOT, "Failed to run the tool %s with the error message %s.", action, e.getMessage()));
             }
         } else {
             String res = String.format(Locale.ROOT, "Failed to run the tool %s due to wrong input %s.", action, actionInput);
@@ -396,7 +529,14 @@ public class MLChatAgentRunner implements MLAgentRunner {
         }
     }
 
-    private static Map<String, String> constructToolParams(Map<String, Tool> tools, Map<String, MLToolSpec> toolSpecMap, String question, AtomicReference<String> lastActionInput, String action, String actionInput) {
+    private static Map<String, String> constructToolParams(
+        Map<String, Tool> tools,
+        Map<String, MLToolSpec> toolSpecMap,
+        String question,
+        AtomicReference<String> lastActionInput,
+        String action,
+        String actionInput
+    ) {
         Map<String, String> toolParams = new HashMap<>();
         Map<String, String> toolSpecParams = toolSpecMap.get(action).getParameters();
         if (toolSpecParams != null) {
@@ -421,30 +561,77 @@ public class MLChatAgentRunner implements MLAgentRunner {
         return toolName;
     }
 
-    private static void saveTraceData(ConversationIndexMemory conversationIndexMemory, String memory, String question, String thoughtResponse, String sessionId, boolean traceDisabled, String parentInteractionId, AtomicInteger traceNumber, String origin) {
+    private static void saveTraceData(
+        ConversationIndexMemory conversationIndexMemory,
+        String memory,
+        String question,
+        String thoughtResponse,
+        String sessionId,
+        boolean traceDisabled,
+        String parentInteractionId,
+        AtomicInteger traceNumber,
+        String origin
+    ) {
         if (conversationIndexMemory != null) {
-            ConversationIndexMessage msgTemp = ConversationIndexMessage.conversationIndexMessageBuilder().type(memory).question(question).response(thoughtResponse).finalAnswer(false).sessionId(sessionId).build();
+            ConversationIndexMessage msgTemp = ConversationIndexMessage
+                .conversationIndexMessageBuilder()
+                .type(memory)
+                .question(question)
+                .response(thoughtResponse)
+                .finalAnswer(false)
+                .sessionId(sessionId)
+                .build();
             if (!traceDisabled) {
                 conversationIndexMemory.save(msgTemp, parentInteractionId, traceNumber.addAndGet(1), origin);
             }
         }
     }
 
-    private void sendFinalAnswer(String sessionId, ActionListener<Object> listener, String question, String parentInteractionId, boolean verbose, boolean traceDisabled, List<ModelTensors> cotModelTensors, ConversationIndexMemory conversationIndexMemory, AtomicInteger traceNumber, Map<String, Object> additionalInfo, String finalAnswer) {
+    private void sendFinalAnswer(
+        String sessionId,
+        ActionListener<Object> listener,
+        String question,
+        String parentInteractionId,
+        boolean verbose,
+        boolean traceDisabled,
+        List<ModelTensors> cotModelTensors,
+        ConversationIndexMemory conversationIndexMemory,
+        AtomicInteger traceNumber,
+        Map<String, Object> additionalInfo,
+        String finalAnswer
+    ) {
         if (conversationIndexMemory != null) {
             String copyOfFinalAnswer = finalAnswer;
-            ActionListener saveTraceListener = ActionListener.wrap(r->{
-                conversationIndexMemory.getMemoryManager().updateInteraction(parentInteractionId,
+            ActionListener saveTraceListener = ActionListener.wrap(r -> {
+                conversationIndexMemory
+                    .getMemoryManager()
+                    .updateInteraction(
+                        parentInteractionId,
                         Map.of(AI_RESPONSE_FIELD, copyOfFinalAnswer, ADDITIONAL_INFO_FIELD, additionalInfo),
-                        ActionListener.wrap(res ->{
-                            returnFinalResponse(sessionId, listener, parentInteractionId, verbose, cotModelTensors, additionalInfo, copyOfFinalAnswer);
-                        }, e-> {
-                            listener.onFailure(e);
-                        }));
-            }, e-> {
-                listener.onFailure(e);
-            });
-            saveMessage(conversationIndexMemory, question, finalAnswer, sessionId, parentInteractionId, traceNumber, true, traceDisabled, saveTraceListener);
+                        ActionListener.wrap(res -> {
+                            returnFinalResponse(
+                                sessionId,
+                                listener,
+                                parentInteractionId,
+                                verbose,
+                                cotModelTensors,
+                                additionalInfo,
+                                copyOfFinalAnswer
+                            );
+                        }, e -> { listener.onFailure(e); })
+                    );
+            }, e -> { listener.onFailure(e); });
+            saveMessage(
+                conversationIndexMemory,
+                question,
+                finalAnswer,
+                sessionId,
+                parentInteractionId,
+                traceNumber,
+                true,
+                traceDisabled,
+                saveTraceListener
+            );
         } else {
             returnFinalResponse(sessionId, listener, parentInteractionId, verbose, cotModelTensors, additionalInfo, finalAnswer);
         }
@@ -453,11 +640,28 @@ public class MLChatAgentRunner implements MLAgentRunner {
     private static List<ModelTensors> createModelTensors(String sessionId, String parentInteractionId) {
         List<ModelTensors> cotModelTensors = new ArrayList<>();
 
-        cotModelTensors.add(ModelTensors.builder().mlModelTensors(List.of(ModelTensor.builder().name(MLAgentExecutor.MEMORY_ID).result(sessionId).build(), ModelTensor.builder().name(MLAgentExecutor.PARENT_INTERACTION_ID).result(parentInteractionId).build())).build());
+        cotModelTensors
+            .add(
+                ModelTensors
+                    .builder()
+                    .mlModelTensors(
+                        List
+                            .of(
+                                ModelTensor.builder().name(MLAgentExecutor.MEMORY_ID).result(sessionId).build(),
+                                ModelTensor.builder().name(MLAgentExecutor.PARENT_INTERACTION_ID).result(parentInteractionId).build()
+                            )
+                    )
+                    .build()
+            );
         return cotModelTensors;
     }
 
-    private static String constructLLMPrompt(Map<String, Tool> tools, Map<String, String> parameters, List<String> inputTools, Map<String, String> tmpParameters) {
+    private static String constructLLMPrompt(
+        Map<String, Tool> tools,
+        Map<String, String> parameters,
+        List<String> inputTools,
+        Map<String, String> tmpParameters
+    ) {
         String prompt = parameters.getOrDefault(PROMPT, PromptTemplate.PROMPT_TEMPLATE);
         StringSubstitutor promptSubstitutor = new StringSubstitutor(tmpParameters, "${parameters.", "}");
         prompt = promptSubstitutor.replace(prompt);
@@ -480,7 +684,20 @@ public class MLChatAgentRunner implements MLAgentRunner {
             tmpParameters.put("stop", gson.toJson(new String[] { "\nObservation:", "\n\tObservation:" }));
         }
         if (!tmpParameters.containsKey("stop_sequences")) {
-            tmpParameters.put("stop_sequences", gson.toJson(new String[] {"\n\nHuman:", "\nObservation:", "\n\tObservation:", "\nObservation", "\n\tObservation", "\n\nQuestion" }));
+            tmpParameters
+                .put(
+                    "stop_sequences",
+                    gson
+                        .toJson(
+                            new String[] {
+                                "\n\nHuman:",
+                                "\nObservation:",
+                                "\n\tObservation:",
+                                "\nObservation",
+                                "\n\tObservation",
+                                "\n\nQuestion" }
+                        )
+                );
         }
 
         String promptPrefix = parameters.getOrDefault(PROMPT_PREFIX, PromptTemplate.PROMPT_TEMPLATE_PREFIX);
@@ -497,13 +714,32 @@ public class MLChatAgentRunner implements MLAgentRunner {
         return tmpParameters;
     }
 
+    private static void returnFinalResponse(
+        String sessionId,
+        ActionListener<Object> listener,
+        String parentInteractionId,
+        boolean verbose,
+        List<ModelTensors> cotModelTensors, // AtomicBoolean getFinalAnswer,
+        Map<String, Object> additionalInfo,
+        String finalAnswer2
+    ) {
+        cotModelTensors
+            .add(
+                ModelTensors.builder().mlModelTensors(List.of(ModelTensor.builder().name("response").result(finalAnswer2).build())).build()
+            );
 
-    private static void returnFinalResponse(String sessionId, ActionListener<Object> listener, String parentInteractionId, boolean verbose, List<ModelTensors> cotModelTensors, //AtomicBoolean getFinalAnswer,
-                                            Map<String, Object> additionalInfo, String finalAnswer2) {
-        cotModelTensors.add(ModelTensors.builder().mlModelTensors(List.of(ModelTensor.builder().name("response").result(finalAnswer2).build())).build());
-
-        List<ModelTensors> finalModelTensors = createFinalAnswerTensors(createModelTensors(sessionId, parentInteractionId), List.of(ModelTensor.builder().name("response").dataAsMap(ImmutableMap.of("response", finalAnswer2, ADDITIONAL_INFO_FIELD, additionalInfo)).build()));
-        //getFinalAnswer.set(true);
+        List<ModelTensors> finalModelTensors = createFinalAnswerTensors(
+            createModelTensors(sessionId, parentInteractionId),
+            List
+                .of(
+                    ModelTensor
+                        .builder()
+                        .name("response")
+                        .dataAsMap(ImmutableMap.of("response", finalAnswer2, ADDITIONAL_INFO_FIELD, additionalInfo))
+                        .build()
+                )
+        );
+        // getFinalAnswer.set(true);
         if (verbose) {
             listener.onResponse(ModelTensorOutput.builder().mlModelOutputs(cotModelTensors).build());
         } else {
@@ -512,17 +748,24 @@ public class MLChatAgentRunner implements MLAgentRunner {
     }
 
     private void saveMessage(
-            ConversationIndexMemory memory,
-            String question ,
-            String finalAnswer ,
-            String sessionId ,
-            String parentInteractionId,
-            AtomicInteger traceNumber,
-            boolean isFinalAnswer,
-            boolean traceDisabled,
-            ActionListener listener
+        ConversationIndexMemory memory,
+        String question,
+        String finalAnswer,
+        String sessionId,
+        String parentInteractionId,
+        AtomicInteger traceNumber,
+        boolean isFinalAnswer,
+        boolean traceDisabled,
+        ActionListener listener
     ) {
-        ConversationIndexMessage msgTemp = ConversationIndexMessage.conversationIndexMessageBuilder().type(memory.getType()).question(question).response(finalAnswer).finalAnswer(isFinalAnswer).sessionId(sessionId).build();
+        ConversationIndexMessage msgTemp = ConversationIndexMessage
+            .conversationIndexMessageBuilder()
+            .type(memory.getType())
+            .question(question)
+            .response(finalAnswer)
+            .finalAnswer(isFinalAnswer)
+            .sessionId(sessionId)
+            .build();
         if (traceDisabled) {
             listener.onResponse(true);
         } else {

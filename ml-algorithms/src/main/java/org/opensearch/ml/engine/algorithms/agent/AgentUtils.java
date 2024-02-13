@@ -159,11 +159,16 @@ public class AgentUtils {
         return prompt;
     }
 
-    public static List<String> MODEL_RESPONSE_PATTERNS = List.of(
+    public static List<String> MODEL_RESPONSE_PATTERNS = List
+        .of(
             "\\{\\s*\"thought\":.*?\\s*,\\s*\"action\":.*?\\s*,\\s*\"action_input\":.*?\\}",
             "\\{\\s*\"thought\"\\s*:\\s*\".*?\"\\s*,\\s*\"action\"\\s*:\\s*\".*?\"\\s*,\\s*\"action_input\"\\s*:\\s*\".*?\"\\s*}",
             "\\{\\s*\"thought\"\\s*:\\s*\".*?\"\\s*,\\s*\"final_answer\"\\s*:\\s*\".*?\"\\s*}"
-    );
+        );
+
+    public static String extractModelResponseJson(String text) {
+        return extractModelResponseJson(text, null);
+    }
 
     public static String extractModelResponseJson(String text, List<String> llmResponsePatterns) {
         Pattern pattern1 = Pattern.compile("```json\\s*([\\s\\S]+?)\\s*```");
@@ -241,11 +246,13 @@ public class AgentUtils {
         return toolSpecs;
     }
 
-    public static void createTools(Map<String, Tool.Factory> toolFactories,
-                                   Map<String, String> params,
-                                   List<MLToolSpec> toolSpecs,
-                                   Map<String, Tool> tools,
-                                   Map<String, MLToolSpec> toolSpecMap) {
+    public static void createTools(
+        Map<String, Tool.Factory> toolFactories,
+        Map<String, String> params,
+        List<MLToolSpec> toolSpecs,
+        Map<String, Tool> tools,
+        Map<String, MLToolSpec> toolSpecMap
+    ) {
         for (MLToolSpec toolSpec : toolSpecs) {
             Tool tool = createTool(toolFactories, params, toolSpec);
             tools.put(tool.getName(), tool);
