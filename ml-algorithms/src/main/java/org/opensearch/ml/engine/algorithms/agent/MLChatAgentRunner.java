@@ -12,6 +12,7 @@ import static org.opensearch.ml.common.utils.StringUtils.gson;
 import static org.opensearch.ml.common.utils.StringUtils.isJson;
 import static org.opensearch.ml.common.utils.StringUtils.toJson;
 import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.DISABLE_TRACE;
+import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.PROMPT_CHAT_HISTORY_PREFIX;
 import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.PROMPT_PREFIX;
 import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.PROMPT_SUFFIX;
 import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.RESPONSE_FORMAT_INSTRUCTION;
@@ -23,6 +24,7 @@ import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.getMessageHis
 import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.getMlToolSpecs;
 import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.getToolNames;
 import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.outputToOutputString;
+import static org.opensearch.ml.engine.algorithms.agent.PromptTemplate.CHAT_HISTORY_PREFIX;
 
 import java.security.PrivilegedActionException;
 import java.util.ArrayList;
@@ -145,7 +147,8 @@ public class MLChatAgentRunner implements MLAgentRunner {
 
                 StringBuilder chatHistoryBuilder = new StringBuilder();
                 if (messageList.size() > 0) {
-                    chatHistoryBuilder.append("Human:CONVERSATION HISTORY WITH AI ASSISTANT\n----------------------------\nBelow is Chat History between Human and AI which sorted by time with asc order:\n");
+                    String chatHistoryPrefix = params.getOrDefault(PROMPT_CHAT_HISTORY_PREFIX, CHAT_HISTORY_PREFIX);
+                    chatHistoryBuilder.append(chatHistoryPrefix);
                     for (Message message : messageList) {
                         chatHistoryBuilder.append(message.toString()).append("\n");
                     }
@@ -203,7 +206,6 @@ public class MLChatAgentRunner implements MLAgentRunner {
         AtomicInteger traceNumber = new AtomicInteger(0);
 
         AtomicReference<StepListener<MLTaskResponse>> lastLlmListener = new AtomicReference<>();
-//        AtomicBoolean getFinalAnswer = new AtomicBoolean(false);
         AtomicReference<String> lastThought = new AtomicReference<>();
         AtomicReference<String> lastAction = new AtomicReference<>();
         AtomicReference<String> lastActionInput = new AtomicReference<>();

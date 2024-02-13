@@ -40,6 +40,7 @@ public class AgentUtils {
     public static final String PROMPT_SUFFIX = "prompt.suffix";
     public static final String RESPONSE_FORMAT_INSTRUCTION = "prompt.format_instruction";
     public static final String TOOL_RESPONSE = "prompt.tool_response";
+    public static final String PROMPT_CHAT_HISTORY_PREFIX = "prompt.chat_history_prefix";
     public static final String DISABLE_TRACE = "disable_trace";
     public static final String VERBOSE = "verbose";
 
@@ -182,8 +183,8 @@ public class AgentUtils {
         }
     }
 
-    public static String findMatchedPart(String text, List<String> llmResponsePatterns) {
-        for (String p : llmResponsePatterns) {
+    public static String findMatchedPart(String text, List<String> patternList) {
+        for (String p : patternList) {
             Pattern pattern = Pattern.compile(p);
             Matcher matcher = pattern.matcher(text);
             if (matcher.find()) {
