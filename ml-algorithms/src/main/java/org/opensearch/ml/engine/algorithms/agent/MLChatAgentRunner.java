@@ -200,7 +200,7 @@ public class MLChatAgentRunner implements MLAgentRunner {
         boolean traceDisabled = parameters.containsKey(DISABLE_TRACE) && Boolean.parseBoolean(parameters.get(DISABLE_TRACE));
 
         Map<String, String> tmpParameters = constructLLMParams(llm, parameters);
-        String prompt = constructLLMPrompt(tools, parameters, inputTools, tmpParameters);
+        String prompt = constructLLMPrompt(tools, inputTools, tmpParameters);
         tmpParameters.put(PROMPT, prompt);
 
         List<ModelTensors> traceTensors = createModelTensors(sessionId, parentInteractionId);
@@ -680,19 +680,18 @@ public class MLChatAgentRunner implements MLAgentRunner {
 
     private static String constructLLMPrompt(
         Map<String, Tool> tools,
-        Map<String, String> parameters,
         List<String> inputTools,
         Map<String, String> tmpParameters
     ) {
-        String prompt = parameters.getOrDefault(PROMPT, PromptTemplate.PROMPT_TEMPLATE);
+        String prompt = tmpParameters.getOrDefault(PROMPT, PromptTemplate.PROMPT_TEMPLATE);
         StringSubstitutor promptSubstitutor = new StringSubstitutor(tmpParameters, "${parameters.", "}");
         prompt = promptSubstitutor.replace(prompt);
-        prompt = AgentUtils.addPrefixSuffixToPrompt(parameters, prompt);
-        prompt = AgentUtils.addToolsToPrompt(tools, parameters, inputTools, prompt);
-        prompt = AgentUtils.addIndicesToPrompt(parameters, prompt);
-        prompt = AgentUtils.addExamplesToPrompt(parameters, prompt);
-        prompt = AgentUtils.addChatHistoryToPrompt(parameters, prompt);
-        prompt = AgentUtils.addContextToPrompt(parameters, prompt);
+        prompt = AgentUtils.addPrefixSuffixToPrompt(tmpParameters, prompt);
+        prompt = AgentUtils.addToolsToPrompt(tools, tmpParameters, inputTools, prompt);
+        prompt = AgentUtils.addIndicesToPrompt(tmpParameters, prompt);
+        prompt = AgentUtils.addExamplesToPrompt(tmpParameters, prompt);
+        prompt = AgentUtils.addChatHistoryToPrompt(tmpParameters, prompt);
+        prompt = AgentUtils.addContextToPrompt(tmpParameters, prompt);
         return prompt;
     }
 
