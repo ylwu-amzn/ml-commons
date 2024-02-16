@@ -19,13 +19,17 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
+import com.google.gson.Gson;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.opensearch.ml.common.spi.tools.Tool;
+import org.opensearch.ml.common.utils.StringUtils;
 
 public class AgentUtilsTest {
 
@@ -305,5 +309,98 @@ public class AgentUtilsTest {
             + "}";
         System.out.println(result);
         Assert.assertEquals(expectedResult, result);
+    }
+
+    @Test
+    public void test1() {
+        String text = "```json\n{\n    \"thought\": \"Now I know the final answer\",\n    \"final_answer\": \"Sure, here is a simple Python script that reads a local file line by line and ingests it into an OpenSearch cluster using the _bulk API. Please replace 'localhost', 'port', 'index_name', and 'file_path' with your actual values.\n\n```python\nimport json\nimport requests\n\ndef read_file(file_path):\n    with open(file_path, 'r') as file:\n        for line in file:\n            yield line\n\ndef bulk_insert(data, index_name):\n    url = 'http://localhost:port/{}/_bulk'.format(index_name)\n    headers = {'Content-Type': 'application/x-ndjson'}\n    response = requests.post(url, headers=headers, data=data)\n    return response.json()\n\ndef prepare_bulk_data(file_path):\n    bulk_data = ''\n    for line in read_file(file_path):\n        index = { 'index' : {} }\n        bulk_data += json.dumps(index) + '\\\\n'\n        bulk_data += line + '\\\\n'\n    return bulk_data\n\ndef ingest_data(file_path, index_name):\n    bulk_data = prepare_bulk_data(file_path)\n    response = bulk_insert(bulk_data, index_name)\n    print(response)\n\ningest_data('file_path', 'index_name')\n```\nThis script first reads the file line by line, then prepares the bulk data in the format required by the _bulk API, and finally sends a POST request to the OpenSearch cluster. Please note that error handling and exception management are not included in this script, so you may want to add those according to your needs.\"\n}\n```";
+        //String result = AgentUtils.extractModelResponseJson(text, List.of("\\{\\s*(\"(thought|action|action_input|final_answer)\"\\s*:\\s*\"[^\"]*\"\\s*,?\\s*)+\\}"));
+//        String result = AgentUtils.extractModelResponseJson(text, List.of("\\{\\s*(\"(thought|action|action_input|final_answer)\"\\s*:\\s*\"[^\"]*\"\\s*,?\\s*)+\\}"));
+        String result = AgentUtils.extractModelResponseJson(text);
+        Gson gson = new Gson();
+        System.out.println(gson.toJson(result));
+        if (result.contains("\"final_answer\"")) {
+            String pattern = "\"final_answer\"\\s*:\\s*\"(.*?)\"";
+            Pattern jsonBlockPattern = Pattern.compile(pattern);
+            Matcher jsonBlockMatcher = jsonBlockPattern.matcher(result);
+            while (jsonBlockMatcher.find()) {
+                String group = jsonBlockMatcher.group(1);
+                System.out.println("Match found: " + group);
+            }
+        }
+        Assert.assertTrue(StringUtils.isJson(result));;
+    }
+
+    @Test
+    public void test2 () {
+        String result = "{\n    \"thought\": \"Now I know the final answer\",\n    \"final_answer\": \"Sure, here\\\" is a simple Python script that reads a local file line by line and ingests it into an OpenSearch cluster using the _bulk API. Please replace \u0027localhost\u0027, \u0027port\u0027, \u0027index_name\u0027, and \u0027file_path\u0027 with your actual values.\n\n```python\nimport json\nimport requests\n\ndef read_file(file_path):\n    with open(file_path, \u0027r\u0027) as file:\n        for line in file:\n            yield line\n\ndef bulk_insert(data, index_name):\n    url \u003d \u0027http://localhost:port/{}/_bulk\u0027.format(index_name)\n    headers \u003d {\u0027Content-Type\u0027: \u0027application/x-ndjson\u0027}\n    response \u003d requests.post(url, headers\u003dheaders, data\u003ddata)\n    return response.json()\n\ndef prepare_bulk_data(file_path):\n    bulk_data \u003d \u0027\u0027\n    for line in read_file(file_path):\n        index \u003d { \u0027index\u0027 : {} }\n        bulk_data +\u003d json.dumps(index) + \u0027\\\\n\u0027\n        bulk_data +\u003d line + \u0027\\\\n\u0027\n    return bulk_data\n\ndef ingest_data(file_path, index_name):\n    bulk_data \u003d prepare_bulk_data(file_path)\n    response \u003d bulk_insert(bulk_data, index_name)\n    print(response)\n\ningest_data(\u0027file_path\u0027, \u0027index_name\u0027)\n```\nThis script first reads the file line by line, then prepares the bulk data in the format required by the _bulk API, and finally sends a POST request to the OpenSearch cluster. Please note that error handling and exception management are not included in this script, so you may want to add those according to your needs.\"\n}";
+        Gson gson = new Gson();
+        System.out.println(gson.toJson(result));
+        String group=null;
+        if (result.contains("\"final_answer\"")) {
+            String pattern = "\"final_answer\"\\s*:\\s*\"(.*?)\"";
+            Pattern jsonBlockPattern = Pattern.compile(pattern, Pattern.DOTALL); // Add Pattern.DOTALL to match across newlines
+            Matcher jsonBlockMatcher = jsonBlockPattern.matcher(result);
+            while (jsonBlockMatcher.find()) {
+                group = jsonBlockMatcher.group(1);
+                System.out.println("Match found: " + group);
+            }
+        }
+        Assert.assertNotNull(group);
+    }
+
+    @Test
+    public void testExtractThought () {
+        String finalAnswer = "{\n    \"thought\": \"Now I \n know the\" final answer \",\n    \"final_answer\": \"Sure, here\\\" is a simple Python script that reads a local file line by line and ingests it into an OpenSearch cluster using the _bulk API. Please replace \u0027localhost\u0027, \u0027port\u0027, \u0027index_name\u0027, and \u0027file_path\u0027 with your actual values.\n\n```python\nimport json\nimport requests\n\ndef read_file(file_path):\n    with open(file_path, \u0027r\u0027) as file:\n        for line in file:\n            yield line\n\ndef bulk_insert(data, index_name):\n    url \u003d \u0027http://localhost:port/{}/_bulk\u0027.format(index_name)\n    headers \u003d {\u0027Content-Type\u0027: \u0027application/x-ndjson\u0027}\n    response \u003d requests.post(url, headers\u003dheaders, data\u003ddata)\n    return response.json()\n\ndef prepare_bulk_data(file_path):\n    bulk_data \u003d \u0027\u0027\n    for line in read_file(file_path):\n        index \u003d { \u0027index\u0027 : {} }\n        bulk_data +\u003d json.dumps(index) + \u0027\\\\n\u0027\n        bulk_data +\u003d line + \u0027\\\\n\u0027\n    return bulk_data\n\ndef ingest_data(file_path, index_name):\n    bulk_data \u003d prepare_bulk_data(file_path)\n    response \u003d bulk_insert(bulk_data, index_name)\n    print(response)\n\ningest_data(\u0027file_path\u0027, \u0027index_name\u0027)\n```\nThis script first reads the file line by line, then prepares the bulk data in the format required by the _bulk API, and finally sends a POST request to the OpenSearch cluster. Please note that error handling and exception management are not included in this script, so you may want to add those according to your needs.\"\n}";
+        String thoughtResult = AgentUtils.extractThought(finalAnswer);
+        Assert.assertEquals("Now I \n know the\" final answer ", thoughtResult);
+
+        String action = "{\n    \"thought\": \"Let's run \n some\" tool get more data \",\n   \n \"action\": \"Ok now let's run CatIndexTool\"\n}";
+        thoughtResult = AgentUtils.extractThought(action);
+        Assert.assertEquals("Let's run \n some\" tool get more data ", thoughtResult);
+    }
+
+    @Test
+    public void testExtractFinalAnswer () {
+        String text = "{\n    \"thought\": \"Now I \n know the\" final answer \",\n    \"final_answer\": \"Sure, here\\\" is { a simple Python } script that reads a local file line by line and ingests it into an OpenSearch cluster using the _bulk API. Please replace \u0027localhost\u0027, \u0027port\u0027, \u0027index_name\u0027, and \u0027file_path\u0027 with your actual values.\n\n```python\nimport json\nimport requests\n\ndef read_file(file_path):\n    with open(file_path, \u0027r\u0027) as file:\n        for line in file:\n            yield line\n\ndef bulk_insert(data, index_name):\n    url \u003d \u0027http://localhost:port/{}/_bulk\u0027.format(index_name)\n    headers \u003d {\u0027Content-Type\u0027: \u0027application/x-ndjson\u0027}\n    response \u003d requests.post(url, headers\u003dheaders, data\u003ddata)\n    return response.json()\n\ndef prepare_bulk_data(file_path):\n    bulk_data \u003d \u0027\u0027\n    for line in read_file(file_path):\n        index \u003d { \u0027index\u0027 : {} }\n        bulk_data +\u003d json.dumps(index) + \u0027\\\\n\u0027\n        bulk_data +\u003d line + \u0027\\\\n\u0027\n    return bulk_data\n\ndef ingest_data(file_path, index_name):\n    bulk_data \u003d prepare_bulk_data(file_path)\n    response \u003d bulk_insert(bulk_data, index_name)\n    print(response)\n\ningest_data(\u0027file_path\u0027, \u0027index_name\u0027)\n```\nThis script first reads the file line by line, then prepares the bulk data in the format required by the _bulk API, and finally sends a POST request to the OpenSearch cluster. Please note that error handling and exception management are not included in this script, so you may want to add those according to your needs.\"\n}";
+        String result = AgentUtils.extractFinalAnswer(text);
+        Assert.assertEquals("Sure, here\\\" is { a simple Python } script that reads a local file line by line and ingests it into an OpenSearch cluster using the _bulk API. Please replace \u0027localhost\u0027, \u0027port\u0027, \u0027index_name\u0027, and \u0027file_path\u0027 with your actual values.\n\n```python\nimport json\nimport requests\n\ndef read_file(file_path):\n    with open(file_path, \u0027r\u0027) as file:\n        for line in file:\n            yield line\n\ndef bulk_insert(data, index_name):\n    url \u003d \u0027http://localhost:port/{}/_bulk\u0027.format(index_name)\n    headers \u003d {\u0027Content-Type\u0027: \u0027application/x-ndjson\u0027}\n    response \u003d requests.post(url, headers\u003dheaders, data\u003ddata)\n    return response.json()\n\ndef prepare_bulk_data(file_path):\n    bulk_data \u003d \u0027\u0027\n    for line in read_file(file_path):\n        index \u003d { \u0027index\u0027 : {} }\n        bulk_data +\u003d json.dumps(index) + \u0027\\\\n\u0027\n        bulk_data +\u003d line + \u0027\\\\n\u0027\n    return bulk_data\n\ndef ingest_data(file_path, index_name):\n    bulk_data \u003d prepare_bulk_data(file_path)\n    response \u003d bulk_insert(bulk_data, index_name)\n    print(response)\n\ningest_data(\u0027file_path\u0027, \u0027index_name\u0027)\n```\nThis script first reads the file line by line, then prepares the bulk data in the format required by the _bulk API, and finally sends a POST request to the OpenSearch cluster. Please note that error handling and exception management are not included in this script, so you may want to add those according to your needs.\"\n}", result);
+    }
+
+    @Test
+    public void testExtractFinalAnswer_NoMatch() {
+        String text = "{\n    \"thought\": \"Let's run \n some\" tool get more data \",\n   \n \"action\": \"Ok now let's run \n{ CatIndexTool }\"\n}";
+        String result = AgentUtils.extractFinalAnswer(text);
+        Assert.assertNull(result);
+    }
+
+    @Test
+    public void testExtractAction_NoActionInput() {
+        String text = "{\n    \"thought\": \"Let's run \n some\" tool get more data \",\n   \n \"action\": \"Ok now let's run \n{ CatIndexTool }\"\n}";
+        String result = AgentUtils.extractAction(text);
+        Assert.assertEquals("Ok now let\u0027s run \n{ CatIndexTool }\"\n}", result);
+    }
+
+    @Test
+    public void testExtractAction_ActionInput() {
+        String text = "{\n    \"thought\": \"Let's run \n some\" tool get more data \",\n   \n \"action\": \"Ok now let's run \n{ CatIndexTool }\", \n \"action_input\": 123 \n}";
+        String result = AgentUtils.extractAction(text);
+        Assert.assertEquals("Ok now let's run \n{ CatIndexTool }\", \n ", result);
+    }
+
+    @Test
+    public void testExtractActionInput() {
+//        String text = "{\n    \"thought\": \"Let's run \n some\" tool get more data \",\n   \n \"action\": \"Ok now let's run \n{ CatIndexTool }\", \n \"action_input\": 123 \n}";
+//        String text = "{\n    \"thought\": \"I need to use the stock_price_data_knowledge_base tool to get the stock price data for Amazon from May 2023 to Jan 2024.\",\n    \"action\": \"stock_price_data_knowledge_base\",\n    \"action_input\": \"{\\\"company_name\\\": \\\"Amazon\\\", \\\"start_date\\\": \\\"2023-05-01\\\", \\\"end_date\\\": \\\"2024-01-31\\\"}\"\n}";
+//        String text = "{\n    \"thought\": \"I need to use the stock_price_data_knowledge_base tool to get the stock price data for Amazon from May 2023 to Jan 2024.\",\n    \"action\": \"stock_price_data_knowledge_base\",\n    \"action_input\": \"{\\\"company_name\\\": \\\"Amazon\\\\\\\\\"inc \\\", \\\"start_date\\\": \\\"2023-05-01\\\", \\\"end_date\\\": \\\"2024-01-31\\\"}\"\n}";
+        String text = "{\n    \"thought\": \"I need to use the stock_price_data_knowledge_base tool to get the stock price data for Amazon from May 2023 to Jan 2024.\",\n    \"action\": \"stock_price_data_knowledge_base\",\n    \"action_input\": \"Amazon\"\n}";
+        String result = AgentUtils.extractActionInput(text);
+        Assert.assertEquals("Ok now let's run \n{ CatIndexTool }\", \n ", result);
+    }
+
+    @Test
+    public void testExtractActionInput2() {
+//        Gson gson = new Gson();
+//        gson.fromJson("{\\\"company_name\\\": \\\"Amazon\\\", \\\"start_date\\\": \\\"2023-05-01\\\", \\\"end_date\\\": \\\"2024-01-31\\\"}")
     }
 }

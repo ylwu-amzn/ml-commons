@@ -6,6 +6,7 @@
 package org.opensearch.ml.engine.algorithms.agent;
 
 import static org.opensearch.ml.common.utils.StringUtils.gson;
+import static org.opensearch.ml.common.utils.StringUtils.isJson;
 import static org.opensearch.ml.engine.algorithms.agent.MLAgentExecutor.MESSAGE_HISTORY_LIMIT;
 import static org.opensearch.ml.engine.algorithms.agent.MLChatAgentRunner.CHAT_HISTORY;
 import static org.opensearch.ml.engine.algorithms.agent.MLChatAgentRunner.CONTEXT;
@@ -33,6 +34,7 @@ import org.opensearch.ml.common.agent.MLToolSpec;
 import org.opensearch.ml.common.output.model.ModelTensor;
 import org.opensearch.ml.common.output.model.ModelTensorOutput;
 import org.opensearch.ml.common.spi.tools.Tool;
+import org.opensearch.ml.common.utils.StringUtils;
 
 public class AgentUtils {
 
@@ -168,22 +170,108 @@ public class AgentUtils {
     }
 
     public static String extractModelResponseJson(String text, List<String> llmResponsePatterns) {
-        Pattern jsonBlockPattern = Pattern.compile("```json\\s*([\\s\\S]+?)\\s*```");
-        Matcher jsonBlockMatcher = jsonBlockPattern.matcher(text);
-
-        if (jsonBlockMatcher.find()) {
-            return jsonBlockMatcher.group(1);
-        } else {
-            String matchedPart = findMatchedPart(text, MODEL_RESPONSE_PATTERNS);
-            if (matchedPart == null && llmResponsePatterns != null) {
-                // If no match is found, try additional patterns if provided
-                matchedPart = findMatchedPart(text, llmResponsePatterns);
+        if (text.contains("```json")) {
+            text = text.substring(text.indexOf("```json") + "```json".length());
+            if (text.contains("```")) {
+                text = text.substring(0, text.lastIndexOf("```"));
             }
+        }
+        text = text.trim();
+        if (isJson(text)) {
+            return text;
+        }
+        // String text = "1234567 ```json  \nabc \n``` ef"; text = text.substring(text.indexOf("```json") + "```json".length()); text = text.substring(0, text.lastIndexOf("```")); text = text.trim();
+        String matchedPart = null;
+        if (llmResponsePatterns != null) {
+            matchedPart = findMatchedPart(text, llmResponsePatterns);
             if (matchedPart != null) {
                 return matchedPart;
             }
-            throw new IllegalArgumentException("Model output is invalid");
         }
+        matchedPart = findMatchedPart(text, MODEL_RESPONSE_PATTERNS);
+        if (matchedPart != null) {
+            return matchedPart;
+        }
+        throw new IllegalArgumentException("Model output is invalid");
+//        Pattern jsonBlockPattern = Pattern.compile("```json\\s*(.*?)\\s*```\\s*$");
+//        Matcher jsonBlockMatcher = jsonBlockPattern.matcher(text);
+//        if (jsonBlockMatcher.find()) {
+//            return jsonBlockMatcher.group(1);
+//        } else {
+//            matchedPart = findMatchedPart(text, MODEL_RESPONSE_PATTERNS);
+//            if (matchedPart != null) {
+//                return matchedPart;
+//            }
+//            throw new IllegalArgumentException("Model output is invalid");
+//        }
+    }
+
+    public static String extractFinalAnswer(String text) {
+        String result=null;
+        if (text.contains("\"final_answer\"")) {
+//            String pattern = "\"final_answer\"\\s*:\\s*\"(.*?)";
+//            String pattern = "\"final_answer\"\\s*:\\s*\".*?\"\\s*}"; // this works , but include final_answer
+            String pattern = "\"final_answer\"\\s*:\\s*\"(.*?)$";
+            Pattern jsonBlockPattern = Pattern.compile(pattern, Pattern.DOTALL); // Add Pattern.DOTALL to match across newlines
+            Matcher jsonBlockMatcher = jsonBlockPattern.matcher(text);
+            if (jsonBlockMatcher.find()) {
+                result = jsonBlockMatcher.group(1);
+                System.out.println("-------000");
+                System.out.println(gson.toJson(result));
+                System.out.println("-------000");
+            }
+        }
+        return result;
+    }
+
+    public static String extractThought(String text) {
+        String result=null;
+        if (text.contains("\"thought\"")) {
+            String pattern = "\"thought\"\\s*:\\s*\"(.*?)\"\\s*,\\s*[\"final_answer\"|\"action\"]";
+            Pattern jsonBlockPattern = Pattern.compile(pattern, Pattern.DOTALL); // Add Pattern.DOTALL to match across newlines
+            Matcher jsonBlockMatcher = jsonBlockPattern.matcher(text);
+            if (jsonBlockMatcher.find()) {
+                result = jsonBlockMatcher.group(1);
+            }
+        }
+        return result;
+    }
+
+    public static String extractAction(String text) {
+        String result=null;
+        if (text.contains("\"action\"")) {
+//            String pattern = "\"action\"\\s*:\\s*\"(.*?)\"\\s*,\\s*(\"action_input\"|$)";
+//            String pattern = "\"action\"\\s*:\\s*\"(.*?)\"(?:,\\s*\"action_input\"|$)";
+            String pattern = "\"action\"\\s*:\\s*\"(.*?)(?:\"action_input\"|$)";
+            Pattern jsonBlockPattern = Pattern.compile(pattern, Pattern.DOTALL); // Add Pattern.DOTALL to match across newlines
+            Matcher jsonBlockMatcher = jsonBlockPattern.matcher(text);
+            if (jsonBlockMatcher.find()) {
+                result = jsonBlockMatcher.group(1);
+                //System.out.println(gson.toJson(result));
+            }
+        }
+        return result;
+    }
+
+    public static String extractActionInput(String text) {
+        String result=null;
+        if (text.contains("\"action_input\"")) {
+//            String pattern = "\"action\"\\s*:\\s*\"(.*?)\"\\s*,\\s*(\"action_input\"|$)";
+//            String pattern = "\"action\"\\s*:\\s*\"(.*?)\"(?:,\\s*\"action_input\"|$)";
+//            String pattern = "\"action_input\"\\s*:\\s*\"(.*?)\"";
+            String pattern = "\"action_input\"\\s*:\\s*\"((?:[^\\\"]|\\\")*)\"";
+            Pattern jsonBlockPattern = Pattern.compile(pattern, Pattern.DOTALL); // Add Pattern.DOTALL to match across newlines
+            Matcher jsonBlockMatcher = jsonBlockPattern.matcher(text);
+            if (jsonBlockMatcher.find()) {
+                result = jsonBlockMatcher.group(1);
+//                System.out.println(gson.toJson(result));
+                //String s = "{\\\"company_name\\\": \\\"Amazon\\\", \\\"start_date\\\": \\\"2023-05-01\\\", \\\"end_date\\\": \\\"2024-01-31\\\"}";
+                result = result.replace("\\\"", "\"");
+//                System.out.println(StringUtils.isJson(result));
+//                System.out.println(result);
+            }
+        }
+        return result;
     }
 
     public static String findMatchedPart(String text, List<String> patternList) {

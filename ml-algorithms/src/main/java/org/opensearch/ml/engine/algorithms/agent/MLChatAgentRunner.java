@@ -19,7 +19,11 @@ import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.RESPONSE_FORM
 import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.TOOL_RESPONSE;
 import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.VERBOSE;
 import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.createTools;
+import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.extractAction;
+import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.extractActionInput;
+import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.extractFinalAnswer;
 import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.extractModelResponseJson;
+import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.extractThought;
 import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.getMessageHistoryLimit;
 import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.getMlToolSpecs;
 import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.getToolNames;
@@ -415,8 +419,27 @@ public class MLChatAgentRunner implements MLAgentRunner {
                 modelOutput.put(THOUGHT_RESPONSE, llmReasoningResponse);
                 modelOutput.put(FINAL_ANSWER, llmReasoningResponse);
             }
-            if (isJson(thoughtResponse)) {
-                modelOutput.putAll(getParameterMap(gson.fromJson(thoughtResponse, Map.class)));
+            if (thoughtResponse != null) {
+                if (isJson(thoughtResponse)) {
+                    modelOutput.putAll(getParameterMap(gson.fromJson(thoughtResponse, Map.class)));
+                } else {
+                    String thought = extractThought(thoughtResponse);
+                    String action = extractAction(thoughtResponse);
+                    String actionInput = extractActionInput(thoughtResponse);
+                    String finalAnswer = extractFinalAnswer(thoughtResponse);
+                    if (thought != null) {
+                        modelOutput.put(THOUGHT, thought);
+                    }
+                    if (action != null) {
+                        modelOutput.put(ACTION, action);
+                    }
+                    if (actionInput != null) {
+                        modelOutput.put(ACTION_INPUT, actionInput);
+                    }
+                    if (finalAnswer != null) {
+                        modelOutput.put(FINAL_ANSWER, finalAnswer);
+                    }
+                }
             }
         } else {
             extractParams(modelOutput, dataAsMap, THOUGHT);
