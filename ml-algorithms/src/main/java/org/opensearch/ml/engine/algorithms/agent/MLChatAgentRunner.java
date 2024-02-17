@@ -642,17 +642,18 @@ public class MLChatAgentRunner implements MLAgentRunner {
                 );
         }
 
-        String promptPrefix = parameters.getOrDefault(PROMPT_PREFIX, PromptTemplate.PROMPT_TEMPLATE_PREFIX);
-        tmpParameters.put(PROMPT_PREFIX, promptPrefix);
-
-        String promptSuffix = parameters.getOrDefault(PROMPT_SUFFIX, PromptTemplate.PROMPT_TEMPLATE_SUFFIX);
-        tmpParameters.put(PROMPT_SUFFIX, promptSuffix);
-
-        String promptFormatInstruction = parameters.getOrDefault(RESPONSE_FORMAT_INSTRUCTION, PromptTemplate.PROMPT_FORMAT_INSTRUCTION);
-        tmpParameters.put(RESPONSE_FORMAT_INSTRUCTION, promptFormatInstruction);
-
-        String promptToolResponse = parameters.getOrDefault(TOOL_RESPONSE, PromptTemplate.PROMPT_TEMPLATE_TOOL_RESPONSE);
-        tmpParameters.put(TOOL_RESPONSE, promptToolResponse);
+        if (!tmpParameters.containsKey(PROMPT_PREFIX)) {
+            tmpParameters.put(PROMPT_PREFIX, PromptTemplate.PROMPT_TEMPLATE_PREFIX);
+        }
+        if (!tmpParameters.containsKey(PROMPT_SUFFIX)) {
+            tmpParameters.put(PROMPT_SUFFIX, PromptTemplate.PROMPT_TEMPLATE_SUFFIX);
+        }
+        if (!tmpParameters.containsKey(RESPONSE_FORMAT_INSTRUCTION)) {
+            tmpParameters.put(RESPONSE_FORMAT_INSTRUCTION, PromptTemplate.PROMPT_FORMAT_INSTRUCTION);
+        }
+        if (!tmpParameters.containsKey(TOOL_RESPONSE)) {
+            tmpParameters.put(TOOL_RESPONSE, PromptTemplate.PROMPT_TEMPLATE_TOOL_RESPONSE);
+        }
         return tmpParameters;
     }
 
