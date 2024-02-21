@@ -256,7 +256,7 @@ POST _plugins/_ml/agents/_register
     },
     {
       "type": "CatIndexTool",
-      "description": "Use this tool to get OpenSearch index information: (health, status, index, uuid, primary count, replica count, docs.count, docs.deleted, store.size, primary.store.size). \nIt takes 2 optional arguments named `index` which is a comma-delimited list of one or more indices to get information from (default is an empty list meaning all indices), and `local` which means whether to return information from the local node only instead of the cluster manager node (default is false)."
+      "description": "\nUse this tool to get OpenSearch index information: (health, status, index, uuid, primary count, replica count, docs.count, docs.deleted, store.size, primary.store.size). \n\nIt takes 2 optional arguments\n1. `indices`: it is a string list of one or more indices to get information from\n2. `local`: if it's true means return information from the local node only instead of the cluster manager node (default is false).\n\nSample input for get index information of specific index:\n{'indices': ['index-name1,index-name2']}\n\nSample input for get specific index formation on local node:\n{'indices': ['index-name1,index-name2'], 'local': 'true'}\n\nSample input for get all index formation on local node:\n{'local': 'true'}\n\nSample input for get all index formation on cluster manager node:\n{'local': 'false'} \nor just provide empty string ''\n"
     },
     {
       "type": "SearchAnomalyDetectorsTool"
