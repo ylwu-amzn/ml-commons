@@ -232,7 +232,7 @@ public class MLInput implements Input {
             }
         }
         MLInputDataset inputDataSet = null;
-        if (algorithm == FunctionName.TEXT_EMBEDDING) {
+        if (algorithm == FunctionName.TEXT_EMBEDDING || algorithm == FunctionName.QUESTION_ANSWERING) {
             ModelResultFilter filter = new ModelResultFilter(returnBytes, returnNumber, targetResponse, targetResponsePositions);
             inputDataSet = new TextDocsInputDataSet(textDocs, filter);
         }
