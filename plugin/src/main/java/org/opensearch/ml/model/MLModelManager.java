@@ -934,16 +934,18 @@ public class MLModelManager {
         String modelContentHash,
         FunctionName functionName,
         boolean deployToAllNodes,
+        boolean autoDeployModel,
         MLTask mlTask,
         ActionListener<String> listener
     ) {
+        log.debug("Auto deploy model : {}", autoDeployModel);
         mlStats.createCounterStatIfAbsent(functionName, ActionName.DEPLOY, ML_ACTION_REQUEST_COUNT).increment();
         mlStats.getStat(MLNodeLevelStat.ML_EXECUTING_TASK_COUNT).increment();
         mlStats.getStat(MLNodeLevelStat.ML_REQUEST_COUNT).increment();
         mlStats.createModelCounterStatIfAbsent(modelId, ActionName.DEPLOY, ML_ACTION_REQUEST_COUNT).increment();
         List<String> workerNodes = mlTask.getWorkerNodes();
         if (modelCacheHelper.isModelDeployed(modelId)) {
-            if (workerNodes != null && workerNodes.size() > 0) {
+            if (!autoDeployModel && workerNodes != null && workerNodes.size() > 0) {
                 log.info("Set new target node ids {} for model {}", Arrays.toString(workerNodes.toArray(new String[0])), modelId);
                 modelCacheHelper.setDeployToAllNodes(modelId, deployToAllNodes);
                 modelCacheHelper.setTargetWorkerNodes(modelId, workerNodes);
@@ -958,8 +960,13 @@ public class MLModelManager {
         int eligibleNodeCount = workerNodes.size();
         modelCacheHelper.initModelState(modelId, MLModelState.DEPLOYING, functionName, workerNodes, deployToAllNodes);
         try (ThreadContext.StoredContext context = client.threadPool().getThreadContext().stashContext()) {
-            ActionListener<String> wrappedListener = ActionListener.runBefore(listener, context::restore);
-            checkAndAddRunningTask(mlTask, maxDeployTasksPerNode);
+            ActionListener<String> wrappedListener = ActionListener.runBefore(listener, () -> {
+                context.restore();
+                modelCacheHelper.removeAutoDeployModel(modelId);
+            });
+            if (!autoDeployModel) {
+                checkAndAddRunningTask(mlTask, maxDeployTasksPerNode);
+            }
             this.getModel(modelId, threadedActionListener(DEPLOY_THREAD_POOL, ActionListener.wrap(mlModel -> {
                 modelCacheHelper.setIsModelEnabled(modelId, mlModel.getIsEnabled());
                 if (FunctionName.REMOTE == mlModel.getAlgorithm()
@@ -1821,4 +1828,11 @@ public class MLModelManager {
         return modelCacheHelper.isModelRunningOnNode(modelId);
     }
 
+    public MLModel addModelToAutoDeployCache(String modelId, MLModel model) {
+        return modelCacheHelper.addModelToAutoDeployCache(modelId, model);
+    }
+
+    public void removeAutoDeployModel(String modelId) {
+        modelCacheHelper.removeAutoDeployModel(modelId);
+    }
 }

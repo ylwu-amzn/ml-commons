@@ -32,10 +32,12 @@ import lombok.extern.log4j.Log4j2;
 @Log4j2
 public class MLModelCacheHelper {
     private final Map<String, MLModelCache> modelCaches;
+    private final Map<String, MLModel> autoDeployModels;
     private volatile Long maxRequestCount;
 
     public MLModelCacheHelper(ClusterService clusterService, Settings settings) {
         this.modelCaches = new ConcurrentHashMap<>();
+        this.autoDeployModels = new ConcurrentHashMap<>();
 
         maxRequestCount = ML_COMMONS_MONITORING_REQUEST_COUNT.get(settings);
         clusterService.getClusterSettings().addSettingsUpdateConsumer(ML_COMMONS_MONITORING_REQUEST_COUNT, it -> maxRequestCount = it);
@@ -358,6 +360,7 @@ public class MLModelCacheHelper {
             modelCache.clear();
             modelCaches.remove(modelId);
         }
+        autoDeployModels.remove(modelId);
     }
 
     /**
@@ -590,4 +593,18 @@ public class MLModelCacheHelper {
         return modelCaches.computeIfAbsent(modelId, it -> new MLModelCache());
     }
 
+    public MLModel addModelToAutoDeployCache(String modelId, MLModel model) {
+        MLModel addedModel = autoDeployModels.computeIfAbsent(modelId, key -> model);
+        if (addedModel == model) {
+            log.info("Add model {} to auto deploy cache", modelId);
+        }
+        return addedModel;
+    }
+
+    public void removeAutoDeployModel(String modelId) {
+        MLModel removedModel = autoDeployModels.remove(modelId);
+        if (removedModel != null) {
+            log.info("Remove model {} from auto deploy cache", modelId);
+        }
+    }
 }
