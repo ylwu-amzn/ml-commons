@@ -51,17 +51,28 @@ public class MLModelCacheHelper {
      * @param functionName function name
      */
     public synchronized void initModelState(
+            String modelId,
+            MLModelState state,
+            FunctionName functionName,
+            List<String> targetWorkerNodes,
+            boolean deployToAllNodes
+    ) {
+        initModelState(modelId, state, functionName, targetWorkerNodes, deployToAllNodes, false);
+    }
+
+    public synchronized void initModelState(
         String modelId,
         MLModelState state,
         FunctionName functionName,
         List<String> targetWorkerNodes,
-        boolean deployToAllNodes
+        boolean deployToAllNodes,
+        boolean autoDeployModel
     ) {
-        if (isModelRunningOnNode(modelId)) {
+        if (!autoDeployModel && isModelRunningOnNode(modelId)) {
             throw new MLLimitExceededException("Duplicate deploy model task");
         }
         log.debug("init model state for model {}, state: {}", modelId, state);
-        MLModelCache modelCache = new MLModelCache();
+        MLModelCache modelCache = autoDeployModel ? modelCaches.computeIfAbsent(modelId, key -> new MLModelCache()) : new MLModelCache();
         modelCache.setModelState(state);
         modelCache.setFunctionName(functionName);
         modelCache.setTargetWorkerNodes(targetWorkerNodes);

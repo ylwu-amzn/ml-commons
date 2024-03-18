@@ -958,7 +958,7 @@ public class MLModelManager {
             return;
         }
         int eligibleNodeCount = workerNodes.size();
-        modelCacheHelper.initModelState(modelId, MLModelState.DEPLOYING, functionName, workerNodes, deployToAllNodes);
+        modelCacheHelper.initModelState(modelId, MLModelState.DEPLOYING, functionName, workerNodes, deployToAllNodes, autoDeployModel);
         try (ThreadContext.StoredContext context = client.threadPool().getThreadContext().stashContext()) {
             ActionListener<String> wrappedListener = ActionListener.runBefore(listener, () -> {
                 context.restore();
