@@ -9,7 +9,6 @@ import static org.opensearch.ml.processor.InferenceProcessorAttributes.*;
 
 import java.util.*;
 import java.util.function.BiConsumer;
-import java.util.stream.Collectors;
 
 import org.opensearch.action.ActionRequest;
 import org.opensearch.action.support.GroupedActionListener;
@@ -38,6 +37,7 @@ import com.jayway.jsonpath.Option;
  */
 public class MLInferenceIngestProcessor extends AbstractProcessor implements ModelExecutor {
 
+    public static final String DOT_SYMBOL = ".";
     private final InferenceProcessorAttributes inferenceProcessorAttributes;
     private final boolean ignoreMissing;
     private final boolean ignoreFailure;
@@ -45,7 +45,9 @@ public class MLInferenceIngestProcessor extends AbstractProcessor implements Mod
     private static Client client;
     public static final String TYPE = "ml_inference";
     public static final String DEFAULT_OUTPUT_FIELD_NAME = "inference_results";
+    // allow to ignore a field from mapping is not present in the document
     public static final String IGNORE_MISSING = "ignore_missing";
+    // At default, ml inference processor allows maximum 10 prediction tasks running in parallel
     public static final int DEFAULT_MAX_PREDICTION_TASKS = 10;
 
     private Configuration suppressExceptionConfiguration = Configuration
@@ -112,16 +114,18 @@ public class MLInferenceIngestProcessor extends AbstractProcessor implements Mod
             try {
                 processPredictions(ingestDocument, batchPredictionListener, processInputMap, processOutputMap, inputMapIndex, inputMapSize);
             } catch (Exception e) {
-                if (ignoreFailure) {
-                    batchPredictionListener.onFailure(e);
-                } else {
-                    throw e;
-                }
-
+                batchPredictionListener.onFailure(e);
             }
         }
     }
 
+    /**
+     * This method was called previously within
+     * execute( IngestDocument ingestDocument, BiConsumer (IngestDocument, Exception)  handler)
+     * in the ml_inference ingest processor, it's not called.
+     * @param ingestDocument
+     * @throws Exception
+     */
     @Override
     public IngestDocument execute(IngestDocument ingestDocument) throws Exception {
         throw new UnsupportedOperationException("this method should not get executed.");
@@ -162,9 +166,9 @@ public class MLInferenceIngestProcessor extends AbstractProcessor implements Mod
         } else {
             Map<String, String> inputMapping = processInputMap.get(inputMapIndex);
             for (Map.Entry<String, String> entry : inputMapping.entrySet()) {
-                // model field as key, document field as value
-                String originalFieldName = entry.getValue();
-                String modelInputFieldName = entry.getKey();
+                // model field as value, document field as key
+                String originalFieldName = entry.getKey();
+                String modelInputFieldName = entry.getValue();
                 getMappedModelInputFromDocuments(ingestDocument, modelParameters, originalFieldName, modelInputFieldName);
             }
         }
@@ -179,11 +183,13 @@ public class MLInferenceIngestProcessor extends AbstractProcessor implements Mod
                 if (processOutputMap == null || processOutputMap.isEmpty()) {
                     appendFieldValue(modelTensorOutput, null, DEFAULT_OUTPUT_FIELD_NAME, ingestDocument);
                 } else {
+                    // outMapping serves as a filter to modelTensorOutput, the fields that are not specified
+                    // in the outputMapping will not write to document
                     Map<String, String> outputMapping = processOutputMap.get(inputMapIndex);
 
                     for (Map.Entry<String, String> entry : outputMapping.entrySet()) {
-                        String originalModelOutputFieldName = entry.getKey();
-                        String newDocumentFieldName = entry.getValue();
+                        String originalModelOutputFieldName = entry.getValue();
+                        String newDocumentFieldName = entry.getKey();
                         appendFieldValue(modelTensorOutput, originalModelOutputFieldName, newDocumentFieldName, ingestDocument);
                     }
                 }
@@ -212,7 +218,7 @@ public class MLInferenceIngestProcessor extends AbstractProcessor implements Mod
         }
         // check for nested array
         else {
-            if (originalFieldName.contains(".")) {
+            if (originalFieldName.contains(DOT_SYMBOL)) {
 
                 Map<String, Object> sourceObject = ingestDocument.getSourceAndMetadata();
 
@@ -352,10 +358,18 @@ public class MLInferenceIngestProcessor extends AbstractProcessor implements Mod
             boolean ignoreFailure = ConfigurationUtils
                 .readBooleanProperty(TYPE, processorTag, config, ConfigurationUtils.IGNORE_FAILURE_KEY, false);
             // convert model config user input data structure to Map<String, String>
-            Map<String, String> modelConfigMaps = (modelConfigInput != null)
-                ? modelConfigInput.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, e -> gson.toJson(e.getValue())))
-                : Map.of();
-
+            Map<String, String> modelConfigMaps = null;
+            if (modelConfigInput != null) {
+                modelConfigMaps = new HashMap<>();
+                for (String key : modelConfigInput.keySet()) {
+                    Object value = modelConfigInput.get(key);
+                    if (value instanceof String) {
+                        modelConfigMaps.put(key, (String) value);
+                    } else {
+                        modelConfigMaps.put(key, gson.toJson(value));
+                    }
+                }
+            }
             // check if the number of prediction tasks exceeds max prediction tasks
             if (inputMaps != null && inputMaps.size() > maxPredictionTask) {
                 throw new IllegalArgumentException(

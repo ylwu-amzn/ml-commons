@@ -78,7 +78,7 @@ public interface ModelExecutor {
                         }
                         // if dataAsMap is empty try getData
                         else {
-                            // pase data type
+                            // parse data type
                             modelOutputValue = parseGetDataInTensor(tensor);
                         }
                     } else {
@@ -125,7 +125,7 @@ public interface ModelExecutor {
         return modelOutputValue;
     }
 
-    private static Object parseGetDataInTensor(ModelTensor tensor) {
+    static Object parseGetDataInTensor(ModelTensor tensor) {
         Object modelOutputValue;
         if (tensor.getDataType().isInteger()) {
             modelOutputValue = Arrays.stream(tensor.getData()).map(Number::intValue).map(Integer::new).collect(Collectors.toList());
