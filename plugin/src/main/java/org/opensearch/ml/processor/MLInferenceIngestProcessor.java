@@ -167,8 +167,8 @@ public class MLInferenceIngestProcessor extends AbstractProcessor implements Mod
             Map<String, String> inputMapping = processInputMap.get(inputMapIndex);
             for (Map.Entry<String, String> entry : inputMapping.entrySet()) {
                 // model field as value, document field as key
-                String originalFieldName = entry.getKey();
-                String modelInputFieldName = entry.getValue();
+                String modelInputFieldName = entry.getKey();
+                String originalFieldName = entry.getValue();
                 getMappedModelInputFromDocuments(ingestDocument, modelParameters, originalFieldName, modelInputFieldName);
             }
         }
@@ -251,13 +251,7 @@ public class MLInferenceIngestProcessor extends AbstractProcessor implements Mod
     }
 
     private String getFieldPath(IngestDocument ingestDocument, String originalFieldName) {
-        final boolean fieldPathIsNullOrEmpty = Strings.isNullOrEmpty(originalFieldName);
-
-        if (fieldPathIsNullOrEmpty) {
-            return null;
-        }
-        final boolean hasFieldPath = ingestDocument.hasField(originalFieldName, true);
-        if (!hasFieldPath) {
+        if (Strings.isNullOrEmpty(originalFieldName) || !ingestDocument.hasField(originalFieldName, true)) {
             return null;
         }
         return originalFieldName;
@@ -285,7 +279,8 @@ public class MLInferenceIngestProcessor extends AbstractProcessor implements Mod
                 ValueSource ingestValue = ValueSource.wrap(modelOutputValue, scriptService);
                 TemplateScript.Factory ingestField = ConfigurationUtils
                     .compileTemplate(TYPE, tag, newDocumentFieldName, newDocumentFieldName, scriptService);
-                ingestDocument.appendFieldValue(ingestField, ingestValue, false);
+                ingestDocument.setFieldValue(ingestField, ingestValue);//TODO: check if ingestField exist
+                //ingestDocument.appendFieldValue(ingestField, ingestValue, false); //ingestDocument.setFieldValue();
             } else {
                 ArrayList<?> modelOutputValueArray;
                 if (modelOutputValue instanceof List) {
