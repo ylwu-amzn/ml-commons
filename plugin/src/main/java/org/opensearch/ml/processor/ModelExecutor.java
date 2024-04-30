@@ -198,17 +198,6 @@ public interface ModelExecutor {
     }
 
     /**
-     * Converts the given Object to its JSON string representation using the Gson library.
-     *
-     * @param originalFieldValue the Object to be converted to JSON string
-     * @return the JSON string representation of the input Object
-     */
-
-    default String toString(Object originalFieldValue) {
-        return gson.toJson(originalFieldValue);
-    }
-
-    /**
      * Writes a new dot path for a nested object within the given JSON object.
      * This method is useful when dealing with arrays or nested objects in the JSON structure.
      * for example foo.*.bar.*.quk to be [foo.0.bar.0.quk, foo.0.bar.1.quk..]

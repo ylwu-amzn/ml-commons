@@ -4,6 +4,7 @@
  */
 package org.opensearch.ml.processor;
 
+import static org.opensearch.ml.common.utils.StringUtils.toJson;
 import static org.opensearch.ml.processor.InferenceProcessorAttributes.*;
 
 import java.util.*;
@@ -235,7 +236,7 @@ public class MLInferenceIngestProcessor extends AbstractProcessor implements Mod
         String originalFieldPath = getFieldPath(ingestDocument, documentFieldName);
         if (originalFieldPath != null) {
             Object documentFieldValue = ingestDocument.getFieldValue(originalFieldPath, Object.class);
-            String documentFieldValueAsString = toString(documentFieldValue);
+            String documentFieldValueAsString = toJson(documentFieldValue);
             updateModelParameters(modelInputFieldName, documentFieldValueAsString, modelParameters);
         }
         // else when cannot find field path in document, try check for nested array using json path
@@ -248,7 +249,7 @@ public class MLInferenceIngestProcessor extends AbstractProcessor implements Mod
                     .parse(sourceObject)
                     .read(documentFieldName);
                 if (!fieldValueList.isEmpty()) {
-                    updateModelParameters(modelInputFieldName, toString(fieldValueList), modelParameters);
+                    updateModelParameters(modelInputFieldName, toJson(fieldValueList), modelParameters);
                 } else if (!ignoreMissing) {
                     throw new IllegalArgumentException("cannot find field name defined from input map: " + documentFieldName);
                 }
@@ -275,7 +276,7 @@ public class MLInferenceIngestProcessor extends AbstractProcessor implements Mod
             Object existingValue = modelParameters.get(modelInputFieldName);
             List<Object> updatedList = (List<Object>) existingValue;
             updatedList.add(originalFieldValueAsString);
-            modelParameters.put(modelInputFieldName, toString(updatedList));
+            modelParameters.put(modelInputFieldName, toJson(updatedList));
         } else {
             modelParameters.put(modelInputFieldName, originalFieldValueAsString);
         }
