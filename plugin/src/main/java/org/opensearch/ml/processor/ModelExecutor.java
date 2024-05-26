@@ -5,6 +5,8 @@
 
 package org.opensearch.ml.processor;
 
+import static org.opensearch.ml.common.utils.StringUtils.gson;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -13,9 +15,13 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.opensearch.action.ActionRequest;
+import org.opensearch.common.xcontent.XContentFactory;
+import org.opensearch.core.xcontent.ToXContent;
+import org.opensearch.core.xcontent.XContentBuilder;
 import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.common.dataset.remote.RemoteInferenceInputDataSet;
 import org.opensearch.ml.common.input.MLInput;
+import org.opensearch.ml.common.output.MLOutput;
 import org.opensearch.ml.common.output.model.ModelTensor;
 import org.opensearch.ml.common.output.model.ModelTensorOutput;
 import org.opensearch.ml.common.output.model.ModelTensors;
@@ -133,6 +139,39 @@ public interface ModelExecutor {
             throw new RuntimeException("An unexpected error occurred: " + e.getMessage());
         }
         return modelOutputValue;
+    }
+
+    default Object getModelOutputValue(MLOutput mlOutput, String modelOutputFieldName, boolean ignoreMissing, boolean fullResponsePath) {
+        try (XContentBuilder builder = XContentFactory.jsonBuilder()) {
+            String modelOutputJsonStr = mlOutput.toXContent(builder, ToXContent.EMPTY_PARAMS).toString();
+            Map<String, Object> modelTensorOutputMap = gson.fromJson(modelOutputJsonStr, Map.class);
+            try {
+                // boolean retrieveData = "data".equals(modelOutputFieldName);
+                // if (!fullResponsePath) {
+                // if (modelOutputFieldName.startsWith("$.")){
+                // modelOutputFieldName = modelOutputFieldName.substring(2,modelOutputFieldName.length());
+                // }
+                // if (!retrieveData) {
+                //// modelOutputFieldName = "$.inference_results[0].output[*]." + modelOutputFieldName;
+                //// } else {
+                // modelOutputFieldName = "$.inference_results[0].output[0].dataAsMap." + modelOutputFieldName;
+                // }
+                // }
+                if (!fullResponsePath && mlOutput instanceof ModelTensorOutput) {
+                    return getModelOutputValue((ModelTensorOutput) mlOutput, modelOutputFieldName, ignoreMissing);
+                } else {
+                    return JsonPath.parse(modelTensorOutputMap).read(modelOutputFieldName);
+                }
+            } catch (Exception e) {
+                if (ignoreMissing) {
+                    return modelTensorOutputMap;
+                } else {
+                    throw new IllegalArgumentException("model inference output cannot find such json path: " + modelOutputFieldName, e);
+                }
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("An unexpected error occurred: " + e.getMessage());
+        }
     }
 
     /**

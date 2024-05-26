@@ -24,6 +24,7 @@ import org.opensearch.ingest.ConfigurationUtils;
 import org.opensearch.ingest.IngestDocument;
 import org.opensearch.ingest.Processor;
 import org.opensearch.ingest.ValueSource;
+import org.opensearch.ml.common.output.MLOutput;
 import org.opensearch.ml.common.output.model.ModelTensorOutput;
 import org.opensearch.ml.common.transport.MLTaskResponse;
 import org.opensearch.ml.common.transport.prediction.MLPredictionTaskAction;
@@ -45,6 +46,7 @@ public class MLInferenceIngestProcessor extends AbstractProcessor implements Mod
     public static final String DOT_SYMBOL = ".";
     private final InferenceProcessorAttributes inferenceProcessorAttributes;
     private final boolean ignoreMissing;
+    private final boolean fullResponsePath;
     private final boolean ignoreFailure;
     private final ScriptService scriptService;
     private static Client client;
@@ -53,6 +55,7 @@ public class MLInferenceIngestProcessor extends AbstractProcessor implements Mod
     // allow to ignore a field from mapping is not present in the document, and when the outfield is not found in the
     // prediction outcomes, return the whole prediction outcome by skipping filtering
     public static final String IGNORE_MISSING = "ignore_missing";
+    public static final String FULL_RESPONSE_PATH = "full_response_path";
     // At default, ml inference processor allows maximum 10 prediction tasks running in parallel
     // it can be overwritten using max_prediction_tasks when creating processor
     public static final int DEFAULT_MAX_PREDICTION_TASKS = 10;
@@ -71,6 +74,7 @@ public class MLInferenceIngestProcessor extends AbstractProcessor implements Mod
         String tag,
         String description,
         boolean ignoreMissing,
+        boolean fullResponsePath,
         boolean ignoreFailure,
         ScriptService scriptService,
         Client client
@@ -84,6 +88,7 @@ public class MLInferenceIngestProcessor extends AbstractProcessor implements Mod
             maxPredictionTask
         );
         this.ignoreMissing = ignoreMissing;
+        this.fullResponsePath = fullResponsePath;
         this.ignoreFailure = ignoreFailure;
         this.scriptService = scriptService;
         this.client = client;
@@ -190,9 +195,9 @@ public class MLInferenceIngestProcessor extends AbstractProcessor implements Mod
 
             @Override
             public void onResponse(MLTaskResponse mlTaskResponse) {
-                ModelTensorOutput modelTensorOutput = (ModelTensorOutput) mlTaskResponse.getOutput();
+                MLOutput mlOutput = mlTaskResponse.getOutput();
                 if (processOutputMap == null || processOutputMap.isEmpty()) {
-                    appendFieldValue(modelTensorOutput, null, DEFAULT_OUTPUT_FIELD_NAME, ingestDocument);
+                    appendFieldValue(mlOutput, null, DEFAULT_OUTPUT_FIELD_NAME, ingestDocument);
                 } else {
                     // outMapping serves as a filter to modelTensorOutput, the fields that are not specified
                     // in the outputMapping will not write to document
@@ -209,7 +214,7 @@ public class MLInferenceIngestProcessor extends AbstractProcessor implements Mod
                                     + ". Not allow to overwrite the same field name, please check output_map."
                             );
                         }
-                        appendFieldValue(modelTensorOutput, modelOutputFieldName, newDocumentFieldName, ingestDocument);
+                        appendFieldValue(mlOutput, modelOutputFieldName, newDocumentFieldName, ingestDocument);
                     }
                 }
                 batchPredictionListener.onResponse(null);
@@ -362,6 +367,59 @@ public class MLInferenceIngestProcessor extends AbstractProcessor implements Mod
         }
     }
 
+    private void appendFieldValue(
+        MLOutput mlOutput,
+        String modelOutputFieldName,
+        String newDocumentFieldName,
+        IngestDocument ingestDocument
+    ) {
+
+        if (mlOutput == null) {
+            throw new RuntimeException("model inference output is null");
+        }
+
+        Object modelOutputValue = getModelOutputValue(mlOutput, modelOutputFieldName, ignoreMissing, fullResponsePath);
+
+        Map<String, Object> ingestDocumentSourceAndMetaData = new HashMap<>();
+        ingestDocumentSourceAndMetaData.putAll(ingestDocument.getSourceAndMetadata());
+        ingestDocumentSourceAndMetaData.put(IngestDocument.INGEST_KEY, ingestDocument.getIngestMetadata());
+        List<String> dotPathsInArray = writeNewDotPathForNestedObject(ingestDocumentSourceAndMetaData, newDocumentFieldName);
+
+        if (dotPathsInArray.size() == 1) {
+            ValueSource ingestValue = ValueSource.wrap(modelOutputValue, scriptService);
+            TemplateScript.Factory ingestField = ConfigurationUtils
+                .compileTemplate(TYPE, tag, dotPathsInArray.get(0), dotPathsInArray.get(0), scriptService);
+            ingestDocument.setFieldValue(ingestField, ingestValue, ignoreMissing);
+        } else {
+            if (!(modelOutputValue instanceof List)) {
+                throw new IllegalArgumentException("Model output is not an array, cannot assign to array in documents.");
+            }
+            List<?> modelOutputValueArray = (List<?>) modelOutputValue;
+            // check length of the prediction array to be the same of the document array
+            if (dotPathsInArray.size() != modelOutputValueArray.size()) {
+                throw new RuntimeException(
+                    "the prediction field: "
+                        + modelOutputFieldName
+                        + " is an array in size of "
+                        + modelOutputValueArray.size()
+                        + " but the document field array from field "
+                        + newDocumentFieldName
+                        + " is in size of "
+                        + dotPathsInArray.size()
+                );
+            }
+            // Iterate over dotPathInArray
+            for (int i = 0; i < dotPathsInArray.size(); i++) {
+                String dotPathInArray = dotPathsInArray.get(i);
+                Object modelOutputValueInArray = modelOutputValueArray.get(i);
+                ValueSource ingestValue = ValueSource.wrap(modelOutputValueInArray, scriptService);
+                TemplateScript.Factory ingestField = ConfigurationUtils
+                    .compileTemplate(TYPE, tag, dotPathInArray, dotPathInArray, scriptService);
+                ingestDocument.setFieldValue(ingestField, ingestValue, ignoreMissing);
+            }
+        }
+    }
+
     @Override
     public String getType() {
         return TYPE;
@@ -407,6 +465,7 @@ public class MLInferenceIngestProcessor extends AbstractProcessor implements Mod
             int maxPredictionTask = ConfigurationUtils
                 .readIntProperty(TYPE, processorTag, config, MAX_PREDICTION_TASKS, DEFAULT_MAX_PREDICTION_TASKS);
             boolean ignoreMissing = ConfigurationUtils.readBooleanProperty(TYPE, processorTag, config, IGNORE_MISSING, false);
+            boolean fullResponsePath = ConfigurationUtils.readBooleanProperty(TYPE, processorTag, config, FULL_RESPONSE_PATH, false);
             boolean ignoreFailure = ConfigurationUtils
                 .readBooleanProperty(TYPE, processorTag, config, ConfigurationUtils.IGNORE_FAILURE_KEY, false);
             // convert model config user input data structure to Map<String, String>
@@ -437,6 +496,7 @@ public class MLInferenceIngestProcessor extends AbstractProcessor implements Mod
                 processorTag,
                 description,
                 ignoreMissing,
+                fullResponsePath,
                 ignoreFailure,
                 scriptService,
                 client
