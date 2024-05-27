@@ -6,9 +6,11 @@ package org.opensearch.ml.processor;
 
 import static org.opensearch.ml.processor.InferenceProcessorAttributes.*;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -19,11 +21,13 @@ import org.opensearch.action.support.GroupedActionListener;
 import org.opensearch.client.Client;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.common.Strings;
+import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.ingest.AbstractProcessor;
 import org.opensearch.ingest.ConfigurationUtils;
 import org.opensearch.ingest.IngestDocument;
 import org.opensearch.ingest.Processor;
 import org.opensearch.ingest.ValueSource;
+import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.common.output.MLOutput;
 import org.opensearch.ml.common.output.model.ModelTensorOutput;
 import org.opensearch.ml.common.transport.MLTaskResponse;
@@ -46,8 +50,10 @@ public class MLInferenceIngestProcessor extends AbstractProcessor implements Mod
     public static final String DOT_SYMBOL = ".";
     private final InferenceProcessorAttributes inferenceProcessorAttributes;
     private final boolean ignoreMissing;
+    private final String functionName;
     private final boolean fullResponsePath;
     private final boolean ignoreFailure;
+    private final String modelInput;
     private final ScriptService scriptService;
     private static Client client;
     public static final String TYPE = "ml_inference";
@@ -55,10 +61,13 @@ public class MLInferenceIngestProcessor extends AbstractProcessor implements Mod
     // allow to ignore a field from mapping is not present in the document, and when the outfield is not found in the
     // prediction outcomes, return the whole prediction outcome by skipping filtering
     public static final String IGNORE_MISSING = "ignore_missing";
+    public static final String FUNCTION_NAME = "function_name";
     public static final String FULL_RESPONSE_PATH = "full_response_path";
+    public static final String MODEL_INPUT = "model_input";
     // At default, ml inference processor allows maximum 10 prediction tasks running in parallel
     // it can be overwritten using max_prediction_tasks when creating processor
     public static final int DEFAULT_MAX_PREDICTION_TASKS = 10;
+    private final NamedXContentRegistry xContentRegistry;
 
     private Configuration suppressExceptionConfiguration = Configuration
         .builder()
@@ -74,10 +83,13 @@ public class MLInferenceIngestProcessor extends AbstractProcessor implements Mod
         String tag,
         String description,
         boolean ignoreMissing,
+        String functionName,
         boolean fullResponsePath,
         boolean ignoreFailure,
+        String modelInput,
         ScriptService scriptService,
-        Client client
+        Client client,
+        NamedXContentRegistry xContentRegistry
     ) {
         super(tag, description);
         this.inferenceProcessorAttributes = new InferenceProcessorAttributes(
@@ -88,10 +100,13 @@ public class MLInferenceIngestProcessor extends AbstractProcessor implements Mod
             maxPredictionTask
         );
         this.ignoreMissing = ignoreMissing;
+        this.functionName = functionName;
         this.fullResponsePath = fullResponsePath;
         this.ignoreFailure = ignoreFailure;
+        this.modelInput = modelInput;
         this.scriptService = scriptService;
         this.client = client;
+        this.xContentRegistry = xContentRegistry;
     }
 
     /**
@@ -167,10 +182,13 @@ public class MLInferenceIngestProcessor extends AbstractProcessor implements Mod
         List<Map<String, String>> processOutputMap,
         int inputMapIndex,
         int inputMapSize
-    ) {
+    ) throws IOException {
         Map<String, String> modelParameters = new HashMap<>();
+        Map<String, String> modelConfigs = new HashMap<>();
+
         if (inferenceProcessorAttributes.getModelConfigMaps() != null) {
             modelParameters.putAll(inferenceProcessorAttributes.getModelConfigMaps());
+            modelConfigs.putAll(inferenceProcessorAttributes.getModelConfigMaps());
         }
         // when no input mapping is provided, default to read all fields from documents as model input
         if (inputMapSize == 0) {
@@ -189,7 +207,22 @@ public class MLInferenceIngestProcessor extends AbstractProcessor implements Mod
             }
         }
 
-        ActionRequest request = getRemoteModelInferenceRequest(modelParameters, inferenceProcessorAttributes.getModelId());
+        Set<String> inputMapKeys = new HashSet<>(modelParameters.keySet());
+        inputMapKeys.removeAll(modelConfigs.keySet());
+
+        Map<String, String> inputMappings = new HashMap<>();
+        for (String k : inputMapKeys) {
+            inputMappings.put(k, modelParameters.get(k));
+        }
+        ActionRequest request = getRemoteModelInferenceRequest(
+            xContentRegistry,
+            modelParameters,
+            modelConfigs,
+            inputMappings,
+            inferenceProcessorAttributes.getModelId(),
+            functionName,
+            modelInput
+        );
 
         client.execute(MLPredictionTaskAction.INSTANCE, request, new ActionListener<>() {
 
@@ -429,6 +462,7 @@ public class MLInferenceIngestProcessor extends AbstractProcessor implements Mod
 
         private final ScriptService scriptService;
         private final Client client;
+        private final NamedXContentRegistry xContentRegistry;
 
         /**
          * Constructs a new instance of the Factory class.
@@ -436,9 +470,10 @@ public class MLInferenceIngestProcessor extends AbstractProcessor implements Mod
          * @param scriptService the ScriptService instance to be used by the Factory
          * @param client        the Client instance to be used by the Factory
          */
-        public Factory(ScriptService scriptService, Client client) {
+        public Factory(ScriptService scriptService, Client client, NamedXContentRegistry xContentRegistry) {
             this.scriptService = scriptService;
             this.client = client;
+            this.xContentRegistry = xContentRegistry;
         }
 
         /**
@@ -465,6 +500,10 @@ public class MLInferenceIngestProcessor extends AbstractProcessor implements Mod
             int maxPredictionTask = ConfigurationUtils
                 .readIntProperty(TYPE, processorTag, config, MAX_PREDICTION_TASKS, DEFAULT_MAX_PREDICTION_TASKS);
             boolean ignoreMissing = ConfigurationUtils.readBooleanProperty(TYPE, processorTag, config, IGNORE_MISSING, false);
+            String functionName = ConfigurationUtils
+                .readStringProperty(TYPE, processorTag, config, FUNCTION_NAME, FunctionName.REMOTE.name());
+            String modelInput = ConfigurationUtils
+                .readStringProperty(TYPE, processorTag, config, MODEL_INPUT, "{ \"parameters\": ${ml_inference.parameters} }");
             boolean fullResponsePath = ConfigurationUtils.readBooleanProperty(TYPE, processorTag, config, FULL_RESPONSE_PATH, false);
             boolean ignoreFailure = ConfigurationUtils
                 .readBooleanProperty(TYPE, processorTag, config, ConfigurationUtils.IGNORE_FAILURE_KEY, false);
@@ -496,10 +535,13 @@ public class MLInferenceIngestProcessor extends AbstractProcessor implements Mod
                 processorTag,
                 description,
                 ignoreMissing,
+                functionName,
                 fullResponsePath,
                 ignoreFailure,
+                modelInput,
                 scriptService,
-                client
+                client,
+                xContentRegistry
             );
         }
     }
