@@ -159,11 +159,11 @@ public interface RemoteConnectorExecutor {
                 return Tuple.tuple(textDocsLength / stepSize + 1, stepSize);
             }
         } else {
-            Optional<ConnectorAction> predictAction = getConnector().findAction(action);
-            if (predictAction.isEmpty()) {
-                throw new IllegalArgumentException("no predict action found");
+            Optional<ConnectorAction> connectorAction = getConnector().findAction(action);
+            if (connectorAction.isEmpty()) {
+                throw new IllegalArgumentException("no " + action + " action found");
             }
-            String preProcessFunction = predictAction.get().getPreProcessFunction();
+            String preProcessFunction = connectorAction.get().getPreProcessFunction();
             if (preProcessFunction != null && !MLPreProcessFunction.contains(preProcessFunction)) {
                 // user defined preprocess script, this case, the chunk size is always equals to text docs length.
                 return Tuple.tuple(textDocsLength, 1);

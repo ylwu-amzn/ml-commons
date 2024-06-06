@@ -72,9 +72,9 @@ public class ConnectorUtils {
         if (mlInput == null) {
             throw new IllegalArgumentException("Input is null");
         }
-        Optional<ConnectorAction> predictAction = connector.findAction(action);
-        if (predictAction.isEmpty()) {
-            throw new IllegalArgumentException("no predict action found");
+        Optional<ConnectorAction> connectorAction = connector.findAction(action);
+        if (connectorAction.isEmpty()) {
+            throw new IllegalArgumentException("no " + action + " action found");
         }
         RemoteInferenceInputDataSet inputData = processMLInput(action, mlInput, connector, parameters, scriptService);
         escapeRemoteInferenceInputData(inputData);
@@ -197,11 +197,11 @@ public class ConnectorUtils {
             throw new IllegalArgumentException("guardrails triggered for LLM output");
         }
         List<ModelTensor> modelTensors = new ArrayList<>();
-        Optional<ConnectorAction> predictAction = connector.findAction(action);
-        if (predictAction.isEmpty()) {
-            throw new IllegalArgumentException("no predict action found");
+        Optional<ConnectorAction> optionalAction = connector.findAction(action);
+        if (optionalAction.isEmpty()) {
+            throw new IllegalArgumentException("no " + action + " action found");
         }
-        ConnectorAction connectorAction = predictAction.get();
+        ConnectorAction connectorAction = optionalAction.get();
         String postProcessFunction = connectorAction.getPostProcessFunction();
         postProcessFunction = fillProcessFunctionParameter(parameters, postProcessFunction);
 

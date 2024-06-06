@@ -12,6 +12,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.opensearch.ml.common.CommonValue.REMOTE_SERVICE_ERROR;
+import static org.opensearch.ml.common.connector.ConnectorAction.ActionType.PREDICT;
 import static org.opensearch.ml.engine.algorithms.remote.MLSdkAsyncHttpResponseHandler.AMZ_ERROR_HEADER;
 
 import java.nio.ByteBuffer;
@@ -105,7 +106,8 @@ public class MLSdkAsyncHttpResponseHandlerTest {
             tensorOutputs,
             connector,
             scriptService,
-            null
+            null,
+            PREDICT.name()
         );
         responseSubscriber = mlSdkAsyncHttpResponseHandler.new MLResponseSubscriber();
         headersMap = Map.of(AMZ_ERROR_HEADER, Arrays.asList("ThrottlingException:request throttled!"));
@@ -173,7 +175,8 @@ public class MLSdkAsyncHttpResponseHandlerTest {
             tensorOutputs,
             noProcessFunctionConnector,
             scriptService,
-            null
+            null,
+            PREDICT.name()
         );
         noProcessFunctionMlSdkAsyncHttpResponseHandler.onHeaders(sdkHttpResponse);
         noProcessFunctionMlSdkAsyncHttpResponseHandler.onStream(stream);
@@ -278,7 +281,8 @@ public class MLSdkAsyncHttpResponseHandlerTest {
             tensorOutputs,
             connector,
             scriptService,
-            null
+            null,
+            PREDICT.name()
         );
         MLSdkAsyncHttpResponseHandler mlSdkAsyncHttpResponseHandler2 = new MLSdkAsyncHttpResponseHandler(
             new ExecutionContext(1, count, exceptionHolder),
@@ -287,7 +291,8 @@ public class MLSdkAsyncHttpResponseHandlerTest {
             tensorOutputs,
             connector,
             scriptService,
-            null
+            null,
+            PREDICT.name()
         );
         SdkHttpFullResponse sdkHttpResponse1 = mock(SdkHttpFullResponse.class);
         when(sdkHttpResponse1.statusCode()).thenReturn(200);
@@ -346,7 +351,8 @@ public class MLSdkAsyncHttpResponseHandlerTest {
             tensorOutputs,
             connector,
             scriptService,
-            null
+            null,
+            PREDICT.name()
         );
         MLSdkAsyncHttpResponseHandler mlSdkAsyncHttpResponseHandler2 = new MLSdkAsyncHttpResponseHandler(
             new ExecutionContext(1, count, exceptionHolder),
@@ -355,7 +361,8 @@ public class MLSdkAsyncHttpResponseHandlerTest {
             tensorOutputs,
             connector,
             scriptService,
-            null
+            null,
+            PREDICT.name()
         );
 
         SdkHttpFullResponse sdkHttpResponse2 = mock(SdkHttpFullResponse.class);
@@ -480,7 +487,8 @@ public class MLSdkAsyncHttpResponseHandlerTest {
             tensorOutputs,
             connector,
             scriptService,
-            null
+            null,
+            PREDICT.name()
         );
         MLSdkAsyncHttpResponseHandler mlSdkAsyncHttpResponseHandler2 = new MLSdkAsyncHttpResponseHandler(
             new ExecutionContext(1, count, exceptionHolder),
@@ -489,7 +497,8 @@ public class MLSdkAsyncHttpResponseHandlerTest {
             tensorOutputs,
             connector,
             scriptService,
-            null
+            null,
+            PREDICT.name()
         );
 
         SdkHttpFullResponse sdkHttpResponse2 = mock(SdkHttpFullResponse.class);
@@ -550,7 +559,8 @@ public class MLSdkAsyncHttpResponseHandlerTest {
             tensorOutputs,
             connector,
             scriptService,
-            null
+            null,
+            PREDICT.name()
         );
         MLSdkAsyncHttpResponseHandler mlSdkAsyncHttpResponseHandler2 = new MLSdkAsyncHttpResponseHandler(
             new ExecutionContext(1, count, exceptionHolder),
@@ -559,7 +569,8 @@ public class MLSdkAsyncHttpResponseHandlerTest {
             tensorOutputs,
             connector,
             scriptService,
-            null
+            null,
+            PREDICT.name()
         );
         SdkHttpFullResponse sdkHttpResponse1 = mock(SdkHttpFullResponse.class);
         when(sdkHttpResponse1.statusCode()).thenReturn(200);

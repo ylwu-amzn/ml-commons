@@ -36,24 +36,17 @@ public class MLExecuteConnectorRequest extends MLTaskRequest {
     String connectorId;
     String connectorAction;
     MLInput mlInput;
-    @Setter
-    User user;
 
     @Builder
-    public MLExecuteConnectorRequest(String connectorId, String connectorAction, MLInput mlInput, boolean dispatchTask, User user) {
+    public MLExecuteConnectorRequest(String connectorId, String connectorAction, MLInput mlInput, boolean dispatchTask) {
         super(dispatchTask);
         this.mlInput = mlInput;
         this.connectorAction = connectorAction == null ? "predict" : connectorAction;
         this.connectorId = connectorId;
-        this.user = user;
     }
 
     public MLExecuteConnectorRequest(String connectorId, String connectorAction, MLInput mlInput) {
-        this(connectorId, connectorAction, mlInput, true, null);
-    }
-
-    public MLExecuteConnectorRequest(String connectorId, String connectorAction, MLInput mlInput, User user) {
-        this(connectorId, connectorAction, mlInput, true, user);
+        this(connectorId, connectorAction, mlInput, true);
     }
 
     public MLExecuteConnectorRequest(StreamInput in) throws IOException {
@@ -61,9 +54,6 @@ public class MLExecuteConnectorRequest extends MLTaskRequest {
         this.connectorId = in.readString();
         this.connectorAction = in.readString();
         this.mlInput = new MLInput(in);
-        if (in.readBoolean()) {
-            this.user = new User(in);
-        }
     }
 
     @Override
@@ -72,12 +62,6 @@ public class MLExecuteConnectorRequest extends MLTaskRequest {
         out.writeString(this.connectorId);
         out.writeString(this.connectorAction);
         this.mlInput.writeTo(out);
-        if (user != null) {
-            out.writeBoolean(true);
-            user.writeTo(out);
-        } else {
-            out.writeBoolean(false);
-        }
     }
 
     @Override

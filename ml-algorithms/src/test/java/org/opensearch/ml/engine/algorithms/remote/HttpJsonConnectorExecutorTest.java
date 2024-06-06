@@ -8,6 +8,7 @@ package org.opensearch.ml.engine.algorithms.remote;
 import static org.junit.Assert.assertEquals;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.opensearch.ml.common.connector.ConnectorAction.ActionType.PREDICT;
 
 import java.lang.reflect.Field;
 import java.util.Arrays;
@@ -65,7 +66,7 @@ public class HttpJsonConnectorExecutorTest {
             .actions(Arrays.asList(predictAction))
             .build();
         HttpJsonConnectorExecutor executor = new HttpJsonConnectorExecutor(connector);
-        executor.invokeRemoteService(null, null, null, null, null, actionListener);
+        executor.invokeRemoteService(PREDICT.name(), null, null, null, null, null, actionListener);
         ArgumentCaptor<Exception> captor = ArgumentCaptor.forClass(IllegalArgumentException.class);
         Mockito.verify(actionListener, times(1)).onFailure(captor.capture());
         assertEquals("unsupported http method", captor.getValue().getMessage());
@@ -90,6 +91,7 @@ public class HttpJsonConnectorExecutorTest {
         HttpJsonConnectorExecutor executor = new HttpJsonConnectorExecutor(connector);
         executor
             .invokeRemoteService(
+                PREDICT.name(),
                 createMLInput(),
                 new HashMap<>(),
                 "{\"input\": \"hello world\"}",
@@ -122,6 +124,7 @@ public class HttpJsonConnectorExecutorTest {
         HttpJsonConnectorExecutor executor = new HttpJsonConnectorExecutor(connector);
         executor
             .invokeRemoteService(
+                PREDICT.name(),
                 createMLInput(),
                 new HashMap<>(),
                 null,
@@ -154,6 +157,7 @@ public class HttpJsonConnectorExecutorTest {
         HttpJsonConnectorExecutor executor = new HttpJsonConnectorExecutor(connector);
         executor
             .invokeRemoteService(
+                PREDICT.name(),
                 createMLInput(),
                 new HashMap<>(),
                 null,
@@ -182,6 +186,7 @@ public class HttpJsonConnectorExecutorTest {
         HttpJsonConnectorExecutor executor = new HttpJsonConnectorExecutor(connector);
         executor
             .invokeRemoteService(
+                PREDICT.name(),
                 createMLInput(),
                 new HashMap<>(),
                 "hello world",
@@ -213,6 +218,7 @@ public class HttpJsonConnectorExecutorTest {
         httpClientField.set(executor, null);
         executor
             .invokeRemoteService(
+                PREDICT.name(),
                 createMLInput(),
                 new HashMap<>(),
                 "hello world",

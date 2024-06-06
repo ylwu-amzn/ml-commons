@@ -5,6 +5,8 @@
 
 package org.opensearch.ml.engine.tools;
 
+import static org.opensearch.ml.common.connector.ConnectorAction.ActionType.PREDICT;
+
 import java.util.List;
 import java.util.Map;
 
@@ -36,13 +38,13 @@ public class ConnectorTool implements Tool {
     public static final String TYPE = "ConnectorTool";
     public static final String CONNECTOR_ID = "connector_id";
     public static final String CONNECTOR_ACTION = "connector_action";
-    private static final String DEFAULT_DESCRIPTION = "This tool will invoke external service.";
+
     @Setter
     @Getter
-    private String name = IndexMappingTool.TYPE;
+    private String name = ConnectorTool.TYPE;
     @Getter
     @Setter
-    private String description = DEFAULT_DESCRIPTION;
+    private String description = Factory.DEFAULT_DESCRIPTION;
     @Getter
     private String version;
     @Setter
@@ -56,8 +58,11 @@ public class ConnectorTool implements Tool {
 
     public ConnectorTool(Client client, String connectorId, String connectorAction) {
         this.client = client;
+        if (connectorId == null) {
+            throw new IllegalArgumentException("connector_id can't be null");
+        }
         this.connectorId = connectorId;
-        this.connectorAction = connectorAction;
+        this.connectorAction = connectorAction == null ? PREDICT.name() : connectorAction;
 
         outputParser = new Parser() {
             @Override
@@ -103,7 +108,7 @@ public class ConnectorTool implements Tool {
 
     public static class Factory implements Tool.Factory<ConnectorTool> {
         public static final String TYPE = "ConnectorTool";
-        private static final String DEFAULT_DESCRIPTION = "This tool will invoke external service.";
+        public static final String DEFAULT_DESCRIPTION = "This tool will invoke external service.";
         private Client client;
         private static Factory INSTANCE;
 
