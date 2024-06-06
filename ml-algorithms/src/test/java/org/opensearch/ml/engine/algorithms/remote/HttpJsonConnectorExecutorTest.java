@@ -49,7 +49,7 @@ public class HttpJsonConnectorExecutorTest {
     }
 
     @Test
-    public void invokeRemoteModel_WrongHttpMethod() {
+    public void invokeRemoteService_WrongHttpMethod() {
         ConnectorAction predictAction = ConnectorAction
             .builder()
             .actionType(ConnectorAction.ActionType.PREDICT)
@@ -65,14 +65,14 @@ public class HttpJsonConnectorExecutorTest {
             .actions(Arrays.asList(predictAction))
             .build();
         HttpJsonConnectorExecutor executor = new HttpJsonConnectorExecutor(connector);
-        executor.invokeRemoteModel(null, null, null, null, null, actionListener);
+        executor.invokeRemoteService(null, null, null, null, null, actionListener);
         ArgumentCaptor<Exception> captor = ArgumentCaptor.forClass(IllegalArgumentException.class);
         Mockito.verify(actionListener, times(1)).onFailure(captor.capture());
         assertEquals("unsupported http method", captor.getValue().getMessage());
     }
 
     @Test
-    public void invokeRemoteModel_invalidIpAddress() {
+    public void invokeRemoteService_invalidIpAddress() {
         ConnectorAction predictAction = ConnectorAction
             .builder()
             .actionType(ConnectorAction.ActionType.PREDICT)
@@ -89,7 +89,7 @@ public class HttpJsonConnectorExecutorTest {
             .build();
         HttpJsonConnectorExecutor executor = new HttpJsonConnectorExecutor(connector);
         executor
-            .invokeRemoteModel(
+            .invokeRemoteService(
                 createMLInput(),
                 new HashMap<>(),
                 "{\"input\": \"hello world\"}",
@@ -104,7 +104,7 @@ public class HttpJsonConnectorExecutorTest {
     }
 
     @Test
-    public void invokeRemoteModel_Empty_payload() {
+    public void invokeRemoteService_Empty_payload() {
         ConnectorAction predictAction = ConnectorAction
             .builder()
             .actionType(ConnectorAction.ActionType.PREDICT)
@@ -121,7 +121,7 @@ public class HttpJsonConnectorExecutorTest {
             .build();
         HttpJsonConnectorExecutor executor = new HttpJsonConnectorExecutor(connector);
         executor
-            .invokeRemoteModel(
+            .invokeRemoteService(
                 createMLInput(),
                 new HashMap<>(),
                 null,
@@ -136,7 +136,7 @@ public class HttpJsonConnectorExecutorTest {
     }
 
     @Test
-    public void invokeRemoteModel_get_request() {
+    public void invokeRemoteService_get_request() {
         ConnectorAction predictAction = ConnectorAction
             .builder()
             .actionType(ConnectorAction.ActionType.PREDICT)
@@ -153,7 +153,7 @@ public class HttpJsonConnectorExecutorTest {
             .build();
         HttpJsonConnectorExecutor executor = new HttpJsonConnectorExecutor(connector);
         executor
-            .invokeRemoteModel(
+            .invokeRemoteService(
                 createMLInput(),
                 new HashMap<>(),
                 null,
@@ -164,7 +164,7 @@ public class HttpJsonConnectorExecutorTest {
     }
 
     @Test
-    public void invokeRemoteModel_post_request() {
+    public void invokeRemoteService_post_request() {
         ConnectorAction predictAction = ConnectorAction
             .builder()
             .actionType(ConnectorAction.ActionType.PREDICT)
@@ -181,7 +181,7 @@ public class HttpJsonConnectorExecutorTest {
             .build();
         HttpJsonConnectorExecutor executor = new HttpJsonConnectorExecutor(connector);
         executor
-            .invokeRemoteModel(
+            .invokeRemoteService(
                 createMLInput(),
                 new HashMap<>(),
                 "hello world",
@@ -192,7 +192,7 @@ public class HttpJsonConnectorExecutorTest {
     }
 
     @Test
-    public void invokeRemoteModel_nullHttpClient_throwMLException() throws NoSuchFieldException, IllegalAccessException {
+    public void invokeRemoteService_nullHttpClient_throwMLException() throws NoSuchFieldException, IllegalAccessException {
         ConnectorAction predictAction = ConnectorAction
             .builder()
             .actionType(ConnectorAction.ActionType.PREDICT)
@@ -212,7 +212,7 @@ public class HttpJsonConnectorExecutorTest {
         httpClientField.setAccessible(true);
         httpClientField.set(executor, null);
         executor
-            .invokeRemoteModel(
+            .invokeRemoteService(
                 createMLInput(),
                 new HashMap<>(),
                 "hello world",

@@ -42,7 +42,7 @@ import org.opensearch.script.ScriptService;
 
 public interface RemoteConnectorExecutor {
 
-    default void executePredict(MLInput mlInput, ActionListener<MLTaskResponse> actionListener) {
+    default void executeAction(String action, MLInput mlInput, ActionListener<MLTaskResponse> actionListener) {
         ActionListener<List<ModelTensors>> tensorActionListener = ActionListener.wrap(r -> {
             actionListener.onResponse(new MLTaskResponse(new ModelTensorOutput(r)));
         }, actionListener::onFailure);
@@ -51,13 +51,14 @@ public interface RemoteConnectorExecutor {
             AtomicReference<Exception> exceptionHolder = new AtomicReference<>();
             if (mlInput.getInputDataset() instanceof TextDocsInputDataSet) {
                 TextDocsInputDataSet textDocsInputDataSet = (TextDocsInputDataSet) mlInput.getInputDataset();
-                Tuple<Integer, Integer> calculatedChunkSize = calculateChunkSize(textDocsInputDataSet);
+                Tuple<Integer, Integer> calculatedChunkSize = calculateChunkSize(action, textDocsInputDataSet);
                 CountDownLatch countDownLatch = new CountDownLatch(calculatedChunkSize.v1());
                 int sequence = 0;
                 for (int processedDocs = 0; processedDocs < textDocsInputDataSet.getDocs().size(); processedDocs += calculatedChunkSize
                     .v2()) {
                     List<String> textDocs = textDocsInputDataSet.getDocs().subList(processedDocs, textDocsInputDataSet.getDocs().size());
-                    preparePayloadAndInvokeRemoteModel(
+                    preparePayloadAndInvoke(
+                        action,
                         MLInput
                             .builder()
                             .algorithm(FunctionName.TEXT_EMBEDDING)
@@ -69,7 +70,8 @@ public interface RemoteConnectorExecutor {
                     );
                 }
             } else {
-                preparePayloadAndInvokeRemoteModel(
+                preparePayloadAndInvoke(
+                    action,
                     mlInput,
                     modelTensors,
                     new ExecutionContext(0, new CountDownLatch(1), exceptionHolder),
@@ -81,12 +83,67 @@ public interface RemoteConnectorExecutor {
         }
     }
 
+    default void executePredict(MLInput mlInput, ActionListener<MLTaskResponse> actionListener) {
+        executeAction(ConnectorAction.ActionType.PREDICT.name(), mlInput, actionListener);
+    }
+
+    default void preparePayloadAndInvoke(
+        String action,
+        MLInput mlInput,
+        Map<Integer, ModelTensors> tensorOutputs,
+        ExecutionContext countDownLatch,
+        ActionListener<List<ModelTensors>> actionListener
+    ) {
+        Connector connector = getConnector();
+
+        Map<String, String> parameters = new HashMap<>();
+        if (connector.getParameters() != null) {
+            parameters.putAll(connector.getParameters());
+        }
+        MLInputDataset inputDataset = mlInput.getInputDataset();
+        Map<String, String> inputParameters = new HashMap<>();
+        if (inputDataset instanceof RemoteInferenceInputDataSet && ((RemoteInferenceInputDataSet) inputDataset).getParameters() != null) {
+            escapeRemoteInferenceInputData((RemoteInferenceInputDataSet) inputDataset);
+            inputParameters.putAll(((RemoteInferenceInputDataSet) inputDataset).getParameters());
+        }
+        parameters.putAll(inputParameters);
+        RemoteInferenceInputDataSet inputData = processInput(action, mlInput, connector, parameters, getScriptService());
+        if (inputData.getParameters() != null) {
+            parameters.putAll(inputData.getParameters());
+        }
+        // override again to always prioritize the input parameter
+        parameters.putAll(inputParameters);
+        String payload = connector.createPayload(action, parameters);
+        connector.validatePayload(payload);
+        String userStr = getClient()
+            .threadPool()
+            .getThreadContext()
+            .getTransient(ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT);
+        User user = User.parse(userStr);
+        if (getRateLimiter() != null && !getRateLimiter().request()) {
+            throw new OpenSearchStatusException("Request is throttled at model level.", RestStatus.TOO_MANY_REQUESTS);
+        } else if (user != null
+            && getUserRateLimiterMap() != null
+            && getUserRateLimiterMap().get(user.getName()) != null
+            && !getUserRateLimiterMap().get(user.getName()).request()) {
+            throw new OpenSearchStatusException(
+                "Request is throttled at user level. If you think there's an issue, please contact your cluster admin.",
+                RestStatus.TOO_MANY_REQUESTS
+            );
+        } else {
+            if (getMlGuard() != null && !getMlGuard().validate(payload, MLGuard.Type.INPUT)) {
+                throw new IllegalArgumentException("guardrails triggered for user input");
+            }
+            invokeRemoteService(action, mlInput, parameters, payload, tensorOutputs, countDownLatch, actionListener);
+        }
+    }
+
     /**
      * Calculate the chunk size.
      * @param textDocsInputDataSet
      * @return Tuple of chunk size and step size.
      */
-    private Tuple<Integer, Integer> calculateChunkSize(TextDocsInputDataSet textDocsInputDataSet) {
+    private Tuple<Integer, Integer> calculateChunkSize(String action, TextDocsInputDataSet textDocsInputDataSet) {
         int textDocsLength = textDocsInputDataSet.getDocs().size();
         Map<String, String> parameters = getConnector().getParameters();
         if (parameters != null && parameters.containsKey("input_docs_processed_step_size")) {
@@ -102,7 +159,7 @@ public interface RemoteConnectorExecutor {
                 return Tuple.tuple(textDocsLength / stepSize + 1, stepSize);
             }
         } else {
-            Optional<ConnectorAction> predictAction = getConnector().findPredictAction();
+            Optional<ConnectorAction> predictAction = getConnector().findAction(action);
             if (predictAction.isEmpty()) {
                 throw new IllegalArgumentException("no predict action found");
             }
@@ -142,57 +199,8 @@ public interface RemoteConnectorExecutor {
 
     default void setMlGuard(MLGuard mlGuard) {}
 
-    default void preparePayloadAndInvokeRemoteModel(
-        MLInput mlInput,
-        Map<Integer, ModelTensors> tensorOutputs,
-        ExecutionContext countDownLatch,
-        ActionListener<List<ModelTensors>> actionListener
-    ) {
-        Connector connector = getConnector();
-
-        Map<String, String> parameters = new HashMap<>();
-        if (connector.getParameters() != null) {
-            parameters.putAll(connector.getParameters());
-        }
-        MLInputDataset inputDataset = mlInput.getInputDataset();
-        Map<String, String> inputParameters = new HashMap<>();
-        if (inputDataset instanceof RemoteInferenceInputDataSet && ((RemoteInferenceInputDataSet) inputDataset).getParameters() != null) {
-            escapeRemoteInferenceInputData((RemoteInferenceInputDataSet) inputDataset);
-            inputParameters.putAll(((RemoteInferenceInputDataSet) inputDataset).getParameters());
-        }
-        parameters.putAll(inputParameters);
-        RemoteInferenceInputDataSet inputData = processInput(mlInput, connector, parameters, getScriptService());
-        if (inputData.getParameters() != null) {
-            parameters.putAll(inputData.getParameters());
-        }
-        // override again to always prioritize the input parameter
-        parameters.putAll(inputParameters);
-        String payload = connector.createPredictPayload(parameters);
-        connector.validatePayload(payload);
-        String userStr = getClient()
-            .threadPool()
-            .getThreadContext()
-            .getTransient(ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT);
-        User user = User.parse(userStr);
-        if (getRateLimiter() != null && !getRateLimiter().request()) {
-            throw new OpenSearchStatusException("Request is throttled at model level.", RestStatus.TOO_MANY_REQUESTS);
-        } else if (user != null
-            && getUserRateLimiterMap() != null
-            && getUserRateLimiterMap().get(user.getName()) != null
-            && !getUserRateLimiterMap().get(user.getName()).request()) {
-            throw new OpenSearchStatusException(
-                "Request is throttled at user level. If you think there's an issue, please contact your cluster admin.",
-                RestStatus.TOO_MANY_REQUESTS
-            );
-        } else {
-            if (getMlGuard() != null && !getMlGuard().validate(payload, MLGuard.Type.INPUT)) {
-                throw new IllegalArgumentException("guardrails triggered for user input");
-            }
-            invokeRemoteModel(mlInput, parameters, payload, tensorOutputs, countDownLatch, actionListener);
-        }
-    }
-
-    void invokeRemoteModel(
+    void invokeRemoteService(
+        String action,
         MLInput mlInput,
         Map<String, String> parameters,
         String payload,

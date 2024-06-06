@@ -71,7 +71,8 @@ public class AwsConnectorExecutor extends AbstractConnectorExecutor {
 
     @SuppressWarnings("removal")
     @Override
-    public void invokeRemoteModel(
+    public void invokeRemoteService(
+        String action,
         MLInput mlInput,
         Map<String, String> parameters,
         String payload,
@@ -80,7 +81,7 @@ public class AwsConnectorExecutor extends AbstractConnectorExecutor {
         ActionListener<List<ModelTensors>> actionListener
     ) {
         try {
-            SdkHttpFullRequest request = ConnectorUtils.buildSdkRequest(connector, parameters, payload, POST);
+            SdkHttpFullRequest request = ConnectorUtils.buildSdkRequest(action, connector, parameters, payload, POST);
             AsyncExecuteRequest executeRequest = AsyncExecuteRequest
                 .builder()
                 .request(signRequest(request))
@@ -93,17 +94,18 @@ public class AwsConnectorExecutor extends AbstractConnectorExecutor {
                         tensorOutputs,
                         connector,
                         scriptService,
-                        mlGuard
+                        mlGuard,
+                        action
                     )
                 )
                 .build();
             AccessController.doPrivileged((PrivilegedExceptionAction<CompletableFuture<Void>>) () -> httpClient.execute(executeRequest));
         } catch (RuntimeException exception) {
-            log.error("Failed to execute predict in aws connector: " + exception.getMessage(), exception);
+            log.error("Failed to execute {} in aws connector: {}", action, exception.getMessage(), exception);
             actionListener.onFailure(exception);
         } catch (Throwable e) {
-            log.error("Failed to execute predict in aws connector", e);
-            actionListener.onFailure(new MLException("Fail to execute predict in aws connector", e));
+            log.error("Failed to execute {} in aws connector", action, e);
+            actionListener.onFailure(new MLException("Fail to execute " + action + " in aws connector", e));
         }
     }
 

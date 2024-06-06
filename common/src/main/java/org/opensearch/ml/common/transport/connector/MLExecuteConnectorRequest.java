@@ -34,29 +34,32 @@ import static org.opensearch.action.ValidateActions.addValidationError;
 public class MLExecuteConnectorRequest extends MLTaskRequest {
 
     String connectorId;
+    String connectorAction;
     MLInput mlInput;
     @Setter
     User user;
 
     @Builder
-    public MLExecuteConnectorRequest(String connectorId, MLInput mlInput, boolean dispatchTask, User user) {
+    public MLExecuteConnectorRequest(String connectorId, String connectorAction, MLInput mlInput, boolean dispatchTask, User user) {
         super(dispatchTask);
         this.mlInput = mlInput;
+        this.connectorAction = connectorAction == null ? "predict" : connectorAction;
         this.connectorId = connectorId;
         this.user = user;
     }
 
-    public MLExecuteConnectorRequest(String connectorId, MLInput mlInput) {
-        this(connectorId, mlInput, true, null);
+    public MLExecuteConnectorRequest(String connectorId, String connectorAction, MLInput mlInput) {
+        this(connectorId, connectorAction, mlInput, true, null);
     }
 
-    public MLExecuteConnectorRequest(String connectorId, MLInput mlInput, User user) {
-        this(connectorId, mlInput, true, user);
+    public MLExecuteConnectorRequest(String connectorId, String connectorAction, MLInput mlInput, User user) {
+        this(connectorId, connectorAction, mlInput, true, user);
     }
 
     public MLExecuteConnectorRequest(StreamInput in) throws IOException {
         super(in);
-        this.connectorId = in.readOptionalString();
+        this.connectorId = in.readString();
+        this.connectorAction = in.readString();
         this.mlInput = new MLInput(in);
         if (in.readBoolean()) {
             this.user = new User(in);
@@ -66,7 +69,8 @@ public class MLExecuteConnectorRequest extends MLTaskRequest {
     @Override
     public void writeTo(StreamOutput out) throws IOException {
         super.writeTo(out);
-        out.writeOptionalString(this.connectorId);
+        out.writeString(this.connectorId);
+        out.writeString(this.connectorAction);
         this.mlInput.writeTo(out);
         if (user != null) {
             out.writeBoolean(true);

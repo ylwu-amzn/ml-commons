@@ -35,6 +35,7 @@ import lombok.extern.log4j.Log4j2;
 public class ConnectorTool implements Tool {
     public static final String TYPE = "ConnectorTool";
     public static final String CONNECTOR_ID = "connector_id";
+    public static final String CONNECTOR_ACTION = "connector_action";
     private static final String DEFAULT_DESCRIPTION = "This tool will invoke external service.";
     @Setter
     @Getter
@@ -44,16 +45,19 @@ public class ConnectorTool implements Tool {
     private String description = DEFAULT_DESCRIPTION;
     @Getter
     private String version;
-    private Client client;
-    private String connectorId;
     @Setter
     private Parser inputParser;
     @Setter
     private Parser outputParser;
 
-    public ConnectorTool(Client client, String connectorId) {
+    private Client client;
+    private String connectorId;
+    private String connectorAction;
+
+    public ConnectorTool(Client client, String connectorId, String connectorAction) {
         this.client = client;
         this.connectorId = connectorId;
+        this.connectorAction = connectorAction;
 
         outputParser = new Parser() {
             @Override
@@ -68,7 +72,7 @@ public class ConnectorTool implements Tool {
     public <T> void run(Map<String, String> parameters, ActionListener<T> listener) {
         RemoteInferenceInputDataSet inputDataSet = RemoteInferenceInputDataSet.builder().parameters(parameters).build();
         MLInput mlInput = RemoteInferenceMLInput.builder().algorithm(FunctionName.CONNECTOR).inputDataset(inputDataSet).build();
-        ActionRequest request = new MLExecuteConnectorRequest(connectorId, mlInput);
+        ActionRequest request = new MLExecuteConnectorRequest(connectorId, connectorAction, mlInput);
 
         client.execute(MLExecuteConnectorAction.INSTANCE, request, ActionListener.wrap(r -> {
             ModelTensorOutput modelTensorOutput = (ModelTensorOutput) r.getOutput();
@@ -98,7 +102,7 @@ public class ConnectorTool implements Tool {
     }
 
     public static class Factory implements Tool.Factory<ConnectorTool> {
-        public static final String TYPE = "MLConnectorTool";
+        public static final String TYPE = "ConnectorTool";
         private static final String DEFAULT_DESCRIPTION = "This tool will invoke external service.";
         private Client client;
         private static Factory INSTANCE;
@@ -122,7 +126,7 @@ public class ConnectorTool implements Tool {
 
         @Override
         public ConnectorTool create(Map<String, Object> map) {
-            return new ConnectorTool(client, (String) map.get(CONNECTOR_ID));
+            return new ConnectorTool(client, (String) map.get(CONNECTOR_ID), (String) map.get(CONNECTOR_ACTION));
         }
 
         @Override

@@ -55,6 +55,8 @@ public class MLSdkAsyncHttpResponseHandler implements SdkAsyncHttpResponseHandle
 
     private final Connector connector;
 
+    private final String action;
+
     private final ScriptService scriptService;
 
     private final MLGuard mlGuard;
@@ -66,7 +68,8 @@ public class MLSdkAsyncHttpResponseHandler implements SdkAsyncHttpResponseHandle
         Map<Integer, ModelTensors> tensorOutputs,
         Connector connector,
         ScriptService scriptService,
-        MLGuard mlGuard
+        MLGuard mlGuard,
+        String action
     ) {
         this.executionContext = executionContext;
         this.actionListener = actionListener;
@@ -75,6 +78,7 @@ public class MLSdkAsyncHttpResponseHandler implements SdkAsyncHttpResponseHandle
         this.connector = connector;
         this.scriptService = scriptService;
         this.mlGuard = mlGuard;
+        this.action = action;
     }
 
     @Override
@@ -127,6 +131,7 @@ public class MLSdkAsyncHttpResponseHandler implements SdkAsyncHttpResponseHandle
     }
 
     private void processResponse(
+        String action,
         Integer statusCode,
         String body,
         Map<String, String> parameters,
@@ -149,7 +154,7 @@ public class MLSdkAsyncHttpResponseHandler implements SdkAsyncHttpResponseHandle
                 }
             } else {
                 try {
-                    ModelTensors tensors = processOutput(body, connector, scriptService, parameters, mlGuard);
+                    ModelTensors tensors = processOutput(action, body, connector, scriptService, parameters, mlGuard);
                     tensors.setStatusCode(statusCode);
                     tensorOutputs.put(executionContext.getSequence(), tensors);
                 } catch (Exception e) {
@@ -157,7 +162,7 @@ public class MLSdkAsyncHttpResponseHandler implements SdkAsyncHttpResponseHandle
                     if (executionContext.getExceptionHolder().get() == null) {
                         executionContext
                             .getExceptionHolder()
-                            .compareAndSet(null, new MLException("Fail to execute predict in aws connector", e));
+                            .compareAndSet(null, new MLException("Fail to execute " + action + " in aws connector", e));
                     }
                 }
             }
@@ -197,17 +202,17 @@ public class MLSdkAsyncHttpResponseHandler implements SdkAsyncHttpResponseHandle
                     t instanceof NullPointerException ? "NullPointerException" : t.getMessage(),
                     t
                 );
-            response(tensorOutputs);
+            response(action, tensorOutputs);
         }
 
         @Override
         public void onComplete() {
-            response(tensorOutputs);
+            response(action, tensorOutputs);
         }
     }
 
-    private void response(Map<Integer, ModelTensors> tensors) {
-        processResponse(statusCode, responseBody.toString(), parameters, tensorOutputs);
+    private void response(String action, Map<Integer, ModelTensors> tensors) {
+        processResponse(action, statusCode, responseBody.toString(), parameters, tensorOutputs);
         executionContext.getCountDownLatch().countDown();
         // when countdown's count equals to 0 means all responses are received.
         if (executionContext.getCountDownLatch().getCount() == 0) {

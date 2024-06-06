@@ -67,20 +67,22 @@ public class ExecuteConnectorTransportAction extends HandledTransportAction<Acti
     protected void doExecute(Task task, ActionRequest request, ActionListener<MLTaskResponse> actionListener) {
         MLExecuteConnectorRequest executeConnectorRequest = MLExecuteConnectorRequest.fromActionRequest(request);
         String connectorId = executeConnectorRequest.getConnectorId();
+        String connectorAction = executeConnectorRequest.getConnectorAction();
 
         if (clusterService.state().metadata().hasIndex(ML_CONNECTOR_INDEX)) {
             ActionListener<Connector> listener = ActionListener.wrap(connector -> {
                 if (connectorAccessControlHelper.validateConnectorAccess(client, connector)) {
-                    connector.decrypt((credential) -> encryptor.decrypt(credential));
+                    connector.decrypt(connectorAction, (credential) -> encryptor.decrypt(credential));
                     RemoteConnectorExecutor connectorExecutor = MLEngineClassLoader
                         .initInstance(connector.getProtocol(), connector, Connector.class);
                     connectorExecutor.setScriptService(scriptService);
                     connectorExecutor.setClusterService(clusterService);
                     connectorExecutor.setClient(client);
                     connectorExecutor.setXContentRegistry(xContentRegistry);
-                    connectorExecutor.executePredict(executeConnectorRequest.getMlInput(), ActionListener.wrap(taskResponse -> {
-                        actionListener.onResponse(taskResponse);
-                    }, e -> { actionListener.onFailure(e); }));
+                    connectorExecutor
+                        .executeAction(connectorAction, executeConnectorRequest.getMlInput(), ActionListener.wrap(taskResponse -> {
+                            actionListener.onResponse(taskResponse);
+                        }, e -> { actionListener.onFailure(e); }));
                 }
             }, e -> {
                 log.error("Failed to get connector " + connectorId, e);

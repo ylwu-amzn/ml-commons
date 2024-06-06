@@ -37,6 +37,7 @@ import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.common.MLTask;
 import org.opensearch.ml.common.MLTaskState;
 import org.opensearch.ml.common.MLTaskType;
+import org.opensearch.ml.common.connector.ConnectorAction;
 import org.opensearch.ml.common.transport.connector.MLCreateConnectorAction;
 import org.opensearch.ml.common.transport.connector.MLCreateConnectorInput;
 import org.opensearch.ml.common.transport.connector.MLCreateConnectorRequest;
@@ -257,7 +258,7 @@ public class TransportRegisterModelAction extends HandledTransportAction<ActionR
                     listener.onFailure(e);
                 }));
             } else {
-                validateInternalConnector(registerModelInput);
+                validateInternalConnector(ConnectorAction.ActionType.PREDICT.name(), registerModelInput);
                 ActionListener<MLCreateConnectorResponse> dryRunResultListener = ActionListener.wrap(res -> {
                     log.info("Dry run create connector successfully");
                     createModelGroup(registerModelInput, listener);
@@ -295,12 +296,12 @@ public class TransportRegisterModelAction extends HandledTransportAction<ActionR
         return new MLCreateConnectorRequest(createConnectorInput);
     }
 
-    private void validateInternalConnector(MLRegisterModelInput registerModelInput) {
+    private void validateInternalConnector(String action, MLRegisterModelInput registerModelInput) {
         if (registerModelInput.getConnector() == null) {
             log.error("You must provide connector content when creating a remote model without providing connector id!");
             throw new IllegalArgumentException("You must provide connector content when creating a remote model without connector id!");
         }
-        if (registerModelInput.getConnector().getPredictEndpoint(registerModelInput.getConnector().getParameters()) == null) {
+        if (registerModelInput.getConnector().getActionEndpoint(action, registerModelInput.getConnector().getParameters()) == null) {
             log.error("Connector endpoint is required when creating a remote model without connector id!");
             throw new IllegalArgumentException("Connector endpoint is required when creating a remote model without connector id!");
         }

@@ -75,7 +75,8 @@ public class HttpJsonConnectorExecutor extends AbstractConnectorExecutor {
 
     @SuppressWarnings("removal")
     @Override
-    public void invokeRemoteModel(
+    public void invokeRemoteService(
+        String action,
         MLInput mlInput,
         Map<String, String> parameters,
         String payload,
@@ -85,15 +86,15 @@ public class HttpJsonConnectorExecutor extends AbstractConnectorExecutor {
     ) {
         try {
             SdkHttpFullRequest request;
-            switch (connector.getPredictHttpMethod().toUpperCase(Locale.ROOT)) {
+            switch (connector.getActionHttpMethod(action).toUpperCase(Locale.ROOT)) {
                 case "POST":
                     log.debug("original payload to remote model: " + payload);
-                    validateHttpClientParameters(parameters);
-                    request = ConnectorUtils.buildSdkRequest(connector, parameters, payload, POST);
+                    validateHttpClientParameters(action, parameters);
+                    request = ConnectorUtils.buildSdkRequest(action, connector, parameters, payload, POST);
                     break;
                 case "GET":
-                    validateHttpClientParameters(parameters);
-                    request = ConnectorUtils.buildSdkRequest(connector, parameters, null, GET);
+                    validateHttpClientParameters(action, parameters);
+                    request = ConnectorUtils.buildSdkRequest(action, connector, parameters, null, GET);
                     break;
                 default:
                     throw new IllegalArgumentException("unsupported http method");
@@ -110,7 +111,8 @@ public class HttpJsonConnectorExecutor extends AbstractConnectorExecutor {
                         tensorOutputs,
                         connector,
                         scriptService,
-                        mlGuard
+                        mlGuard,
+                        action
                     )
                 )
                 .build();
@@ -124,8 +126,8 @@ public class HttpJsonConnectorExecutor extends AbstractConnectorExecutor {
         }
     }
 
-    private void validateHttpClientParameters(Map<String, String> parameters) throws Exception {
-        String endpoint = connector.getPredictEndpoint(parameters);
+    private void validateHttpClientParameters(String action, Map<String, String> parameters) throws Exception {
+        String endpoint = connector.getActionEndpoint(action, parameters);
         URL url = new URL(endpoint);
         String protocol = url.getProtocol();
         String host = url.getHost();

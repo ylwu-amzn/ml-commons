@@ -63,6 +63,7 @@ public class ConnectorUtils {
     }
 
     public static RemoteInferenceInputDataSet processInput(
+        String action,
         MLInput mlInput,
         Connector connector,
         Map<String, String> parameters,
@@ -71,22 +72,23 @@ public class ConnectorUtils {
         if (mlInput == null) {
             throw new IllegalArgumentException("Input is null");
         }
-        Optional<ConnectorAction> predictAction = connector.findPredictAction();
+        Optional<ConnectorAction> predictAction = connector.findAction(action);
         if (predictAction.isEmpty()) {
             throw new IllegalArgumentException("no predict action found");
         }
-        RemoteInferenceInputDataSet inputData = processMLInput(mlInput, connector, parameters, scriptService);
+        RemoteInferenceInputDataSet inputData = processMLInput(action, mlInput, connector, parameters, scriptService);
         escapeRemoteInferenceInputData(inputData);
         return inputData;
     }
 
     private static RemoteInferenceInputDataSet processMLInput(
+        String action,
         MLInput mlInput,
         Connector connector,
         Map<String, String> parameters,
         ScriptService scriptService
     ) {
-        String preProcessFunction = getPreprocessFunction(mlInput, connector);
+        String preProcessFunction = getPreprocessFunction(action, mlInput, connector);
         if (preProcessFunction == null) {
             if (mlInput.getInputDataset() instanceof RemoteInferenceInputDataSet) {
                 return (RemoteInferenceInputDataSet) mlInput.getInputDataset();
@@ -168,8 +170,8 @@ public class ConnectorUtils {
         }
     }
 
-    private static String getPreprocessFunction(MLInput mlInput, Connector connector) {
-        Optional<ConnectorAction> predictAction = connector.findPredictAction();
+    private static String getPreprocessFunction(String action, MLInput mlInput, Connector connector) {
+        Optional<ConnectorAction> predictAction = connector.findAction(action);
         String preProcessFunction = predictAction.get().getPreProcessFunction();
         if (preProcessFunction != null) {
             return preProcessFunction;
@@ -181,6 +183,7 @@ public class ConnectorUtils {
     }
 
     public static ModelTensors processOutput(
+        String action,
         String modelResponse,
         Connector connector,
         ScriptService scriptService,
@@ -194,7 +197,7 @@ public class ConnectorUtils {
             throw new IllegalArgumentException("guardrails triggered for LLM output");
         }
         List<ModelTensor> modelTensors = new ArrayList<>();
-        Optional<ConnectorAction> predictAction = connector.findPredictAction();
+        Optional<ConnectorAction> predictAction = connector.findAction(action);
         if (predictAction.isEmpty()) {
             throw new IllegalArgumentException("no predict action found");
         }
@@ -263,6 +266,7 @@ public class ConnectorUtils {
     }
 
     public static SdkHttpFullRequest buildSdkRequest(
+        String action,
         Connector connector,
         Map<String, String> parameters,
         String payload,
@@ -279,7 +283,7 @@ public class ConnectorUtils {
             log.error("Content length is 0. Aborting request to remote model");
             throw new IllegalArgumentException("Content length is 0. Aborting request to remote model");
         }
-        String endpoint = connector.getPredictEndpoint(parameters);
+        String endpoint = connector.getActionEndpoint(action, parameters);
         SdkHttpFullRequest.Builder builder = SdkHttpFullRequest
             .builder()
             .method(method)
