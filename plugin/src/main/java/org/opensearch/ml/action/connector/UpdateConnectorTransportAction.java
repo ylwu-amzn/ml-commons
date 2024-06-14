@@ -9,6 +9,7 @@ import static org.opensearch.ml.common.CommonValue.ML_CONNECTOR_INDEX;
 import static org.opensearch.ml.common.CommonValue.ML_MODEL_INDEX;
 import static org.opensearch.ml.settings.MLCommonsSettings.ML_COMMONS_TRUSTED_CONNECTOR_ENDPOINTS_REGEX;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -91,12 +92,26 @@ public class UpdateConnectorTransportAction extends HandledTransportAction<Actio
             connectorAccessControlHelper.getConnector(client, connectorId, ActionListener.wrap(connector -> {
                 boolean hasPermission = connectorAccessControlHelper.validateConnectorAccess(client, connector);
                 if (Boolean.TRUE.equals(hasPermission)) {
-                    connector.update(mlUpdateConnectorAction.getUpdateContent(), mlEngine::encrypt);
-                    connector.validateConnectorURL(trustedConnectorEndpointsRegex);
-                    UpdateRequest updateRequest = new UpdateRequest(ML_CONNECTOR_INDEX, connectorId);
-                    updateRequest.setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE);
-                    updateRequest.doc(connector.toXContent(XContentBuilder.builder(XContentType.JSON.xContent()), ToXContent.EMPTY_PARAMS));
-                    updateUndeployedConnector(connectorId, updateRequest, listener, context);
+                    ActionListener<String> encryptListener = new ActionListener<>() {
+                        @Override
+                        public void onResponse(String response) {
+                            try {
+                                connector.validateConnectorURL(trustedConnectorEndpointsRegex);
+                                UpdateRequest updateRequest = new UpdateRequest(ML_CONNECTOR_INDEX, connectorId);
+                                updateRequest.setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE);
+                                updateRequest.doc(connector.toXContent(XContentBuilder.builder(XContentType.JSON.xContent()), ToXContent.EMPTY_PARAMS));
+                                updateUndeployedConnector(connectorId, updateRequest, listener, context);
+                            } catch (IOException e) {
+                                throw new RuntimeException(e);
+                            }
+                        }
+                        @Override
+                        public void onFailure(Exception e) {
+                            log.error("Failed to encrypt connector credentials", e);
+                            listener.onFailure(e);
+                        }
+                    };
+                    connector.update(mlUpdateConnectorAction.getUpdateContent(), mlEngine::encrypt, encryptListener);
                 } else {
                     listener
                         .onFailure(

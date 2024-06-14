@@ -73,19 +73,29 @@ public class ExecuteConnectorTransportAction extends HandledTransportAction<Acti
         if (clusterService.state().metadata().hasIndex(ML_CONNECTOR_INDEX)) {
             ActionListener<Connector> listener = ActionListener.wrap(connector -> {
                 if (connectorAccessControlHelper.validateConnectorAccess(client, connector)) {
-                    connector.decrypt(connectorAction, (credential) -> encryptor.decrypt(credential));
-                    RemoteConnectorExecutor connectorExecutor = MLEngineClassLoader
-                        .initInstance(connector.getProtocol(), connector, Connector.class);
-                    connectorExecutor.setScriptService(scriptService);
-                    connectorExecutor.setClusterService(clusterService);
-                    connectorExecutor.setClient(client);
-                    connectorExecutor.setXContentRegistry(xContentRegistry);
-                    connectorExecutor
-                        .executeAction(connectorAction, executeConnectorRequest.getMlInput(), ActionListener.wrap(taskResponse -> {
-                            actionListener.onResponse(taskResponse);
-                        }, e -> { actionListener.onFailure(e); }));
-                }
-            }, e -> {
+                    ActionListener<String> decryptListener = new ActionListener<>() {
+                        @Override
+                        public void onResponse(String response) {
+                            RemoteConnectorExecutor connectorExecutor = MLEngineClassLoader
+                                .initInstance(connector.getProtocol(), connector, Connector.class);
+                            connectorExecutor.setScriptService(scriptService);
+                            connectorExecutor.setClusterService(clusterService);
+                            connectorExecutor.setClient(client);
+                            connectorExecutor.setXContentRegistry(xContentRegistry);
+                            connectorExecutor
+                                .executeAction(connectorAction, executeConnectorRequest.getMlInput(), ActionListener.wrap(taskResponse -> {
+                                    actionListener.onResponse(taskResponse);
+                                }, e -> { actionListener.onFailure(e); }));
+                        }
+
+                        @Override
+                        public void onFailure(Exception e) {
+                            log.error("Failed to decrypt connector credentials.", e);
+                        }
+                    };
+
+                    connector.decrypt(connectorAction, (credential, connectorListener) -> encryptor.decrypt(credential, decryptListener), decryptListener);
+                }}, e -> {
                 log.error("Failed to get connector " + connectorId, e);
                 actionListener.onFailure(e);
             });

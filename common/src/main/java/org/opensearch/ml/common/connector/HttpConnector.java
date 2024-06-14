@@ -12,6 +12,7 @@ import lombok.extern.log4j.Log4j2;
 import org.apache.commons.text.StringSubstitutor;
 import org.opensearch.common.io.stream.BytesStreamOutput;
 import org.opensearch.commons.authuser.User;
+import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.common.io.stream.StreamInput;
 import org.opensearch.core.common.io.stream.StreamOutput;
 import org.opensearch.core.xcontent.XContentBuilder;
@@ -25,6 +26,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BiConsumer;
+import java.util.function.BiFunction;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -273,7 +279,7 @@ public class HttpConnector extends AbstractConnector {
     }
 
     @Override
-    public void update(MLCreateConnectorInput updateContent, Function<String, String> function) {
+    public void update(MLCreateConnectorInput updateContent, BiConsumer<String, ActionListener<String>> consumer, ActionListener<String> listener) {
         if (updateContent.getName() != null) {
             this.name = updateContent.getName();
         }
@@ -291,7 +297,7 @@ public class HttpConnector extends AbstractConnector {
         }
         if (updateContent.getCredential() != null && updateContent.getCredential().size() > 0) {
             this.credential = updateContent.getCredential();
-            encrypt(function);
+            encrypt(consumer, listener);
         }
         if (updateContent.getActions() != null) {
             this.actions = updateContent.getActions();
@@ -349,15 +355,42 @@ public class HttpConnector extends AbstractConnector {
     }
 
     @Override
-    public void decrypt(String action, Function<String, String> function) {
+    public void decrypt(String action, BiConsumer<String, ActionListener<String>> consumer, ActionListener<String> listener) {
         Map<String, String> decrypted = new HashMap<>();
+        AtomicBoolean completed = new AtomicBoolean(false);
+
         for (String key : credential.keySet()) {
-            decrypted.put(key, function.apply(credential.get(key)));
+            consumer.accept(credential.get(key), new ActionListener<>() {
+                @Override
+                public void onResponse(String decryptedValue) {
+                    decrypted.put(key, decryptedValue);
+                    if (decrypted.size() == credential.size() && !completed.get()) {
+                        completed.set(true);
+                        decryptedCredential = decrypted;
+                        Optional<ConnectorAction> connectorAction = findAction(action);
+                        Map<String, String> headers = connectorAction.isPresent() ? connectorAction.get().getHeaders() : null;
+                        decryptedHeaders = createDecryptedHeaders(headers);
+                        listener.onResponse("All credentials encrypted successfully"); // Notify that decryption is complete
+                    }
+                }
+
+                @Override
+                public void onFailure(Exception e) {
+                    log.error("Failed to decrypt credential for key: " + key, e);
+                    if (!completed.getAndSet(true)) {
+                        listener.onFailure(e);
+                    }
+                }
+            });
         }
-        this.decryptedCredential = decrypted;
-        Optional<ConnectorAction> connectorAction = findAction(action);
-        Map<String, String> headers = connectorAction.isPresent() ? connectorAction.get().getHeaders() : null;
-        this.decryptedHeaders = createDecryptedHeaders(headers);
+//        Map<String, String> decrypted = new HashMap<>();
+//        for (String key : credential.keySet()) {
+//            decrypted.put(key, function.apply(credential.get(key)));
+//        }
+//        this.decryptedCredential = decrypted;
+//        Optional<ConnectorAction> connectorAction = findAction(action);
+//        Map<String, String> headers = connectorAction.isPresent() ? connectorAction.get().getHeaders() : null;
+//        this.decryptedHeaders = createDecryptedHeaders(headers);
     }
 
     @Override
@@ -372,10 +405,35 @@ public class HttpConnector extends AbstractConnector {
     }
 
     @Override
-    public void encrypt(Function<String, String> function) {
+//    public void encrypt(Function<String, String> function) {
+//        for (String key : credential.keySet()) {
+//            String encrypted = function.apply(credential.get(key));
+//            credential.put(key, encrypted);
+//        }
+//    }
+
+    public void encrypt(BiConsumer<String, ActionListener<String>> consumer, ActionListener<String> listener) {
+        AtomicBoolean completed = new AtomicBoolean(false);
+
         for (String key : credential.keySet()) {
-            String encrypted = function.apply(credential.get(key));
-            credential.put(key, encrypted);
+            consumer.accept(credential.get(key), new ActionListener<>() {
+                @Override
+                public void onResponse(String encrypted) {
+                    credential.put(key, encrypted);
+                    if (credential.entrySet().stream().allMatch(entry -> entry.getValue() != null)) {
+                        completed.set(true);
+                        listener.onResponse("All credentials encrypted successfully");
+                    }
+                }
+
+                @Override
+                public void onFailure(Exception e) {
+                    log.error("Failed to encrypt credential for key: " + key, e);
+                    if (!completed.getAndSet(true)) {
+                        listener.onFailure(e);
+                    }
+                }
+            });
         }
     }
 

@@ -13,10 +13,13 @@ import java.security.PrivilegedExceptionAction;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.BiConsumer;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.commons.text.StringSubstitutor;
+import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.common.io.stream.StreamInput;
 import org.opensearch.core.common.io.stream.StreamOutput;
 import org.opensearch.common.xcontent.LoggingDeprecationHandler;
@@ -62,8 +65,8 @@ public interface Connector extends ToXContentObject, Writeable {
 
     <T> T createPayload(String action, Map<String, String> parameters);
 
-    void decrypt(String action, Function<String, String> function);
-    void encrypt(Function<String, String> function);
+    void decrypt(String action, BiConsumer<String, ActionListener<String>> function, ActionListener<String> listener);
+    void encrypt(BiConsumer<String, ActionListener<String>> function, ActionListener<String> listener);
 
     Connector cloneConnector();
 
@@ -73,7 +76,7 @@ public interface Connector extends ToXContentObject, Writeable {
 
     void writeTo(StreamOutput out) throws IOException;
 
-    void update(MLCreateConnectorInput updateContent, Function<String, String> function);
+    void update(MLCreateConnectorInput updateContent, BiConsumer<String, ActionListener<String>> function, ActionListener<String> listener);
 
     <T> void parseResponse(T orElse, List<ModelTensor> modelTensors, boolean b) throws IOException;
 

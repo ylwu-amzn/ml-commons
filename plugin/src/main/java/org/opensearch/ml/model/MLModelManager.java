@@ -523,64 +523,144 @@ public class MLModelManager {
             String modelName = registerModelInput.getModelName();
             String version = modelVersion == null ? registerModelInput.getVersion() : modelVersion;
             Instant now = Instant.now();
-            if (registerModelInput.getConnector() != null) {
-                registerModelInput.getConnector().encrypt(mlEngine::encrypt);
-            }
 
-            mlIndicesHandler.initModelIndexIfAbsent(ActionListener.wrap(boolResponse -> {
-                MLModel mlModelMeta = MLModel
-                    .builder()
-                    .name(modelName)
-                    .algorithm(functionName)
-                    .modelGroupId(registerModelInput.getModelGroupId())
-                    .version(version)
-                    .description(registerModelInput.getDescription())
-                    .rateLimiter(registerModelInput.getRateLimiter())
-                    .isEnabled(registerModelInput.getIsEnabled())
-                    .modelFormat(registerModelInput.getModelFormat())
-                    .modelState(MLModelState.REGISTERED)
-                    .connector(registerModelInput.getConnector())
-                    .connectorId(registerModelInput.getConnectorId())
-                    .modelConfig(registerModelInput.getModelConfig())
-                    .deploySetting(registerModelInput.getDeploySetting())
-                    .createdTime(now)
-                    .lastUpdateTime(now)
-                    .isHidden(registerModelInput.getIsHidden())
-                    .guardrails(registerModelInput.getGuardrails())
-                    .modelInterface(registerModelInput.getModelInterface())
-                    .build();
+            // Encryption listener
+            ActionListener<String> encryptListener = new ActionListener<>() {
+                @Override
+                public void onResponse(String response) {
+                    mlIndicesHandler.initModelIndexIfAbsent(ActionListener.wrap(boolResponse -> {
+                        MLModel mlModelMeta = MLModel
+                            .builder()
+                            .name(modelName)
+                            .algorithm(functionName)
+                            .modelGroupId(registerModelInput.getModelGroupId())
+                            .version(version)
+                            .description(registerModelInput.getDescription())
+                            .rateLimiter(registerModelInput.getRateLimiter())
+                            .modelFormat(registerModelInput.getModelFormat())
+                            .modelState(MLModelState.REGISTERED)
+                            .connector(registerModelInput.getConnector())
+                            .connectorId(registerModelInput.getConnectorId())
+                            .modelConfig(registerModelInput.getModelConfig())
+                            .deploySetting(registerModelInput.getDeploySetting())
+                            .createdTime(now)
+                            .lastUpdateTime(now)
+                            .isHidden(registerModelInput.getIsHidden())
+                            .guardrails(registerModelInput.getGuardrails())
+                            .modelInterface(registerModelInput.getModelInterface())
+                            .build();
 
-                IndexRequest indexModelMetaRequest = new IndexRequest(ML_MODEL_INDEX);
-                if (registerModelInput.getIsHidden() != null && registerModelInput.getIsHidden()) {
-                    indexModelMetaRequest.id(modelName);
+                        IndexRequest indexModelMetaRequest = new IndexRequest(ML_MODEL_INDEX);
+                        if (registerModelInput.getIsHidden() != null && registerModelInput.getIsHidden()) {
+                            indexModelMetaRequest.id(modelName);
+                        }
+                        indexModelMetaRequest.source(mlModelMeta.toXContent(XContentBuilder.builder(JSON.xContent()), EMPTY_PARAMS));
+                        indexModelMetaRequest.setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE);
+
+                        // Index remote model doc
+                        ActionListener<IndexResponse> indexListener = ActionListener.wrap(modelMetaRes -> {
+                            String modelId = modelMetaRes.getId();
+                            mlTask.setModelId(modelId);
+                            log.info("create new model meta doc {} for upload task {}", modelId, taskId);
+                            mlTaskManager.updateMLTask(taskId, Map.of(MODEL_ID_FIELD, modelId, STATE_FIELD, COMPLETED), 5000, true);
+                            if (registerModelInput.isDeployModel()) {
+                                deployModelAfterRegistering(registerModelInput, modelId);
+                            }
+                            listener.onResponse(new MLRegisterModelResponse(taskId, MLTaskState.CREATED.name(), modelId));
+                        }, e -> {
+                            log.error("Failed to index model meta doc", e);
+                            handleException(functionName, taskId, e);
+                            listener.onFailure(e);
+                        });
+
+                        client.index(indexModelMetaRequest, threadedActionListener(REGISTER_THREAD_POOL, indexListener));
+                    }, error -> {
+                        // Failed to initialize the model index
+                        log.error("Failed to init model index", error);
+                        handleException(functionName, taskId, error);
+                        listener.onFailure(error);
+                    }));
                 }
-                indexModelMetaRequest.source(mlModelMeta.toXContent(XContentBuilder.builder(JSON.xContent()), EMPTY_PARAMS));
-                indexModelMetaRequest.setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE);
 
-                // index remote model doc
-                ActionListener<IndexResponse> indexListener = ActionListener.wrap(modelMetaRes -> {
-                    String modelId = modelMetaRes.getId();
-                    mlTask.setModelId(modelId);
-                    log.info("create new model meta doc {} for upload task {}", modelId, taskId);
-                    mlTaskManager.updateMLTask(taskId, Map.of(MODEL_ID_FIELD, modelId, STATE_FIELD, COMPLETED), 5000, true);
-                    if (registerModelInput.isDeployModel()) {
-                        deployModelAfterRegistering(registerModelInput, modelId);
-                    }
-                    listener.onResponse(new MLRegisterModelResponse(taskId, MLTaskState.CREATED.name(), modelId));
-                }, e -> {
-                    log.error("Failed to index model meta doc", e);
-                    handleException(functionName, taskId, e);
+                @Override
+                public void onFailure(Exception e) {
+                    log.error("Failed to encrypt connector credentials", e);
                     listener.onFailure(e);
-                });
+                }
+            };
 
-                client.index(indexModelMetaRequest, threadedActionListener(REGISTER_THREAD_POOL, indexListener));
-            }, error -> {
-                // failed to initialize the model index
-                log.error("Failed to init model index", error);
-                handleException(functionName, taskId, error);
-                listener.onFailure(error);
-            }));
+            if (registerModelInput.getConnector() != null) {
+                registerModelInput.getConnector().encrypt(mlEngine::encrypt, encryptListener);
+            } else {
+                encryptListener.onResponse("No connector to encrypt"); // Proceed if there's no connector
+            }
+        } catch (Exception e) {
+            log.error("Failed to register model for task {}. Details: {}", taskId, e);
+            listener.onFailure(e);
         }
+//        String taskId = mlTask.getTaskId();
+//        FunctionName functionName = mlTask.getFunctionName();
+//        try (ThreadContext.StoredContext context = client.threadPool().getThreadContext().stashContext()) {
+//            String modelName = registerModelInput.getModelName();
+//            String version = modelVersion == null ? registerModelInput.getVersion() : modelVersion;
+//            Instant now = Instant.now();
+//            if (registerModelInput.getConnector() != null) {
+//                registerModelInput.getConnector().encrypt(mlEngine::encrypt);
+//            }
+//
+//            mlIndicesHandler.initModelIndexIfAbsent(ActionListener.wrap(boolResponse -> {
+//                MLModel mlModelMeta = MLModel
+//                    .builder()
+//                    .name(modelName)
+//                    .algorithm(functionName)
+//                    .modelGroupId(registerModelInput.getModelGroupId())
+//                    .version(version)
+//                    .description(registerModelInput.getDescription())
+//                    .rateLimiter(registerModelInput.getRateLimiter())
+//                    .modelFormat(registerModelInput.getModelFormat())
+//                    .modelState(MLModelState.REGISTERED)
+//                    .connector(registerModelInput.getConnector())
+//                    .connectorId(registerModelInput.getConnectorId())
+//                    .modelConfig(registerModelInput.getModelConfig())
+//                    .deploySetting(registerModelInput.getDeploySetting())
+//                    .createdTime(now)
+//                    .lastUpdateTime(now)
+//                    .isHidden(registerModelInput.getIsHidden())
+//                    .guardrails(registerModelInput.getGuardrails())
+//                    .modelInterface(registerModelInput.getModelInterface())
+//                    .build();
+//
+//                IndexRequest indexModelMetaRequest = new IndexRequest(ML_MODEL_INDEX);
+//                if (registerModelInput.getIsHidden() != null && registerModelInput.getIsHidden()) {
+//                    indexModelMetaRequest.id(modelName);
+//                }
+//                indexModelMetaRequest.source(mlModelMeta.toXContent(XContentBuilder.builder(JSON.xContent()), EMPTY_PARAMS));
+//                indexModelMetaRequest.setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE);
+//
+//                // index remote model doc
+//                ActionListener<IndexResponse> indexListener = ActionListener.wrap(modelMetaRes -> {
+//                    String modelId = modelMetaRes.getId();
+//                    mlTask.setModelId(modelId);
+//                    log.info("create new model meta doc {} for upload task {}", modelId, taskId);
+//                    mlTaskManager.updateMLTask(taskId, Map.of(MODEL_ID_FIELD, modelId, STATE_FIELD, COMPLETED), 5000, true);
+//                    if (registerModelInput.isDeployModel()) {
+//                        deployModelAfterRegistering(registerModelInput, modelId);
+//                    }
+//                    listener.onResponse(new MLRegisterModelResponse(taskId, MLTaskState.CREATED.name(), modelId));
+//                }, e -> {
+//                    log.error("Failed to index model meta doc", e);
+//                    handleException(functionName, taskId, e);
+//                    listener.onFailure(e);
+//                });
+//
+//                client.index(indexModelMetaRequest, threadedActionListener(REGISTER_THREAD_POOL, indexListener));
+//            }, error -> {
+//                // failed to initialize the model index
+//                log.error("Failed to init model index", error);
+//                handleException(functionName, taskId, error);
+//                listener.onFailure(error);
+//            }));
+//        }
     }
 
     @VisibleForTesting
@@ -592,59 +672,131 @@ public class MLModelManager {
             String modelName = registerModelInput.getModelName();
             String version = modelVersion == null ? registerModelInput.getVersion() : modelVersion;
             Instant now = Instant.now();
-            if (registerModelInput.getConnector() != null) {
-                registerModelInput.getConnector().encrypt(mlEngine::encrypt);
-            }
-            mlIndicesHandler.initModelIndexIfAbsent(ActionListener.runBefore(ActionListener.wrap(res -> {
-                MLModel mlModelMeta = MLModel
-                    .builder()
-                    .name(modelName)
-                    .algorithm(functionName)
-                    .modelGroupId(registerModelInput.getModelGroupId())
-                    .version(version)
-                    .description(registerModelInput.getDescription())
-                    .rateLimiter(registerModelInput.getRateLimiter())
-                    .isEnabled(registerModelInput.getIsEnabled())
-                    .modelFormat(registerModelInput.getModelFormat())
-                    .modelState(MLModelState.REGISTERED)
-                    .connector(registerModelInput.getConnector())
-                    .connectorId(registerModelInput.getConnectorId())
-                    .modelConfig(registerModelInput.getModelConfig())
-                    .deploySetting(registerModelInput.getDeploySetting())
-                    .createdTime(now)
-                    .lastUpdateTime(now)
-                    .isHidden(registerModelInput.getIsHidden())
-                    .guardrails(registerModelInput.getGuardrails())
-                    .modelInterface(registerModelInput.getModelInterface())
-                    .build();
-                IndexRequest indexModelMetaRequest = new IndexRequest(ML_MODEL_INDEX);
-                if (registerModelInput.getIsHidden() != null && registerModelInput.getIsHidden()) {
-                    indexModelMetaRequest.id(modelName);
+            ActionListener<String> encryptListener = new ActionListener<>() {
+                @Override
+                public void onResponse(String response) {
+
+                    mlIndicesHandler.initModelIndexIfAbsent(ActionListener.runBefore(ActionListener.wrap(res -> {
+                        MLModel mlModelMeta = MLModel
+                            .builder()
+                            .name(modelName)
+                            .algorithm(functionName)
+                            .modelGroupId(registerModelInput.getModelGroupId())
+                            .version(version)
+                            .description(registerModelInput.getDescription())
+                            .rateLimiter(registerModelInput.getRateLimiter())
+                            .modelFormat(registerModelInput.getModelFormat())
+                            .modelState(MLModelState.REGISTERED)
+                            .connector(registerModelInput.getConnector())
+                            .connectorId(registerModelInput.getConnectorId())
+                            .modelConfig(registerModelInput.getModelConfig())
+                            .deploySetting(registerModelInput.getDeploySetting())
+                            .createdTime(now)
+                            .lastUpdateTime(now)
+                            .isHidden(registerModelInput.getIsHidden())
+                            .guardrails(registerModelInput.getGuardrails())
+                            .modelInterface(registerModelInput.getModelInterface())
+                            .build();
+                        IndexRequest indexModelMetaRequest = new IndexRequest(ML_MODEL_INDEX);
+                        if (registerModelInput.getIsHidden() != null && registerModelInput.getIsHidden()) {
+                            indexModelMetaRequest.id(modelName);
+                        }
+                        indexModelMetaRequest.source(mlModelMeta.toXContent(XContentBuilder.builder(JSON.xContent()), EMPTY_PARAMS));
+                        indexModelMetaRequest.setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE);
+                        // create model meta doc
+                        ActionListener<IndexResponse> indexListener = ActionListener.wrap(modelMetaRes -> {
+                            String modelId = modelMetaRes.getId();
+                            mlTask.setModelId(modelId);
+                            log.info("create new model meta doc {} for upload task {}", modelId, taskId);
+                            mlTaskManager.updateMLTask(taskId, Map.of(MODEL_ID_FIELD, modelId, STATE_FIELD, COMPLETED), 5000, true);
+                            if (registerModelInput.isDeployModel()) {
+                                deployModelAfterRegistering(registerModelInput, modelId);
+                            }
+                        }, e -> {
+                            log.error("Failed to index model meta doc", e);
+                            handleException(functionName, taskId, e);
+                        });
+                        client.index(indexModelMetaRequest, threadedActionListener(REGISTER_THREAD_POOL, indexListener));
+                    }, e -> {
+                        log.error("Failed to init model index", e);
+                        handleException(functionName, taskId, e);
+                    }), () -> context.restore()));
                 }
-                indexModelMetaRequest.source(mlModelMeta.toXContent(XContentBuilder.builder(JSON.xContent()), EMPTY_PARAMS));
-                indexModelMetaRequest.setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE);
-                // create model meta doc
-                ActionListener<IndexResponse> indexListener = ActionListener.wrap(modelMetaRes -> {
-                    String modelId = modelMetaRes.getId();
-                    mlTask.setModelId(modelId);
-                    log.info("create new model meta doc {} for upload task {}", modelId, taskId);
-                    mlTaskManager.updateMLTask(taskId, Map.of(MODEL_ID_FIELD, modelId, STATE_FIELD, COMPLETED), 5000, true);
-                    if (registerModelInput.isDeployModel()) {
-                        deployModelAfterRegistering(registerModelInput, modelId);
-                    }
-                }, e -> {
-                    log.error("Failed to index model meta doc", e);
-                    handleException(functionName, taskId, e);
-                });
-                client.index(indexModelMetaRequest, threadedActionListener(REGISTER_THREAD_POOL, indexListener));
-            }, e -> {
-                log.error("Failed to init model index", e);
-                handleException(functionName, taskId, e);
-            }), () -> context.restore()));
+
+                @Override
+                public void onFailure(Exception e) {
+                    log.error("Failed to encrypt connector credentials", e);
+                }
+            };
+
+            if(registerModelInput.getConnector()!=null) {
+                registerModelInput.getConnector().encrypt(mlEngine::encrypt, encryptListener);
+            } else {
+                encryptListener.onResponse("No connector to encrypt"); // Proceed if there's no connector
+            }
         } catch (Exception e) {
             logException("Failed to upload model", e, log);
             handleException(functionName, taskId, e);
         }
+//        String taskId = mlTask.getTaskId();
+//        FunctionName functionName = mlTask.getFunctionName();
+//        try (ThreadContext.StoredContext context = client.threadPool().getThreadContext().stashContext()) {
+//
+//            String modelName = registerModelInput.getModelName();
+//            String version = modelVersion == null ? registerModelInput.getVersion() : modelVersion;
+//            Instant now = Instant.now();
+//            if (registerModelInput.getConnector() != null) {
+//                registerModelInput.getConnector().encrypt(mlEngine::encrypt);
+//            }
+//            mlIndicesHandler.initModelIndexIfAbsent(ActionListener.runBefore(ActionListener.wrap(res -> {
+//                MLModel mlModelMeta = MLModel
+//                    .builder()
+//                    .name(modelName)
+//                    .algorithm(functionName)
+//                    .modelGroupId(registerModelInput.getModelGroupId())
+//                    .version(version)
+//                    .description(registerModelInput.getDescription())
+//                    .rateLimiter(registerModelInput.getRateLimiter())
+//                    .modelFormat(registerModelInput.getModelFormat())
+//                    .modelState(MLModelState.REGISTERED)
+//                    .connector(registerModelInput.getConnector())
+//                    .connectorId(registerModelInput.getConnectorId())
+//                    .modelConfig(registerModelInput.getModelConfig())
+//                    .deploySetting(registerModelInput.getDeploySetting())
+//                    .createdTime(now)
+//                    .lastUpdateTime(now)
+//                    .isHidden(registerModelInput.getIsHidden())
+//                    .guardrails(registerModelInput.getGuardrails())
+//                    .modelInterface(registerModelInput.getModelInterface())
+//                    .build();
+//                IndexRequest indexModelMetaRequest = new IndexRequest(ML_MODEL_INDEX);
+//                if (registerModelInput.getIsHidden() != null && registerModelInput.getIsHidden()) {
+//                    indexModelMetaRequest.id(modelName);
+//                }
+//                indexModelMetaRequest.source(mlModelMeta.toXContent(XContentBuilder.builder(JSON.xContent()), EMPTY_PARAMS));
+//                indexModelMetaRequest.setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE);
+//                // create model meta doc
+//                ActionListener<IndexResponse> indexListener = ActionListener.wrap(modelMetaRes -> {
+//                    String modelId = modelMetaRes.getId();
+//                    mlTask.setModelId(modelId);
+//                    log.info("create new model meta doc {} for upload task {}", modelId, taskId);
+//                    mlTaskManager.updateMLTask(taskId, Map.of(MODEL_ID_FIELD, modelId, STATE_FIELD, COMPLETED), 5000, true);
+//                    if (registerModelInput.isDeployModel()) {
+//                        deployModelAfterRegistering(registerModelInput, modelId);
+//                    }
+//                }, e -> {
+//                    log.error("Failed to index model meta doc", e);
+//                    handleException(functionName, taskId, e);
+//                });
+//                client.index(indexModelMetaRequest, threadedActionListener(REGISTER_THREAD_POOL, indexListener));
+//            }, e -> {
+//                log.error("Failed to init model index", e);
+//                handleException(functionName, taskId, e);
+//            }), () -> context.restore()));
+//        } catch (Exception e) {
+//            logException("Failed to upload model", e, log);
+//            handleException(functionName, taskId, e);
+//        }
     }
 
     private void uploadModel(MLRegisterModelInput registerModelInput, MLTask mlTask, String modelVersion) throws PrivilegedActionException {

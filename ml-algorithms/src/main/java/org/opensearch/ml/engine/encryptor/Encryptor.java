@@ -5,6 +5,8 @@
 
 package org.opensearch.ml.engine.encryptor;
 
+import org.opensearch.core.action.ActionListener;
+
 public interface Encryptor {
 
     /**
@@ -13,7 +15,7 @@ public interface Encryptor {
      * @param plainText plainText.
      * @return String encryptedText.
      */
-    String encrypt(String plainText);
+    void encrypt(String plainText, ActionListener<String> listener);
 
     /**
      * Takes encryptedText and returns plain text.
@@ -21,7 +23,7 @@ public interface Encryptor {
      * @param encryptedText encryptedText.
      * @return String plainText.
      */
-    String decrypt(String encryptedText);
+    void decrypt(String encryptedText, ActionListener<String> listener);
 
     /**
      * Set up the masterKey for dynamic updating

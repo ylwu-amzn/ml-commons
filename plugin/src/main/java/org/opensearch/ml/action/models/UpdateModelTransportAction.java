@@ -245,19 +245,39 @@ public class UpdateModelTransportAction extends HandledTransportAction<ActionReq
             if (newConnectorId == null) {
                 if (updateModelInput.getConnector() != null) {
                     Connector connector = mlModel.getConnector();
-                    connector.update(updateModelInput.getConnector(), mlEngine::encrypt);
-                    connector.validateConnectorURL(trustedConnectorEndpointsRegex);
-                    updateModelInput.setUpdatedConnector(connector);
-                    updateModelInput.setConnector(null);
+                    ActionListener<String> encryptListener = ActionListener.wrap(encryptResponse -> {
+                        log.info(encryptResponse);
+
+                        // Continue processing after successful encryption
+                        connector.validateConnectorURL(trustedConnectorEndpointsRegex);
+                        updateModelInput.setUpdatedConnector(connector);
+                        updateModelInput.setConnector(null);
+
+                        updateModelWithRegisteringToAnotherModelGroup(
+                            modelId,
+                            newModelGroupId,
+                            user,
+                            updateModelInput,
+                            wrappedListener,
+                            isUpdateModelCache
+                        );
+                    }, e -> {
+                        log.error("Failed to encrypt connector credentials", e);
+                        wrappedListener.onFailure(e);
+                    });
+
+                    // Encrypt the connector credentials
+                    connector.update(updateModelInput.getConnector(), mlEngine::encrypt, encryptListener);
+                } else {
+                    updateModelWithRegisteringToAnotherModelGroup(
+                        modelId,
+                        newModelGroupId,
+                        user,
+                        updateModelInput,
+                        wrappedListener,
+                        isUpdateModelCache
+                    );
                 }
-                updateModelWithRegisteringToAnotherModelGroup(
-                    modelId,
-                    newModelGroupId,
-                    user,
-                    updateModelInput,
-                    wrappedListener,
-                    isUpdateModelCache
-                );
             } else {
                 updateModelWithNewStandAloneConnector(
                     modelId,
