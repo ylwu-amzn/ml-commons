@@ -26,17 +26,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
-import java.util.function.BiFunction;
-import java.util.function.Consumer;
-import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static org.opensearch.core.xcontent.XContentParserUtils.ensureExpectedToken;
-import static org.opensearch.ml.common.connector.ConnectorAction.ActionType.PREDICT;
 import static org.opensearch.ml.common.connector.ConnectorProtocols.HTTP;
 import static org.opensearch.ml.common.connector.ConnectorProtocols.validateProtocol;
 import static org.opensearch.ml.common.utils.StringUtils.getParameterMap;
@@ -279,7 +273,7 @@ public class HttpConnector extends AbstractConnector {
     }
 
     @Override
-    public void update(MLCreateConnectorInput updateContent, BiConsumer<String, ActionListener<String>> consumer, ActionListener<String> listener) {
+    public void update(MLCreateConnectorInput updateContent, BiConsumer<Map<String, String>, ActionListener<Map<String, String>>> consumer, ActionListener<String> listener) {
         if (updateContent.getName() != null) {
             this.name = updateContent.getName();
         }
@@ -355,42 +349,17 @@ public class HttpConnector extends AbstractConnector {
     }
 
     @Override
-    public void decrypt(String action, BiConsumer<String, ActionListener<String>> consumer, ActionListener<String> listener) {
-        Map<String, String> decrypted = new HashMap<>();
-        AtomicBoolean completed = new AtomicBoolean(false);
-
-        for (String key : credential.keySet()) {
-            consumer.accept(credential.get(key), new ActionListener<>() {
-                @Override
-                public void onResponse(String decryptedValue) {
-                    decrypted.put(key, decryptedValue);
-                    if (decrypted.size() == credential.size() && !completed.get()) {
-                        completed.set(true);
-                        decryptedCredential = decrypted;
-                        Optional<ConnectorAction> connectorAction = findAction(action);
-                        Map<String, String> headers = connectorAction.isPresent() ? connectorAction.get().getHeaders() : null;
-                        decryptedHeaders = createDecryptedHeaders(headers);
-                        listener.onResponse("All credentials encrypted successfully"); // Notify that decryption is complete
-                    }
-                }
-
-                @Override
-                public void onFailure(Exception e) {
-                    log.error("Failed to decrypt credential for key: " + key, e);
-                    if (!completed.getAndSet(true)) {
-                        listener.onFailure(e);
-                    }
-                }
-            });
-        }
-//        Map<String, String> decrypted = new HashMap<>();
-//        for (String key : credential.keySet()) {
-//            decrypted.put(key, function.apply(credential.get(key)));
-//        }
-//        this.decryptedCredential = decrypted;
-//        Optional<ConnectorAction> connectorAction = findAction(action);
-//        Map<String, String> headers = connectorAction.isPresent() ? connectorAction.get().getHeaders() : null;
-//        this.decryptedHeaders = createDecryptedHeaders(headers);
+    public void decrypt(String action, BiConsumer<Map<String, String>, ActionListener<Map<String, String>>> consumer, ActionListener<String> listener) {
+        consumer.accept(credential, ActionListener.wrap(decryptedCredential -> {
+            this.decryptedCredential = decryptedCredential;
+            Optional<ConnectorAction> connectorAction = findAction(action);
+            Map<String, String> headers = connectorAction.isPresent() ? connectorAction.get().getHeaders() : null;
+            this.decryptedHeaders = createDecryptedHeaders(headers);
+            listener.onResponse("succeed");
+        }, e->{
+            log.error("Failed to decrypt credential of connector", e);
+            listener.onFailure(e);
+        }));
     }
 
     @Override
@@ -405,36 +374,14 @@ public class HttpConnector extends AbstractConnector {
     }
 
     @Override
-//    public void encrypt(Function<String, String> function) {
-//        for (String key : credential.keySet()) {
-//            String encrypted = function.apply(credential.get(key));
-//            credential.put(key, encrypted);
-//        }
-//    }
-
-    public void encrypt(BiConsumer<String, ActionListener<String>> consumer, ActionListener<String> listener) {
-        AtomicBoolean completed = new AtomicBoolean(false);
-
-        for (String key : credential.keySet()) {
-            consumer.accept(credential.get(key), new ActionListener<>() {
-                @Override
-                public void onResponse(String encrypted) {
-                    credential.put(key, encrypted);
-                    if (credential.entrySet().stream().allMatch(entry -> entry.getValue() != null)) {
-                        completed.set(true);
-                        listener.onResponse("All credentials encrypted successfully");
-                    }
-                }
-
-                @Override
-                public void onFailure(Exception e) {
-                    log.error("Failed to encrypt credential for key: " + key, e);
-                    if (!completed.getAndSet(true)) {
-                        listener.onFailure(e);
-                    }
-                }
-            });
-        }
+    public void encrypt(BiConsumer<Map<String, String>, ActionListener<Map<String, String>>> consumer, ActionListener<String> listener) {
+        consumer.accept(credential, ActionListener.wrap(encryptedCredential -> {
+            this.credential.putAll(encryptedCredential);
+            listener.onResponse("succeed");
+        }, e->{
+            log.error("Failed to decrypt credential of connector", e);
+            listener.onFailure(e);
+        }));
     }
 
     @Override

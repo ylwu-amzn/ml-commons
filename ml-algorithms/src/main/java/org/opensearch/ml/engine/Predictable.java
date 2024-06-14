@@ -47,7 +47,7 @@ public interface Predictable {
      * @param params other parameters
      * @param encryptor encryptor
      */
-    void initModel(MLModel model, Map<String, Object> params, Encryptor encryptor);
+    void initModel(MLModel model, Map<String, Object> params, Encryptor encryptor, ActionListener<String> actionListener);
 
     /**
      * Close resources like deployed model.

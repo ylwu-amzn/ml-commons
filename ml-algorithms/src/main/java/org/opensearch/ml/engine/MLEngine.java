@@ -120,10 +120,13 @@ public class MLEngine {
         return trainable.train(mlInput);
     }
 
-    public Predictable deploy(MLModel mlModel, Map<String, Object> params) {
+    public void deploy(MLModel mlModel, Map<String, Object> params, ActionListener<Predictable> listener) {
         Predictable predictable = MLEngineClassLoader.initInstance(mlModel.getAlgorithm(), null, MLAlgoParams.class);
-        predictable.initModel(mlModel, params, encryptor);
-        return predictable;
+        predictable.initModel(mlModel, params, encryptor, ActionListener.wrap(r-> {
+            listener.onResponse(predictable);
+        }, e -> {
+            listener.onFailure(e);
+        }));
     }
 
     public MLExecutable deployExecute(MLModel mlModel, Map<String, Object> params) {
@@ -197,7 +200,11 @@ public class MLEngine {
         }
     }
 
-    public void encrypt(String credential, ActionListener<String> listener) {
+    public String encrypt(String credential) {
+        return encryptor.encrypt(credential);
+    }
+
+    public void encrypt(Map<String, String> credential, ActionListener<Map<String, String>> listener) {
         encryptor.encrypt(credential, listener);
     }
 

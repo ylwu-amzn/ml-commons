@@ -217,7 +217,9 @@ public class MLSyncUpCron implements Runnable {
                 }));
         }, e -> { log.error("Failed to undeploy models {}", expiredModels, e); }));
     }
-
+     // t0: cluster ready
+    // CP call register API: no key ready
+    //  t0 + 10s : cron job run.
     @VisibleForTesting
     void initMLConfig() {
         if (mlConfigInited) {
@@ -235,7 +237,7 @@ public class MLSyncUpCron implements Runnable {
                         indexRequest.opType(DocWriteRequest.OpType.CREATE);
                         client.index(indexRequest, ActionListener.wrap(indexResponse -> {
                             log.info("ML configuration initialized successfully");
-//                            encryptor.setMasterKey(masterKey);
+                            encryptor.setMasterKey(masterKey);
                             mlConfigInited = true;
                         }, e -> { log.debug("Failed to save ML encryption master key", e); }));
                     } else {

@@ -179,8 +179,10 @@ public class TransportForwardAction extends HandledTransportAction<ActionRequest
                     listener.onResponse(new MLForwardResponse("ok", null));
                     break;
                 case REGISTER_MODEL:
-                    mlModelManager.registerMLModel(registerModelInput, mlTask);
-                    listener.onResponse(new MLForwardResponse("ok", null));
+                    mlModelManager.registerMLModel(registerModelInput, mlTask, ActionListener.wrap(r-> {
+                        listener.onResponse(new MLForwardResponse("ok", null));
+                    }, e->{listener.onFailure(e);}));
+                    //listener.onResponse(new MLForwardResponse("ok", null));
                     break;
                 default:
                     throw new IllegalArgumentException("unsupported request type");

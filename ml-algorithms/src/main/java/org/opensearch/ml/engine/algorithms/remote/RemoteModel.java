@@ -91,12 +91,12 @@ public class RemoteModel implements Predictable {
     }
 
     @Override
-    public void initModel(MLModel model, Map<String, Object> params, Encryptor encryptor) {
+    public void initModel(MLModel model, Map<String, Object> params, Encryptor encryptor, ActionListener<String> actionListener) {
         try {
             Connector connector = model.getConnector().cloneConnector();
-                ActionListener<String> decryptListener = new ActionListener<>() {
-                    @Override
-                    public void onResponse(String response) {
+            ActionListener<String> decryptListener = new ActionListener<>() {
+                @Override
+                public void onResponse(String response) {
                     try {
                         connectorExecutor = MLEngineClassLoader.initInstance(connector.getProtocol(), connector, Connector.class);
                         connectorExecutor.setScriptService((ScriptService) params.get(SCRIPT_SERVICE));
@@ -107,8 +107,13 @@ public class RemoteModel implements Predictable {
                         connectorExecutor.setUserRateLimiterMap((Map<String, TokenBucket>) params.get(USER_RATE_LIMITER_MAP));
                         connectorExecutor.setMlGuard((MLGuard) params.get(GUARDRAILS));
                         connectorExecutor.setConnectorPrivateIpEnabled((AtomicBoolean) params.get(CONNECTOR_PRIVATE_IP_ENABLED));
-                    } catch (Exception e) {
+                        actionListener.onResponse("succeed");
+                    } catch (RuntimeException e) {
                         log.error("Failed to init remote model.", e);
+                        actionListener.onFailure(e);
+                    } catch (Throwable e) {
+                        log.error("Failed to init remote model.", e);
+                        actionListener.onFailure(new MLException(e));
                     }
                 }
 
@@ -117,17 +122,7 @@ public class RemoteModel implements Predictable {
                     log.error("Failed to decrypt connector credentials.", e);
                 }
             };
-            connector.decrypt(PREDICT.name(), (credential, listener) -> encryptor.decrypt(credential, decryptListener), decryptListener);
-//            connector.decrypt(PREDICT.name(), (credential) -> encryptor.decrypt(credential));
-//            this.connectorExecutor = MLEngineClassLoader.initInstance(connector.getProtocol(), connector, Connector.class);
-//            this.connectorExecutor.setScriptService((ScriptService) params.get(SCRIPT_SERVICE));
-//            this.connectorExecutor.setClusterService((ClusterService) params.get(CLUSTER_SERVICE));
-//            this.connectorExecutor.setClient((Client) params.get(CLIENT));
-//            this.connectorExecutor.setXContentRegistry((NamedXContentRegistry) params.get(XCONTENT_REGISTRY));
-//            this.connectorExecutor.setRateLimiter((TokenBucket) params.get(RATE_LIMITER));
-//            this.connectorExecutor.setUserRateLimiterMap((Map<String, TokenBucket>) params.get(USER_RATE_LIMITER_MAP));
-//            this.connectorExecutor.setMlGuard((MLGuard) params.get(GUARDRAILS));
-//            this.connectorExecutor.setConnectorPrivateIpEnabled((AtomicBoolean) params.get(CONNECTOR_PRIVATE_IP_ENABLED));
+            connector.decrypt(PREDICT.name(), (credential, listener) -> encryptor.decrypt(credential, listener), decryptListener);
         } catch (RuntimeException e) {
             log.error("Failed to init remote model.", e);
             throw e;

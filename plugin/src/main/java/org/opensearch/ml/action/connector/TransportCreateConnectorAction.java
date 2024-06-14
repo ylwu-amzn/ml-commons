@@ -160,33 +160,6 @@ public class TransportCreateConnectorAction extends HandledTransportAction<Actio
 
         // Encrypt the connector credentials
         connector.encrypt(mlEngine::encrypt, encryptListener);
-
-//        connector.encrypt(mlEngine::encrypt);
-//        log.info("connector created, indexing into the connector system index");
-//        mlIndicesHandler.initMLConnectorIndex(ActionListener.wrap(indexCreated -> {
-//            if (!indexCreated) {
-//                listener.onFailure(new RuntimeException("No response to create ML Connector index"));
-//                return;
-//            }
-//            try (ThreadContext.StoredContext context = client.threadPool().getThreadContext().stashContext()) {
-//                ActionListener<IndexResponse> indexResponseListener = ActionListener.wrap(r -> {
-//                    log.info("Connector saved into index, result:{}, connector id: {}", r.getResult(), r.getId());
-//                    MLCreateConnectorResponse response = new MLCreateConnectorResponse(r.getId());
-//                    listener.onResponse(response);
-//                }, listener::onFailure);
-//
-//                IndexRequest indexRequest = new IndexRequest(ML_CONNECTOR_INDEX);
-//                indexRequest.source(connector.toXContent(XContentBuilder.builder(XContentType.JSON.xContent()), ToXContent.EMPTY_PARAMS));
-//                indexRequest.setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE);
-//                client.index(indexRequest, ActionListener.runBefore(indexResponseListener, context::restore));
-//            } catch (Exception e) {
-//                log.error("Failed to save ML connector", e);
-//                listener.onFailure(e);
-//            }
-//        }, e -> {
-//            log.error("Failed to init ML connector index", e);
-//            listener.onFailure(e);
-//        }));
     }
 
     private void validateRequest4AccessControl(MLCreateConnectorInput input, User user) {

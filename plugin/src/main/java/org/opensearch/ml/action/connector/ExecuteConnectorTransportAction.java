@@ -71,36 +71,32 @@ public class ExecuteConnectorTransportAction extends HandledTransportAction<Acti
         String connectorAction = ConnectorAction.ActionType.EXECUTE.name();
 
         if (clusterService.state().metadata().hasIndex(ML_CONNECTOR_INDEX)) {
-            ActionListener<Connector> listener = ActionListener.wrap(connector -> {
+            ActionListener<Connector> getConnectorListener = ActionListener.wrap(connector -> {
                 if (connectorAccessControlHelper.validateConnectorAccess(client, connector)) {
-                    ActionListener<String> decryptListener = new ActionListener<>() {
-                        @Override
-                        public void onResponse(String response) {
-                            RemoteConnectorExecutor connectorExecutor = MLEngineClassLoader
+                    ActionListener<String> decryptListener = ActionListener.wrap(response -> {
+                        RemoteConnectorExecutor connectorExecutor = MLEngineClassLoader
                                 .initInstance(connector.getProtocol(), connector, Connector.class);
-                            connectorExecutor.setScriptService(scriptService);
-                            connectorExecutor.setClusterService(clusterService);
-                            connectorExecutor.setClient(client);
-                            connectorExecutor.setXContentRegistry(xContentRegistry);
-                            connectorExecutor
+                        connectorExecutor.setScriptService(scriptService);
+                        connectorExecutor.setClusterService(clusterService);
+                        connectorExecutor.setClient(client);
+                        connectorExecutor.setXContentRegistry(xContentRegistry);
+                        connectorExecutor
                                 .executeAction(connectorAction, executeConnectorRequest.getMlInput(), ActionListener.wrap(taskResponse -> {
                                     actionListener.onResponse(taskResponse);
                                 }, e -> { actionListener.onFailure(e); }));
-                        }
+                    }, e -> {
+                        log.error("Failed to decrypt connector credentials.", e);
+                        actionListener.onFailure(e);
+                    });
 
-                        @Override
-                        public void onFailure(Exception e) {
-                            log.error("Failed to decrypt connector credentials.", e);
-                        }
-                    };
-
-                    connector.decrypt(connectorAction, (credential, connectorListener) -> encryptor.decrypt(credential, decryptListener), decryptListener);
-                }}, e -> {
+                    connector.decrypt(connectorAction, (credential, listener) -> encryptor.decrypt(credential, listener), decryptListener);
+                }
+            }, e -> {
                 log.error("Failed to get connector " + connectorId, e);
                 actionListener.onFailure(e);
             });
             try (ThreadContext.StoredContext threadContext = client.threadPool().getThreadContext().stashContext()) {
-                connectorAccessControlHelper.getConnector(client, connectorId, ActionListener.runBefore(listener, threadContext::restore));
+                connectorAccessControlHelper.getConnector(client, connectorId, ActionListener.runBefore(getConnectorListener, threadContext::restore));
             }
         } else {
             actionListener.onFailure(new ResourceNotFoundException("Can't find connector " + connectorId));
