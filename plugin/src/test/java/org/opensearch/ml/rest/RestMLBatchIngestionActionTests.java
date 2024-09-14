@@ -11,7 +11,6 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
-import static org.opensearch.ml.rest.RestMLCancelBatchJobAction.ML_CANCEL_TASK_ACTION;
 import static org.opensearch.ml.utils.TestHelper.getBatchIngestionRestRequest;
 
 import java.io.IOException;
