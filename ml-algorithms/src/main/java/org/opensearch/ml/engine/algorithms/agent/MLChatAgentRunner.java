@@ -454,7 +454,7 @@ public class MLChatAgentRunner implements MLAgentRunner {
         Map<String, String> tmpParameters,
         ActionListener<Object> nextStepListener,
         String action,
-        String actionInput,
+        String actionInput,// {"match_all"}, model: "how many errors last week"
         Map<String, String> toolParams
     ) {
         if (tools.get(action).validate(toolParams)) {
