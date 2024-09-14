@@ -202,44 +202,44 @@ public final class MLCommonsSettings {
         .boolSetting("plugins.ml_commons.connector.private_ip_enabled", false, Setting.Property.NodeScope, Setting.Property.Dynamic);
 
     public static final Setting<List<String>> ML_COMMONS_REMOTE_JOB_STATUS_FIELD = Setting
-            .listSetting(
-                    "plugins.ml_commons.remote_job.status_field",
-                    ImmutableList
-                            .of(
-                                    "status", // openai, bedrock, cohere
-                                    "TransformJobStatus" // sagemaker
-                            ),
-                    Function.identity(),
-                    Setting.Property.NodeScope,
-                    Setting.Property.Dynamic
-            );
+        .listSetting(
+            "plugins.ml_commons.remote_job.status_field",
+            ImmutableList
+                .of(
+                    "status", // openai, bedrock, cohere
+                    "TransformJobStatus" // sagemaker
+                ),
+            Function.identity(),
+            Setting.Property.NodeScope,
+            Setting.Property.Dynamic
+        );
 
     public static final Setting<String> ML_COMMONS_REMOTE_JOB_STATUS_COMPLETED_REGEX = Setting
-            .simpleString(
-                    "plugins.ml_commons.remote_job.status_regex.completed",
-                    "(complete|completed)",
-                    Setting.Property.NodeScope,
-                    Setting.Property.Dynamic
-            );
+        .simpleString(
+            "plugins.ml_commons.remote_job.status_regex.completed",
+            "(complete|completed)",
+            Setting.Property.NodeScope,
+            Setting.Property.Dynamic
+        );
     public static final Setting<String> ML_COMMONS_REMOTE_JOB_STATUS_CANCELLED_REGEX = Setting
-            .simpleString(
-                    "plugins.ml_commons.remote_job.status_regex.cancelled",
-                    "(stopped|cancelled)",
-                    Setting.Property.NodeScope,
-                    Setting.Property.Dynamic
-            );
+        .simpleString(
+            "plugins.ml_commons.remote_job.status_regex.cancelled",
+            "(stopped|cancelled)",
+            Setting.Property.NodeScope,
+            Setting.Property.Dynamic
+        );
     public static final Setting<String> ML_COMMONS_REMOTE_JOB_STATUS_CANCELLING_REGEX = Setting
-            .simpleString(
-                    "plugins.ml_commons.remote_job.status_regex.cancelling",
-                    "(stopping|cancelling)",
-                    Setting.Property.NodeScope,
-                    Setting.Property.Dynamic
-            );
+        .simpleString(
+            "plugins.ml_commons.remote_job.status_regex.cancelling",
+            "(stopping|cancelling)",
+            Setting.Property.NodeScope,
+            Setting.Property.Dynamic
+        );
     public static final Setting<String> ML_COMMONS_REMOTE_JOB_STATUS_EXPIRED_REGEX = Setting
-            .simpleString(
-                    "plugins.ml_commons.remote_job.status_regex.expired",
-                    "(expired|timeout)",
-                    Setting.Property.NodeScope,
-                    Setting.Property.Dynamic
-            );
+        .simpleString(
+            "plugins.ml_commons.remote_job.status_regex.expired",
+            "(expired|timeout)",
+            Setting.Property.NodeScope,
+            Setting.Property.Dynamic
+        );
 }

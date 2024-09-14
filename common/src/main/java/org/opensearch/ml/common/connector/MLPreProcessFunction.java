@@ -39,7 +39,8 @@ public class MLPreProcessFunction {
         BedrockEmbeddingPreProcessFunction bedrockEmbeddingPreProcessFunction = new BedrockEmbeddingPreProcessFunction();
         CohereRerankPreProcessFunction cohereRerankPreProcessFunction = new CohereRerankPreProcessFunction();
         MultiModalConnectorPreProcessFunction multiModalEmbeddingPreProcessFunction = new MultiModalConnectorPreProcessFunction();
-        BedrockGetBatchInferenceJobPreProcessFunction bedrockGetBatchInferenceJobPreProcessFunction = new BedrockGetBatchInferenceJobPreProcessFunction();
+        BedrockGetBatchInferenceJobPreProcessFunction bedrockGetBatchInferenceJobPreProcessFunction =
+            new BedrockGetBatchInferenceJobPreProcessFunction();
         PRE_PROCESS_FUNCTIONS.put(TEXT_DOCS_TO_COHERE_EMBEDDING_INPUT, cohereEmbeddingPreProcessFunction);
         PRE_PROCESS_FUNCTIONS.put(TEXT_IMAGE_TO_BEDROCK_EMBEDDING_INPUT, multiModalEmbeddingPreProcessFunction);
         PRE_PROCESS_FUNCTIONS.put(BEDROCK_GET_BATCH_INFERENCE_JOB_INPUT, bedrockGetBatchInferenceJobPreProcessFunction);

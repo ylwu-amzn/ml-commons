@@ -5,12 +5,12 @@
 
 package org.opensearch.ml.common.connector.functions.postprocess;
 
-import org.opensearch.ml.common.output.model.ModelTensor;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import org.opensearch.ml.common.output.model.ModelTensor;
 
 public class BedrockBatchJobArnPostProcessFunction extends ConnectorPostProcessFunction<Map<String, String>> {
     public static final String JOB_ARN = "jobArn";
@@ -34,14 +34,7 @@ public class BedrockBatchJobArnPostProcessFunction extends ConnectorPostProcessF
         processedResult.putAll(jobInfo);
         String jobArn = jobInfo.get(JOB_ARN);
         processedResult.put(PROCESSED_JOB_ARN, jobArn.replace("/", "%2F"));
-        modelTensors
-            .add(
-                ModelTensor
-                    .builder()
-                    .name("response")
-                    .dataAsMap(processedResult)
-                    .build()
-            );
+        modelTensors.add(ModelTensor.builder().name("response").dataAsMap(processedResult).build());
         return modelTensors;
     }
 }

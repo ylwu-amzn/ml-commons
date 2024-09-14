@@ -7,15 +7,8 @@
 
 package org.opensearch.ml.common.connector.functions.preprocess;
 
-import org.opensearch.ml.common.dataset.TextDocsInputDataSet;
 import org.opensearch.ml.common.dataset.remote.RemoteInferenceInputDataSet;
 import org.opensearch.ml.common.input.MLInput;
-
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
-import static org.opensearch.ml.common.utils.StringUtils.convertScriptStringToJsonString;
 
 /**
  * This class provides a pre-processing function for bedrock batch inference job input.

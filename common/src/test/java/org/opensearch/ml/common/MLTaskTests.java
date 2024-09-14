@@ -5,6 +5,8 @@
 
 package org.opensearch.ml.common;
 
+import static org.opensearch.ml.common.CommonValue.ML_TASK_INDEX_MAPPING;
+
 import java.io.IOException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -48,6 +50,11 @@ public class MLTaskTests {
         mlTask.writeTo(output);
         MLTask task2 = new MLTask(output.bytes().streamInput());
         Assert.assertEquals(mlTask, task2);
+    }
+
+    @Test
+    public void testIndexMapping() {
+        System.out.println(ML_TASK_INDEX_MAPPING);
     }
 
     @Test

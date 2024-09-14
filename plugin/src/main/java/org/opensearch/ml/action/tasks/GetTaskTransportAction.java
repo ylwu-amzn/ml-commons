@@ -90,7 +90,7 @@ public class GetTaskTransportAction extends HandledTransportAction<ActionRequest
 
     MLTaskManager mlTaskManager;
     MLModelCacheHelper modelCacheHelper;
-    
+
     volatile List<String> remoteJobStatusFields;
     volatile String remoteJobCompletedStatusRegex;
     volatile String remoteJobCancelledStatusRegex;
@@ -296,7 +296,7 @@ public class GetTaskTransportAction extends HandledTransportAction<ActionRequest
                         remoteJob.putAll(remoteJobStatus);
                         Map<String, Object> updatedTask = new HashMap<>();
                         updatedTask.put(REMOTE_JOB_FIELD, remoteJob);
-                        
+
                         for (String statusField : remoteJobStatusFields) {
                             String statusValue = String.valueOf(remoteJob.get(statusField));
                             if (remoteJob.containsKey(statusField)) {
@@ -322,7 +322,7 @@ public class GetTaskTransportAction extends HandledTransportAction<ActionRequest
                                 }
                             }
                         }
-                        
+
                         mlTaskManager.updateMLTaskDirectly(taskId, updatedTask, ActionListener.wrap(response -> {
                             actionListener.onResponse(MLTaskGetResponse.builder().mlTask(mlTask).build());
                         }, e -> {

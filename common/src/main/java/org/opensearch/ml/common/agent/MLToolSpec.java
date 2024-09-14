@@ -28,6 +28,7 @@ public class MLToolSpec implements ToXContentObject {
     public static final String TOOL_NAME_FIELD = "name";
     public static final String DESCRIPTION_FIELD = "description";
     public static final String PARAMETERS_FIELD = "parameters";
+    // public static final String CONFIGS_FIELD = "configs";
     public static final String INCLUDE_OUTPUT_IN_AGENT_RESPONSE = "include_output_in_agent_response";
 
     private String type;
