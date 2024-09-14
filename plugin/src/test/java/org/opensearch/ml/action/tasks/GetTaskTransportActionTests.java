@@ -139,7 +139,8 @@ public class GetTaskTransportActionTests extends OpenSearchTestCase {
                 connectorAccessControlHelper,
                 encryptor,
                 mlTaskManager,
-                mlModelManager
+                mlModelManager,
+                settings
             )
         );
 
