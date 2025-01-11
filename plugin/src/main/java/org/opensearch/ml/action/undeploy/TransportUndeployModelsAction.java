@@ -195,14 +195,19 @@ public class TransportUndeployModelsAction extends HandledTransportAction<Action
 
         bulkUpdateRequest.setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE);
         log.info("No nodes service: {}", modelIds.toString());
-
-        client.bulk(bulkUpdateRequest, ActionListener.wrap(br -> {
-            log.debug("Successfully set modelIds to UNDEPLOY in index");
-            listener.onResponse(new MLUndeployModelsResponse(response));
-        }, e -> {
-            log.error("Failed to set modelIds to UNDEPLOY in index", e);
+        try (ThreadContext.StoredContext threadContext = client.threadPool().getThreadContext().stashContext()) {
+            client.bulk(bulkUpdateRequest, ActionListener.wrap(br -> {
+                log.debug("Successfully set modelIds to UNDEPLOY in index");
+                listener.onResponse(new MLUndeployModelsResponse(response));
+            }, e -> {
+                log.error("Failed to set modelIds to UNDEPLOY in index", e);
+                listener.onFailure(e);
+            }));
+        }  catch (Exception e) {
+            log.error("Failed to update model status", e);
             listener.onFailure(e);
-        }));
+        }
+
     }
 
     private void validateAccess(String modelId, ActionListener<Boolean> listener) {
