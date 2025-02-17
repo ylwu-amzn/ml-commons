@@ -192,8 +192,8 @@ public class MLInferenceSearchRequestProcessor extends AbstractProcessor impleme
             }
         } catch (Exception e) {
             if (ignoreMissing) {
-                requestListener.onResponse(request);
-                return;
+//                requestListener.onResponse(request);
+//                return;
             } else {
                 requestListener.onFailure(e);
                 return;
@@ -455,8 +455,15 @@ public class MLInferenceSearchRequestProcessor extends AbstractProcessor impleme
                 // model field as key, query field name as value
                 String modelInputFieldName = entry.getKey();
                 String queryFieldName = entry.getValue();
-                String queryFieldValue = toJson(JsonPath.parse(newQuery).read(queryFieldName));
-                modelParameters.put(modelInputFieldName, queryFieldValue);
+                try {
+                    String queryFieldValue = toJson(JsonPath.parse(newQuery).read(queryFieldName));
+                    modelParameters.put(modelInputFieldName, queryFieldValue);
+                } catch (PathNotFoundException e) {
+                    if (!ignoreMissing) {
+                        throw e;
+                    }
+                }
+
             }
         }
 
@@ -597,8 +604,8 @@ public class MLInferenceSearchRequestProcessor extends AbstractProcessor impleme
             boolean fullResponsePath = ConfigurationUtils
                 .readBooleanProperty(TYPE, processorTag, config, FULL_RESPONSE_PATH, defaultFullResponsePath);
 
-            ignoreFailure = ConfigurationUtils
-                .readBooleanProperty(TYPE, processorTag, config, ConfigurationUtils.IGNORE_FAILURE_KEY, false);
+//            ignoreFailure = ConfigurationUtils
+//                .readBooleanProperty(TYPE, processorTag, config, ConfigurationUtils.IGNORE_FAILURE_KEY, false);
 
             // convert model config user input data structure to Map<String, String>
             Map<String, String> modelConfigMaps = null;
