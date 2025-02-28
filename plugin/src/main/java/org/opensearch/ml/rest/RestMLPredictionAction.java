@@ -97,13 +97,14 @@ public class RestMLPredictionAction extends BaseRestHandler {
                 .execute(MLPredictionTaskAction.INSTANCE, mlPredictionTaskRequest, new RestToXContentListener<>(channel));
         }
 
+        String finalAlgorithm = algorithm;
         return channel -> {
             ActionListener<MLModel> listener = ActionListener.wrap(mlModel -> {
-                String algoName = mlModel.getAlgorithm().name();
+                String modelType = mlModel.getAlgorithm().name();
                 client
                     .execute(
                         MLPredictionTaskAction.INSTANCE,
-                        getRequest(modelId, functionName.get().name(), algoName, request),
+                        getRequest(modelId, modelType, finalAlgorithm, request),
                         new RestToXContentListener<>(channel)
                     );
             }, e -> {
