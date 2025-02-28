@@ -91,7 +91,7 @@ public class RestMLPredictionAction extends BaseRestHandler {
             algorithm = functionName.get().name();
         }
 
-        if (algorithm != null && functionName != null) {
+        if (algorithm != null && functionName.isPresent()) {
             MLPredictionTaskRequest mlPredictionTaskRequest = getRequest(modelId, functionName.get().name(), algorithm, request);
             return channel -> client
                 .execute(MLPredictionTaskAction.INSTANCE, mlPredictionTaskRequest, new RestToXContentListener<>(channel));
