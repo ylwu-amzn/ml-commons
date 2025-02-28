@@ -83,15 +83,15 @@ public class RestMLPredictionAction extends BaseRestHandler {
 
     @Override
     public RestChannelConsumer prepareRequest(RestRequest request, NodeClient client) throws IOException {
-        String algorithm = request.param(PARAMETER_ALGORITHM);
+        String algorithm = request.param(PARAMETER_ALGORITHM);//embedding
         String modelId = getParameterId(request, PARAMETER_MODEL_ID);
-        Optional<FunctionName> functionName = modelManager.getOptionalModelFunctionName(modelId);
+        Optional<FunctionName> functionName = modelManager.getOptionalModelFunctionName(modelId);//remote
 
         if (algorithm == null && functionName.isPresent()) {
             algorithm = functionName.get().name();
         }
 
-        if (algorithm != null) {
+        if (algorithm != null && functionName != null) {
             MLPredictionTaskRequest mlPredictionTaskRequest = getRequest(modelId, functionName.get().name(), algorithm, request);
             return channel -> client
                 .execute(MLPredictionTaskAction.INSTANCE, mlPredictionTaskRequest, new RestToXContentListener<>(channel));
