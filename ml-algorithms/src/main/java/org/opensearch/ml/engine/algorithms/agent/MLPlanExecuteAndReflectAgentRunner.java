@@ -309,6 +309,9 @@ public class MLPlanExecuteAndReflectAgentRunner implements MLAgentRunner {
                 }
 
                 reactParams.put(SYSTEM_PROMPT_FIELD, DEFAULT_REACT_SYSTEM_PROMPT);
+                if (allParams.containsKey("react_system_prompt")) {
+                    reactParams.put(SYSTEM_PROMPT_FIELD, allParams.get("react_system_prompt"));
+                }
                 reactParams.put(LLM_RESPONSE_FILTER, allParams.get(LLM_RESPONSE_FILTER));
 
                 AgentMLInput agentInput = AgentMLInput
@@ -404,9 +407,11 @@ public class MLPlanExecuteAndReflectAgentRunner implements MLAgentRunner {
             llmResponse = JsonPath.read(dataAsMap, allParams.get(LLM_RESPONSE_FILTER));
         }
 
-        String json = extractJsonFromModelResponse(llmResponse);
+        String json = null;
         if (!StringUtils.isJson(json)) {
             json = extractJsonFromMarkdown(llmResponse);
+        } else {
+            json = extractJsonFromModelResponse(llmResponse);
         }
 
         Map<String, Object> parsedJson = StringUtils.fromJson(json, RESPONSE_FIELD);

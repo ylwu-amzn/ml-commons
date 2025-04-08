@@ -163,7 +163,7 @@ public class MLChatAgentRunner implements MLAgentRunner {
         // handle parameters based on llmInterface
         if ("openai/v1/chat/completions".equalsIgnoreCase(llmInterface)) {
             if (!params.containsKey(NO_ESCAPE_PARAMS)) {
-                params.put(NO_ESCAPE_PARAMS, DEFAULT_NO_ESCAPE_PARAMS);
+                params.put(NO_ESCAPE_PARAMS, DEFAULT_NO_ESCAPE_PARAMS + ",tool_configs");
             }
             params.put(LLM_RESPONSE_FILTER, "$.choices[0].message.content");
 
@@ -176,6 +176,7 @@ public class MLChatAgentRunner implements MLAgentRunner {
             params.put(TOOL_CALLS_TOOL_NAME, "function.name");
             params.put(TOOL_CALLS_TOOL_INPUT, "function.arguments");
             params.put(TOOL_CALL_ID_PATH, "id");
+            params.put("tool_configs", ", \"tools\": [${parameters._tools:-}], \"parallel_tool_calls\": false");
 
             params.put("tool_choice", "auto");
             params.put("parallel_tool_calls", "false");
