@@ -48,11 +48,11 @@ public class MLHttpClientFactory {
                     NioSocketChannel channel = new NioSocketChannel() {
                         @Override
                         protected boolean doConnect(java.net.SocketAddress remoteAddress, java.net.SocketAddress localAddress) throws Exception {
-                            // Force outgoing connections to use our eth1 address
-                            if (localAddress == null) {
-                                localAddress = new java.net.InetSocketAddress(Eth1BoundHttpClient.this.localAddress, 0);
-                            }
-                            return super.doConnect(remoteAddress, localAddress);
+                            // Always use our eth1 address, ignoring any other local address that might be passed
+                            java.net.InetSocketAddress eth1Address = new java.net.InetSocketAddress(
+                                    Eth1BoundHttpClient.this.localAddress, 0);
+                            log.info("ylwudebug ---- eth1Address: {}", eth1Address);
+                            return super.doConnect(remoteAddress, eth1Address);
                         }
                     };
                     return channel;
@@ -128,7 +128,7 @@ public class MLHttpClientFactory {
 
     private static InetAddress getEth1Address() {
         try {
-            NetworkInterface eth1 = NetworkInterface.getByName("eth1");
+            NetworkInterface eth1 = NetworkInterface.getByName("eth0");
             if (eth1 != null) {
                 Enumeration<InetAddress> addresses = eth1.getInetAddresses();
                 while (addresses.hasMoreElements()) {
