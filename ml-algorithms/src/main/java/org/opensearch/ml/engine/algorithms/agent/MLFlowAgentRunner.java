@@ -44,6 +44,9 @@ import org.opensearch.ml.repackage.com.google.common.collect.ImmutableMap;
 import org.opensearch.remote.metadata.client.SdkClient;
 import org.opensearch.transport.client.Client;
 
+import com.jayway.jsonpath.JsonPath;
+import com.jayway.jsonpath.PathNotFoundException;
+
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.extern.log4j.Log4j2;
@@ -118,7 +121,21 @@ public class MLFlowAgentRunner implements MLAgentRunner {
                     String outputKey = key + ".output";
 
                     String outputResponse = parseResponse(output);
-                    params.put(outputKey, escapeJson(outputResponse));
+                    if (previousToolSpec.getParameters() != null && previousToolSpec.getParameters().containsKey("output_filter")) {
+                        try {
+                            Object filteredOutput = JsonPath.read(outputResponse, previousToolSpec.getParameters().get("output_filter"));
+                            if (filteredOutput instanceof String) {
+                                params.put(outputKey, (String) filteredOutput);
+                            } else {
+                                params.put(outputKey, escapeJson(filteredOutput + ""));
+                            }
+                        } catch (PathNotFoundException e) {
+                            log.error("Failed to read response from path [{}]", previousToolSpec.getParameters().get("output_filter"), e);
+                            params.put(outputKey, escapeJson(outputResponse));
+                        }
+                    } else {
+                        params.put(outputKey, escapeJson(outputResponse));
+                    }
 
                     if (previousToolSpec.isIncludeOutputInAgentResponse() || finalI == toolSpecs.size()) {
                         if (output instanceof ModelTensorOutput) {
