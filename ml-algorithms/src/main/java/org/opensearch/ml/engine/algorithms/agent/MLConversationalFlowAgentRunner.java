@@ -12,7 +12,6 @@ import static org.opensearch.ml.common.conversation.ActionConstants.AI_RESPONSE_
 import static org.opensearch.ml.common.conversation.ActionConstants.MEMORY_ID;
 import static org.opensearch.ml.common.conversation.ActionConstants.PARENT_INTERACTION_ID_FIELD;
 import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.DISABLE_TRACE;
-import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.createTool;
 import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.getMessageHistoryLimit;
 import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.getMlToolSpecs;
 import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.getToolName;
@@ -53,6 +52,7 @@ import org.opensearch.ml.common.utils.StringUtils;
 import org.opensearch.ml.engine.encryptor.Encryptor;
 import org.opensearch.ml.engine.memory.ConversationIndexMemory;
 import org.opensearch.ml.engine.memory.ConversationIndexMessage;
+import org.opensearch.ml.engine.tools.ToolUtils;
 import org.opensearch.ml.repackage.com.google.common.annotations.VisibleForTesting;
 import org.opensearch.remote.metadata.client.SdkClient;
 import org.opensearch.transport.client.Client;
@@ -186,7 +186,8 @@ public class MLConversationalFlowAgentRunner implements MLAgentRunner {
         for (int i = 0; i <= toolSpecs.size(); i++) {
             if (i == 0) {
                 MLToolSpec toolSpec = toolSpecs.get(i);
-                Tool tool = createTool(toolFactories, params, toolSpec, mlAgent.getTenantId());
+                Map<String, String> executeParams = ToolUtils.buildToolParameters(params, toolSpec, mlAgent.getTenantId());
+                Tool tool = ToolUtils.createTool(toolFactories, executeParams, toolSpec);
                 firstStepListener = new StepListener<>();
                 previousStepListener = firstStepListener;
                 firstTool = tool;
@@ -271,17 +272,18 @@ public class MLConversationalFlowAgentRunner implements MLAgentRunner {
         if (previousToolSpec.getParameters() != null && previousToolSpec.getParameters().containsKey("output_filter")) {
             try {
                 Object filteredOutput = JsonPath.read(outputResponse, previousToolSpec.getParameters().get("output_filter"));
-                if (filteredOutput instanceof String) {
-                    params.put(outputKey, (String) filteredOutput);
-                } else {
-                    params.put(outputKey, escapeJson(filteredOutput + ""));
-                }
+                params.put(outputKey, StringUtils.toJson(filteredOutput));
+//                if (filteredOutput instanceof String) {
+//                    params.put(outputKey, (String) filteredOutput);
+//                } else {
+//                    params.put(outputKey, StringUtils.toJson(filteredOutput));
+//                }
             } catch (PathNotFoundException e) {
                 log.error("Failed to read response from path [{}]", previousToolSpec.getParameters().get("output_filter"), e);
-                params.put(outputKey, escapeJson(outputResponse));
+                params.put(outputKey, StringUtils.escapeString(outputResponse));
             }
         } else {
-            params.put(outputKey, escapeJson(outputResponse));
+            params.put(outputKey, StringUtils.escapeString(outputResponse));
         }
         boolean traceDisabled = params.containsKey(DISABLE_TRACE) && Boolean.parseBoolean(params.get(DISABLE_TRACE));
 
@@ -368,9 +370,10 @@ public class MLConversationalFlowAgentRunner implements MLAgentRunner {
         StepListener<Object> nextStepListener
     ) {
         MLToolSpec toolSpec = toolSpecs.get(finalI);
-        Tool tool = createTool(toolFactories, params, toolSpec, tenantId);
+        Map<String, String> executeParams = ToolUtils.buildToolParameters(params, toolSpec, tenantId);
+        Tool tool = ToolUtils.createTool(toolFactories, executeParams, toolSpec);
         if (finalI < toolSpecs.size()) {
-            tool.run(getToolExecuteParams(toolSpec, params, tenantId), nextStepListener);
+            tool.run(getToolExecuteParams(toolSpec, executeParams, tenantId), nextStepListener);
         }
     }
 

@@ -81,6 +81,7 @@ import org.opensearch.ml.engine.algorithms.remote.McpConnectorExecutor;
 import org.opensearch.ml.engine.encryptor.Encryptor;
 import org.opensearch.ml.engine.function_calling.FunctionCalling;
 import org.opensearch.ml.engine.tools.McpSseTool;
+import org.opensearch.ml.engine.tools.ToolUtils;
 import org.opensearch.remote.metadata.client.GetDataObjectRequest;
 import org.opensearch.remote.metadata.client.SdkClient;
 import org.opensearch.remote.metadata.common.SdkClientUtils;
@@ -841,7 +842,8 @@ public class AgentUtils {
             return;
         }
         for (MLToolSpec toolSpec : toolSpecs) {
-            Tool tool = createTool(toolFactories, params, toolSpec, mlAgent.getTenantId());
+            Map<String, String> executeParams = ToolUtils.buildToolParameters(params, toolSpec, mlAgent.getTenantId());
+            Tool tool = ToolUtils.createTool(toolFactories, executeParams, toolSpec);
             tools.put(tool.getName(), tool);
             if (toolSpec.getAttributes() != null) {
                 if (tool.getAttributes() == null) {
@@ -856,45 +858,46 @@ public class AgentUtils {
         }
     }
 
-    public static Tool createTool(
-        Map<String, Tool.Factory> toolFactories,
-        Map<String, String> params,
-        MLToolSpec toolSpec,
-        String tenantId
-    ) {
-        if (!toolFactories.containsKey(toolSpec.getType())) {
-            throw new IllegalArgumentException("Tool not found: " + toolSpec.getType());
-        }
-        Map<String, String> executeParams = new HashMap<>();
-        if (toolSpec.getParameters() != null) {
-            executeParams.putAll(toolSpec.getParameters());
-        }
-        executeParams.put(TENANT_ID_FIELD, tenantId);
-        for (String key : params.keySet()) {
-            String toolNamePrefix = getToolName(toolSpec) + ".";
-            if (key.startsWith(toolNamePrefix)) {
-                executeParams.put(key.replace(toolNamePrefix, ""), params.get(key));
-            }
-        }
-        Map<String, Object> toolParams = new HashMap<>();
-        toolParams.putAll(executeParams);
-        Map<String, Object> runtimeResources = toolSpec.getRuntimeResources();
-        if (runtimeResources != null) {
-            toolParams.putAll(runtimeResources);
-        }
-        Tool tool = toolFactories.get(toolSpec.getType()).create(toolParams);
-        String toolName = getToolName(toolSpec);
-        tool.setName(toolName);
-
-        if (toolSpec.getDescription() != null) {
-            tool.setDescription(toolSpec.getDescription());
-        }
-        if (params.containsKey(toolName + ".description")) {
-            tool.setDescription(params.get(toolName + ".description"));
-        }
-
-        return tool;
-    }
+//    public static Tool createTool(
+//        Map<String, Tool.Factory> toolFactories,
+//        Map<String, String> executeParams,
+//        MLToolSpec toolSpec,
+//        String tenantId
+//    ) {
+//        if (!toolFactories.containsKey(toolSpec.getType())) {
+//            throw new IllegalArgumentException("Tool not found: " + toolSpec.getType());
+//        }
+////        Map<String, String> executeParams = ToolUtils.extractRequiredParameters(params, toolSpec.getAttributes());
+//////        Map<String, String> executeParams = new HashMap<>();
+////        if (toolSpec.getParameters() != null) {
+////            executeParams.putAll(toolSpec.getParameters());
+////        }
+////        executeParams.put(TENANT_ID_FIELD, tenantId);
+////        for (String key : params.keySet()) {
+////            String toolNamePrefix = getToolName(toolSpec) + ".";
+////            if (key.startsWith(toolNamePrefix)) {
+////                executeParams.put(key.replace(toolNamePrefix, ""), params.get(key));
+////            }
+////        }
+//        Map<String, Object> toolParams = new HashMap<>();
+//        toolParams.putAll(executeParams);
+//        Map<String, Object> runtimeResources = toolSpec.getRuntimeResources();
+//        if (runtimeResources != null) {
+//            toolParams.putAll(runtimeResources);
+//        }
+//        Tool tool = toolFactories.get(toolSpec.getType()).create(toolParams);
+//        String toolName = getToolName(toolSpec);
+//        tool.setName(toolName);
+//
+//        if (toolSpec.getDescription() != null) {
+//            tool.setDescription(toolSpec.getDescription());
+//        }
+//        if (executeParams.containsKey(toolName + ".description")) {
+//            tool.setDescription(executeParams.get(toolName + ".description"));
+//        }
+//
+//        return tool;
+//    }
 
     public static List<String> getToolNames(Map<String, Tool> tools) {
         final List<String> inputTools = new ArrayList<>();

@@ -39,6 +39,7 @@ import org.opensearch.ml.common.spi.tools.Tool;
 import org.opensearch.ml.common.utils.StringUtils;
 import org.opensearch.ml.engine.encryptor.Encryptor;
 import org.opensearch.ml.engine.memory.ConversationIndexMemory;
+import org.opensearch.ml.engine.tools.ToolUtils;
 import org.opensearch.ml.repackage.com.google.common.annotations.VisibleForTesting;
 import org.opensearch.ml.repackage.com.google.common.collect.ImmutableMap;
 import org.opensearch.remote.metadata.client.SdkClient;
@@ -107,7 +108,8 @@ public class MLFlowAgentRunner implements MLAgentRunner {
         for (int i = 0; i <= toolSpecs.size(); i++) {
             if (i == 0) {
                 MLToolSpec toolSpec = toolSpecs.get(i);
-                Tool tool = createTool(toolSpec, mlAgent.getTenantId());
+                Map<String, String> executeParams = ToolUtils.buildToolParameters(params, toolSpec, mlAgent.getTenantId());
+                Tool tool = ToolUtils.createTool(toolFactories, executeParams, toolSpec);
                 firstStepListener = new StepListener<>();
                 previousStepListener = firstStepListener;
                 firstTool = tool;
@@ -124,11 +126,12 @@ public class MLFlowAgentRunner implements MLAgentRunner {
                     if (previousToolSpec.getParameters() != null && previousToolSpec.getParameters().containsKey("output_filter")) {
                         try {
                             Object filteredOutput = JsonPath.read(outputResponse, previousToolSpec.getParameters().get("output_filter"));
-                            if (filteredOutput instanceof String) {
-                                params.put(outputKey, (String) filteredOutput);
-                            } else {
-                                params.put(outputKey, escapeJson(filteredOutput + ""));
-                            }
+                            params.put(outputKey, StringUtils.toJson(filteredOutput));
+//                            if (filteredOutput instanceof String) {
+//                                params.put(outputKey, (String) filteredOutput);
+//                            } else {
+//                                params.put(outputKey, escapeJson(filteredOutput + ""));
+//                            }
                         } catch (PathNotFoundException e) {
                             log.error("Failed to read response from path [{}]", previousToolSpec.getParameters().get("output_filter"), e);
                             params.put(outputKey, escapeJson(outputResponse));
@@ -169,9 +172,10 @@ public class MLFlowAgentRunner implements MLAgentRunner {
                     }
 
                     MLToolSpec toolSpec = toolSpecs.get(finalI);
-                    Tool tool = createTool(toolSpec, mlAgent.getTenantId());
+                    Map<String, String> executeParams = ToolUtils.buildToolParameters(params, toolSpec, mlAgent.getTenantId());
+                    Tool tool = ToolUtils.createTool(toolFactories, executeParams, toolSpec);
                     if (finalI < toolSpecs.size()) {
-                        tool.run(getToolExecuteParams(toolSpec, params, mlAgent.getTenantId()), nextStepListener);
+                        tool.run(getToolExecuteParams(toolSpec, executeParams, mlAgent.getTenantId()), nextStepListener);
                     }
 
                 }, e -> {
@@ -273,26 +277,41 @@ public class MLFlowAgentRunner implements MLAgentRunner {
         }
     }
 
-    @VisibleForTesting
-    Tool createTool(MLToolSpec toolSpec, String tenantId) {
-        Map<String, String> toolParams = new HashMap<>();
-        if (toolSpec.getParameters() != null) {
-            toolParams.putAll(toolSpec.getParameters());
-        }
-        toolParams.put(TENANT_ID_FIELD, tenantId);
-        if (!toolFactories.containsKey(toolSpec.getType())) {
-            throw new IllegalArgumentException("Tool not found: " + toolSpec.getType());
-        }
-        Tool tool = toolFactories.get(toolSpec.getType()).create(toolParams);
-        if (toolSpec.getName() != null) {
-            tool.setName(toolSpec.getName());
-        }
-
-        if (toolSpec.getDescription() != null) {
-            tool.setDescription(toolSpec.getDescription());
-        }
-        return tool;
-    }
+//    @VisibleForTesting
+//    Tool createTool(Map<String, Tool.Factory> toolFactories,
+//                    Map<String, String> executeParams,
+//                    MLToolSpec toolSpec,
+//                    String tenantId) {
+//        if (!toolFactories.containsKey(toolSpec.getType())) {
+//            throw new IllegalArgumentException("Tool not found: " + toolSpec.getType());
+//        }
+////        Map<String, String> executeParams = ToolUtils.extractRequiredParameters(params, toolSpec.getAttributes());
+////        Map<String, String> executeParams = new HashMap<>();
+////        if (toolSpec.getParameters() != null) {
+////            executeParams.putAll(toolSpec.getParameters());
+////        }
+////        executeParams.put(TENANT_ID_FIELD, tenantId);
+////        for (String key : params.keySet()) {
+////            String toolNamePrefix = getToolName(toolSpec) + ".";
+////            if (key.startsWith(toolNamePrefix)) {
+////                executeParams.put(key.replace(toolNamePrefix, ""), params.get(key));
+////            }
+////        }
+//        Tool tool = toolFactories.get(toolSpec.getType()).create(executeParams);
+//        String toolName = getToolName(toolSpec);
+//        tool.setName(toolName);
+////        if (toolSpec.getName() != null) {
+////            tool.setName(toolSpec.getName());
+////        }
+//
+//        if (toolSpec.getDescription() != null) {
+//            tool.setDescription(toolSpec.getDescription());
+//        }
+//        if (executeParams.containsKey(toolName + ".description")) {
+//            tool.setDescription(executeParams.get(toolName + ".description"));
+//        }
+//        return tool;
+//    }
 
     @VisibleForTesting
     Map<String, String> getToolExecuteParams(MLToolSpec toolSpec, Map<String, String> params, String tenantId) {

@@ -5,8 +5,10 @@
 
 package org.opensearch.ml.common.utils;
 
+import static org.apache.commons.text.StringEscapeUtils.escapeJson;
 import static org.opensearch.action.ValidateActions.addValidationError;
 
+import java.lang.reflect.Type;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.AccessController;
@@ -25,6 +27,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import com.google.gson.reflect.TypeToken;
 import org.apache.commons.lang3.BooleanUtils;
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -109,6 +112,13 @@ public class StringUtils {
         } catch (JsonSyntaxException ex) {
             return false;
         }
+    }
+
+    public static String escapeString(String input) {
+        if (isJson(input)) {
+            return input;
+        }
+        return escapeJson(input);
     }
 
     public static String toUTF8(String rawString) {
@@ -552,4 +562,8 @@ public class StringUtils {
         return SAFE_INPUT_PATTERN.matcher(value).matches();
     }
 
+    public static List<String> parseStringArrayToList(String jsonArrayString) {
+        Type listType = new TypeToken<List<String>>(){}.getType();
+        return gson.fromJson(jsonArrayString, listType);
+    }
 }
