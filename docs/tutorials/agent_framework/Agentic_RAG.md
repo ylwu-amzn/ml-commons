@@ -607,7 +607,10 @@ POST _plugins/_ml/agents/_register
   "tools": [
     {
       "type": "IndexMappingTool",
-      "include_output_in_agent_response": false
+      "include_output_in_agent_response": false,
+      "parameters": {
+        "input": "{\"index\": \"${parameters.index_name}\"}"
+      }
     },
     {
       "type": "SearchIndexTool",
@@ -825,7 +828,7 @@ POST _plugins/_ml/agents/_register
     {
       "type": "AgentTool",
       "name": "search_opensearch_index_with_nlq",
-      "include_output_in_agent_response": true,
+      "include_output_in_agent_response": false,
       "description": "This tool accepts one OpenSearch index and one natrual language question and generate OpenSearch query DSL. Then query the index with generated query DSL. If the question if complex, suggest split it into smaller questions then query one by one.",
       "parameters": {
         "agent_id": "your_flow_agent_id_created_in_appoach2_step1",
