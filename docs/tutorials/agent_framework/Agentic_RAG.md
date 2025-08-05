@@ -745,7 +745,56 @@ The metro area population of Ogden-Layton in 2022 was 738,000, a 1.79% increase 
   ]
 }
 ```
+You can use selected tools parameter to run specific tool. For example, only run first three tools to check LLM generated OpenSearch query.
 
+This example use the OpenSearch Sample Flights data set index `opensearch_dashboards_sample_data_flights`. https://docs.opensearch.org/latest/dashboards/quickstart/
+```
+POST /_plugins/_ml/agents/NM3Md5gBdXuU4dFd8GPC/_execute
+{
+  "parameters": {
+    "question": "How many flights from Canada to USA?",
+    "index_name": "opensearch_dashboards_sample_data_flights",
+    "selected_tools": ["IndexMappingTool", "SearchIndexTool", "generate_os_query_dsl"]
+  }
+}
+```
+Sample output
+```
+{
+  "inference_results": [
+    {
+      "output": [
+        {
+          "name": "generate_os_query_dsl",
+          "result": """{
+    "size": 0.0,
+    "query": {
+        "bool": {
+            "must": [{
+                "term": {
+                    "OriginCountry": "CA"
+                }
+            }, {
+                "term": {
+                    "DestCountry": "US"
+                }
+            }]
+        }
+    },
+    "aggs": {
+        "flight_count": {
+            "value_count": {
+                "field": "FlightNum"
+            }
+        }
+    }
+}"""
+        }
+      ]
+    }
+  ]
+}
+```
 ## 2. Create Chat Agent
 
 ```
