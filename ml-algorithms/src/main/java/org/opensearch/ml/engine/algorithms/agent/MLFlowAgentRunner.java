@@ -161,11 +161,12 @@ public class MLFlowAgentRunner implements MLAgentRunner {
                 previousStepListener = nextStepListener;
             }
         }
-        if (toolSpecs.size() == 1) {
-            firstTool.run(firstToolExecuteParams, listener);
-        } else {
-            firstTool.run(firstToolExecuteParams, firstStepListener);
-        }
+        firstTool.run(firstToolExecuteParams, firstStepListener);
+        // if (toolSpecs.size() == 1) {
+        // firstTool.run(firstToolExecuteParams, listener);
+        // } else {
+        // firstTool.run(firstToolExecuteParams, firstStepListener);
+        // }
     }
 
     @VisibleForTesting

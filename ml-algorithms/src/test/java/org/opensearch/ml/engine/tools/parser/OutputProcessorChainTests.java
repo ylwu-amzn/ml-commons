@@ -3,6 +3,7 @@ package org.opensearch.ml.engine.tools.parser;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 import static org.opensearch.ml.engine.tools.parser.OutputProcessorChain.EXTRACT_JSON;
@@ -21,8 +22,11 @@ import org.junit.Test;
 import org.opensearch.ml.common.output.model.ModelTensor;
 import org.opensearch.ml.common.output.model.ModelTensorOutput;
 import org.opensearch.ml.common.output.model.ModelTensors;
+import org.opensearch.ml.common.utils.StringUtils;
 import org.opensearch.ml.engine.tools.parser.OutputProcessorChain.OutputProcessor;
 import org.opensearch.ml.engine.tools.parser.OutputProcessorChain.ProcessorRegistry;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class OutputProcessorChainTests {
 
@@ -566,4 +570,557 @@ public class OutputProcessorChainTests {
         Map<String, Object> matchMap = (Map<String, Object>) queryMap.get("match");
         assertEquals("Seattle", matchMap.get("Origin"));
     }
+
+    @Test
+    public void testBasicStringConditions() {
+        // Setup test input
+        Map<String, Object> input = new HashMap<>();
+        input.put("status", "success");
+
+        // Create processor configs
+        List<Map<String, Object>> processorConfigs = new ArrayList<>();
+
+        Map<String, Object> conditionalConfig = new HashMap<>();
+        conditionalConfig.put("type", "conditional");
+        conditionalConfig.put("path", "$.status");
+
+        // ====== Ordered routes list ======
+        List<Object> routes = new ArrayList<>();
+
+        // Success route
+        List<Map<String, Object>> successRoute = new ArrayList<>();
+        Map<String, Object> successToString = new HashMap<>();
+        successToString.put("type", "to_string");
+        successRoute.add(successToString);
+
+        Map<String, Object> successRegexReplace = new HashMap<>();
+        successRegexReplace.put("type", "regex_replace");
+        successRegexReplace.put("pattern", "\\{.*\\}");
+        successRegexReplace.put("replacement", "Operation was successful");
+        successRoute.add(successRegexReplace);
+
+        routes.add(Collections.singletonMap("success", successRoute));
+
+        // Error route
+        List<Map<String, Object>> errorRoute = new ArrayList<>();
+        Map<String, Object> errorToString = new HashMap<>();
+        errorToString.put("type", "to_string");
+        errorRoute.add(errorToString);
+
+        Map<String, Object> errorRegexReplace = new HashMap<>();
+        errorRegexReplace.put("type", "regex_replace");
+        errorRegexReplace.put("pattern", "\\{.*\\}");
+        errorRegexReplace.put("replacement", "Operation failed");
+        errorRoute.add(errorRegexReplace);
+
+        routes.add(Collections.singletonMap("error", errorRoute));
+
+        // Put ordered routes into config
+        conditionalConfig.put("routes", routes);
+
+        processorConfigs.add(conditionalConfig);
+
+        // Create and run processor chain
+        OutputProcessorChain chain = new OutputProcessorChain(processorConfigs);
+
+        // Test success
+        Object result = chain.process(input);
+        assertEquals("Operation was successful", result);
+
+        // Test error
+        input.put("status", "error");
+        result = chain.process(input);
+        assertEquals("Operation failed", result);
+    }
+
+    @Test
+    public void testNumericConditions() {
+        Map<String, Object> input = new HashMap<>();
+        input.put("count", 42);
+
+        Map<String, Object> conditionalConfig = new HashMap<>();
+        conditionalConfig.put("type", "conditional");
+        conditionalConfig.put("path", "$.count");
+
+        List<Map<String, Object>> routes = new ArrayList<>();
+
+        // >50
+        List<Map<String, Object>> gtRoute = new ArrayList<>();
+        Map<String, Object> gtString = new HashMap<>();
+        gtString.put("type", "to_string");
+        gtRoute.add(gtString);
+        Map<String, Object> gtReplace = new HashMap<>();
+        gtReplace.put("type", "regex_replace");
+        gtReplace.put("pattern", ".*");
+        gtReplace.put("replacement", "Greater than 50");
+        gtRoute.add(gtReplace);
+        routes.add(Map.of(">50", gtRoute));
+
+        // ==42
+        List<Map<String, Object>> eqRoute = new ArrayList<>();
+        Map<String, Object> eqString = new HashMap<>();
+        eqString.put("type", "to_string");
+        eqRoute.add(eqString);
+        Map<String, Object> eqReplace = new HashMap<>();
+        eqReplace.put("type", "regex_replace");
+        eqReplace.put("pattern", "^.*$");
+        eqReplace.put("replacement", "Exactly 42");
+        eqRoute.add(eqReplace);
+        routes.add(Map.of("==42", eqRoute));
+
+        // <50
+        List<Map<String, Object>> ltRoute = new ArrayList<>();
+        Map<String, Object> ltString = new HashMap<>();
+        ltString.put("type", "to_string");
+        ltRoute.add(ltString);
+        Map<String, Object> ltReplace = new HashMap<>();
+        ltReplace.put("type", "regex_replace");
+        ltReplace.put("pattern", "^.*$");
+        ltReplace.put("replacement", "Less than 50");
+        ltRoute.add(ltReplace);
+        routes.add(Map.of("<50", ltRoute));
+
+        conditionalConfig.put("routes", routes);
+
+        // Default
+        List<Map<String, Object>> defaultRoute = new ArrayList<>();
+        Map<String, Object> defaultString = new HashMap<>();
+        defaultString.put("type", "to_string");
+        defaultRoute.add(defaultString);
+        Map<String, Object> defaultReplace = new HashMap<>();
+        defaultReplace.put("type", "regex_replace");
+        defaultReplace.put("pattern", "^.*$");
+        defaultReplace.put("replacement", "Default route");
+        defaultRoute.add(defaultReplace);
+        conditionalConfig.put("default", defaultRoute);
+
+        OutputProcessor processor = OutputProcessorChain.ProcessorRegistry.createProcessor("conditional", conditionalConfig);
+        assertEquals("Exactly 42", processor.process(input));
+
+        input.put("count", 30);
+        assertEquals("Less than 50", processor.process(input));
+
+        input.put("count", 50);
+        assertEquals("Default route", processor.process(input));
+    }
+
+    @Test
+    public void testExistenceConditions() {
+        Map<String, Object> input = new HashMap<>();
+        input.put("required", "value");
+        input.put("optional", null);
+
+        Map<String, Object> conditionalConfig = new HashMap<>();
+        conditionalConfig.put("type", "conditional");
+        conditionalConfig.put("path", "$.missing");
+
+        List<Map<String, Object>> routes = new ArrayList<>();
+
+        // exists
+        List<Map<String, Object>> existsRoute = new ArrayList<>();
+        Map<String, Object> existsReplace = new HashMap<>();
+        existsReplace.put("type", "regex_replace");
+        existsReplace.put("pattern", "\\{.*\\}");
+        existsReplace.put("replacement", "Field exists");
+        existsRoute.add(existsReplace);
+        routes.add(Map.of("exists", existsRoute));
+
+        // not_exists
+        List<Map<String, Object>> notExistsRoute = new ArrayList<>();
+        Map<String, Object> notExistsReplace = new HashMap<>();
+        notExistsReplace.put("type", "regex_replace");
+        notExistsReplace.put("pattern", "\\{.*\\}");
+        notExistsReplace.put("replacement", "Field does not exist");
+        notExistsRoute.add(notExistsReplace);
+        routes.add(Map.of("not_exists", notExistsRoute));
+
+        conditionalConfig.put("routes", routes);
+
+        OutputProcessor processor = OutputProcessorChain.ProcessorRegistry.createProcessor("conditional", conditionalConfig);
+        assertEquals("Field does not exist", processor.process(input));
+
+        conditionalConfig.put("path", "$.required");
+        processor = OutputProcessorChain.ProcessorRegistry.createProcessor("conditional", conditionalConfig);
+        assertEquals("Field exists", processor.process(input));
+
+        conditionalConfig.put("path", "$.optional");
+        processor = OutputProcessorChain.ProcessorRegistry.createProcessor("conditional", conditionalConfig);
+        assertEquals("Field does not exist", processor.process(input));
+    }
+
+    @Test
+    public void testRegexAndContainsConditions() {
+        Map<String, Object> input = new HashMap<>();
+        input.put("text", "Error 404: Page not found");
+
+        Map<String, Object> conditionalConfig = new HashMap<>();
+        conditionalConfig.put("type", "conditional");
+        conditionalConfig.put("path", "$.text");
+
+        List<Map<String, Object>> routes = new ArrayList<>();
+
+        // regex first
+        List<Map<String, Object>> regexRoute = new ArrayList<>();
+        Map<String, Object> regexReplace = new HashMap<>();
+        regexReplace.put("type", "regex_replace");
+        regexReplace.put("pattern", "^.*$");
+        regexReplace.put("replacement", "Matches error code pattern");
+        regexRoute.add(regexReplace);
+        routes.add(Map.of("^Error \\d{3}:", regexRoute));
+
+        // contains second
+        List<Map<String, Object>> containsRoute = new ArrayList<>();
+        Map<String, Object> containsReplace = new HashMap<>();
+        containsReplace.put("type", "regex_replace");
+        containsReplace.put("pattern", "^.*$");
+        containsReplace.put("replacement", "Contains error");
+        containsRoute.add(containsReplace);
+        routes.add(Map.of("contains:Error", containsRoute));
+
+        conditionalConfig.put("routes", routes);
+
+        OutputProcessor processor = OutputProcessorChain.ProcessorRegistry.createProcessor("conditional", conditionalConfig);
+        assertEquals("Matches error code pattern", processor.process(input));
+
+        input.put("text", "Error occurred");
+        assertEquals("Contains error", processor.process(input));
+    }
+
+    @Test
+    public void testNoMatchingConditionUsesDefault() {
+        Map<String, Object> input = new HashMap<>();
+        input.put("status", "unknown");
+
+        Map<String, Object> conditionalConfig = new HashMap<>();
+        conditionalConfig.put("type", "conditional");
+        conditionalConfig.put("path", "$.status");
+
+        List<Map<String, Object>> routes = new ArrayList<>();
+
+        // success
+        List<Map<String, Object>> successRoute = new ArrayList<>();
+        Map<String, Object> successReplace = new HashMap<>();
+        successReplace.put("type", "regex_replace");
+        successReplace.put("pattern", "^.*$");
+        successReplace.put("replacement", "Success route");
+        successRoute.add(successReplace);
+        routes.add(Map.of("success", successRoute));
+
+        // error
+        List<Map<String, Object>> errorRoute = new ArrayList<>();
+        Map<String, Object> errorReplace = new HashMap<>();
+        errorReplace.put("type", "regex_replace");
+        errorReplace.put("pattern", "^.*$");
+        errorReplace.put("replacement", "Error route");
+        errorRoute.add(errorReplace);
+        routes.add(Map.of("error", errorRoute));
+
+        conditionalConfig.put("routes", routes);
+
+        // default
+        List<Map<String, Object>> defaultRoute = new ArrayList<>();
+        Map<String, Object> defaultReplace = new HashMap<>();
+        defaultReplace.put("type", "regex_replace");
+        defaultReplace.put("pattern", "^.*$");
+        defaultReplace.put("replacement", "Default route");
+        defaultRoute.add(defaultReplace);
+        conditionalConfig.put("default", defaultRoute);
+
+        OutputProcessor processor = OutputProcessorChain.ProcessorRegistry.createProcessor("conditional", conditionalConfig);
+        assertEquals("Default route", processor.process(input));
+    }
+
+    @Test
+    public void testChainedProcessors() {
+        Map<String, Object> input = new HashMap<>();
+        input.put("status", "SUCCESS");
+
+        List<Map<String, Object>> successChain = new ArrayList<>();
+        Map<String, Object> step1 = new HashMap<>();
+        step1.put("type", "to_string");
+        successChain.add(step1);
+        Map<String, Object> step1Replace = new HashMap<>();
+        step1Replace.put("type", "regex_replace");
+        step1Replace.put("pattern", "^.*$");
+        step1Replace.put("replacement", "Step 1");
+        successChain.add(step1Replace);
+        Map<String, Object> step2Replace = new HashMap<>();
+        step2Replace.put("type", "regex_replace");
+        step2Replace.put("pattern", "^.*$");
+        step2Replace.put("replacement", "Step 2");
+        successChain.add(step2Replace);
+
+        Map<String, Object> conditionalConfig = new HashMap<>();
+        conditionalConfig.put("type", "conditional");
+        conditionalConfig.put("path", "$.status");
+
+        List<Map<String, Object>> routes = new ArrayList<>();
+        routes.add(Map.of("SUCCESS", successChain));
+
+        List<Map<String, Object>> errorRoute = new ArrayList<>();
+        Map<String, Object> errorReplace = new HashMap<>();
+        errorReplace.put("type", "regex_replace");
+        errorReplace.put("pattern", "^.*$");
+        errorReplace.put("replacement", "Error occurred");
+        errorRoute.add(errorReplace);
+        routes.add(Map.of("ERROR", errorRoute));
+
+        conditionalConfig.put("routes", routes);
+
+        OutputProcessor processor = OutputProcessorChain.ProcessorRegistry.createProcessor("conditional", conditionalConfig);
+        assertEquals("Step 2", processor.process(input));
+    }
+
+    @Test
+    public void testNoPathSpecified() {
+        Map<String, Object> input = new HashMap<>();
+        input.put("value", 42);
+
+        Map<String, Object> conditionalConfig = new HashMap<>();
+        conditionalConfig.put("type", "conditional");
+
+        List<Map<String, Object>> routes = new ArrayList<>();
+        List<Map<String, Object>> existsRoute = new ArrayList<>();
+        Map<String, Object> existsReplace = new HashMap<>();
+        existsReplace.put("type", "regex_replace");
+        existsReplace.put("pattern", "^.*$");
+        existsReplace.put("replacement", "Input exists");
+        existsRoute.add(existsReplace);
+        routes.add(Map.of("exists", existsRoute));
+
+        conditionalConfig.put("routes", routes);
+
+        OutputProcessor processor = OutputProcessorChain.ProcessorRegistry.createProcessor("conditional", conditionalConfig);
+        assertEquals("Input exists", processor.process(input));
+
+        assertNull(processor.process(null));
+    }
+
+    @Test
+    public void testProcessorInProcessorChain() {
+        Map<String, Object> input = new HashMap<>();
+        input.put("value", 100);
+
+        List<Map<String, Object>> chainConfig = new ArrayList<>();
+
+        Map<String, Object> extractConfig = new HashMap<>();
+        extractConfig.put("type", "jsonpath_filter");
+        extractConfig.put("path", "$.value");
+        chainConfig.add(extractConfig);
+
+        Map<String, Object> conditionalConfig = new HashMap<>();
+        conditionalConfig.put("type", "conditional");
+
+        List<Map<String, Object>> routes = new ArrayList<>();
+        List<Map<String, Object>> gtRoute = new ArrayList<>();
+        Map<String, Object> gtReplace = new HashMap<>();
+        gtReplace.put("type", "regex_replace");
+        gtReplace.put("pattern", "^.*$");
+        gtReplace.put("replacement", "Greater than 50");
+        gtRoute.add(gtReplace);
+        routes.add(Map.of(">50", gtRoute));
+
+        List<Map<String, Object>> lteRoute = new ArrayList<>();
+        Map<String, Object> lteReplace = new HashMap<>();
+        lteReplace.put("type", "regex_replace");
+        lteReplace.put("pattern", "^.*$");
+        lteReplace.put("replacement", "Less than or equal to 50");
+        lteRoute.add(lteReplace);
+        routes.add(Map.of("<=50", lteRoute));
+
+        conditionalConfig.put("routes", routes);
+
+        chainConfig.add(conditionalConfig);
+
+        OutputProcessorChain chain = new OutputProcessorChain(chainConfig);
+        assertEquals("Greater than 50", chain.process(input));
+    }
+
+    private OutputProcessorChain.OutputProcessor createRemoveJsonPathProcessor(String path) {
+        Map<String, Object> config = new HashMap<>();
+        config.put("type", "remove_jsonpath");
+        config.put("path", path);
+        return OutputProcessorChain.ProcessorRegistry.createProcessor("remove_jsonpath", config);
+    }
+
+    @Test
+    public void testRemoveSimpleField() {
+        Map<String, Object> input = new HashMap<>();
+        input.put("field1", "value1");
+        input.put("field2", "value2");
+
+        OutputProcessorChain.OutputProcessor processor = createRemoveJsonPathProcessor("$.field1");
+        Object result = processor.process(input);
+
+        Map<String, Object> resultMap = (Map<String, Object>) result;
+        assertFalse(resultMap.containsKey("field1"));
+        assertEquals("value2", resultMap.get("field2"));
+    }
+
+    @Test
+    public void testRemoveArrayElement() {
+        Map<String, Object> input = new HashMap<>();
+        List<String> items = new ArrayList<>();
+        items.add("item1");
+        items.add("item2");
+        items.add("item3");
+        input.put("items", items);
+
+        OutputProcessorChain.OutputProcessor processor = createRemoveJsonPathProcessor("$.items[1]");
+        Object result = processor.process(input);
+
+        List<String> resultItems = com.jayway.jsonpath.JsonPath.read(StringUtils.toJson(result), "$.items");
+        assertEquals(2, resultItems.size());
+        assertEquals("item1", resultItems.get(0));
+        assertEquals("item3", resultItems.get(1));
+    }
+
+    @Test
+    public void testRemoveNestedObject() {
+        Map<String, Object> input = new HashMap<>();
+        Map<String, Object> nested = new HashMap<>();
+        nested.put("innerField", "value");
+        input.put("outer", nested);
+
+        OutputProcessorChain.OutputProcessor processor = createRemoveJsonPathProcessor("$.outer.innerField");
+        Object result = processor.process(input);
+
+        Map<String, Object> resultOuter = com.jayway.jsonpath.JsonPath.read(StringUtils.toJson(result), "$.outer");
+        assertFalse(resultOuter.containsKey("innerField"));
+    }
+
+    @Test
+    public void testRemoveFromNestedArray() {
+        Map<String, Object> input = new HashMap<>();
+        List<Map<String, Object>> items = new ArrayList<>();
+
+        Map<String, Object> item1 = new HashMap<>();
+        item1.put("id", "1");
+        item1.put("value", "first");
+
+        Map<String, Object> item2 = new HashMap<>();
+        item2.put("id", "2");
+        item2.put("value", "second");
+
+        items.add(item1);
+        items.add(item2);
+        input.put("items", items);
+
+        OutputProcessorChain.OutputProcessor processor = createRemoveJsonPathProcessor("$.items[0].value");
+        Object result = processor.process(input);
+
+        Map<String, Object> firstItem = com.jayway.jsonpath.JsonPath.read(StringUtils.toJson(result), "$.items[0]");
+        assertEquals("1", firstItem.get("id"));
+        assertFalse(firstItem.containsKey("value"));
+    }
+
+    @Test
+    public void testRemoveNonExistentPath() {
+        Map<String, Object> input = new HashMap<>();
+        input.put("field", "value");
+
+        OutputProcessorChain.OutputProcessor processor = createRemoveJsonPathProcessor("$.nonexistent.path");
+        Object result = processor.process(input);
+
+        assertEquals(input, result);
+    }
+
+    @Test
+    public void testRemoveWithInvalidInput() {
+        String input = "not a json object";
+
+        OutputProcessorChain.OutputProcessor processor = createRemoveJsonPathProcessor("$.field");
+        Object result = processor.process(input);
+
+        assertEquals(input, result);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    public void testConditionalAndRemoveJsonPath() throws Exception {
+        ObjectMapper mapper = new ObjectMapper();
+
+        // Input JSON
+        String inputJson =
+            """
+                {
+                  "metrics": {
+                    "latencyMs": 1841
+                  },
+                  "output": {
+                    "message": {
+                      "content": [
+                        {
+                          "reasoningContent": {
+                            "reasoningText": {
+                              "text": "The user asked \\"How many flights from China to USA\\". We sent search query to opensearch_dashboards_sample_data_flights and got hits.total=91. So answer: 91 flights. Provide citation: index opensearch_dashboards_sample_data_flights. Provide concise response."
+                            }
+                          }
+                        },
+                        {
+                          "text": "<reasoning>The user asked \\"How many flights from China to USA\\". We sent search query to opensearch_dashboards_sample_data_flights and got hits.total=91. So answer: 91 flights. Provide citation: index opensearch_dashboards_sample_data_flights. Provide concise response.</reasoning>**Answer**\\n\\nThere are **91 flights** scheduled from China to the United States, according to the `opensearch_dashboards_sample_data_flights` index.\\n\\n*Source: `opensearch_dashboards_sample_data_flights` index – Total hits for OriginCountry=CN and DestCountry=US = 91*"
+                        }
+                      ],
+                      "role": "assistant"
+                    }
+                  },
+                  "stopReason": "end_turn",
+                  "usage": {
+                    "inputTokens": 1179,
+                    "outputTokens": 137,
+                    "totalTokens": 1316
+                  }
+                }
+                """;
+
+        // Processor config
+        String configJson = """
+            [
+                {
+                  "type": "conditional",
+                  "path": "$.output.message.content[*].toolUse",
+                  "routes": [
+                    {
+                      "exists": [
+                        {
+                          "type": "regex_replace",
+                          "pattern": "\"stopReason\\\\"\\\\s*:\\\\s*\\\\"end_turn\\\\"",
+                          "replacement": "\\\\"stopReason\\\\": \\\\"tool_use\\\\""
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "remove_jsonpath",
+                  "path": "$.output.message.content[0]"
+                }
+            ]
+            """;
+
+        // Parse input & config
+        Map<String, Object> inputMap = mapper.readValue(inputJson, Map.class);
+        List<Map<String, Object>> processorConfigs = mapper.readValue(configJson, List.class);
+
+        // Create chain and process
+        OutputProcessorChain chain = new OutputProcessorChain(processorConfigs);
+        Object result = chain.process(inputMap);
+
+        assertNotNull(result);
+        assertTrue(result instanceof Map);
+
+        Map<String, Object> resultMap = (Map<String, Object>) result;
+
+        // Verify stopReason changed if condition matched
+        String resultJson = mapper.writeValueAsString(resultMap);
+        assertFalse(resultJson.contains("\"stopReason\":\"end_turn\""));
+        assertTrue(resultJson.contains("\"stopReason\":\"tool_use\""));
+
+        // Verify first element in $.output.message.content removed
+        List<?> contentList = (List<?>) ((Map<String, Object>) ((Map<String, Object>) resultMap.get("output")).get("message"))
+            .get("content");
+        assertEquals(1, contentList.size());
+        assertTrue(((Map<?, ?>) contentList.get(0)).containsKey("text"));
+    }
+
 }

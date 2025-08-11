@@ -7,6 +7,7 @@ package org.opensearch.ml.engine.tools.parser;
 
 import static org.opensearch.ml.common.utils.StringUtils.gson;
 
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -28,6 +29,7 @@ import com.jayway.jsonpath.JsonPath;
 import com.jayway.jsonpath.PathNotFoundException;
 
 import lombok.extern.log4j.Log4j2;
+import net.minidev.json.JSONArray;
 
 /**
  * Common framework for processing outputs from ML models and tools
@@ -63,6 +65,122 @@ public class OutputProcessorChain {
         static {
             // Register all available processors
             registerDefaultProcessors();
+        }
+
+        /**
+         * Helper method to apply a list of processors to an input
+         */
+        private static Object applyProcessors(Object input, List<OutputProcessor> processors) {
+            Object result = input;
+            for (OutputProcessor processor : processors) {
+                result = processor.process(result);
+            }
+            return result;
+        }
+
+        /**
+         * Parse processor configurations into a list of processor instances
+         */
+        @SuppressWarnings("unchecked")
+        private static List<OutputProcessor> parseProcessorConfigs(Object config) {
+            if (config == null) {
+                return Collections.emptyList();
+            }
+
+            List<Map<String, Object>> processorConfigs;
+            if (config instanceof Map) {
+                processorConfigs = Collections.singletonList((Map<String, Object>) config);
+            } else if (config instanceof List) {
+                processorConfigs = (List<Map<String, Object>>) config;
+            } else {
+                log.warn("Invalid processor configuration: {}", config);
+                return Collections.emptyList();
+            }
+
+            return ProcessorRegistry.createProcessingChain(processorConfigs);
+        }
+
+        /**
+         * Check if a value matches the specified condition
+         */
+        private static boolean matchesCondition(String condition, Object value) {
+            // Handle null value cases
+            if (value == null || (value instanceof JSONArray && ((JSONArray) value).isEmpty())) {
+                return "null".equals(condition) || "not_exists".equals(condition);
+            }
+
+            // Handle existence condition
+            if ("exists".equals(condition)) {
+                return true;
+            }
+
+            // Handle exact value match
+            String strValue = value.toString();
+            if (condition.equals(strValue)) {
+                return true;
+            }
+
+            // Handle numeric conditions
+            if (value instanceof Number || canParseAsNumber(strValue)) {
+                double numValue;
+                if (value instanceof Number) {
+                    numValue = ((Number) value).doubleValue();
+                } else {
+                    try {
+                        numValue = Double.parseDouble(strValue);
+                    } catch (NumberFormatException e) {
+                        return false;
+                    }
+                }
+
+                // Check numeric conditions
+                if (condition.startsWith(">") && !condition.startsWith(">=")) {
+                    double threshold = Double.parseDouble(condition.substring(1));
+                    return numValue > threshold;
+                } else if (condition.startsWith("<") && !condition.startsWith("<=")) {
+                    double threshold = Double.parseDouble(condition.substring(1));
+                    return numValue < threshold;
+                } else if (condition.startsWith(">=")) {
+                    double threshold = Double.parseDouble(condition.substring(2));
+                    return numValue >= threshold;
+                } else if (condition.startsWith("<=")) {
+                    double threshold = Double.parseDouble(condition.substring(2));
+                    return numValue <= threshold;
+                } else if (condition.startsWith("==")) {
+                    double threshold = Double.parseDouble(condition.substring(2));
+                    return Math.abs(numValue - threshold) < 1e-10;
+                }
+            }
+
+            // Handle regex matching
+            if (condition.startsWith("regex:")) {
+                String regex = condition.substring(6);
+                try {
+                    return Pattern.matches(regex, strValue);
+                } catch (Exception e) {
+                    log.warn("Invalid regex in condition: {}", regex);
+                }
+            }
+
+            // Handle contains condition
+            if (condition.startsWith("contains:")) {
+                String substring = condition.substring(9);
+                return strValue.contains(substring);
+            }
+
+            return false;
+        }
+
+        /**
+         * Check if a string can be parsed as a number
+         */
+        private static boolean canParseAsNumber(String str) {
+            try {
+                Double.parseDouble(str);
+                return true;
+            } catch (NumberFormatException e) {
+                return false;
+            }
         }
 
         /**
@@ -239,6 +357,79 @@ public class OutputProcessorChain {
                 };
             });
 
+            // Remove JsonPath processor
+            PROCESSORS.put("remove_jsonpath", config -> {
+                String path = (String) config.get("path");
+
+                return input -> {
+                    try {
+                        String jsonStr = StringUtils.toJson(input);
+                        Object document = com.jayway.jsonpath.JsonPath.parse(jsonStr).json();
+                        // Remove the specified path
+                        com.jayway.jsonpath.JsonPath.parse(document).delete(path);
+                        return document;
+                    } catch (Exception e) {
+                        log.warn("Failed to remove JsonPath {}: {}", path, e.getMessage());
+                        return input;
+                    }
+                };
+            });
+
+            PROCESSORS.put("conditional", config -> {
+                // Get the path to evaluate for all conditions
+                String path = (String) config.get("path");
+
+                // Parse routes configuration as a list to preserve order
+                List<Object> routesList = (List<Object>) config.get("routes");
+                List<Map.Entry<String, List<OutputProcessor>>> conditionalProcessors = new ArrayList<>();
+
+                // Parse each route's processors while preserving order
+                for (Object routeObj : routesList) {
+                    if (routeObj instanceof Map) {
+                        Map<String, Object> routeMap = (Map<String, Object>) routeObj;
+                        for (Map.Entry<String, Object> routeEntry : routeMap.entrySet()) {
+                            List<OutputProcessor> processors = parseProcessorConfigs(routeEntry.getValue());
+                            conditionalProcessors.add(new AbstractMap.SimpleEntry<>(routeEntry.getKey(), processors));
+                        }
+                    }
+                }
+
+                // Parse default processors
+                List<OutputProcessor> defaultProcessors = config.containsKey("default")
+                    ? parseProcessorConfigs(config.get("default"))
+                    : Collections.emptyList();
+
+                return input -> {
+                    // Extract the value to check against all conditions
+                    Object valueToCheck = input;
+
+                    // If a path is specified, extract the value at that path
+                    if (path != null && !path.isEmpty()) {
+                        try {
+                            String jsonStr = StringUtils.toJson(input);
+                            try {
+                                valueToCheck = JsonPath.read(jsonStr, path);
+                            } catch (PathNotFoundException e) {
+                                valueToCheck = null;
+                            }
+                        } catch (Exception e) {
+                            log.warn("Error evaluating path {}: {}", path, e.getMessage());
+                        }
+                    }
+
+                    // Check each condition in order
+                    for (Map.Entry<String, List<OutputProcessor>> entry : conditionalProcessors) {
+                        String condition = entry.getKey();
+                        if (matchesCondition(condition, valueToCheck)) {
+                            return applyProcessors(input, entry.getValue());
+                        }
+                    }
+
+                    // If no condition matched, use default processors
+                    return applyProcessors(input, defaultProcessors);
+                };
+            });
+
             // Add more processors as needed
         }
 
@@ -332,7 +523,7 @@ public class OutputProcessorChain {
      * @return List of processor configurations or empty list if none found
      */
     @SuppressWarnings("unchecked")
-    public static List<Map<String, Object>> extractProcessorConfigs(Map<String, Object> params) {
+    public static List<Map<String, Object>> extractProcessorConfigs(Map<String, ?> params) {
         if (params == null || !params.containsKey(OUTPUT_PROCESSORS)) {
             return Collections.emptyList();
         }

@@ -79,6 +79,7 @@ public class StringUtils {
 
     static {
         gson = new GsonBuilder()
+            .disableHtmlEscaping()
             .registerTypeAdapter(ModelTensor.class, new ToStringTypeAdapter<>(ModelTensor.class))
             .registerTypeAdapter(ModelTensorOutput.class, new ToStringTypeAdapter<>(ModelTensorOutput.class))
             .registerTypeAdapter(ModelTensors.class, new ToStringTypeAdapter<>(ModelTensors.class))

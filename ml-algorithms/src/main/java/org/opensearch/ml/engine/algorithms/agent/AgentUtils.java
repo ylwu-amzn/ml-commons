@@ -322,7 +322,7 @@ public class AgentUtils {
             dataAsMap = removeJsonPath(dataAsMap, llmResponseExcludePath, true);
         }
         if (dataAsMap.size() == 1 && dataAsMap.containsKey(RESPONSE_FIELD)) {
-            String llmReasoningResponse = (String) dataAsMap.get(RESPONSE_FIELD);
+            String llmReasoningResponse = StringUtils.toJson(dataAsMap.get(RESPONSE_FIELD));
             String thoughtResponse = null;
             try {
                 thoughtResponse = extractModelResponseJson(llmReasoningResponse, llmResponsePatterns);
@@ -341,6 +341,9 @@ public class AgentUtils {
             } catch (PathNotFoundException e) {
                 // If the regular response path fails, try the tool calls path
                 response = JsonPath.read(dataAsMap, parameters.get(TOOL_CALLS_PATH));
+                // if (response != null && response instanceof JSONArray && ((JsonArray) response).isEmpty()) {
+                // isToolUseResponse throw exception?
+                // }
                 isToolUseResponse = true;
             }
 
