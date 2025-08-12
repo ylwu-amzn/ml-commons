@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.opensearch.ml.common.spi.tools.Parser;
+import org.opensearch.ml.engine.processor.ProcessorChain;
 
 /**
  * Helper class for tool output processing
@@ -17,7 +18,7 @@ public class ToolParser {
      * @return Parser with output processing
      */
     public static Parser createProcessingParser(Parser baseParser, List<Map<String, Object>> processorConfigs) {
-        OutputProcessorChain processorChain = new OutputProcessorChain(processorConfigs);
+        ProcessorChain processorChain = new ProcessorChain(processorConfigs);
 
         return o -> {
             // Apply base parser first
@@ -42,7 +43,7 @@ public class ToolParser {
      * @return Parser with output processing applied
      */
     public static Parser createFromToolParams(Map<String, Object> params, Parser baseParser) {
-        List<Map<String, Object>> processorConfigs = OutputProcessorChain.extractProcessorConfigs(params);
+        List<Map<String, Object>> processorConfigs = ProcessorChain.extractProcessorConfigs(params);
         return createProcessingParser(baseParser, processorConfigs);
     }
 

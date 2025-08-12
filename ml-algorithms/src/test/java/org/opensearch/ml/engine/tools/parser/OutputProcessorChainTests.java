@@ -6,11 +6,11 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
-import static org.opensearch.ml.engine.tools.parser.OutputProcessorChain.EXTRACT_JSON;
-import static org.opensearch.ml.engine.tools.parser.OutputProcessorChain.JSONPATH_FILTER;
-import static org.opensearch.ml.engine.tools.parser.OutputProcessorChain.REGEX_CAPTURE;
-import static org.opensearch.ml.engine.tools.parser.OutputProcessorChain.REGEX_REPLACE;
-import static org.opensearch.ml.engine.tools.parser.OutputProcessorChain.TO_STRING;
+import static org.opensearch.ml.engine.processor.ProcessorChain.EXTRACT_JSON;
+import static org.opensearch.ml.engine.processor.ProcessorChain.JSONPATH_FILTER;
+import static org.opensearch.ml.engine.processor.ProcessorChain.REGEX_CAPTURE;
+import static org.opensearch.ml.engine.processor.ProcessorChain.REGEX_REPLACE;
+import static org.opensearch.ml.engine.processor.ProcessorChain.TO_STRING;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -23,8 +23,9 @@ import org.opensearch.ml.common.output.model.ModelTensor;
 import org.opensearch.ml.common.output.model.ModelTensorOutput;
 import org.opensearch.ml.common.output.model.ModelTensors;
 import org.opensearch.ml.common.utils.StringUtils;
-import org.opensearch.ml.engine.tools.parser.OutputProcessorChain.OutputProcessor;
-import org.opensearch.ml.engine.tools.parser.OutputProcessorChain.ProcessorRegistry;
+import org.opensearch.ml.engine.processor.ProcessorChain;
+import org.opensearch.ml.engine.processor.ProcessorChain.OutputProcessor;
+import org.opensearch.ml.engine.processor.ProcessorChain.ProcessorRegistry;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -406,7 +407,7 @@ public class OutputProcessorChainTests {
         extractConfig.put("type", EXTRACT_JSON);
         configs.add(extractConfig);
 
-        OutputProcessorChain chain = new OutputProcessorChain(configs);
+        ProcessorChain chain = new ProcessorChain(configs);
 
         // Test the chain
         String input = "<reasoning>This is reasoning</reasoning>{\"query\":{\"match_all\":{}}}";
@@ -423,7 +424,7 @@ public class OutputProcessorChainTests {
         OutputProcessor second = input -> ((String) input).replace("second", "2nd");
         OutputProcessor third = input -> ((String) input).replace("third", "3rd");
 
-        OutputProcessorChain chain = new OutputProcessorChain(first, second, third);
+        ProcessorChain chain = new ProcessorChain(first, second, third);
 
         String input = "first second third";
         Object result = chain.process(input);
@@ -433,7 +434,7 @@ public class OutputProcessorChainTests {
 
     @Test
     public void testEmptyChain() {
-        OutputProcessorChain chain = new OutputProcessorChain(Collections.emptyList());
+        ProcessorChain chain = new ProcessorChain(Collections.emptyList());
         assertFalse(chain.hasProcessors());
 
         String input = "test";
@@ -452,9 +453,9 @@ public class OutputProcessorChainTests {
         config1.put("pattern", "test");
         configs.add(config1);
 
-        params.put(OutputProcessorChain.OUTPUT_PROCESSORS, configs);
+        params.put(ProcessorChain.OUTPUT_PROCESSORS, configs);
 
-        List<Map<String, Object>> result = OutputProcessorChain.extractProcessorConfigs(params);
+        List<Map<String, Object>> result = ProcessorChain.extractProcessorConfigs(params);
         assertEquals(1, result.size());
         assertEquals(REGEX_REPLACE, result.get(0).get("type"));
     }
@@ -465,9 +466,9 @@ public class OutputProcessorChainTests {
         Map<String, Object> params = new HashMap<>();
         String configStr = "[{\"type\":\"regex_replace\",\"pattern\":\"test\",\"replacement\":\"\"}]";
 
-        params.put(OutputProcessorChain.OUTPUT_PROCESSORS, configStr);
+        params.put(ProcessorChain.OUTPUT_PROCESSORS, configStr);
 
-        List<Map<String, Object>> result = OutputProcessorChain.extractProcessorConfigs(params);
+        List<Map<String, Object>> result = ProcessorChain.extractProcessorConfigs(params);
         assertEquals(1, result.size());
         assertEquals(REGEX_REPLACE, result.get(0).get("type"));
     }
@@ -478,20 +479,20 @@ public class OutputProcessorChainTests {
         Map<String, Object> params = new HashMap<>();
         String configStr = "not a json";
 
-        params.put(OutputProcessorChain.OUTPUT_PROCESSORS, configStr);
+        params.put(ProcessorChain.OUTPUT_PROCESSORS, configStr);
 
-        List<Map<String, Object>> result = OutputProcessorChain.extractProcessorConfigs(params);
+        List<Map<String, Object>> result = ProcessorChain.extractProcessorConfigs(params);
         assertTrue(result.isEmpty());
     }
 
     @Test
     public void testExtractProcessorConfigsWithNull() {
         // Test with null params
-        List<Map<String, Object>> result = OutputProcessorChain.extractProcessorConfigs(null);
+        List<Map<String, Object>> result = ProcessorChain.extractProcessorConfigs(null);
         assertTrue(result.isEmpty());
 
         // Test with empty params
-        result = OutputProcessorChain.extractProcessorConfigs(Collections.emptyMap());
+        result = ProcessorChain.extractProcessorConfigs(Collections.emptyMap());
         assertTrue(result.isEmpty());
     }
 
@@ -502,9 +503,9 @@ public class OutputProcessorChainTests {
         String configStr =
             "[{\"pattern\":\"\\u003creasoning\\u003e.*?\\u003c/reasoning\\u003e\",\"type\":\"regex_replace\",\"replacement\":\"\"},{\"type\":\"extract_json\"}]";
 
-        params.put(OutputProcessorChain.OUTPUT_PROCESSORS, configStr);
+        params.put(ProcessorChain.OUTPUT_PROCESSORS, configStr);
 
-        List<Map<String, Object>> result = OutputProcessorChain.extractProcessorConfigs(params);
+        List<Map<String, Object>> result = ProcessorChain.extractProcessorConfigs(params);
         assertEquals(2, result.size());
         assertEquals(REGEX_REPLACE, result.get(0).get("type"));
         assertEquals(EXTRACT_JSON, result.get(1).get("type"));
@@ -550,7 +551,7 @@ public class OutputProcessorChainTests {
         extractConfig.put("type", EXTRACT_JSON);
         configs.add(extractConfig);
 
-        OutputProcessorChain chain = new OutputProcessorChain(configs);
+        ProcessorChain chain = new ProcessorChain(configs);
 
         Object result = chain.process(input);
 
@@ -621,7 +622,7 @@ public class OutputProcessorChainTests {
         processorConfigs.add(conditionalConfig);
 
         // Create and run processor chain
-        OutputProcessorChain chain = new OutputProcessorChain(processorConfigs);
+        ProcessorChain chain = new ProcessorChain(processorConfigs);
 
         // Test success
         Object result = chain.process(input);
@@ -694,7 +695,7 @@ public class OutputProcessorChainTests {
         defaultRoute.add(defaultReplace);
         conditionalConfig.put("default", defaultRoute);
 
-        OutputProcessor processor = OutputProcessorChain.ProcessorRegistry.createProcessor("conditional", conditionalConfig);
+        OutputProcessor processor = ProcessorChain.ProcessorRegistry.createProcessor("conditional", conditionalConfig);
         assertEquals("Exactly 42", processor.process(input));
 
         input.put("count", 30);
@@ -736,15 +737,15 @@ public class OutputProcessorChainTests {
 
         conditionalConfig.put("routes", routes);
 
-        OutputProcessor processor = OutputProcessorChain.ProcessorRegistry.createProcessor("conditional", conditionalConfig);
+        OutputProcessor processor = ProcessorChain.ProcessorRegistry.createProcessor("conditional", conditionalConfig);
         assertEquals("Field does not exist", processor.process(input));
 
         conditionalConfig.put("path", "$.required");
-        processor = OutputProcessorChain.ProcessorRegistry.createProcessor("conditional", conditionalConfig);
+        processor = ProcessorChain.ProcessorRegistry.createProcessor("conditional", conditionalConfig);
         assertEquals("Field exists", processor.process(input));
 
         conditionalConfig.put("path", "$.optional");
-        processor = OutputProcessorChain.ProcessorRegistry.createProcessor("conditional", conditionalConfig);
+        processor = ProcessorChain.ProcessorRegistry.createProcessor("conditional", conditionalConfig);
         assertEquals("Field does not exist", processor.process(input));
     }
 
@@ -779,7 +780,7 @@ public class OutputProcessorChainTests {
 
         conditionalConfig.put("routes", routes);
 
-        OutputProcessor processor = OutputProcessorChain.ProcessorRegistry.createProcessor("conditional", conditionalConfig);
+        OutputProcessor processor = ProcessorChain.ProcessorRegistry.createProcessor("conditional", conditionalConfig);
         assertEquals("Matches error code pattern", processor.process(input));
 
         input.put("text", "Error occurred");
@@ -826,7 +827,7 @@ public class OutputProcessorChainTests {
         defaultRoute.add(defaultReplace);
         conditionalConfig.put("default", defaultRoute);
 
-        OutputProcessor processor = OutputProcessorChain.ProcessorRegistry.createProcessor("conditional", conditionalConfig);
+        OutputProcessor processor = ProcessorChain.ProcessorRegistry.createProcessor("conditional", conditionalConfig);
         assertEquals("Default route", processor.process(input));
     }
 
@@ -867,7 +868,7 @@ public class OutputProcessorChainTests {
 
         conditionalConfig.put("routes", routes);
 
-        OutputProcessor processor = OutputProcessorChain.ProcessorRegistry.createProcessor("conditional", conditionalConfig);
+        OutputProcessor processor = ProcessorChain.ProcessorRegistry.createProcessor("conditional", conditionalConfig);
         assertEquals("Step 2", processor.process(input));
     }
 
@@ -890,7 +891,7 @@ public class OutputProcessorChainTests {
 
         conditionalConfig.put("routes", routes);
 
-        OutputProcessor processor = OutputProcessorChain.ProcessorRegistry.createProcessor("conditional", conditionalConfig);
+        OutputProcessor processor = ProcessorChain.ProcessorRegistry.createProcessor("conditional", conditionalConfig);
         assertEquals("Input exists", processor.process(input));
 
         assertNull(processor.process(null));
@@ -932,15 +933,15 @@ public class OutputProcessorChainTests {
 
         chainConfig.add(conditionalConfig);
 
-        OutputProcessorChain chain = new OutputProcessorChain(chainConfig);
+        ProcessorChain chain = new ProcessorChain(chainConfig);
         assertEquals("Greater than 50", chain.process(input));
     }
 
-    private OutputProcessorChain.OutputProcessor createRemoveJsonPathProcessor(String path) {
+    private ProcessorChain.OutputProcessor createRemoveJsonPathProcessor(String path) {
         Map<String, Object> config = new HashMap<>();
         config.put("type", "remove_jsonpath");
         config.put("path", path);
-        return OutputProcessorChain.ProcessorRegistry.createProcessor("remove_jsonpath", config);
+        return ProcessorChain.ProcessorRegistry.createProcessor("remove_jsonpath", config);
     }
 
     @Test
@@ -949,7 +950,7 @@ public class OutputProcessorChainTests {
         input.put("field1", "value1");
         input.put("field2", "value2");
 
-        OutputProcessorChain.OutputProcessor processor = createRemoveJsonPathProcessor("$.field1");
+        ProcessorChain.OutputProcessor processor = createRemoveJsonPathProcessor("$.field1");
         Object result = processor.process(input);
 
         Map<String, Object> resultMap = (Map<String, Object>) result;
@@ -966,7 +967,7 @@ public class OutputProcessorChainTests {
         items.add("item3");
         input.put("items", items);
 
-        OutputProcessorChain.OutputProcessor processor = createRemoveJsonPathProcessor("$.items[1]");
+        ProcessorChain.OutputProcessor processor = createRemoveJsonPathProcessor("$.items[1]");
         Object result = processor.process(input);
 
         List<String> resultItems = com.jayway.jsonpath.JsonPath.read(StringUtils.toJson(result), "$.items");
@@ -982,7 +983,7 @@ public class OutputProcessorChainTests {
         nested.put("innerField", "value");
         input.put("outer", nested);
 
-        OutputProcessorChain.OutputProcessor processor = createRemoveJsonPathProcessor("$.outer.innerField");
+        ProcessorChain.OutputProcessor processor = createRemoveJsonPathProcessor("$.outer.innerField");
         Object result = processor.process(input);
 
         Map<String, Object> resultOuter = com.jayway.jsonpath.JsonPath.read(StringUtils.toJson(result), "$.outer");
@@ -1006,7 +1007,7 @@ public class OutputProcessorChainTests {
         items.add(item2);
         input.put("items", items);
 
-        OutputProcessorChain.OutputProcessor processor = createRemoveJsonPathProcessor("$.items[0].value");
+        ProcessorChain.OutputProcessor processor = createRemoveJsonPathProcessor("$.items[0].value");
         Object result = processor.process(input);
 
         Map<String, Object> firstItem = com.jayway.jsonpath.JsonPath.read(StringUtils.toJson(result), "$.items[0]");
@@ -1019,7 +1020,7 @@ public class OutputProcessorChainTests {
         Map<String, Object> input = new HashMap<>();
         input.put("field", "value");
 
-        OutputProcessorChain.OutputProcessor processor = createRemoveJsonPathProcessor("$.nonexistent.path");
+        ProcessorChain.OutputProcessor processor = createRemoveJsonPathProcessor("$.nonexistent.path");
         Object result = processor.process(input);
 
         assertEquals(input, result);
@@ -1029,7 +1030,7 @@ public class OutputProcessorChainTests {
     public void testRemoveWithInvalidInput() {
         String input = "not a json object";
 
-        OutputProcessorChain.OutputProcessor processor = createRemoveJsonPathProcessor("$.field");
+        ProcessorChain.OutputProcessor processor = createRemoveJsonPathProcessor("$.field");
         Object result = processor.process(input);
 
         assertEquals(input, result);
@@ -1103,7 +1104,7 @@ public class OutputProcessorChainTests {
         List<Map<String, Object>> processorConfigs = mapper.readValue(configJson, List.class);
 
         // Create chain and process
-        OutputProcessorChain chain = new OutputProcessorChain(processorConfigs);
+        ProcessorChain chain = new ProcessorChain(processorConfigs);
         Object result = chain.process(inputMap);
 
         assertNotNull(result);

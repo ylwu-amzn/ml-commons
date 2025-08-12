@@ -3,7 +3,7 @@
 * SPDX-License-Identifier: Apache-2.0
 */
 
-package org.opensearch.ml.engine.tools.parser;
+package org.opensearch.ml.engine.processor;
 
 import static org.opensearch.ml.common.utils.StringUtils.gson;
 
@@ -35,7 +35,7 @@ import net.minidev.json.JSONArray;
  * Common framework for processing outputs from ML models and tools
  */
 @Log4j2
-public class OutputProcessorChain {
+public class ProcessorChain {
 
     public static final String OUTPUT_PROCESSORS = "output_processors";
     public static final String TO_STRING = "to_string";
@@ -484,7 +484,7 @@ public class OutputProcessorChain {
      * Create a processor chain from configuration
      * @param processorConfigs List of processor configurations
      */
-    public OutputProcessorChain(List<Map<String, Object>> processorConfigs) {
+    public ProcessorChain(List<Map<String, Object>> processorConfigs) {
         this.processors = ProcessorRegistry.createProcessingChain(processorConfigs);
     }
 
@@ -492,7 +492,7 @@ public class OutputProcessorChain {
      * Create a processor chain from a list of processor instances
      * @param processors List of processor instances
      */
-    public OutputProcessorChain(OutputProcessor... processors) {
+    public ProcessorChain(OutputProcessor... processors) {
         this.processors = Arrays.asList(processors);
     }
 

@@ -50,7 +50,7 @@ import org.opensearch.ml.common.model.MLGuard;
 import org.opensearch.ml.common.output.model.MLResultDataType;
 import org.opensearch.ml.common.output.model.ModelTensor;
 import org.opensearch.ml.common.output.model.ModelTensors;
-import org.opensearch.ml.engine.tools.parser.OutputProcessorChain;
+import org.opensearch.ml.engine.processor.ProcessorChain;
 import org.opensearch.script.ScriptService;
 
 import com.jayway.jsonpath.JsonPath;
@@ -256,9 +256,9 @@ public class ConnectorUtils {
         // Apply output processor chain if configured
         Object processedOutput;
         // Apply output processor chain if configured
-        List<Map<String, Object>> processorConfigs = OutputProcessorChain.extractProcessorConfigs(parameters);
+        List<Map<String, Object>> processorConfigs = ProcessorChain.extractProcessorConfigs(parameters);
         if (!processorConfigs.isEmpty()) {
-            OutputProcessorChain processorChain = new OutputProcessorChain(processorConfigs);
+            ProcessorChain processorChain = new ProcessorChain(processorConfigs);
 
             if (responseFilter != null) {
                 // Apply filter first, then processor chain
