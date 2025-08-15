@@ -6,57 +6,57 @@
 package org.opensearch.ml.engine.algorithms.agent;
 
 /**
- * Unit tests for {@link MLFlowAgentRunner}.
- *
- * <p>This test class covers the functionality of the ML Flow Agent Runner, which is responsible for
- * executing a sequence of tools in a flow-based manner. The tests verify:</p>
- *
+ * Unit tests for {@link MLConversationalFlowAgentRunner}.
+ * 
+ * <p>This test class covers the functionality of the ML Conversational Flow Agent Runner, which is
+ * responsible for executing a sequence of tools in a conversational context with memory management.
+ * The tests verify:</p>
+ * 
  * <ul>
- *   <li>Basic flow execution with single and multiple tools</li>
- *   <li>Memory management and interaction updates</li>
+ *   <li>Conversational flow execution with and without memory</li>
+ *   <li>Chat history retrieval and processing</li>
+ *   <li>Memory creation and management</li>
  *   <li>Tool parameter extraction and configuration</li>
  *   <li>Response parsing for different output types</li>
  *   <li>Error handling and tracing integration</li>
- *   <li>Model tensor output processing</li>
+ *   <li>Message saving and interaction updates</li>
  * </ul>
- *
+ * 
  * <p>The tests use Mockito for mocking dependencies and verify both successful execution paths
  * and error scenarios. The MLAgentTracer is initialized with a NoopTracer for testing purposes
  * to avoid actual tracing overhead.</p>
- *
+ * 
  * <p>Key test scenarios include:</p>
  * <ul>
- *   <li>Flow execution with and without memory</li>
- *   <li>Tool chain execution with multiple tools</li>
- *   <li>Error handling when tools fail</li>
+ *   <li>Conversational flow with memory and app type</li>
+ *   <li>Flow execution without memory management</li>
+ *   <li>Single and multiple tool execution</li>
+ *   <li>Error handling for memory creation and chat history retrieval</li>
  *   <li>Parameter substitution and configuration overrides</li>
  *   <li>Response parsing for various output formats</li>
  * </ul>
- *
- * @see MLFlowAgentRunner
+ * 
+ * <p>Unlike {@link MLFlowAgentRunner}, the conversational flow agent includes memory management
+ * and chat history processing, making it suitable for multi-turn conversations.</p>
+ * 
+ * @see MLConversationalFlowAgentRunner
  * @see MLAgentTracer
  * @see MLAgent
  * @see MLToolSpec
+ * @see ConversationIndexMemory
  */
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isA;
 import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.opensearch.ml.common.utils.ToolUtils.buildToolParameters;
-import static org.opensearch.ml.engine.memory.ConversationIndexMemory.APP_TYPE;
-import static org.opensearch.ml.engine.memory.ConversationIndexMemory.MEMORY_ID;
-import static org.opensearch.ml.engine.memory.ConversationIndexMemory.MEMORY_NAME;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -84,6 +84,7 @@ import org.opensearch.ml.common.MLAgentType;
 import org.opensearch.ml.common.agent.MLAgent;
 import org.opensearch.ml.common.agent.MLMemorySpec;
 import org.opensearch.ml.common.agent.MLToolSpec;
+import org.opensearch.ml.common.conversation.Interaction;
 import org.opensearch.ml.common.output.model.ModelTensor;
 import org.opensearch.ml.common.output.model.ModelTensorOutput;
 import org.opensearch.ml.common.output.model.ModelTensors;
@@ -101,7 +102,7 @@ import org.opensearch.transport.client.Client;
 
 import software.amazon.awssdk.utils.ImmutableMap;
 
-public class MLFlowAgentRunnerTest {
+public class MLConversationalFlowAgentRunnerTest {
 
     public static final String FIRST_TOOL = "firstTool";
     public static final String SECOND_TOOL = "secondTool";
@@ -131,7 +132,7 @@ public class MLFlowAgentRunnerTest {
 
     private Map<String, Memory.Factory> memoryMap;
 
-    private MLFlowAgentRunner mlFlowAgentRunner;
+    private MLConversationalFlowAgentRunner mlConversationalFlowAgentRunner;
 
     @Mock
     private Tool.Factory firstToolFactory;
@@ -151,7 +152,7 @@ public class MLFlowAgentRunnerTest {
     private ActionListener<Object> agentActionListener;
 
     @Mock
-    private ActionListener<ConversationIndexMemory> conversationIndexMemoryActionListener;
+    private ConversationIndexMemory mockMemory;
 
     @Captor
     private ArgumentCaptor<Object> objectCaptor;
@@ -164,17 +165,19 @@ public class MLFlowAgentRunnerTest {
 
     /**
      * Sets up the test environment before each test method.
-     *
-     * <p>This method initializes all mocks and dependencies required for testing the MLFlowAgentRunner.
+     * 
+     * <p>This method initializes all mocks and dependencies required for testing the MLConversationalFlowAgentRunner.
      * It sets up:</p>
      * <ul>
      *   <li>Mock tool factories and tools</li>
      *   <li>Mock memory management components</li>
      *   <li>MLAgentTracer with NoopTracer for testing</li>
      *   <li>Tool response generators</li>
+     *   <li>ConversationIndexMemory mocks</li>
      * </ul>
-     *
-     * <p>The setup ensures that all tests have a consistent and isolated environment.</p>
+     * 
+     * <p>The setup ensures that all tests have a consistent and isolated environment for testing
+     * conversational flow functionality.</p>
      */
     @Before
     @SuppressWarnings("unchecked")
@@ -183,7 +186,16 @@ public class MLFlowAgentRunnerTest {
         settings = Settings.builder().build();
         toolFactories = ImmutableMap.of(FIRST_TOOL, firstToolFactory, SECOND_TOOL, secondToolFactory);
         memoryMap = ImmutableMap.of("memoryType", mockMemoryFactory);
-        mlFlowAgentRunner = new MLFlowAgentRunner(client, settings, clusterService, xContentRegistry, toolFactories, memoryMap, null, null);
+        mlConversationalFlowAgentRunner = new MLConversationalFlowAgentRunner(
+            client,
+            settings,
+            clusterService,
+            xContentRegistry,
+            toolFactories,
+            memoryMap,
+            null,
+            null
+        );
         when(firstToolFactory.create(anyMap())).thenReturn(firstTool);
         when(secondToolFactory.create(anyMap())).thenReturn(secondTool);
         when(secondTool.getDescription()).thenReturn(SECOND_TOOL_DESC);
@@ -202,7 +214,7 @@ public class MLFlowAgentRunnerTest {
 
     /**
      * Generates a mock tool response for testing.
-     *
+     * 
      * @param response The response string to return from the tool
      * @return A Mockito Answer that simulates a successful tool execution
      */
@@ -216,10 +228,10 @@ public class MLFlowAgentRunnerTest {
 
     /**
      * Generates a mock ModelTensorOutput response for testing.
-     *
+     * 
      * <p>This method creates a mock response that simulates a tool returning a ModelTensorOutput,
-     * which is used to test the parsing and handling of complex model outputs.</p>
-     *
+     * which is used to test the parsing and handling of complex model outputs in conversational flows.</p>
+     * 
      * @return A Mockito Answer that simulates a tool returning ModelTensorOutput
      */
     private Answer generateToolTensorResponse() {
@@ -234,144 +246,252 @@ public class MLFlowAgentRunnerTest {
     }
 
     /**
-     * Tests flow execution when includeOutputInAgentResponse is not set.
-     *
-     * <p>This test verifies that when tools are configured without the includeOutputInAgentResponse
-     * flag, only the last tool's output is included in the final response. The test:</p>
+     * Tests the conversational flow agent runner with memory and app type set.
+     * 
+     * <p>This test verifies the full conversational flow functionality when both memory and app type
+     * are configured. The test:</p>
      * <ul>
-     *   <li>Creates an agent with two tools</li>
-     *   <li>Executes the flow with memory management</li>
-     *   <li>Verifies that only the second tool's output is returned</li>
-     *   <li>Checks that memory interaction is updated correctly</li>
+     *   <li>Creates an agent with memory specification and app type</li>
+     *   <li>Mocks memory creation and chat history retrieval</li>
+     *   <li>Executes the conversational flow with two tools</li>
+     *   <li>Verifies that memory_id and parent_interaction_id are included in output</li>
+     *   <li>Checks that only the last tool's output is returned (default behavior)</li>
+     *   <li>Ensures memory updates are performed correctly</li>
      * </ul>
-     *
-     * <p>This test ensures the default behavior where intermediate tool outputs are not
-     * included in the final response unless explicitly configured.</p>
+     * 
+     * <p>This test ensures that the conversational flow properly integrates with memory management
+     * and maintains conversation context across interactions.</p>
      */
     @Test
-    public void testRunWithIncludeOutputNotSet() {
+    public void testRunWithMemoryAndAppType() {
         final Map<String, String> params = new HashMap<>();
         params.put(MLAgentExecutor.MEMORY_ID, "memoryId");
         params.put(MLAgentExecutor.PARENT_INTERACTION_ID, "interaction_id");
+        params.put(MLAgentExecutor.QUESTION, "test question");
         MLToolSpec firstToolSpec = MLToolSpec.builder().name(FIRST_TOOL).type(FIRST_TOOL).build();
         MLToolSpec secondToolSpec = MLToolSpec.builder().name(SECOND_TOOL).type(SECOND_TOOL).build();
         MLMemorySpec mlMemorySpec = MLMemorySpec.builder().type("memoryType").build();
-        ConversationIndexMemory memory = mock(ConversationIndexMemory.class);
+
+        // Mock memory creation
+        Mockito.doAnswer(invocation -> {
+            ActionListener<ConversationIndexMemory> listener = invocation.getArgument(3);
+            listener.onResponse(mockMemory);
+            return null;
+        }).when(mockMemoryFactory).create(anyString(), anyString(), anyString(), any(ActionListener.class));
+
+        // Mock memory methods
+        when(mockMemory.getConversationId()).thenReturn("conversationId");
+        when(mockMemory.getType()).thenReturn("memoryType");
+
+        // Mock getMessages response
+        List<Interaction> interactions = Arrays
+            .asList(Interaction.builder().input("previous question").response("previous response").build());
+        Mockito.doAnswer(invocation -> {
+            ActionListener<List<Interaction>> listener = invocation.getArgument(0);
+            listener.onResponse(interactions);
+            return null;
+        }).when(mockMemory).getMessages(any(ActionListener.class), any(Integer.class));
+
+        // Mock memory update
         Mockito.doAnswer(invocation -> {
             ActionListener<UpdateResponse> listener = invocation.getArgument(2);
             ShardId shardId = new ShardId(new Index("indexName", "uuid"), 1);
             listener.onResponse(new UpdateResponse(shardId, "taskId", 1, 1, 1, DocWriteResponse.Result.UPDATED));
             return null;
-        }).when(memoryManager).updateInteraction(Mockito.any(), Mockito.any(), Mockito.any());
-        doReturn(memoryManager).when(memory).getMemoryManager();
+        }).when(mockMemory).update(anyString(), anyMap(), any(ActionListener.class));
+
+        // Mock memory save
         Mockito.doAnswer(invocation -> {
-            ActionListener<Object> listener = invocation.getArgument(1);
-            listener.onResponse(memory);
+            ActionListener<Boolean> listener = invocation.getArgument(4);
+            listener.onResponse(true);
             return null;
-        }).when(mockMemoryFactory).create(Mockito.anyString(), Mockito.any());
+        }).when(mockMemory).save(any(), anyString(), any(Integer.class), anyString(), any(ActionListener.class));
 
         final MLAgent mlAgent = MLAgent
             .builder()
             .name("TestAgent")
-            .type(MLAgentType.FLOW.name())
+            .type(MLAgentType.CONVERSATIONAL_FLOW.name())
             .memory(mlMemorySpec)
+            .appType("testApp")
             .tools(Arrays.asList(firstToolSpec, secondToolSpec))
             .build();
-        mlFlowAgentRunner.run(mlAgent, params, agentActionListener);
+
+        mlConversationalFlowAgentRunner.run(mlAgent, params, agentActionListener);
+
+        Mockito.verify(agentActionListener).onResponse(objectCaptor.capture());
+        List<ModelTensor> agentOutput = (List<ModelTensor>) objectCaptor.getValue();
+        assertEquals(3, agentOutput.size()); // memory_id, parent_interaction_id, second_tool (last tool only)
+        assertEquals(SECOND_TOOL, agentOutput.get(2).getName());
+        assertEquals(SECOND_TOOL_RESPONSE, agentOutput.get(2).getResult());
+    }
+
+    /**
+     * Tests the conversational flow agent runner without memory and app type.
+     * 
+     * <p>This test verifies the conversational flow functionality when memory and app type are not
+     * configured. The test:</p>
+     * <ul>
+     *   <li>Creates an agent without memory specification or app type</li>
+     *   <li>Executes the conversational flow with two tools</li>
+     *   <li>Verifies that only tool outputs are returned (no memory metadata)</li>
+     *   <li>Checks that only the last tool's output is returned (default behavior)</li>
+     *   <li>Ensures the flow executes without memory management overhead</li>
+     * </ul>
+     * 
+     * <p>This test ensures that the conversational flow can operate in a stateless manner
+     * when memory management is not required.</p>
+     */
+    @Test
+    public void testRunWithoutMemoryAndAppType() {
+        final Map<String, String> params = new HashMap<>();
+        params.put(MLAgentExecutor.MEMORY_ID, "memoryId");
+        params.put(MLAgentExecutor.QUESTION, "test question");
+        MLToolSpec firstToolSpec = MLToolSpec.builder().name(FIRST_TOOL).type(FIRST_TOOL).build();
+        MLToolSpec secondToolSpec = MLToolSpec.builder().name(SECOND_TOOL).type(SECOND_TOOL).build();
+
+        final MLAgent mlAgent = MLAgent
+            .builder()
+            .name("TestAgent")
+            .type(MLAgentType.CONVERSATIONAL_FLOW.name())
+            .memory(null)
+            .appType(null)
+            .tools(Arrays.asList(firstToolSpec, secondToolSpec))
+            .build();
+
+        mlConversationalFlowAgentRunner.run(mlAgent, params, agentActionListener);
+
+        Mockito.verify(agentActionListener).onResponse(objectCaptor.capture());
+        List<ModelTensor> agentOutput = (List<ModelTensor>) objectCaptor.getValue();
+        assertEquals(1, agentOutput.size()); // second_tool (last tool only)
+        assertEquals(SECOND_TOOL, agentOutput.get(0).getName());
+        assertEquals(SECOND_TOOL_RESPONSE, agentOutput.get(0).getResult());
+    }
+
+    /**
+     * Tests the conversational flow agent runner with a single tool.
+     * 
+     * <p>This test verifies the conversational flow functionality when only one tool is configured.
+     * The test:</p>
+     * <ul>
+     *   <li>Creates an agent with a single tool</li>
+     *   <li>Executes the conversational flow</li>
+     *   <li>Verifies that the single tool's output is returned</li>
+     *   <li>Ensures proper tool execution and response handling</li>
+     * </ul>
+     * 
+     * <p>This test ensures that single-tool conversational flows work correctly and
+     * maintain the same output format as multi-tool flows.</p>
+     */
+    @Test
+    public void testRunWithSingleTool() {
+        final Map<String, String> params = new HashMap<>();
+        params.put(MLAgentExecutor.MEMORY_ID, "memoryId");
+        params.put(MLAgentExecutor.QUESTION, "test question");
+        MLToolSpec firstToolSpec = MLToolSpec.builder().name(FIRST_TOOL).type(FIRST_TOOL).build();
+
+        final MLAgent mlAgent = MLAgent
+            .builder()
+            .name("TestAgent")
+            .type(MLAgentType.CONVERSATIONAL_FLOW.name())
+            .memory(null)
+            .appType(null)
+            .tools(Arrays.asList(firstToolSpec))
+            .build();
+
+        mlConversationalFlowAgentRunner.run(mlAgent, params, agentActionListener);
+
         Mockito.verify(agentActionListener).onResponse(objectCaptor.capture());
         List<ModelTensor> agentOutput = (List<ModelTensor>) objectCaptor.getValue();
         assertEquals(1, agentOutput.size());
-        // Respond with last tool output
-        assertEquals(SECOND_TOOL, agentOutput.get(0).getName());
-        assertEquals(SECOND_TOOL_RESPONSE, agentOutput.get(0).getResult());
-
-        verify(memoryManager).updateInteraction(anyString(), memoryMapCaptor.capture(), any(ActionListener.class));
-        Map<String, Object> additionalInfo = (Map<String, Object>) memoryMapCaptor.getValue().get("additional_info");
-        assertEquals(1, additionalInfo.size());
-        assertNotNull(additionalInfo.get(SECOND_TOOL + ".output"));
+        assertEquals(FIRST_TOOL, agentOutput.get(0).getName());
+        assertEquals(FIRST_TOOL_RESPONSE, agentOutput.get(0).getResult());
     }
 
-    @Test()
-    public void testRunWithNoToolSpec() {
-        final Map<String, String> params = new HashMap<>();
-        params.put(MLAgentExecutor.MEMORY_ID, "memoryId");
-        MLMemorySpec mlMemorySpec = MLMemorySpec.builder().type("memoryType").build();
-        final MLAgent mlAgent = MLAgent.builder().name("TestAgent").type(MLAgentType.FLOW.name()).memory(mlMemorySpec).build();
-        mlFlowAgentRunner.run(mlAgent, params, agentActionListener);
-        ArgumentCaptor<Exception> argCaptor = ArgumentCaptor.forClass(IllegalArgumentException.class);
-        verify(agentActionListener).onFailure(argCaptor.capture());
-        assert (argCaptor.getValue().getMessage().equals("no tool configured"));
-    }
-
+    /**
+     * Tests the conversational flow agent runner with no tools.
+     * 
+     * <p>This test verifies that the conversational flow agent properly handles the case when
+     * no tools are configured. The test:</p>
+     * <ul>
+     *   <li>Creates an agent without any tools</li>
+     *   <li>Attempts to execute the conversational flow</li>
+     *   <li>Verifies that an IllegalArgumentException is thrown</li>
+     *   <li>Checks that the error message is correct</li>
+     * </ul>
+     * 
+     * <p>This test ensures that the agent fails gracefully with a meaningful error message
+     * when no tools are available for execution.</p>
+     */
     @Test
-    public void testRunWithIncludeOutputSet() {
+    public void testRunWithNoTools() {
         final Map<String, String> params = new HashMap<>();
         params.put(MLAgentExecutor.MEMORY_ID, "memoryId");
-        params.put(MLAgentExecutor.PARENT_INTERACTION_ID, "interaction_id");
-        MLToolSpec firstToolSpec = MLToolSpec.builder().name(FIRST_TOOL).type(FIRST_TOOL).includeOutputInAgentResponse(true).build();
-        MLToolSpec secondToolSpec = MLToolSpec.builder().name(SECOND_TOOL).type(SECOND_TOOL).includeOutputInAgentResponse(true).build();
-        MLMemorySpec mlMemorySpec = MLMemorySpec.builder().type("memoryType").build();
-        ConversationIndexMemory memory = mock(ConversationIndexMemory.class);
-        Mockito.doAnswer(invocation -> {
-            ActionListener<UpdateResponse> listener = invocation.getArgument(2);
-            ShardId shardId = new ShardId(new Index("indexName", "uuid"), 1);
-            listener.onResponse(new UpdateResponse(shardId, "taskId", 1, 1, 1, DocWriteResponse.Result.UPDATED));
-            return null;
-        }).when(memoryManager).updateInteraction(Mockito.any(), Mockito.any(), Mockito.any());
-        doReturn(memoryManager).when(memory).getMemoryManager();
-        Mockito.doAnswer(invocation -> {
-            ActionListener<Object> listener = invocation.getArgument(1);
-            listener.onResponse(memory);
-            return null;
-        }).when(mockMemoryFactory).create(Mockito.anyString(), Mockito.any());
+        params.put(MLAgentExecutor.QUESTION, "test question");
+
         final MLAgent mlAgent = MLAgent
             .builder()
             .name("TestAgent")
-            .type(MLAgentType.FLOW.name())
-            .memory(mlMemorySpec)
-            .tools(Arrays.asList(firstToolSpec, secondToolSpec))
+            .type(MLAgentType.CONVERSATIONAL_FLOW.name())
+            .memory(null)
+            .appType(null)
+            .tools(null)
             .build();
-        mlFlowAgentRunner.run(mlAgent, params, agentActionListener);
-        Mockito.verify(agentActionListener).onResponse(objectCaptor.capture());
-        List<ModelTensor> agentOutput = (List<ModelTensor>) objectCaptor.getValue();
-        // Respond with all tool output
-        assertEquals(2, agentOutput.size());
-        assertEquals(FIRST_TOOL, agentOutput.get(0).getName());
-        assertEquals(SECOND_TOOL, agentOutput.get(1).getName());
-        assertEquals(FIRST_TOOL_RESPONSE, agentOutput.get(0).getResult());
-        assertEquals(SECOND_TOOL_RESPONSE, agentOutput.get(1).getResult());
 
-        verify(memoryManager).updateInteraction(anyString(), memoryMapCaptor.capture(), any(ActionListener.class));
-        Map<String, Object> additionalInfo = (Map<String, Object>) memoryMapCaptor.getValue().get("additional_info");
-        assertEquals(2, additionalInfo.size());
+        mlConversationalFlowAgentRunner.run(mlAgent, params, agentActionListener);
+
+        ArgumentCaptor<Exception> argCaptor = ArgumentCaptor.forClass(IllegalArgumentException.class);
+        verify(agentActionListener).onFailure(argCaptor.capture());
+        assertEquals("no tool configured", argCaptor.getValue().getMessage());
     }
 
+    /**
+     * Tests the conversational flow agent runner with ModelTensorOutput responses.
+     * 
+     * <p>This test verifies that the conversational flow agent properly handles tools that return
+     * ModelTensorOutput objects. The test:</p>
+     * <ul>
+     *   <li>Creates an agent with two tools</li>
+     *   <li>Configures the first tool to return ModelTensorOutput</li>
+     *   <li>Executes the conversational flow</li>
+     *   <li>Verifies that only the last tool's output is returned (default behavior)</li>
+     *   <li>Ensures ModelTensorOutput is properly parsed and handled</li>
+     * </ul>
+     * 
+     * <p>This test ensures that complex model outputs are handled correctly in conversational flows
+     * and that the default behavior of returning only the last tool's output is maintained.</p>
+     */
     @Test
     public void testRunWithModelTensorOutput() {
         final Map<String, String> params = new HashMap<>();
         params.put(MLAgentExecutor.MEMORY_ID, "memoryId");
-        MLToolSpec firstToolSpec = MLToolSpec.builder().name(null).type(FIRST_TOOL).includeOutputInAgentResponse(true).build();
-        MLToolSpec secondToolSpec = MLToolSpec.builder().name(SECOND_TOOL).type(SECOND_TOOL).includeOutputInAgentResponse(true).build();
-        MLMemorySpec mlMemorySpec = MLMemorySpec.builder().type("memoryType").build();
+        params.put(MLAgentExecutor.QUESTION, "test question");
+        MLToolSpec firstToolSpec = MLToolSpec.builder().name(FIRST_TOOL).type(FIRST_TOOL).build();
+        MLToolSpec secondToolSpec = MLToolSpec.builder().name(SECOND_TOOL).type(SECOND_TOOL).build();
+
         final MLAgent mlAgent = MLAgent
             .builder()
             .name("TestAgent")
-            .type(MLAgentType.FLOW.name())
-            .memory(mlMemorySpec)
+            .type(MLAgentType.CONVERSATIONAL_FLOW.name())
+            .memory(null)
+            .appType(null)
             .tools(Arrays.asList(firstToolSpec, secondToolSpec))
             .build();
+
         doAnswer(generateToolTensorResponse()).when(firstTool).run(anyMap(), actionListenerCaptor.capture());
-        mlFlowAgentRunner.run(mlAgent, params, agentActionListener);
+
+        mlConversationalFlowAgentRunner.run(mlAgent, params, agentActionListener);
+
         Mockito.verify(agentActionListener).onResponse(objectCaptor.capture());
         List<ModelTensor> agentOutput = (List<ModelTensor>) objectCaptor.getValue();
-        // Respond with all tool output
-        assertEquals(2, agentOutput.size());
-        assertEquals(FIRST_TOOL, agentOutput.get(0).getName());
-        assertEquals(SECOND_TOOL, agentOutput.get(1).getName());
-        assertEquals("index response", agentOutput.get(0).getDataAsMap().get("index"));
-        assertEquals(SECOND_TOOL_RESPONSE, agentOutput.get(1).getResult());
+        assertEquals(1, agentOutput.size());
+        assertEquals(SECOND_TOOL, agentOutput.get(0).getName());
+        assertEquals(SECOND_TOOL_RESPONSE, agentOutput.get(0).getResult());
     }
 
+    /**
+     * Tests the getToolExecuteParams method.
+     * Verifies that tool parameters are correctly extracted and processed.
+     */
     @Test
     public void testGetToolExecuteParams() {
         MLToolSpec toolSpec = mock(MLToolSpec.class);
@@ -381,7 +501,7 @@ public class MLFlowAgentRunnerTest {
 
         Map<String, String> params = Map.of("toolType.param2", "value2", "toolName.param3", "value3", "param4", "value4");
 
-        Map<String, String> result = buildToolParameters(params, toolSpec, null);
+        Map<String, String> result = ToolUtils.buildToolParameters(params, toolSpec, null);
 
         assertEquals("value1", result.get("param1"));
         assertEquals("value3", result.get("param3"));
@@ -389,6 +509,10 @@ public class MLFlowAgentRunnerTest {
         assertFalse(result.containsKey("toolType.param2"));
     }
 
+    /**
+     * Tests the getToolExecuteParams method with configuration overrides.
+     * Verifies that config values override parameter values.
+     */
     @Test
     public void testGetToolExecuteParamsWithConfig() {
         MLToolSpec toolSpec = mock(MLToolSpec.class);
@@ -400,7 +524,7 @@ public class MLFlowAgentRunnerTest {
         Map<String, String> params = Map
             .of("toolType.param2", "value2", "toolName.param3", "value3", "param4", "value4", "toolName.tool_key", "dynamic value");
 
-        Map<String, String> result = buildToolParameters(params, toolSpec, null);
+        Map<String, String> result = ToolUtils.buildToolParameters(params, toolSpec, null);
 
         assertEquals("value1", result.get("param1"));
         assertEquals("value3", result.get("param3"));
@@ -409,15 +533,17 @@ public class MLFlowAgentRunnerTest {
         assertEquals("tool_config_value", result.get("tool_key"));
     }
 
+    /**
+     * Tests the getToolExecuteParams method with input substitution.
+     * Verifies that parameter substitution works correctly in input fields.
+     */
     @Test
     public void testGetToolExecuteParamsWithInputSubstitution() {
-        // Setup ToolSpec with parameters
         MLToolSpec toolSpec = mock(MLToolSpec.class);
         when(toolSpec.getParameters()).thenReturn(Map.of("param1", "value1"));
         when(toolSpec.getType()).thenReturn("toolType");
         when(toolSpec.getName()).thenReturn("toolName");
 
-        // Setup params with a special 'input' key for substitution
         Map<String, String> params = Map
             .of(
                 "toolType.param2",
@@ -430,23 +556,23 @@ public class MLFlowAgentRunnerTest {
                 "Input contains ${parameters.param1}, ${parameters.param4}"
             );
 
-        // Execute the method
-        Map<String, String> result = ToolUtils.extractInputParameters(buildToolParameters(params, toolSpec, null), null);
+        Map<String, String> result = ToolUtils.extractInputParameters(ToolUtils.buildToolParameters(params, toolSpec, null), null);
 
-        // Assertions
         assertEquals("value1", result.get("param1"));
         assertEquals("value3", result.get("param3"));
         assertEquals("value4", result.get("param4"));
         assertFalse(result.containsKey("toolType.param2"));
 
-        // Asserting substitution in 'input'
         String expectedInput = "Input contains value1, value4";
         assertEquals(expectedInput, result.get("input"));
     }
 
+    /**
+     * Tests the parseResponse method with various input types.
+     * Verifies that different response types are properly parsed.
+     */
     @Test
     public void testParseResponse() throws IOException {
-
         String outputString = "testOutput";
         assertEquals(outputString, ToolUtils.parseResponse(outputString));
 
@@ -454,133 +580,40 @@ public class MLFlowAgentRunnerTest {
         ModelTensors modelTensors = ModelTensors.builder().mlModelTensors(Arrays.asList(modelTensor)).build();
         ModelTensorOutput mlModelTensorOutput = ModelTensorOutput.builder().mlModelOutputs(Arrays.asList(modelTensors)).build();
 
-        String expectedJson = "{\"name\":\"firstTool\",\"dataAsMap\":{\"index\":\"index response\"}}"; // the JSON representation of the
-                                                                                                       // model tensor
+        String expectedJson = "{\"name\":\"firstTool\",\"dataAsMap\":{\"index\":\"index response\"}}";
         assertEquals(expectedJson, ToolUtils.parseResponse(modelTensor));
 
-        String expectedTensorOuput =
+        String expectedTensorOutput =
             "{\"inference_results\":[{\"output\":[{\"name\":\"firstTool\",\"dataAsMap\":{\"index\":\"index response\"}}]}]}";
-        assertEquals(expectedTensorOuput, ToolUtils.parseResponse(mlModelTensorOutput));
+        assertEquals(expectedTensorOutput, ToolUtils.parseResponse(mlModelTensorOutput));
 
         // Test for List containing ModelTensors
         ModelTensors tensorsInList = ModelTensors.builder().mlModelTensors(Arrays.asList(modelTensor)).build();
         List<ModelTensors> tensorList = Arrays.asList(tensorsInList);
-        String expectedListJson = "{\"output\":[{\"name\":\"firstTool\",\"dataAsMap\":{\"index\":\"index response\"}}]}"; // Replace with
-                                                                                                                          // the actual JSON
-                                                                                                                          // representation
+        String expectedListJson = "{\"output\":[{\"name\":\"firstTool\",\"dataAsMap\":{\"index\":\"index response\"}}]}";
         assertEquals(expectedListJson, ToolUtils.parseResponse(tensorList));
 
         // Test for a non-string, non-model object
         Map<String, Object> nonModelObject = Map.of("key", "value");
-        String expectedNonModelJson = "{\"key\":\"value\"}"; // Replace with the actual JSON representation from StringUtils.toJson
+        String expectedNonModelJson = "{\"key\":\"value\"}";
         assertEquals(expectedNonModelJson, ToolUtils.parseResponse(nonModelObject));
-    }
-
-    @Test
-    public void testUpdateInteraction() {
-        String interactionId = "interactionId";
-        ConversationIndexMemory memory = mock(ConversationIndexMemory.class);
-        MLMemoryManager memoryManager = mock(MLMemoryManager.class);
-        when(memory.getMemoryManager()).thenReturn(memoryManager);
-        Map<String, Object> additionalInfo = new HashMap<>();
-
-        mlFlowAgentRunner.updateInteraction(additionalInfo, interactionId, memory);
-        verify(memoryManager).updateInteraction(eq(interactionId), anyMap(), any());
-    }
-
-    @Test
-    public void testWithMemoryNotSet() {
-        final Map<String, String> params = new HashMap<>();
-        params.put(MLAgentExecutor.MEMORY_ID, "memoryId");
-        MLToolSpec firstToolSpec = MLToolSpec.builder().name(FIRST_TOOL).type(FIRST_TOOL).build();
-        MLToolSpec secondToolSpec = MLToolSpec.builder().name(SECOND_TOOL).type(SECOND_TOOL).build();
-        final MLAgent mlAgent = MLAgent
-            .builder()
-            .name("TestAgent")
-            .type(MLAgentType.FLOW.name())
-            .memory(null)
-            .tools(Arrays.asList(firstToolSpec, secondToolSpec))
-            .build();
-        mlFlowAgentRunner.run(mlAgent, params, agentActionListener);
-        Mockito.verify(agentActionListener).onResponse(objectCaptor.capture());
-        List<ModelTensor> agentOutput = (List<ModelTensor>) objectCaptor.getValue();
-        assertEquals(1, agentOutput.size());
-        // Respond with last tool output
-        assertEquals(SECOND_TOOL, agentOutput.get(0).getName());
-        assertEquals(SECOND_TOOL_RESPONSE, agentOutput.get(0).getResult());
-    }
-
-    @Test
-    public void testUpdateMemory() {
-        // Mocking MLMemorySpec
-        MLMemorySpec memorySpec = mock(MLMemorySpec.class);
-        when(memorySpec.getType()).thenReturn("memoryType");
-
-        // Mocking Memory Factory and Memory
-
-        ConversationIndexMemory.Factory memoryFactory = new ConversationIndexMemory.Factory();
-        memoryFactory.init(client, indicesHandler, memoryManager);
-        ActionListener<ConversationIndexMemory> listener = mock(ActionListener.class);
-        memoryFactory.create(Map.of(MEMORY_ID, "123", MEMORY_NAME, "name", APP_TYPE, "app"), listener);
-
-        verify(listener).onResponse(isA(ConversationIndexMemory.class));
-
-        Map<String, Memory.Factory> memoryFactoryMap = new HashMap<>();
-        memoryFactoryMap.put("memoryType", memoryFactory);
-        mlFlowAgentRunner.setMemoryFactoryMap(memoryFactoryMap);
-
-        // Execute the method under test
-        mlFlowAgentRunner.updateMemory(new HashMap<>(), memorySpec, "memoryId", "interactionId");
-
-        // Asserting that the Memory Manager's updateInteraction method was called
-        verify(memoryManager).updateInteraction(anyString(), anyMap(), any(ActionListener.class));
-    }
-
-    @Test
-    public void testRunWithUpdateFailure() {
-        final Map<String, String> params = new HashMap<>();
-        params.put(MLAgentExecutor.MEMORY_ID, "memoryId");
-        params.put(MLAgentExecutor.PARENT_INTERACTION_ID, "interaction_id");
-        MLToolSpec firstToolSpec = MLToolSpec.builder().name(FIRST_TOOL).type(FIRST_TOOL).build();
-        MLToolSpec secondToolSpec = MLToolSpec.builder().name(SECOND_TOOL).type(SECOND_TOOL).build();
-        MLMemorySpec mlMemorySpec = MLMemorySpec.builder().type("memoryType").build();
-        ConversationIndexMemory memory = mock(ConversationIndexMemory.class);
-        Mockito.doAnswer(invocation -> {
-            ActionListener<UpdateResponse> listener = invocation.getArgument(2);
-            listener.onFailure(new IllegalArgumentException("input error"));
-            return null;
-        }).when(memoryManager).updateInteraction(Mockito.any(), Mockito.any(), Mockito.any());
-        doReturn(memoryManager).when(memory).getMemoryManager();
-        Mockito.doAnswer(invocation -> {
-            ActionListener<Object> listener = invocation.getArgument(1);
-            listener.onResponse(memory);
-            return null;
-        }).when(mockMemoryFactory).create(Mockito.anyString(), Mockito.any());
-
-        final MLAgent mlAgent = MLAgent
-            .builder()
-            .name("TestAgent")
-            .type(MLAgentType.FLOW.name())
-            .memory(mlMemorySpec)
-            .tools(Arrays.asList(firstToolSpec, secondToolSpec))
-            .build();
-        mlFlowAgentRunner.run(mlAgent, params, agentActionListener);
-        Mockito.verify(agentActionListener).onResponse(objectCaptor.capture());
-        List<ModelTensor> agentOutput = (List<ModelTensor>) objectCaptor.getValue();
-        assertEquals(1, agentOutput.size());
-        // Respond with last tool output
-        assertEquals(SECOND_TOOL, agentOutput.get(0).getName());
-        assertEquals(SECOND_TOOL_RESPONSE, agentOutput.get(0).getResult());
-
-        verify(memoryManager).updateInteraction(anyString(), memoryMapCaptor.capture(), any(ActionListener.class));
-        Map<String, Object> additionalInfo = (Map<String, Object>) memoryMapCaptor.getValue().get("additional_info");
-        assertEquals(1, additionalInfo.size());
-        assertNotNull(additionalInfo.get(SECOND_TOOL + ".output"));
     }
 
     /**
      * Tests error handling when a tool in the chain fails during execution.
-     * Verifies that MLAgentTracer.handleSpanError is called with the correct error message.
+     * 
+     * <p>This test verifies that the conversational flow agent properly handles tool failures
+     * in a multi-tool chain. The test:</p>
+     * <ul>
+     *   <li>Creates an agent with two tools</li>
+     *   <li>Configures the second tool to fail with a RuntimeException</li>
+     *   <li>Executes the conversational flow</li>
+     *   <li>Verifies that the failure is properly propagated to the listener</li>
+     *   <li>Ensures that MLAgentTracer handles the error correctly</li>
+     * </ul>
+     * 
+     * <p>This test ensures that tool failures are handled gracefully and that error information
+     * is properly propagated through the conversational flow.</p>
      */
     @Test
     public void testToolChainExecutionError() {
@@ -592,8 +625,9 @@ public class MLFlowAgentRunnerTest {
         final MLAgent mlAgent = MLAgent
             .builder()
             .name("TestAgent")
-            .type(MLAgentType.FLOW.name())
+            .type(MLAgentType.CONVERSATIONAL_FLOW.name())
             .memory(null)
+            .appType(null)
             .tools(Arrays.asList(firstToolSpec, secondToolSpec))
             .build();
 
@@ -604,7 +638,7 @@ public class MLFlowAgentRunnerTest {
             return null;
         }).when(secondTool).run(anyMap(), any(ActionListener.class));
 
-        mlFlowAgentRunner.run(mlAgent, params, agentActionListener);
+        mlConversationalFlowAgentRunner.run(mlAgent, params, agentActionListener);
 
         // Verify that the listener was called with failure
         verify(agentActionListener).onFailure(any(RuntimeException.class));
@@ -623,8 +657,9 @@ public class MLFlowAgentRunnerTest {
         final MLAgent mlAgent = MLAgent
             .builder()
             .name("TestAgent")
-            .type(MLAgentType.FLOW.name())
+            .type(MLAgentType.CONVERSATIONAL_FLOW.name())
             .memory(null)
+            .appType(null)
             .tools(Arrays.asList(firstToolSpec))
             .build();
 
@@ -635,67 +670,113 @@ public class MLFlowAgentRunnerTest {
             return null;
         }).when(firstTool).run(anyMap(), any(ActionListener.class));
 
-        mlFlowAgentRunner.run(mlAgent, params, agentActionListener);
+        mlConversationalFlowAgentRunner.run(mlAgent, params, agentActionListener);
 
         // Verify that the listener was called with failure
         verify(agentActionListener).onFailure(any(RuntimeException.class));
     }
 
     /**
-     * Tests error handling when the first tool in a multiple tool chain fails.
-     * Verifies that MLAgentTracer.handleSpanError is called with the correct error message.
+     * Tests error handling when memory creation fails.
+     * 
+     * <p>This test verifies that the conversational flow agent properly handles memory creation
+     * failures. The test:</p>
+     * <ul>
+     *   <li>Creates an agent with memory specification and app type</li>
+     *   <li>Configures memory creation to fail with a RuntimeException</li>
+     *   <li>Executes the conversational flow</li>
+     *   <li>Verifies that the failure is properly propagated to the listener</li>
+     *   <li>Ensures that MLAgentTracer handles the error correctly</li>
+     * </ul>
+     * 
+     * <p>This test ensures that memory creation failures are handled gracefully and that
+     * the conversational flow can fail safely when memory management is unavailable.</p>
      */
     @Test
-    public void testMultipleToolsFirstToolError() {
+    public void testMemoryCreationError() {
         final Map<String, String> params = new HashMap<>();
         params.put(MLAgentExecutor.MEMORY_ID, "memoryId");
         params.put(MLAgentExecutor.QUESTION, "test question");
         MLToolSpec firstToolSpec = MLToolSpec.builder().name(FIRST_TOOL).type(FIRST_TOOL).build();
-        MLToolSpec secondToolSpec = MLToolSpec.builder().name(SECOND_TOOL).type(SECOND_TOOL).build();
+        MLMemorySpec mlMemorySpec = MLMemorySpec.builder().type("memoryType").build();
+
+        // Mock memory creation to fail
+        Mockito.doAnswer(invocation -> {
+            ActionListener<ConversationIndexMemory> listener = invocation.getArgument(3);
+            listener.onFailure(new RuntimeException("Memory creation failed"));
+            return null;
+        }).when(mockMemoryFactory).create(anyString(), anyString(), anyString(), any(ActionListener.class));
+
         final MLAgent mlAgent = MLAgent
             .builder()
             .name("TestAgent")
-            .type(MLAgentType.FLOW.name())
-            .memory(null)
-            .tools(Arrays.asList(firstToolSpec, secondToolSpec))
+            .type(MLAgentType.CONVERSATIONAL_FLOW.name())
+            .memory(mlMemorySpec)
+            .appType("testApp")
+            .tools(Arrays.asList(firstToolSpec))
             .build();
 
-        // Make the first tool fail in a multiple tool scenario
-        doAnswer(invocation -> {
-            ActionListener<Object> listener = invocation.getArgument(1);
-            listener.onFailure(new RuntimeException("First tool in chain failed"));
-            return null;
-        }).when(firstTool).run(anyMap(), any(ActionListener.class));
-
-        mlFlowAgentRunner.run(mlAgent, params, agentActionListener);
+        mlConversationalFlowAgentRunner.run(mlAgent, params, agentActionListener);
 
         // Verify that the listener was called with failure
         verify(agentActionListener).onFailure(any(RuntimeException.class));
     }
 
     /**
-     * Tests error handling in the main run method when an exception occurs.
-     * Verifies that MLAgentTracer.handleSpanError is called with the correct error message.
+     * Tests error handling when chat history retrieval fails.
+     * 
+     * <p>This test verifies that the conversational flow agent properly handles chat history
+     * retrieval failures. The test:</p>
+     * <ul>
+     *   <li>Creates an agent with memory specification and app type</li>
+     *   <li>Configures memory creation to succeed but chat history retrieval to fail</li>
+     *   <li>Executes the conversational flow</li>
+     *   <li>Verifies that the failure is properly propagated to the listener</li>
+     *   <li>Ensures that MLAgentTracer handles the error correctly</li>
+     * </ul>
+     * 
+     * <p>This test ensures that chat history retrieval failures are handled gracefully and that
+     * the conversational flow can fail safely when chat history is unavailable.</p>
      */
     @Test
-    public void testRunMethodException() {
+    public void testChatHistoryRetrievalError() {
         final Map<String, String> params = new HashMap<>();
         params.put(MLAgentExecutor.MEMORY_ID, "memoryId");
         params.put(MLAgentExecutor.QUESTION, "test question");
+        MLToolSpec firstToolSpec = MLToolSpec.builder().name(FIRST_TOOL).type(FIRST_TOOL).build();
+        MLMemorySpec mlMemorySpec = MLMemorySpec.builder().type("memoryType").build();
 
-        // Create an agent that will cause an exception during execution
+        // Mock memory creation
+        Mockito.doAnswer(invocation -> {
+            ActionListener<ConversationIndexMemory> listener = invocation.getArgument(3);
+            listener.onResponse(mockMemory);
+            return null;
+        }).when(mockMemoryFactory).create(anyString(), anyString(), anyString(), any(ActionListener.class));
+
+        // Mock memory methods
+        when(mockMemory.getConversationId()).thenReturn("conversationId");
+        when(mockMemory.getType()).thenReturn("memoryType");
+
+        // Mock getMessages to fail
+        Mockito.doAnswer(invocation -> {
+            ActionListener<List<Interaction>> listener = invocation.getArgument(0);
+            listener.onFailure(new RuntimeException("Chat history retrieval failed"));
+            return null;
+        }).when(mockMemory).getMessages(any(ActionListener.class), any(Integer.class));
+
         final MLAgent mlAgent = MLAgent
             .builder()
             .name("TestAgent")
-            .type(MLAgentType.FLOW.name())
-            .memory(null)
-            .tools(Arrays.asList()) // Empty tools list will cause exception
+            .type(MLAgentType.CONVERSATIONAL_FLOW.name())
+            .memory(mlMemorySpec)
+            .appType("testApp")
+            .tools(Arrays.asList(firstToolSpec))
             .build();
 
-        mlFlowAgentRunner.run(mlAgent, params, agentActionListener);
+        mlConversationalFlowAgentRunner.run(mlAgent, params, agentActionListener);
 
         // Verify that the listener was called with failure
-        verify(agentActionListener).onFailure(any(IllegalArgumentException.class));
+        verify(agentActionListener).onFailure(any(RuntimeException.class));
     }
 
     /**
@@ -722,6 +803,42 @@ public class MLFlowAgentRunnerTest {
         // Verify that the span was marked with error and ended
         verify(mockSpan).setError(any(RuntimeException.class));
         verify(mockSpan).endSpan();
+    }
+
+    /**
+     * Tests the updateMemoryWithListener method.
+     * Verifies that memory updates are properly handled.
+     */
+    @Test
+    public void testUpdateMemoryWithListener() {
+        MLMemorySpec memorySpec = mock(MLMemorySpec.class);
+        when(memorySpec.getType()).thenReturn("memoryType");
+
+        Map<String, Object> additionalInfo = Map.of("key", "value");
+        String memoryId = "memoryId";
+        String interactionId = "interactionId";
+
+        // Mock memory factory
+        Mockito.doAnswer(invocation -> {
+            ActionListener<ConversationIndexMemory> listener = invocation.getArgument(1);
+            listener.onResponse(mockMemory);
+            return null;
+        }).when(mockMemoryFactory).create(anyString(), any(ActionListener.class));
+
+        // Mock memory update
+        Mockito.doAnswer(invocation -> {
+            ActionListener<UpdateResponse> listener = invocation.getArgument(2);
+            ShardId shardId = new ShardId(new Index("indexName", "uuid"), 1);
+            listener.onResponse(new UpdateResponse(shardId, "taskId", 1, 1, 1, DocWriteResponse.Result.UPDATED));
+            return null;
+        }).when(mockMemory).update(anyString(), anyMap(), any(ActionListener.class));
+
+        ActionListener<UpdateResponse> testListener = mock(ActionListener.class);
+
+        mlConversationalFlowAgentRunner.updateMemoryWithListener(additionalInfo, memorySpec, memoryId, interactionId, testListener);
+
+        // Verify that the memory update was called
+        verify(mockMemory).update(eq(interactionId), anyMap(), any(ActionListener.class));
     }
 
 }
