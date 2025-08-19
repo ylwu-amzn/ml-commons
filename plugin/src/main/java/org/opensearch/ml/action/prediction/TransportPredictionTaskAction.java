@@ -52,7 +52,7 @@ import lombok.extern.log4j.Log4j2;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class TransportPredictionTaskAction extends HandledTransportAction<ActionRequest, MLTaskResponse> {
     MLTaskRunner<MLPredictionTaskRequest, MLTaskResponse> mlPredictTaskRunner;
-    TransportService transportService;
+    TransportService transportService; // Use StreamTransprotService/
     MLModelCacheHelper modelCacheHelper;
 
     Client client;

@@ -489,11 +489,12 @@ public class MachineLearningPlugin extends Plugin
 
     @Override
     public List<ActionHandler<? extends ActionRequest, ? extends ActionResponse>> getActions() {
+  //public List<ActionHandler<? extends ActionRequest, ? extends ActionResponse>> getActions() { // from stream example pluign
         return ImmutableList
             .of(
                 new ActionHandler<>(MLStatsNodesAction.INSTANCE, MLStatsNodesTransportAction.class),
                 new ActionHandler<>(MLExecuteTaskAction.INSTANCE, TransportExecuteTaskAction.class),
-                new ActionHandler<>(MLPredictionTaskAction.INSTANCE, TransportPredictionTaskAction.class),
+                new ActionHandler<>(MLPredictionTaskAction.INSTANCE, TransportPredictionTaskAction.class), //
                 new ActionHandler<>(MLTrainingTaskAction.INSTANCE, TransportTrainingTaskAction.class),
                 new ActionHandler<>(MLTrainAndPredictionTaskAction.INSTANCE, TransportTrainAndPredictionTaskAction.class),
                 new ActionHandler<>(MLModelGetAction.INSTANCE, GetModelTransportAction.class),

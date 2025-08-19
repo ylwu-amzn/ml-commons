@@ -28,6 +28,7 @@ import org.opensearch.ResourceNotFoundException;
 import org.opensearch.action.ActionListenerResponseHandler;
 import org.opensearch.action.get.GetRequest;
 import org.opensearch.action.get.GetResponse;
+import org.opensearch.action.support.ChannelActionListener;
 import org.opensearch.action.support.ThreadedActionListener;
 import org.opensearch.cluster.node.DiscoveryNode;
 import org.opensearch.cluster.service.ClusterService;
@@ -254,7 +255,7 @@ public class MLPredictTaskRunner extends MLTaskRunner<MLPredictionTaskRequest, M
      */
     @Override
     protected void executeTask(MLPredictionTaskRequest request, ActionListener<MLTaskResponse> listener) {
-        final String tenantId = request.getTenantId();
+        final String tenantId = request.getTenantId(); // server side logic
         MLInputDataType inputDataType = request.getMlInput().getInputDataset().getInputDataType();
         Instant now = Instant.now();
         String modelId = request.getModelId();
@@ -308,6 +309,8 @@ public class MLPredictTaskRunner extends MLTaskRunner<MLPredictionTaskRequest, M
         String tenantId,
         ActionListener<MLTaskResponse> listener
     ) {
+        // 3 data nodes, n1, n2, n3
+        // n1: r,  n3: r, n3: run the task
         switch (inputDataType) {
             case SEARCH_QUERY:
                 ActionListener<MLInputDataset> dataFrameActionListener = ActionListener.wrap(dataSet -> {
@@ -434,7 +437,7 @@ public class MLPredictTaskRunner extends MLTaskRunner<MLPredictionTaskRequest, M
         MLInput mlInput,
         FunctionName algorithm,
         ActionName actionName,
-        ActionListener<MLTaskResponse> internalListener
+        ActionListener<MLTaskResponse> internalListener // Use ChannelActionListener ?
     ) {
         // run predict
         if (modelId != null) {
@@ -481,7 +484,7 @@ public class MLPredictTaskRunner extends MLTaskRunner<MLPredictionTaskRequest, M
                                                 mlTaskManager.startTaskPollingJob();
 
                                                 MLTaskResponse predictOutput = MLTaskResponse.builder().output(outputBuilder).build();
-                                                internalListener.onResponse(predictOutput);
+                                                internalListener.onResponse(predictOutput); // stream response
                                             }, e -> {
                                                 logException("Failed to create task for batch predict model", e, log);
                                                 internalListener.onFailure(e);

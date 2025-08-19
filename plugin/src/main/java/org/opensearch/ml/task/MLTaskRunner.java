@@ -117,6 +117,8 @@ public abstract class MLTaskRunner<Request extends MLTaskRequest, Response exten
                 // Execute ML task remotely
                 log.debug("Execute ML request {} remotely on node {}", request.getRequestID(), nodeId);
                 request.setDispatchTask(false);
+                // resplace with StreamTransportService
+                // change getResponseHandler to StreamTranspportHandler.
                 transportService.sendRequest(node, getTransportActionName(), request, getResponseHandler(listener));
             }
         }, listener::onFailure));
