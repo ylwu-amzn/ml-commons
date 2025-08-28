@@ -6,6 +6,7 @@
 package org.opensearch.ml.action.memorycontainer;
 
 import static org.opensearch.ml.common.CommonValue.ML_MEMORY_CONTAINER_INDEX;
+import static org.opensearch.ml.common.CommonValue.ML_MEMORY_INDEX_PREFIX;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.AGENT_ID_FIELD;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.CREATED_TIME_FIELD;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.EMBEDDING_MODEL_NOT_FOUND_ERROR;
@@ -210,7 +211,7 @@ public class TransportCreateMemoryContainerAction extends
         }
 
         // Convert to lowercase as OpenSearch doesn't support uppercase in index names
-        final String finalIndexName = baseIndexName.toLowerCase(Locale.ROOT);
+        final String finalIndexName = ML_MEMORY_INDEX_PREFIX + "-" + baseIndexName.toLowerCase(Locale.ROOT);
         // Create the memory data index with appropriate mapping
         createMemoryDataIndex(finalIndexName, container.getMemoryStorageConfig(), ActionListener.wrap(success -> {
             // Return the actual index name that was created
