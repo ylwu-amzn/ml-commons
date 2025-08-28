@@ -48,6 +48,25 @@ public class MemorySearchQueryBuilder {
             .endObject()
             .endObject();
     }
+    public static String buildNeuralQueryString(String userId, String queryText, String embeddingModelId) throws IOException {
+        return "{\n" +
+                "    \"bool\": {\n" +
+                "      \"filter\": [\n" +
+                "        { \"term\": { \"user_id\": \""+userId+"\" } }\n" +
+                "      ],\n" +
+                "      \"must\": [\n" +
+                "        {\n" +
+                "          \"neural\": {\n" +
+                "            \""+MEMORY_EMBEDDING_FIELD+"\": {\n" +
+                "              \"query_text\": \""+queryText+"\",\n" +
+                "              \"model_id\": \""+embeddingModelId+"\"\n" +
+                "            }\n" +
+                "          }\n" +
+                "        }\n" +
+                "      ]\n" +
+                "    }\n" +
+                "  }";
+    }
 
     /**
      * Builds a neural sparse search query for sparse embeddings
@@ -100,6 +119,20 @@ public class MemorySearchQueryBuilder {
             }
         } else {
             return buildMatchQuery(queryText);
+        }
+    }
+
+    public static String buildMemorySearchQueryString(String userId, String queryText, MemoryStorageConfig storageConfig) throws IOException {
+        if (storageConfig != null && storageConfig.isSemanticStorageEnabled()) {
+            if (storageConfig.getEmbeddingModelType() == FunctionName.TEXT_EMBEDDING) {
+                return buildNeuralQueryString(userId, queryText, storageConfig.getEmbeddingModelId());
+            } else if (storageConfig.getEmbeddingModelType() == FunctionName.SPARSE_ENCODING) {
+                return buildNeuralSparseQuery(queryText, storageConfig.getEmbeddingModelId()).toString();
+            } else {
+                throw new IllegalStateException("Unsupported embedding model type: " + storageConfig.getEmbeddingModelType());
+            }
+        } else {
+            return buildMatchQuery(queryText).toString();
         }
     }
 

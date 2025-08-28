@@ -204,7 +204,11 @@ public class MLMemory implements ToXContentObject, Writeable {
                     break;
                 case MEMORY_EMBEDDING_FIELD:
                     // Parse embedding as generic object (could be array or sparse map)
-                    memoryEmbedding = parser.map();
+                    if (parser.currentToken() == XContentParser.Token.START_ARRAY) {
+                        memoryEmbedding = parser.list();
+                    } else {
+                        memoryEmbedding = parser.map();
+                    }
                     break;
                 default:
                     parser.skipChildren();

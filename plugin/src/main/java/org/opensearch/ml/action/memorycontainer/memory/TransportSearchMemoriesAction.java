@@ -22,6 +22,7 @@ import org.opensearch.action.search.SearchResponse;
 import org.opensearch.action.support.ActionFilters;
 import org.opensearch.action.support.HandledTransportAction;
 import org.opensearch.common.inject.Inject;
+import org.opensearch.common.util.concurrent.ThreadContext;
 import org.opensearch.commons.authuser.User;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.rest.RestStatus;
@@ -133,22 +134,26 @@ public class TransportSearchMemoriesAction extends HandledTransportAction<MLSear
                 ? storageConfig.getMemoryIndexName()
                 : STATIC_MEMORY_INDEX_PREFIX + container.getName().toLowerCase() + "-" + RestActionUtils.getUserContext(client).getName();
 
+            User user = RestActionUtils.getUserContext(client);
+            String userId = user.getName();
             // Build search request based on storage configuration
-            SearchRequest searchRequest = buildSearchRequest(input.getQuery(), storageConfig, indexName);
+            SearchRequest searchRequest = buildSearchRequest(userId, input.getQuery(), storageConfig, indexName);
 
-            // Execute search
-            client.search(searchRequest, ActionListener.wrap(response -> {
-                try {
-                    MLSearchMemoriesResponse searchResponse = parseSearchResponse(response);
-                    actionListener.onResponse(searchResponse);
-                } catch (Exception e) {
-                    log.error("Failed to parse search response", e);
-                    actionListener.onFailure(new OpenSearchException("Failed to parse search response", e));
-                }
-            }, e -> {
-                log.error("Search execution failed", e);
-                actionListener.onFailure(new OpenSearchException("Search execution failed: " + e.getMessage(), e));
-            }));
+            try (ThreadContext.StoredContext threadContext = client.threadPool().getThreadContext().stashContext()) {
+                // Execute search
+                client.search(searchRequest, ActionListener.wrap(response -> {
+                    try {
+                        MLSearchMemoriesResponse searchResponse = parseSearchResponse(response);
+                        actionListener.onResponse(searchResponse);
+                    } catch (Exception e) {
+                        log.error("Failed to parse search response", e);
+                        actionListener.onFailure(new OpenSearchException("Failed to parse search response", e));
+                    }
+                }, e -> {
+                    log.error("Search execution failed", e);
+                    actionListener.onFailure(new OpenSearchException("Search execution failed: " + e.getMessage(), e));
+                }));
+            }
 
         } catch (Exception e) {
             log.error("Failed to build search request", e);
@@ -156,16 +161,16 @@ public class TransportSearchMemoriesAction extends HandledTransportAction<MLSear
         }
     }
 
-    private SearchRequest buildSearchRequest(String query, MemoryStorageConfig storageConfig, String indexName) throws IOException {
+    private SearchRequest buildSearchRequest(String userId, String query, MemoryStorageConfig storageConfig, String indexName) throws IOException {
         // Note: Size limit removed - search will return all matching results
         // int maxResults = storageConfig != null ? storageConfig.getMaxInferSize() : MAX_INFER_SIZE_DEFAULT_VALUE;
 
         // Use utility class to build the appropriate query
-        XContentBuilder queryBuilder = MemorySearchQueryBuilder.buildQueryByStorageType(query, storageConfig);
+        String queryString = MemorySearchQueryBuilder.buildMemorySearchQueryString(userId, query, storageConfig);
 
         // Build search source with exclusions
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
-        searchSourceBuilder.query(QueryBuilders.wrapperQuery(queryBuilder.toString()));
+        searchSourceBuilder.query(QueryBuilders.wrapperQuery(queryString));
         // Size limit removed - will return all matching results
         // searchSourceBuilder.size(maxResults);
         searchSourceBuilder.fetchSource(null, new String[] { MEMORY_EMBEDDING_FIELD });

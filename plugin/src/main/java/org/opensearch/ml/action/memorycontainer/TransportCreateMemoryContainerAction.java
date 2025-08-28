@@ -268,31 +268,33 @@ public class TransportCreateMemoryContainerAction extends
 
             indexMappings.put("properties", properties);
 
-            // Create the index using client directly
-            client
-                .admin()
-                .indices()
-                .create(
-                    new org.opensearch.action.admin.indices.create.CreateIndexRequest(indexName)
-                        .settings(indexSettings)
-                        .mapping(indexMappings),
-                    ActionListener.wrap(response -> {
-                        if (response.isAcknowledged()) {
-                            log.info("Successfully created memory data index: {}", indexName);
-                            listener.onResponse(true);
-                        } else {
-                            listener.onFailure(new RuntimeException("Failed to create memory data index: " + indexName));
-                        }
-                    }, e -> {
-                        if (e instanceof org.opensearch.ResourceAlreadyExistsException) {
-                            log.info("Memory data index already exists: {}", indexName);
-                            listener.onResponse(true);
-                        } else {
-                            log.error("Error creating memory data index: {}", indexName, e);
-                            listener.onFailure(e);
-                        }
-                    })
-                );
+            try (ThreadContext.StoredContext threadContext = client.threadPool().getThreadContext().stashContext()) {
+                // Create the index using client directly
+                client
+                        .admin()
+                        .indices()
+                        .create(
+                                new org.opensearch.action.admin.indices.create.CreateIndexRequest(indexName)
+                                        .settings(indexSettings)
+                                        .mapping(indexMappings),
+                                ActionListener.wrap(response -> {
+                                    if (response.isAcknowledged()) {
+                                        log.info("Successfully created memory data index: {}", indexName);
+                                        listener.onResponse(true);
+                                    } else {
+                                        listener.onFailure(new RuntimeException("Failed to create memory data index: " + indexName));
+                                    }
+                                }, e -> {
+                                    if (e instanceof org.opensearch.ResourceAlreadyExistsException) {
+                                        log.info("Memory data index already exists: {}", indexName);
+                                        listener.onResponse(true);
+                                    } else {
+                                        log.error("Error creating memory data index: {}", indexName, e);
+                                        listener.onFailure(e);
+                                    }
+                                })
+                        );
+            }
         } catch (Exception e) {
             log.error("Failed to create memory data index", e);
             listener.onFailure(e);

@@ -22,6 +22,7 @@ import org.opensearch.action.delete.DeleteRequest;
 import org.opensearch.action.index.IndexRequest;
 import org.opensearch.action.support.WriteRequest;
 import org.opensearch.action.update.UpdateRequest;
+import org.opensearch.common.util.concurrent.ThreadContext;
 import org.opensearch.commons.authuser.User;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.ml.common.memorycontainer.MLMemory;
@@ -149,50 +150,52 @@ public class MemoryOperationsService {
             return;
         }
 
-        client.bulk(bulkRequest, ActionListener.wrap(bulkResponse -> {
-            if (bulkResponse.hasFailures()) {
-                log.error("Bulk memory operations had failures: {}", bulkResponse.buildFailureMessage());
-            }
+        try (ThreadContext.StoredContext threadContext = client.threadPool().getThreadContext().stashContext()) {
+            client.bulk(bulkRequest, ActionListener.wrap(bulkResponse -> {
+                if (bulkResponse.hasFailures()) {
+                    log.error("Bulk memory operations had failures: {}", bulkResponse.buildFailureMessage());
+                }
 
-            log.debug("Executed {} memory operations successfully", bulkResponse.getItems().length);
+                log.debug("Executed {} memory operations successfully", bulkResponse.getItems().length);
 
-            BulkItemResponse[] items = bulkResponse.getItems();
-            int itemIndex = 0;
+                BulkItemResponse[] items = bulkResponse.getItems();
+                int itemIndex = 0;
 
-            for (int i = 0; i < results.size(); i++) {
-                MemoryResult result = results.get(i);
-                if (result.getEvent() == MemoryEvent.ADD && itemIndex < items.length) {
-                    while (itemIndex < items.length && items[itemIndex].getOpType() != DocWriteRequest.OpType.INDEX) {
+                for (int i = 0; i < results.size(); i++) {
+                    MemoryResult result = results.get(i);
+                    if (result.getEvent() == MemoryEvent.ADD && itemIndex < items.length) {
+                        while (itemIndex < items.length && items[itemIndex].getOpType() != DocWriteRequest.OpType.INDEX) {
+                            itemIndex++;
+                        }
+
+                        if (itemIndex < items.length && !items[itemIndex].isFailed()) {
+                            String actualId = items[itemIndex].getId();
+                            results
+                                    .set(
+                                            i,
+                                            MemoryResult
+                                                    .builder()
+                                                    .memoryId(actualId)
+                                                    .memory(result.getMemory())
+                                                    .event(MemoryEvent.ADD)
+                                                    .oldMemory(null)
+                                                    .build()
+                                    );
+                        }
                         itemIndex++;
                     }
-
-                    if (itemIndex < items.length && !items[itemIndex].isFailed()) {
-                        String actualId = items[itemIndex].getId();
-                        results
-                            .set(
-                                i,
-                                MemoryResult
-                                    .builder()
-                                    .memoryId(actualId)
-                                    .memory(result.getMemory())
-                                    .event(MemoryEvent.ADD)
-                                    .oldMemory(null)
-                                    .build()
-                            );
-                    }
-                    itemIndex++;
                 }
-            }
 
-            if (storageConfig != null && storageConfig.isSemanticStorageEnabled()) {
-                updateEmbeddingsForOperations(results, indexName, storageConfig, listener);
-            } else {
-                listener.onResponse(results);
-            }
-        }, e -> {
-            log.error("Failed to execute memory operations", e);
-            listener.onFailure(e);
-        }));
+                if (storageConfig != null && storageConfig.isSemanticStorageEnabled()) {
+                    updateEmbeddingsForOperations(results, indexName, storageConfig, listener);
+                } else {
+                    listener.onResponse(results);
+                }
+            }, e -> {
+                log.error("Failed to execute memory operations", e);
+                listener.onFailure(e);
+            }));
+        }
     }
 
     public void bulkIndexMemoriesWithResults(
