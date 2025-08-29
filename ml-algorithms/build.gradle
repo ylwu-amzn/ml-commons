@@ -50,6 +50,13 @@ dependencies {
     implementation group: 'io.protostuff', name: 'protostuff-runtime', version: '1.8.0'
     implementation group: 'io.protostuff', name: 'protostuff-api', version: '1.8.0'
     implementation group: 'io.protostuff', name: 'protostuff-collectionschema', version: '1.8.0'
+    implementation 'io.netty:netty-transport:4.1.118.Final'
+    implementation 'io.netty:netty-buffer:4.1.118.Final'
+    implementation 'io.netty:netty-common:4.1.118.Final'
+    implementation 'io.netty:netty-handler:4.1.118.Final'
+    implementation 'io.netty:netty-codec:4.1.118.Final'
+    implementation 'io.netty:netty-codec-http:4.1.118.Final'
+    implementation 'io.netty:netty-codec-http2:4.1.118.Final'
     testImplementation group: 'junit', name: 'junit', version: '4.13.2'
     testImplementation group: 'org.mockito', name: 'mockito-core', version: '5.15.2'
     compileOnly (group: 'com.google.guava', name: 'guava', version: "${versions.guava}") {

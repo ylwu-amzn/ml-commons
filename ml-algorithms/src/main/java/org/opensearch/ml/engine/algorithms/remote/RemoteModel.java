@@ -31,6 +31,7 @@ import org.opensearch.ml.engine.annotation.Function;
 import org.opensearch.ml.engine.encryptor.Encryptor;
 import org.opensearch.script.ScriptService;
 import org.opensearch.threadpool.ThreadPool;
+import org.opensearch.transport.TransportChannel;
 import org.opensearch.transport.client.Client;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -80,6 +81,30 @@ public class RemoteModel implements Predictable {
             }
             actionType = actionType == null ? ActionType.PREDICT : actionType;
             connectorExecutor.executeAction(actionType.toString(), mlInput, actionListener);
+        } catch (RuntimeException e) {
+            log.error("Failed to call remote model.", e);
+            actionListener.onFailure(e);
+        } catch (Throwable e) {
+            log.error("Failed to call remote model.", e);
+            actionListener.onFailure(new MLException(e));
+        }
+    }
+
+    public void asyncPredictStream(MLInput mlInput, ActionListener<MLTaskResponse> actionListener, TransportChannel channel) {
+        if (!isModelReady()) {
+            actionListener
+                .onFailure(
+                    new IllegalArgumentException("Model not ready yet. Please run this first: POST /_plugins/_ml/models/<model_id>/_deploy")
+                );
+            return;
+        }
+        try {
+            ActionType actionType = null;
+            if (mlInput.getInputDataset() instanceof RemoteInferenceInputDataSet) {
+                actionType = ((RemoteInferenceInputDataSet) mlInput.getInputDataset()).getActionType();
+            }
+            actionType = actionType == null ? ActionType.PREDICT : actionType;
+            connectorExecutor.executeActionStream(actionType.toString(), mlInput, actionListener, channel);
         } catch (RuntimeException e) {
             log.error("Failed to call remote model.", e);
             actionListener.onFailure(e);

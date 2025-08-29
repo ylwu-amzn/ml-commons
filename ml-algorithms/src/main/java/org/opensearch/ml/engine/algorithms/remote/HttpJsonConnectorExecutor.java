@@ -28,7 +28,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.commons.text.StringEscapeUtils;
 import org.apache.logging.log4j.Logger;
 import org.opensearch.arrow.spi.StreamManager;
-import org.opensearch.arrow.spi.StreamTicket;
 import org.opensearch.common.collect.Tuple;
 import org.opensearch.common.util.TokenBucket;
 import org.opensearch.core.action.ActionListener;
@@ -38,13 +37,15 @@ import org.opensearch.ml.common.exception.MLException;
 import org.opensearch.ml.common.input.MLInput;
 import org.opensearch.ml.common.model.MLGuard;
 import org.opensearch.ml.common.output.model.ModelTensor;
+import org.opensearch.ml.common.output.model.ModelTensorOutput;
 import org.opensearch.ml.common.output.model.ModelTensors;
+import org.opensearch.ml.common.transport.MLTaskResponse;
 import org.opensearch.ml.common.utils.StringUtils;
 import org.opensearch.ml.engine.annotation.ConnectorExecutor;
-import org.opensearch.ml.engine.arrow.RemoteModelStreamProducer;
 import org.opensearch.ml.engine.httpclient.MLHttpClientFactory;
 import org.opensearch.script.ScriptService;
 import org.opensearch.threadpool.ThreadPool;
+import org.opensearch.transport.StreamTransportService;
 import org.opensearch.transport.client.Client;
 
 import com.jayway.jsonpath.JsonPath;
@@ -98,6 +99,10 @@ public class HttpJsonConnectorExecutor extends AbstractConnectorExecutor {
     @Setter
     @Getter
     private ThreadPool threadPool;
+
+    @Setter
+    @Getter
+    private StreamTransportService streamTransportService;
 
     public HttpJsonConnectorExecutor(Connector connector) {
         super.initialize(connector);
@@ -183,36 +188,26 @@ public class HttpJsonConnectorExecutor extends AbstractConnectorExecutor {
         Map<String, String> parameters,
         String payload,
         ExecutionContext executionContext,
-        ActionListener<Tuple<Integer, ModelTensors>> actionListener
+        StreamPredictActionListener<MLTaskResponse, ?> actionListener
     ) {
         try {
-            RemoteModelStreamProducer streamProducer = new RemoteModelStreamProducer();
-            StreamTicket streamTicket = streamManager.registerStream(streamProducer, null);
-            getLogger().debug("Stream ticket: {}", streamTicket);
-            List<ModelTensor> modelTensors = new ArrayList<>();
-            modelTensors.add(ModelTensor.builder().name("response").dataAsMap(Map.of("stream_ticket", streamTicket)).build());
-            threadPool.executor("opensearch_ml_predict_stream").execute(() -> {
-                actionListener.onResponse(new Tuple<>(0, new ModelTensors(modelTensors)));
-            });
             String llmInterface = parameters.get(LLM_INTERFACE);
             llmInterface = llmInterface.trim().toLowerCase(Locale.ROOT);
             llmInterface = StringEscapeUtils.unescapeJava(llmInterface);
             validateLLMInterface(llmInterface);
-            EventSourceListener listener = new HttpJsonConnectorExecutor.HTTPEventSourceListener(getLogger(), streamProducer, llmInterface);
+
+            getLogger().info("Creating SSE connection for streaming request");
+            EventSourceListener listener = new HTTPEventSourceListener(getLogger(), actionListener, llmInterface);
             Request request = ConnectorUtils.buildOKHttpRequestPOST(action, connector, parameters, payload);
-            getLogger().debug("Stream request: {}", request);
+
             AccessController.doPrivileged((PrivilegedExceptionAction<Void>) () -> {
                 final EventSource eventSource = EventSources.createFactory(okHttpClient).newEventSource(request, listener);
                 return null;
             });
-        } catch (PrivilegedActionException e) {
-            throw new RuntimeException("Failed to build event source.", e);
-        } catch (RuntimeException exception) {
-            log.error("Failed to execute {} in aws connector: {}", action, exception.getMessage(), exception);
-            actionListener.onFailure(exception);
-        } catch (Throwable e) {
-            log.error("Failed to execute {} in aws connector", action, e);
-            actionListener.onFailure(new MLException("Fail to execute " + action + " in aws connector", e));
+
+        } catch (Exception e) {
+            log.error("Failed to execute streaming", e);
+            actionListener.onFailure(new MLException("Fail to execute streaming", e));
         }
     }
 
@@ -236,13 +231,19 @@ public class HttpJsonConnectorExecutor extends AbstractConnectorExecutor {
 
     public final class HTTPEventSourceListener extends EventSourceListener {
         private final Logger logger;
-        private RemoteModelStreamProducer streamProducer;
+        private StreamPredictActionListener<MLTaskResponse, ?> streamActionListener;
         private final String llmInterface;
+        private volatile AtomicBoolean isStreamClosed;
 
-        public HTTPEventSourceListener(final Logger logger, RemoteModelStreamProducer streamProducer, String llmInterface) {
+        public HTTPEventSourceListener(
+            final Logger logger,
+            StreamPredictActionListener<MLTaskResponse, ?> streamActionListener,
+            String llmInterface
+        ) {
             this.logger = logger;
-            this.streamProducer = streamProducer;
+            this.streamActionListener = streamActionListener;
             this.llmInterface = llmInterface;
+            this.isStreamClosed = new AtomicBoolean(false);
         }
 
         /***
@@ -299,34 +300,67 @@ public class HttpJsonConnectorExecutor extends AbstractConnectorExecutor {
                 if (t instanceof StreamResetException && t.getMessage().contains("NO_ERROR")) {
                     // TODO: reconnect
                 } else {
-                    streamProducer.setProduceError(true);
-                    throw new MLException("SSE failure.", t);
+                    streamActionListener.onFailure(new MLException("SSE failure.", t));
                 }
             }
         }
 
         private void onOpenAIEvent(String data) {
             if (data.contentEquals("[DONE]")) {
-                streamProducer.getIsStop().set(true);
+                sendCompletionResponse();
                 return;
             }
             Map<String, Object> dataMap = StringUtils.fromJson(data, "data");
             String llmFinishReason = JsonPath.read(dataMap, FINISH_REASON_PATH);
             if (llmFinishReason != null && llmFinishReason.contentEquals("stop")) {
+                sendCompletionResponse();
                 return;
             }
             String deltaContent = JsonPath.read(dataMap, "$.choices[0].delta.content");
-            streamProducer.getQueue().offer(deltaContent);
+            if (deltaContent != null && !deltaContent.isEmpty()) {
+                log.info("Streaming content: {}", deltaContent);
+                sendContentResponse(deltaContent, false);
+            }
+        }
+
+        private void sendContentResponse(String content, boolean isLast) {
+            log.info("sendContentResponse called with content: '{}', isLast: {}", content, isLast);
+            List<ModelTensor> modelTensors = new ArrayList<>();
+            Map<String, Object> dataMap = Map.of("content", content, "is_last", isLast);
+
+            modelTensors.add(ModelTensor.builder().name("response").dataAsMap(dataMap).build());
+            ModelTensorOutput output = ModelTensorOutput
+                .builder()
+                .mlModelOutputs(List.of(ModelTensors.builder().mlModelTensors(modelTensors).build()))
+                .build();
+            MLTaskResponse response = MLTaskResponse.builder().output(output).build();
+            log.info("Calling streamActionListener.onStreamResponse with isLast: {}", isLast);
+            log.info("streamActionListener class: {}", streamActionListener.getClass().getName());
+            streamActionListener.onStreamResponse(response, isLast);
+            log.info("streamActionListener.onStreamResponse completed for isLast: {}", isLast);
+        }
+
+        private void sendCompletionResponse() {
+            log.info("Sending completion response");
+            if (isStreamClosed.compareAndSet(false, true)) {
+                sendContentResponse("", true);
+            }
         }
 
         // For future anthropic support.
         private void onClaudeEvent(String data) {
             Map<String, Object> dataMap = StringUtils.fromJson(data, "data");
             if (dataMap.containsKey("type") && ((String) dataMap.get("type")).contentEquals("message_stop")) {
-                streamProducer.getIsStop().set(true);
+                sendCompletionResponse();
                 return;
             }
-            streamProducer.getQueue().offer(data);
+            // streamProducer.getQueue().offer(data);
+            String deltaContent = JsonPath.read(dataMap, "$.output[0].message.content");
+            log.info("deltaContent {}", deltaContent);
+            if (deltaContent != null && !deltaContent.isEmpty()) {
+                log.info("Streaming content: {}", deltaContent);
+                sendContentResponse(deltaContent, false);
+            }
         }
     }
 }

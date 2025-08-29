@@ -22,6 +22,8 @@ import org.opensearch.ml.common.transport.MLTaskRequest;
 import org.opensearch.ml.common.transport.MLTaskResponse;
 import org.opensearch.ml.stats.MLNodeLevelStat;
 import org.opensearch.ml.stats.MLStats;
+import org.opensearch.transport.TransportChannel;
+import org.opensearch.transport.TransportRequestOptions;
 import org.opensearch.transport.TransportResponseHandler;
 import org.opensearch.transport.TransportService;
 
@@ -84,6 +86,21 @@ public abstract class MLTaskRunner<Request extends MLTaskRequest, Response exten
         }
     }
 
+    public void runStream(
+        FunctionName functionName,
+        Request request,
+        TransportChannel channel,
+        TransportService transportService,
+        ActionListener<Response> listener
+    ) {
+        if (!request.isDispatchTask()) {
+            log.debug("Run ML request {} locally", request.getRequestID());
+            checkCBAndExecuteStream(functionName, request, listener, channel);
+            return;
+        }
+        dispatchTaskStream(functionName, request, transportService, listener, channel);
+    }
+
     public void run(FunctionName functionName, Request request, TransportService transportService, ActionListener<Response> listener) {
         if (!request.isDispatchTask()) {
             log.debug("Run ML request {} locally", request.getRequestID());
@@ -117,7 +134,43 @@ public abstract class MLTaskRunner<Request extends MLTaskRequest, Response exten
                 // Execute ML task remotely
                 log.debug("Execute ML request {} remotely on node {}", request.getRequestID(), nodeId);
                 request.setDispatchTask(false);
-                transportService.sendRequest(node, getTransportActionName(), request, getResponseHandler(listener));
+                transportService
+                    .sendRequest(
+                        node,
+                        getTransportActionName(),
+                        request,
+                        TransportRequestOptions.builder().withType(TransportRequestOptions.Type.STREAM).build(),
+                        getResponseHandler(listener)
+                    );
+            }
+        }, listener::onFailure));
+    }
+
+    public void dispatchTaskStream(
+        FunctionName functionName,
+        Request request,
+        TransportService transportService,
+        ActionListener<Response> listener,
+        TransportChannel channel
+    ) {
+        mlTaskDispatcher.dispatch(functionName, ActionListener.wrap(node -> {
+            String nodeId = node.getId();
+            if (clusterService.localNode().getId().equals(nodeId)) {
+                // Execute ML task locally
+                log.debug("Execute ML request {} locally on node {}", request.getRequestID(), nodeId);
+                checkCBAndExecuteStream(functionName, request, listener, channel);
+            } else {
+                // Execute ML task remotely
+                log.debug("Execute ML request {} remotely on node {}", request.getRequestID(), nodeId);
+                request.setDispatchTask(false);
+                transportService
+                    .sendRequest(
+                        node,
+                        getTransportActionName(),
+                        request,
+                        TransportRequestOptions.builder().withType(TransportRequestOptions.Type.STREAM).build(),
+                        getResponseStreamHandler(listener, channel)
+                    );
             }
         }, listener::onFailure));
     }
@@ -126,7 +179,28 @@ public abstract class MLTaskRunner<Request extends MLTaskRequest, Response exten
 
     protected abstract TransportResponseHandler<Response> getResponseHandler(ActionListener<Response> listener);
 
+    protected TransportResponseHandler<Response> getResponseStreamHandler(ActionListener<Response> listener, TransportChannel channel) {
+        throw new UnsupportedOperationException("Unsupported");
+    }
+
     protected abstract void executeTask(Request request, ActionListener<Response> listener);
+
+    protected void executeTaskStream(Request request, ActionListener<Response> listener, TransportChannel channel) {
+        throw new RuntimeException("error");
+    }
+
+    protected void checkCBAndExecuteStream(
+        FunctionName functionName,
+        Request request,
+        ActionListener<Response> listener,
+        TransportChannel channel
+    ) {
+        // for agent and remote model prediction we don't need to check circuit breaker
+        if (functionName != FunctionName.REMOTE && functionName != FunctionName.AGENT) {
+            checkOpenCircuitBreaker(mlCircuitBreakerService, mlStats);
+        }
+        executeTaskStream(request, listener, channel);
+    }
 
     protected void checkCBAndExecute(FunctionName functionName, Request request, ActionListener<Response> listener) {
         // for agent and remote model prediction we don't need to check circuit breaker

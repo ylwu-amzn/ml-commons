@@ -386,6 +386,7 @@ import org.opensearch.telemetry.tracing.Tracer;
 import org.opensearch.threadpool.ExecutorBuilder;
 import org.opensearch.threadpool.FixedExecutorBuilder;
 import org.opensearch.threadpool.ThreadPool;
+import org.opensearch.transport.StreamTransportService;
 import org.opensearch.transport.client.Client;
 import org.opensearch.watcher.ResourceWatcherService;
 
@@ -438,7 +439,6 @@ public class MachineLearningPlugin extends Plugin
 
     private MLModelChunkUploader mlModelChunkUploader;
     private MLEngine mlEngine;
-    private StreamManagerWrapper streamManagerWrapper;
 
     private Client client;
     private ClusterService clusterService;
@@ -599,7 +599,6 @@ public class MachineLearningPlugin extends Plugin
         encryptor = new EncryptorImpl(clusterService, client, sdkClient, mlIndicesHandler);
 
         mlEngine = new MLEngine(dataPath, encryptor);
-        streamManagerWrapper = new StreamManagerWrapper();
         nodeHelper = new DiscoveryNodeHelper(clusterService, settings);
         modelCacheHelper = new MLModelCacheHelper(clusterService, settings);
         cmHandler = new OpenSearchConversationalMemoryHandler(client, clusterService);
@@ -863,7 +862,7 @@ public class MachineLearningPlugin extends Plugin
         RestMLPredictionStreamingAction restMLPredictionStreamingAction = new RestMLPredictionStreamingAction(
             mlModelManager,
             mlFeatureEnabledSetting,
-            streamManagerWrapper
+            clusterService
         );
         RestMLExecuteAction restMLExecuteAction = new RestMLExecuteAction(mlFeatureEnabledSetting);
         RestMLGetModelAction restMLGetModelAction = new RestMLGetModelAction(mlFeatureEnabledSetting);
@@ -1370,17 +1369,4 @@ public class MachineLearningPlugin extends Plugin
     public ScheduledJobParser getJobParser() {
         return (parser, id, jobDocVersion) -> MLJobParameter.parse(parser);
     }
-
-    public void onStreamManagerInitialized(StreamManager streamManager) {
-        this.streamManager = streamManager;
-        mlEngine.setStreamManager(streamManager);
-        mlEngine.setThreadPool(threadPool);
-        streamManagerWrapper.setStreamManager(streamManager);
-    }
-
-    @Data
-    public static class StreamManagerWrapper {
-        private StreamManager streamManager;
-    }
-
 }
