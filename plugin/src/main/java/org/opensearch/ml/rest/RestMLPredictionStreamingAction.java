@@ -7,6 +7,7 @@ package org.opensearch.ml.rest;
 
 import static org.opensearch.core.xcontent.XContentParserUtils.ensureExpectedToken;
 import static org.opensearch.ml.plugin.MachineLearningPlugin.ML_BASE_URI;
+import static org.opensearch.ml.plugin.MachineLearningPlugin.STREAM_PREDICT_THREAD_POOL;
 import static org.opensearch.ml.utils.MLExceptionUtils.BATCH_INFERENCE_DISABLED_ERR_MSG;
 import static org.opensearch.ml.utils.MLExceptionUtils.LOCAL_MODEL_DISABLED_ERR_MSG;
 import static org.opensearch.ml.utils.MLExceptionUtils.REMOTE_INFERENCE_DISABLED_ERR_MSG;
@@ -232,7 +233,8 @@ public class RestMLPredictionStreamingAction extends BaseRestHandler {
                     "Cache-Control",
                     List.of("no-cache"),
                     "Connection",
-                    List.of("keep-alive")
+                    List.of("keep-alive")//,
+                    //"Transfer-Encoding", List.of("chunked")
                 );
             channel.prepareResponse(RestStatus.OK, headers);
 
@@ -250,20 +252,42 @@ public class RestMLPredictionStreamingAction extends BaseRestHandler {
                         }
 
                         StreamTransportResponseHandler<MLTaskResponse> handler = new StreamTransportResponseHandler<MLTaskResponse>() {
+//                            @Override
+//                            public void handleStreamResponse(StreamTransportResponse<MLTaskResponse> streamResponse) {
+//                                try {
+//                                    MLTaskResponse response;
+//                                    int count = 0;
+//                                    while ((response = streamResponse.nextResponse()) != null) {
+//                                        log.info("Received response: {}, count {}", response, count);
+//                                        channel.sendChunk(convertToHttpChunk(response));
+//                                        count++;
+//                                    }
+//                                    channel.sendChunk(XContentHttpChunk.last());
+//                                    streamResponse.close();
+//                                } catch (Exception e) {
+//                                    streamResponse.cancel("Test error", e);
+//                                }
+//                            }
                             @Override
                             public void handleStreamResponse(StreamTransportResponse<MLTaskResponse> streamResponse) {
                                 try {
-                                    MLTaskResponse response;
-                                    int count = 0;
-                                    while ((response = streamResponse.nextResponse()) != null) {
-                                        log.info("Received response: {}, count {}", response, count);
-                                        channel.sendChunk(convertToHttpChunk(response));
-                                        count++;
+                                    // Process one response at a time
+                                    MLTaskResponse response = streamResponse.nextResponse();
+                                    if (response != null) {
+                                        log.info("Received response: {}", response);
+                                        HttpChunk chunk = convertToHttpChunk(response);
+                                        channel.sendChunk(chunk);
+
+                                        // Recursively handle the next response - asynchronously
+                                        client.threadPool().executor(STREAM_PREDICT_THREAD_POOL).execute(() -> handleStreamResponse(streamResponse));
+                                    } else {
+                                        log.info("No more responses, closing stream");
+                                        channel.sendChunk(XContentHttpChunk.last());
+                                        streamResponse.close();
                                     }
-                                    channel.sendChunk(XContentHttpChunk.last());
-                                    streamResponse.close();
                                 } catch (Exception e) {
-                                    streamResponse.cancel("Test error", e);
+                                    streamResponse.cancel("Error processing stream", e);
+                                    log.error("Error in stream handling", e);
                                 }
                             }
 
