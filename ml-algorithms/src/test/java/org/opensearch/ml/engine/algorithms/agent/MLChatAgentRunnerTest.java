@@ -75,7 +75,7 @@ public class MLChatAgentRunnerTest {
     private Map<String, Tool.Factory> toolFactories;
     @Mock
     private Map<String, Memory.Factory> memoryMap;
-    private MLChatAgentRunner mlChatAgentRunner;
+    private MLConversationalAgentRunner mlConversationalAgentRunner;
     @Mock
     private Tool.Factory firstToolFactory;
 
@@ -159,7 +159,7 @@ public class MLChatAgentRunnerTest {
             return null;
         }).when(mlMemoryManager).updateInteraction(any(), any(), mlMemoryManagerCapture.capture());
 
-        mlChatAgentRunner = new MLChatAgentRunner(client, settings, clusterService, xContentRegistry, toolFactories, memoryMap, null, null);
+        mlConversationalAgentRunner = new MLConversationalAgentRunner(client, settings, clusterService, xContentRegistry, toolFactories, memoryMap, null, null);
         when(firstToolFactory.create(Mockito.anyMap())).thenReturn(firstTool);
         when(secondToolFactory.create(Mockito.anyMap())).thenReturn(secondTool);
         when(firstTool.getName()).thenReturn(FIRST_TOOL);
@@ -198,7 +198,7 @@ public class MLChatAgentRunnerTest {
         Map<String, String> params = new HashMap<>();
         params.put(MLAgentExecutor.PARENT_INTERACTION_ID, "parent_interaction_id");
         params.put("verbose", "true");
-        mlChatAgentRunner.run(mlAgent, params, agentActionListener);
+        mlConversationalAgentRunner.run(mlAgent, params, agentActionListener);
 
         // Capture the response passed to the listener
         ArgumentCaptor<Object> responseCaptor = ArgumentCaptor.forClass(Object.class);
@@ -238,7 +238,7 @@ public class MLChatAgentRunnerTest {
         Map<String, String> params = new HashMap<>();
         params.put(MLAgentExecutor.PARENT_INTERACTION_ID, "parent_interaction_id");
         params.put("verbose", "true");
-        mlChatAgentRunner.run(mlAgent, params, agentActionListener);
+        mlConversationalAgentRunner.run(mlAgent, params, agentActionListener);
 
         // Capture the response passed to the listener
         ArgumentCaptor<Object> responseCaptor = ArgumentCaptor.forClass(Object.class);
@@ -278,7 +278,7 @@ public class MLChatAgentRunnerTest {
         Map<String, String> params = new HashMap<>();
         params.put(MLAgentExecutor.PARENT_INTERACTION_ID, "parent_interaction_id");
         params.put("verbose", "true");
-        mlChatAgentRunner.run(mlAgent, params, agentActionListener);
+        mlConversationalAgentRunner.run(mlAgent, params, agentActionListener);
 
         // Capture the response passed to the listener
         ArgumentCaptor<Object> responseCaptor = ArgumentCaptor.forClass(Object.class);
@@ -318,7 +318,7 @@ public class MLChatAgentRunnerTest {
         Map<String, String> params = new HashMap<>();
         params.put(MLAgentExecutor.PARENT_INTERACTION_ID, "parent_interaction_id");
         params.put("verbose", "false");
-        mlChatAgentRunner.run(mlAgent, params, agentActionListener);
+        mlConversationalAgentRunner.run(mlAgent, params, agentActionListener);
 
         // Capture the response passed to the listener
         ArgumentCaptor<Object> responseCaptor = ArgumentCaptor.forClass(Object.class);
@@ -362,7 +362,7 @@ public class MLChatAgentRunnerTest {
             .memory(mlMemorySpec)
             .tools(Arrays.asList(firstToolSpec, secondToolSpec))
             .build();
-        mlChatAgentRunner.run(mlAgent, new HashMap<>(), agentActionListener);
+        mlConversationalAgentRunner.run(mlAgent, new HashMap<>(), agentActionListener);
         Mockito.verify(agentActionListener).onResponse(objectCaptor.capture());
         ModelTensorOutput modelTensorOutput = (ModelTensorOutput) objectCaptor.getValue();
         List<ModelTensor> agentOutput = modelTensorOutput.getMlModelOutputs().get(1).getMlModelTensors();
@@ -392,7 +392,7 @@ public class MLChatAgentRunnerTest {
             .memory(mlMemorySpec)
             .tools(Arrays.asList(firstToolSpec, secondToolSpec))
             .build();
-        mlChatAgentRunner.run(mlAgent, new HashMap<>(), agentActionListener);
+        mlConversationalAgentRunner.run(mlAgent, new HashMap<>(), agentActionListener);
         Mockito.verify(agentActionListener).onResponse(objectCaptor.capture());
         ModelTensorOutput modelTensorOutput = (ModelTensorOutput) objectCaptor.getValue();
         List<ModelTensor> agentOutput = modelTensorOutput.getMlModelOutputs().get(1).getMlModelTensors();
@@ -427,7 +427,7 @@ public class MLChatAgentRunnerTest {
             .tools(Arrays.asList(firstToolSpec, secondToolSpec))
             .build();
         HashMap<String, String> params = new HashMap<>();
-        mlChatAgentRunner.run(mlAgent, params, agentActionListener);
+        mlConversationalAgentRunner.run(mlAgent, params, agentActionListener);
         Mockito.verify(agentActionListener).onResponse(objectCaptor.capture());
         ModelTensorOutput modelTensorOutput = (ModelTensorOutput) objectCaptor.getValue();
         List<ModelTensor> agentOutput = modelTensorOutput.getMlModelOutputs().get(1).getMlModelTensors();
@@ -479,9 +479,9 @@ public class MLChatAgentRunnerTest {
 
         HashMap<String, String> params = new HashMap<>();
         params.put(MESSAGE_HISTORY_LIMIT, "5");
-        mlChatAgentRunner.run(mlAgent, params, agentActionListener);
+        mlConversationalAgentRunner.run(mlAgent, params, agentActionListener);
         Mockito.verify(agentActionListener).onResponse(objectCaptor.capture());
-        String chatHistory = params.get(MLChatAgentRunner.CHAT_HISTORY);
+        String chatHistory = params.get(MLConversationalAgentRunner.CHAT_HISTORY);
         Assert.assertFalse(chatHistory.contains("input-99"));
         Assert.assertEquals(5, messageHistoryLimitCapture.getValue().intValue());
     }
@@ -535,9 +535,9 @@ public class MLChatAgentRunnerTest {
 
         HashMap<String, String> params = new HashMap<>();
         params.put("verbose", "true");
-        mlChatAgentRunner.run(mlAgent, params, agentActionListener);
+        mlConversationalAgentRunner.run(mlAgent, params, agentActionListener);
         Mockito.verify(agentActionListener).onResponse(objectCaptor.capture());
-        String chatHistory = params.get(MLChatAgentRunner.CHAT_HISTORY);
+        String chatHistory = params.get(MLConversationalAgentRunner.CHAT_HISTORY);
         Assert.assertFalse(chatHistory.contains("input-99"));
         Assert.assertEquals(LAST_N_INTERACTIONS, messageHistoryLimitCapture.getValue().intValue());
     }
@@ -564,7 +564,7 @@ public class MLChatAgentRunnerTest {
         }).when(conversationIndexMemory).getMessages(memoryInteractionCapture.capture(), messageHistoryLimitCapture.capture());
 
         HashMap<String, String> params = new HashMap<>();
-        mlChatAgentRunner.run(mlAgent, params, agentActionListener);
+        mlConversationalAgentRunner.run(mlAgent, params, agentActionListener);
 
         // Verifying that onFailure was called
         verify(agentActionListener).onFailure(any(RuntimeException.class));
@@ -582,7 +582,7 @@ public class MLChatAgentRunnerTest {
         Map<String, String> params = createAgentParamsWithAction(FIRST_TOOL, "someInput");
 
         // Run the MLChatAgentRunner
-        mlChatAgentRunner.run(mlAgent, params, agentActionListener);
+        mlConversationalAgentRunner.run(mlAgent, params, agentActionListener);
 
         // Verify that the tool's run method was called
         verify(firstTool).run(any(), any());
@@ -604,7 +604,7 @@ public class MLChatAgentRunnerTest {
                 .when(firstTool)
                 .run(Mockito.anyMap(), nextStepListenerCaptor.capture());
         // Run the MLChatAgentRunner
-        mlChatAgentRunner.run(mlAgent, params, agentActionListener);
+        mlConversationalAgentRunner.run(mlAgent, params, agentActionListener);
 
         // Verify that the tool's run method was not called
         verify(firstTool, never()).run(any(), any());
@@ -630,7 +630,7 @@ public class MLChatAgentRunnerTest {
         Map<String, String> params = createAgentParamsWithAction("nonExistentTool", "someInput");
 
         // Run the MLChatAgentRunner
-        mlChatAgentRunner.run(mlAgent, params, agentActionListener);
+        mlConversationalAgentRunner.run(mlAgent, params, agentActionListener);
 
         // Verify that no tool's run method was called
         verify(firstTool, never()).run(any(), any());
@@ -653,7 +653,7 @@ public class MLChatAgentRunnerTest {
                 .when(firstTool)
                 .run(Mockito.anyMap(), toolListenerCaptor.capture());
         // Run the MLChatAgentRunner
-        mlChatAgentRunner.run(mlAgent, params, agentActionListener);
+        mlConversationalAgentRunner.run(mlAgent, params, agentActionListener);
 
         // Verify that the tool's run method was called
         verify(firstTool).run(any(), any());
@@ -679,7 +679,7 @@ public class MLChatAgentRunnerTest {
                 .when(firstTool)
                 .run(Mockito.anyMap(), toolListenerCaptor.capture());
         // Run the MLChatAgentRunner
-        mlChatAgentRunner.run(mlAgent, params, agentActionListener);
+        mlConversationalAgentRunner.run(mlAgent, params, agentActionListener);
 
         // Verify that the tool's run method was called
         verify(firstTool).run(any(), any());
@@ -701,7 +701,7 @@ public class MLChatAgentRunnerTest {
         Map<String, String> params = createAgentParamsWithAction(FIRST_TOOL, "someInput");
 
         // Run the MLChatAgentRunner.
-        mlChatAgentRunner.run(mlAgent, params, agentActionListener);
+        mlConversationalAgentRunner.run(mlAgent, params, agentActionListener);
 
         // Verify that the tool's run method was called.
         verify(firstTool).run(any(), any());
@@ -729,7 +729,7 @@ public class MLChatAgentRunnerTest {
         doReturn(true).when(firstTool).useOriginalInput();
 
         // Run the MLChatAgentRunner.
-        mlChatAgentRunner.run(mlAgent, params, agentActionListener);
+        mlConversationalAgentRunner.run(mlAgent, params, agentActionListener);
 
         // Verify that the tool's run method was called.
         verify(firstTool).run(any(), any());
@@ -758,7 +758,7 @@ public class MLChatAgentRunnerTest {
         doReturn(false).when(firstTool).useOriginalInput();
 
         // Run the MLChatAgentRunner.
-        mlChatAgentRunner.run(mlAgent, params, agentActionListener);
+        mlConversationalAgentRunner.run(mlAgent, params, agentActionListener);
 
         // Verify that the tool's run method was called.
         verify(firstTool).run(any(), any());
@@ -788,7 +788,7 @@ public class MLChatAgentRunnerTest {
         doReturn(false).when(firstTool).useOriginalInput();
 
         // Run the MLChatAgentRunner.
-        mlChatAgentRunner.run(mlAgent, params, agentActionListener);
+        mlConversationalAgentRunner.run(mlAgent, params, agentActionListener);
 
         // Verify that the tool's run method was called.
         verify(firstTool).run(any(), any());
@@ -821,7 +821,7 @@ public class MLChatAgentRunnerTest {
             return null;
         }).when(conversationIndexMemory).save(any(), any(), any(), any(), conversationIndexMemoryCapture.capture());
         // Run the MLChatAgentRunner
-        mlChatAgentRunner.run(mlAgent, params, agentActionListener);
+        mlConversationalAgentRunner.run(mlAgent, params, agentActionListener);
 
         // Verify that the tool's run method was called
         verify(firstTool).run(any(), any());
@@ -873,12 +873,12 @@ public class MLChatAgentRunnerTest {
 
         HashMap<String, String> params = new HashMap<>();
         params.put(MESSAGE_HISTORY_LIMIT, "5");
-        mlChatAgentRunner.run(mlAgent, params, agentActionListener);
+        mlConversationalAgentRunner.run(mlAgent, params, agentActionListener);
         Mockito.verify(agentActionListener).onResponse(objectCaptor.capture());
-        String chatHistory = params.get(MLChatAgentRunner.CHAT_HISTORY);
+        String chatHistory = params.get(MLConversationalAgentRunner.CHAT_HISTORY);
         Assert.assertFalse(chatHistory.contains("input-99"));
         Assert.assertEquals(5, messageHistoryLimitCapture.getValue().intValue());
-        Assert.assertTrue(toolParamsCapture.getValue().containsKey(MLChatAgentRunner.CHAT_HISTORY));
+        Assert.assertTrue(toolParamsCapture.getValue().containsKey(MLConversationalAgentRunner.CHAT_HISTORY));
     }
 
     // Helper methods to create MLAgent and parameters
@@ -1001,7 +1001,7 @@ public class MLChatAgentRunnerTest {
         Map<String, String> params = new HashMap<>();
         params.put(MLAgentExecutor.PARENT_INTERACTION_ID, "parent_interaction_id");
 
-        mlChatAgentRunner.run(mlAgent, params, agentActionListener);
+        mlConversationalAgentRunner.run(mlAgent, params, agentActionListener);
 
         // Verify response is captured
         verify(agentActionListener).onResponse(objectCaptor.capture());
@@ -1040,7 +1040,7 @@ public class MLChatAgentRunnerTest {
         Map<String, String> params = new HashMap<>();
         params.put(MLAgentExecutor.PARENT_INTERACTION_ID, "parent_interaction_id");
 
-        mlChatAgentRunner.run(mlAgent, params, agentActionListener);
+        mlConversationalAgentRunner.run(mlAgent, params, agentActionListener);
 
         // Verify response is captured
         verify(agentActionListener).onResponse(objectCaptor.capture());
@@ -1063,14 +1063,14 @@ public class MLChatAgentRunnerTest {
     public void testConstructLLMParams_WithSystemPromptAndDateTimeInjection() {
         LLMSpec llmSpec = LLMSpec.builder().modelId("MODEL_ID").build();
         Map<String, String> parameters = new HashMap<>();
-        parameters.put(MLChatAgentRunner.SYSTEM_PROMPT_FIELD, "You are a helpful assistant.");
-        parameters.put(MLChatAgentRunner.INJECT_DATETIME_FIELD, "true");
+        parameters.put(MLConversationalAgentRunner.SYSTEM_PROMPT_FIELD, "You are a helpful assistant.");
+        parameters.put(MLConversationalAgentRunner.INJECT_DATETIME_FIELD, "true");
 
-        Map<String, String> result = MLChatAgentRunner.constructLLMParams(llmSpec, parameters);
+        Map<String, String> result = MLConversationalAgentRunner.constructLLMParams(llmSpec, parameters);
 
         Assert.assertNotNull(result);
-        Assert.assertTrue(result.containsKey(MLChatAgentRunner.SYSTEM_PROMPT_FIELD));
-        String systemPrompt = result.get(MLChatAgentRunner.SYSTEM_PROMPT_FIELD);
+        Assert.assertTrue(result.containsKey(MLConversationalAgentRunner.SYSTEM_PROMPT_FIELD));
+        String systemPrompt = result.get(MLConversationalAgentRunner.SYSTEM_PROMPT_FIELD);
         Assert.assertTrue(systemPrompt.startsWith("You are a helpful assistant."));
         Assert.assertTrue(systemPrompt.contains(DEFAULT_DATETIME_PREFIX));
     }
@@ -1079,9 +1079,9 @@ public class MLChatAgentRunnerTest {
     public void testConstructLLMParams_WithoutSystemPromptAndDateTimeInjection() {
         LLMSpec llmSpec = LLMSpec.builder().modelId("MODEL_ID").build();
         Map<String, String> parameters = new HashMap<>();
-        parameters.put(MLChatAgentRunner.INJECT_DATETIME_FIELD, "true");
+        parameters.put(MLConversationalAgentRunner.INJECT_DATETIME_FIELD, "true");
 
-        Map<String, String> result = MLChatAgentRunner.constructLLMParams(llmSpec, parameters);
+        Map<String, String> result = MLConversationalAgentRunner.constructLLMParams(llmSpec, parameters);
 
         Assert.assertNotNull(result);
         Assert.assertTrue(result.containsKey(AgentUtils.PROMPT_PREFIX));
@@ -1093,14 +1093,14 @@ public class MLChatAgentRunnerTest {
     public void testConstructLLMParams_DateTimeInjectionDisabled() {
         LLMSpec llmSpec = LLMSpec.builder().modelId("MODEL_ID").build();
         Map<String, String> parameters = new HashMap<>();
-        parameters.put(MLChatAgentRunner.INJECT_DATETIME_FIELD, "false");
-        parameters.put(MLChatAgentRunner.SYSTEM_PROMPT_FIELD, "You are a helpful assistant.");
+        parameters.put(MLConversationalAgentRunner.INJECT_DATETIME_FIELD, "false");
+        parameters.put(MLConversationalAgentRunner.SYSTEM_PROMPT_FIELD, "You are a helpful assistant.");
 
-        Map<String, String> result = MLChatAgentRunner.constructLLMParams(llmSpec, parameters);
+        Map<String, String> result = MLConversationalAgentRunner.constructLLMParams(llmSpec, parameters);
 
         Assert.assertNotNull(result);
-        Assert.assertTrue(result.containsKey(MLChatAgentRunner.SYSTEM_PROMPT_FIELD));
-        String systemPrompt = result.get(MLChatAgentRunner.SYSTEM_PROMPT_FIELD);
+        Assert.assertTrue(result.containsKey(MLConversationalAgentRunner.SYSTEM_PROMPT_FIELD));
+        String systemPrompt = result.get(MLConversationalAgentRunner.SYSTEM_PROMPT_FIELD);
         Assert.assertEquals("You are a helpful assistant.", systemPrompt);
         Assert.assertFalse(systemPrompt.contains(DEFAULT_DATETIME_PREFIX));
     }
@@ -1110,7 +1110,7 @@ public class MLChatAgentRunnerTest {
         LLMSpec llmSpec = LLMSpec.builder().modelId("MODEL_ID").build();
         Map<String, String> parameters = new HashMap<>();
 
-        Map<String, String> result = MLChatAgentRunner.constructLLMParams(llmSpec, parameters);
+        Map<String, String> result = MLConversationalAgentRunner.constructLLMParams(llmSpec, parameters);
 
         Assert.assertNotNull(result);
         Assert.assertTrue(result.containsKey(AgentUtils.PROMPT_PREFIX));

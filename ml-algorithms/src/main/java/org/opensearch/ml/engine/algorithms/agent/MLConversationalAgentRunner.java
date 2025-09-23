@@ -5,10 +5,49 @@
 
 package org.opensearch.ml.engine.algorithms.agent;
 
-import com.google.common.annotations.VisibleForTesting;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.extern.log4j.Log4j2;
+import static org.opensearch.ml.common.conversation.ActionConstants.ADDITIONAL_INFO_FIELD;
+import static org.opensearch.ml.common.conversation.ActionConstants.AI_RESPONSE_FIELD;
+import static org.opensearch.ml.common.utils.StringUtils.gson;
+import static org.opensearch.ml.common.utils.StringUtils.processTextDoc;
+import static org.opensearch.ml.common.utils.ToolUtils.filterToolOutput;
+import static org.opensearch.ml.common.utils.ToolUtils.getToolName;
+import static org.opensearch.ml.common.utils.ToolUtils.parseResponse;
+import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.DISABLE_TRACE;
+import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.INTERACTIONS_PREFIX;
+import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.PROMPT_CHAT_HISTORY_PREFIX;
+import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.PROMPT_PREFIX;
+import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.PROMPT_SUFFIX;
+import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.RESPONSE_FORMAT_INSTRUCTION;
+import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.TOOL_CALL_ID;
+import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.TOOL_RESPONSE;
+import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.TOOL_RESULT;
+import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.VERBOSE;
+import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.cleanUpResource;
+import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.constructToolParams;
+import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.createTools;
+import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.getCurrentDateTime;
+import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.getMcpToolSpecs;
+import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.getMessageHistoryLimit;
+import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.getMlToolSpecs;
+import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.getToolNames;
+import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.outputToOutputString;
+import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.parseLLMOutput;
+import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.substitute;
+import static org.opensearch.ml.engine.algorithms.agent.PromptTemplate.CHAT_HISTORY_PREFIX;
+
+import java.security.PrivilegedActionException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
+
 import org.apache.commons.text.StringSubstitutor;
 import org.opensearch.action.ActionRequest;
 import org.opensearch.action.StepListener;
@@ -46,53 +85,16 @@ import org.opensearch.ml.repackage.com.google.common.collect.Lists;
 import org.opensearch.remote.metadata.client.SdkClient;
 import org.opensearch.transport.client.Client;
 
-import java.security.PrivilegedActionException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Consumer;
+import com.google.common.annotations.VisibleForTesting;
 
-import static org.opensearch.ml.common.conversation.ActionConstants.ADDITIONAL_INFO_FIELD;
-import static org.opensearch.ml.common.conversation.ActionConstants.AI_RESPONSE_FIELD;
-import static org.opensearch.ml.common.utils.StringUtils.gson;
-import static org.opensearch.ml.common.utils.StringUtils.processTextDoc;
-import static org.opensearch.ml.common.utils.ToolUtils.filterToolOutput;
-import static org.opensearch.ml.common.utils.ToolUtils.getToolName;
-import static org.opensearch.ml.common.utils.ToolUtils.parseResponse;
-import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.DISABLE_TRACE;
-import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.INTERACTIONS_PREFIX;
-import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.PROMPT_CHAT_HISTORY_PREFIX;
-import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.PROMPT_PREFIX;
-import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.PROMPT_SUFFIX;
-import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.RESPONSE_FORMAT_INSTRUCTION;
-import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.TOOL_CALL_ID;
-import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.TOOL_RESPONSE;
-import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.TOOL_RESULT;
-import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.VERBOSE;
-import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.cleanUpResource;
-import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.constructToolParams;
-import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.createTools;
-import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.getCurrentDateTime;
-import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.getMcpToolSpecs;
-import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.getMessageHistoryLimit;
-import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.getMlToolSpecs;
-import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.getToolNames;
-import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.outputToOutputString;
-import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.parseLLMOutput;
-import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.substitute;
-import static org.opensearch.ml.engine.algorithms.agent.PromptTemplate.CHAT_HISTORY_PREFIX;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.extern.log4j.Log4j2;
 
 @Log4j2
 @Data
 @NoArgsConstructor
-public class MLChatAgentRunner implements MLAgentRunner {
+public class MLConversationalAgentRunner implements MLAgentRunner {
 
     public static final String SESSION_ID = "session_id";
     public static final String LLM_TOOL_PROMPT_PREFIX = "LanguageModelTool.prompt_prefix";
@@ -136,7 +138,7 @@ public class MLChatAgentRunner implements MLAgentRunner {
     private SdkClient sdkClient;
     private Encryptor encryptor;
 
-    public MLChatAgentRunner(
+    public MLConversationalAgentRunner(
         Client client,
         Settings settings,
         ClusterService clusterService,
@@ -180,9 +182,6 @@ public class MLChatAgentRunner implements MLAgentRunner {
         String memoryId = params.get(MLAgentExecutor.MEMORY_ID);
         String appType = mlAgent.getAppType();
         String title = params.get(MLAgentExecutor.QUESTION);
-        if (params.containsKey(MLAgentExecutor.MESSAGES)) {
-            title = params.get(MLAgentExecutor.MESSAGES);
-        }
         String chatHistoryPrefix = params.getOrDefault(PROMPT_CHAT_HISTORY_PREFIX, CHAT_HISTORY_PREFIX);
         String chatHistoryQuestionTemplate = params.get(CHAT_HISTORY_QUESTION_TEMPLATE);
         String chatHistoryResponseTemplate = params.get(CHAT_HISTORY_RESPONSE_TEMPLATE);
@@ -298,7 +297,7 @@ public class MLChatAgentRunner implements MLAgentRunner {
         tmpParameters.put(PROMPT, prompt);
         final String finalPrompt = prompt;
 
-        String question = tmpParameters.containsKey(MLAgentExecutor.QUESTION)? tmpParameters.get(MLAgentExecutor.QUESTION) : tmpParameters.get(MLAgentExecutor.MESSAGES);
+        String question = tmpParameters.get(MLAgentExecutor.QUESTION);
         String parentInteractionId = tmpParameters.get(MLAgentExecutor.PARENT_INTERACTION_ID);
         boolean verbose = Boolean.parseBoolean(tmpParameters.getOrDefault(VERBOSE, "false"));
         boolean traceDisabled = tmpParameters.containsKey(DISABLE_TRACE) && Boolean.parseBoolean(tmpParameters.get(DISABLE_TRACE));
@@ -663,7 +662,7 @@ public class MLChatAgentRunner implements MLAgentRunner {
                     Map<String, String> llmToolTmpParameters = new HashMap<>();
                     llmToolTmpParameters.putAll(tmpParameters);
                     llmToolTmpParameters.putAll(toolSpecMap.get(action).getParameters());
-                    llmToolTmpParameters.put(MLAgentExecutor.QUESTION, actionInput);//TODO:
+                    llmToolTmpParameters.put(MLAgentExecutor.QUESTION, actionInput);
                     tools.get(action).run(llmToolTmpParameters, toolListener); // run tool
                 } else {
                     Map<String, String> parameters = new HashMap<>();

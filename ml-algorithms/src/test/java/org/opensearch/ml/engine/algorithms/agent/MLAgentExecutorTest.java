@@ -645,7 +645,7 @@ public class MLAgentExecutorTest {
         LLMSpec llmSpec = LLMSpec.builder().modelId("MODEL_ID").build();
         MLAgent mlAgent = MLAgent.builder().name("test_agent").type(MLAgentType.CONVERSATIONAL.name()).llm(llmSpec).build();
         MLAgentRunner mlAgentRunner = mlAgentExecutor.getAgentRunner(mlAgent);
-        Assert.assertTrue(mlAgentRunner instanceof MLChatAgentRunner);
+        Assert.assertTrue(mlAgentRunner instanceof MLConversationalAgentRunner);
     }
 
     @Test(expected = IllegalArgumentException.class)

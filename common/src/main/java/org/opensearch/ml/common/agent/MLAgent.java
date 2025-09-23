@@ -20,6 +20,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
+import lombok.Setter;
 import org.opensearch.Version;
 import org.opensearch.core.common.io.stream.StreamInput;
 import org.opensearch.core.common.io.stream.StreamOutput;
@@ -34,6 +35,7 @@ import org.opensearch.ml.common.MLModel;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
+import org.opensearch.ml.common.transport.register.MLRegisterModelInput;
 
 @EqualsAndHashCode
 @Getter
@@ -42,6 +44,7 @@ public class MLAgent implements ToXContentObject, Writeable {
     public static final String AGENT_TYPE_FIELD = "type";
     public static final String DESCRIPTION_FIELD = "description";
     public static final String LLM_FIELD = "llm";
+    public static final String MODEL_FIELD = "model";
     public static final String TOOLS_FIELD = "tools";
     public static final String PARAMETERS_FIELD = "parameters";
     public static final String MEMORY_FIELD = "memory";
@@ -58,7 +61,9 @@ public class MLAgent implements ToXContentObject, Writeable {
     private String name;
     private String type;
     private String description;
+    @Setter
     private LLMSpec llm;
+    private MLRegisterModelInput registerModelInput;
     private List<MLToolSpec> tools;
     private Map<String, String> parameters;
     private MLMemorySpec memory;
@@ -75,6 +80,7 @@ public class MLAgent implements ToXContentObject, Writeable {
         String type,
         String description,
         LLMSpec llm,
+        MLRegisterModelInput registerModelInput,
         List<MLToolSpec> tools,
         Map<String, String> parameters,
         MLMemorySpec memory,
@@ -88,6 +94,7 @@ public class MLAgent implements ToXContentObject, Writeable {
         this.type = type;
         this.description = description;
         this.llm = llm;
+        this.registerModelInput = registerModelInput;
         this.tools = tools;
         this.parameters = parameters;
         this.memory = memory;
@@ -110,7 +117,7 @@ public class MLAgent implements ToXContentObject, Writeable {
             );
         }
         validateMLAgentType(type);
-        if (type.equalsIgnoreCase(MLAgentType.CONVERSATIONAL.toString()) && llm == null) {
+        if (type.equalsIgnoreCase(MLAgentType.CONVERSATIONAL.toString()) && (llm == null && registerModelInput == null)) {
             throw new IllegalArgumentException("We need model information for the conversational agent type");
         }
         Set<String> toolNames = new HashSet<>();
@@ -168,6 +175,9 @@ public class MLAgent implements ToXContentObject, Writeable {
             isHidden = input.readOptionalBoolean();
         }
         this.tenantId = streamInputVersion.onOrAfter(VERSION_2_19_0) ? input.readOptionalString() : null;
+        if (input.readBoolean()) {
+            this.registerModelInput = new MLRegisterModelInput(input);
+        }
         validate();
     }
 
@@ -213,6 +223,12 @@ public class MLAgent implements ToXContentObject, Writeable {
         if (streamOutputVersion.onOrAfter(VERSION_2_19_0)) {
             out.writeOptionalString(tenantId);
         }
+        if (registerModelInput != null) {
+            out.writeBoolean(true);
+            registerModelInput.writeTo(out);
+        } else {
+            out.writeBoolean(false);
+        }
     }
 
     @Override
@@ -229,6 +245,15 @@ public class MLAgent implements ToXContentObject, Writeable {
         }
         if (llm != null) {
             builder.field(LLM_FIELD, llm);
+        }
+        if (registerModelInput != null) {
+            builder.startObject(MODEL_FIELD);
+            builder.field("model_provider", registerModelInput.getProvider());
+            builder.field("model_id", registerModelInput.getModelId());
+            if (registerModelInput.getParameters() != null && !registerModelInput.getParameters().isEmpty()) {
+                builder.field("parameters", registerModelInput.getParameters());
+            }
+            builder.endObject();
         }
         if (tools != null && tools.size() > 0) {
             builder.field(TOOLS_FIELD, tools);
@@ -269,8 +294,9 @@ public class MLAgent implements ToXContentObject, Writeable {
 
     private static MLAgent parseCommonFields(XContentParser parser, boolean parseHidden) throws IOException {
         String name = null;
-        String type = null;
+        String type = "conversational";
         String description = null;
+        MLRegisterModelInput registerModelInput = null;
         LLMSpec llm = null;
         List<MLToolSpec> tools = null;
         Map<String, String> parameters = null;
@@ -298,6 +324,9 @@ public class MLAgent implements ToXContentObject, Writeable {
                     break;
                 case LLM_FIELD:
                     llm = LLMSpec.parse(parser);
+                    break;
+                case MODEL_FIELD:
+                    registerModelInput = MLRegisterModelInput.parse(parser, false);
                     break;
                 case TOOLS_FIELD:
                     tools = new ArrayList<>();
@@ -340,6 +369,7 @@ public class MLAgent implements ToXContentObject, Writeable {
             .type(type)
             .description(description)
             .llm(llm)
+            .registerModelInput(registerModelInput)
             .tools(tools)
             .parameters(parameters)
             .memory(memory)

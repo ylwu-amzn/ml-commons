@@ -20,9 +20,9 @@ import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.TOOL_CALL_ID_
 import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.TOOL_RESULT;
 import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.TOOL_TEMPLATE;
 import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.removeJsonPath;
-import static org.opensearch.ml.engine.algorithms.agent.MLChatAgentRunner.CHAT_HISTORY_QUESTION_TEMPLATE;
-import static org.opensearch.ml.engine.algorithms.agent.MLChatAgentRunner.CHAT_HISTORY_RESPONSE_TEMPLATE;
-import static org.opensearch.ml.engine.algorithms.agent.MLChatAgentRunner.INTERACTION_TEMPLATE_TOOL_RESPONSE;
+import static org.opensearch.ml.engine.algorithms.agent.MLConversationalAgentRunner.CHAT_HISTORY_QUESTION_TEMPLATE;
+import static org.opensearch.ml.engine.algorithms.agent.MLConversationalAgentRunner.CHAT_HISTORY_RESPONSE_TEMPLATE;
+import static org.opensearch.ml.engine.algorithms.agent.MLConversationalAgentRunner.INTERACTION_TEMPLATE_TOOL_RESPONSE;
 
 import java.util.ArrayList;
 import java.util.List;

@@ -35,15 +35,15 @@ import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.TOOL_CALL_ID_
 import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.TOOL_FILTERS_FIELD;
 import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.TOOL_TEMPLATE;
 import static org.opensearch.ml.engine.algorithms.agent.AgentUtils.createTool;
-import static org.opensearch.ml.engine.algorithms.agent.MLChatAgentRunner.ACTION;
-import static org.opensearch.ml.engine.algorithms.agent.MLChatAgentRunner.ACTION_INPUT;
-import static org.opensearch.ml.engine.algorithms.agent.MLChatAgentRunner.CHAT_HISTORY;
-import static org.opensearch.ml.engine.algorithms.agent.MLChatAgentRunner.CONTEXT;
-import static org.opensearch.ml.engine.algorithms.agent.MLChatAgentRunner.EXAMPLES;
-import static org.opensearch.ml.engine.algorithms.agent.MLChatAgentRunner.FINAL_ANSWER;
-import static org.opensearch.ml.engine.algorithms.agent.MLChatAgentRunner.OS_INDICES;
-import static org.opensearch.ml.engine.algorithms.agent.MLChatAgentRunner.THOUGHT;
-import static org.opensearch.ml.engine.algorithms.agent.MLChatAgentRunner.THOUGHT_RESPONSE;
+import static org.opensearch.ml.engine.algorithms.agent.MLConversationalAgentRunner.ACTION;
+import static org.opensearch.ml.engine.algorithms.agent.MLConversationalAgentRunner.ACTION_INPUT;
+import static org.opensearch.ml.engine.algorithms.agent.MLConversationalAgentRunner.CHAT_HISTORY;
+import static org.opensearch.ml.engine.algorithms.agent.MLConversationalAgentRunner.CONTEXT;
+import static org.opensearch.ml.engine.algorithms.agent.MLConversationalAgentRunner.EXAMPLES;
+import static org.opensearch.ml.engine.algorithms.agent.MLConversationalAgentRunner.FINAL_ANSWER;
+import static org.opensearch.ml.engine.algorithms.agent.MLConversationalAgentRunner.OS_INDICES;
+import static org.opensearch.ml.engine.algorithms.agent.MLConversationalAgentRunner.THOUGHT;
+import static org.opensearch.ml.engine.algorithms.agent.MLConversationalAgentRunner.THOUGHT_RESPONSE;
 
 import java.util.ArrayList;
 import java.util.Arrays;

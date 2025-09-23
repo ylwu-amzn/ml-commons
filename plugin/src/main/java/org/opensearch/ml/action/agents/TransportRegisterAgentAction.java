@@ -26,12 +26,15 @@ import org.opensearch.common.util.concurrent.ThreadContext;
 import org.opensearch.commons.authuser.User;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.ml.common.MLAgentType;
+import org.opensearch.ml.common.agent.LLMSpec;
 import org.opensearch.ml.common.agent.MLAgent;
 import org.opensearch.ml.common.agent.MLToolSpec;
 import org.opensearch.ml.common.settings.MLFeatureEnabledSetting;
 import org.opensearch.ml.common.transport.agent.MLRegisterAgentAction;
 import org.opensearch.ml.common.transport.agent.MLRegisterAgentRequest;
 import org.opensearch.ml.common.transport.agent.MLRegisterAgentResponse;
+import org.opensearch.ml.common.transport.register.MLRegisterModelAction;
+import org.opensearch.ml.common.transport.register.MLRegisterModelRequest;
 import org.opensearch.ml.engine.algorithms.agent.MLPlanExecuteAndReflectAgentRunner;
 import org.opensearch.ml.engine.indices.MLIndicesHandler;
 import org.opensearch.ml.engine.tools.QueryPlanningTool;
@@ -107,6 +110,24 @@ public class TransportRegisterAgentAction extends HandledTransportAction<ActionR
             return;
         }
 
+        // If agent has model config, create model first
+        if (mlAgent.getLlm() == null && mlAgent.getRegisterModelInput() != null) {
+            mlAgent.getRegisterModelInput().setTenantId(tenantId);
+            MLRegisterModelRequest registerModelRequest = new MLRegisterModelRequest(mlAgent.getRegisterModelInput());
+            client.execute(MLRegisterModelAction.INSTANCE, registerModelRequest, ActionListener.wrap(r -> {
+                LLMSpec llm = LLMSpec.builder().modelId(r.getModelId()).build();
+                mlAgent.setLlm(llm);
+                createAgent(listener, mlAgent, tenantId);
+            }, e->{
+                log.error("Failed to register model", e);
+                listener.onFailure(e);
+            }));
+        } else {
+            createAgent(listener, mlAgent, tenantId);
+        }
+    }
+
+    private void createAgent(ActionListener<MLRegisterAgentResponse> listener, MLAgent mlAgent, String tenantId) {
         // If the agent is a PLAN_EXECUTE_AND_REFLECT agent and does not have an executor agent id, create an executor (reAct) agent
         if (MLAgentType.from(mlAgent.getType()) == MLAgentType.PLAN_EXECUTE_AND_REFLECT
             && !mlAgent.getParameters().containsKey(MLPlanExecuteAndReflectAgentRunner.EXECUTOR_AGENT_ID_FIELD)) {

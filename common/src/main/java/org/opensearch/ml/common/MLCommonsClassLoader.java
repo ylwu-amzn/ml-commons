@@ -22,6 +22,7 @@ import org.opensearch.ml.common.annotation.InputDataSet;
 import org.opensearch.ml.common.annotation.MLAlgoOutput;
 import org.opensearch.ml.common.annotation.MLAlgoParameter;
 import org.opensearch.ml.common.annotation.MLInput;
+import org.opensearch.ml.common.annotation.ModelProvider;
 import org.opensearch.ml.common.dataset.MLInputDataType;
 import org.opensearch.ml.common.exception.MLException;
 import org.opensearch.ml.common.output.MLOutput;
@@ -41,6 +42,7 @@ public class MLCommonsClassLoader {
     private static Map<Enum<?>, Class<?>> executeOutputClassMap = new HashMap<>();
     private static Map<Enum<?>, Class<?>> mlInputClassMap = new HashMap<>();
     private static Map<String, Class<?>> connectorClassMap = new HashMap<>();
+    private static Map<String, Class<?>> modelProviderClassMap = new HashMap<>();
 
     static {
         try {
@@ -64,6 +66,7 @@ public class MLCommonsClassLoader {
             loadExecuteOutputClassMapping();
             loadMLInputClassMapping();
             loadConnectorClassMapping();
+            loadModelProviderClassMapping();
         } finally {
             Thread.currentThread().setContextClassLoader(originalClassLoader);
         }
@@ -78,6 +81,20 @@ public class MLCommonsClassLoader {
                 String name = connector.value();
                 if (name != null && name.length() > 0) {
                     connectorClassMap.put(name, clazz);
+                }
+            }
+        }
+    }
+
+    private static void loadModelProviderClassMapping() {
+        Reflections reflections = new Reflections("org.opensearch.ml.common.model.provider");
+        Set<Class<?>> classes = reflections.getTypesAnnotatedWith(ModelProvider.class);
+        for (Class<?> clazz : classes) {
+            ModelProvider provider = clazz.getAnnotation(ModelProvider.class);
+            if (provider != null) {
+                String name = provider.value();
+                if (name != null && name.length() > 0) {
+                    modelProviderClassMap.put(name, clazz);
                 }
             }
         }
@@ -259,6 +276,10 @@ public class MLCommonsClassLoader {
 
     public static <S> S initConnector(String name, Object[] initArgs, Class<?>... constructorParameterTypes) throws JsonParseException {
         return init(connectorClassMap, name, initArgs, constructorParameterTypes);
+    }
+
+    public static <S> S initModelProvider(String name, Object[] initArgs, Class<?>... constructorParameterTypes) throws JsonParseException {
+        return init(modelProviderClassMap, name, initArgs, constructorParameterTypes);
     }
 
     @SuppressWarnings("unchecked")

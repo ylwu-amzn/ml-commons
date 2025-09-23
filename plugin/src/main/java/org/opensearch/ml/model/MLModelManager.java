@@ -626,6 +626,7 @@ public class MLModelManager {
                     .guardrails(registerModelInput.getGuardrails())
                     .modelInterface(registerModelInput.getModelInterface())
                     .tenantId(registerModelInput.getTenantId())
+                    .modelProvider(registerModelInput.getProvider())
                     .build();
 
                 PutDataObjectRequest putModelMetaRequest = PutDataObjectRequest

@@ -44,6 +44,7 @@ import org.opensearch.ml.common.model.TextEmbeddingModelConfig;
 
 import lombok.Builder;
 import lombok.Data;
+import org.opensearch.ml.common.model.provider.ModelProvider;
 
 /**
  * ML input data: algirithm name, parameters and input data set.
@@ -72,6 +73,10 @@ public class MLRegisterModelInput implements ToXContentObject, Writeable {
     public static final String ADD_ALL_BACKEND_ROLES_FIELD = "add_all_backend_roles";
     public static final String DOES_VERSION_CREATE_MODEL_GROUP = "does_version_create_model_group";
     public static final String GUARDRAILS_FIELD = "guardrails";
+    public static final String MODEL_ID_FIELD = "model_id";
+    public static final String PROVIDER_FIELD = "model_provider";
+    public static final String CREDENTIAL_FIELD = "credential";
+    public static final String PARAMETERS_FIELD = "parameters";
 
     public static final Version MINIMAL_SUPPORTED_VERSION_FOR_DOES_VERSION_CREATE_MODEL_GROUP = CommonValue.VERSION_2_11_0;
     public static final Version MINIMAL_SUPPORTED_VERSION_FOR_AGENT_FRAMEWORK = CommonValue.VERSION_2_12_0;
@@ -79,6 +84,10 @@ public class MLRegisterModelInput implements ToXContentObject, Writeable {
     public static final Version MINIMAL_SUPPORTED_VERSION_FOR_INTERFACE = CommonValue.VERSION_2_14_0;
 
     private FunctionName functionName;
+    private String modelId;
+    private String provider;
+    private Map<String, String> credential;
+    private Map<String, Object> parameters;
     private String modelName;
     private String modelGroupId;
     private String version;
@@ -111,6 +120,10 @@ public class MLRegisterModelInput implements ToXContentObject, Writeable {
     @Builder(toBuilder = true)
     public MLRegisterModelInput(
         FunctionName functionName,
+        String modelId,
+        String provider,
+        Map<String, String> credential,
+        Map<String, Object> parameters,
         String modelName,
         String modelGroupId,
         String version,
@@ -136,7 +149,7 @@ public class MLRegisterModelInput implements ToXContentObject, Writeable {
         String tenantId
     ) {
         this.functionName = Objects.requireNonNullElse(functionName, FunctionName.TEXT_EMBEDDING);
-        if (modelName == null) {
+        if (modelName == null && modelId == null) {
             throw new IllegalArgumentException("model name is null");
         }
         if (functionName != FunctionName.REMOTE) {
@@ -153,6 +166,10 @@ public class MLRegisterModelInput implements ToXContentObject, Writeable {
                 throw new IllegalArgumentException("model config is null");
             }
         }
+        this.modelId = modelId;
+        this.provider = provider;
+        this.credential = credential;
+        this.parameters = parameters;
         this.modelName = modelName;
         this.modelGroupId = modelGroupId;
         this.version = version;
@@ -181,6 +198,14 @@ public class MLRegisterModelInput implements ToXContentObject, Writeable {
     public MLRegisterModelInput(StreamInput in) throws IOException {
         Version streamInputVersion = in.getVersion();
         this.functionName = in.readEnum(FunctionName.class);
+        this.modelId = in.readOptionalString();
+        this.provider = in.readOptionalString();
+        if (in.readBoolean()) {
+            this.credential = in.readMap(StreamInput::readString, StreamInput::readString);
+        }
+        if (in.readBoolean()) {
+            this.parameters = in.readMap(StreamInput::readString, StreamInput::readGenericValue);
+        }
         this.modelName = in.readString();
         this.modelGroupId = in.readOptionalString();
         this.version = in.readOptionalString();
@@ -246,6 +271,20 @@ public class MLRegisterModelInput implements ToXContentObject, Writeable {
     public void writeTo(StreamOutput out) throws IOException {
         Version streamOutputVersion = out.getVersion();
         out.writeEnum(functionName);
+        out.writeOptionalString(modelId);
+        out.writeOptionalString(provider);
+        if (credential != null) {
+            out.writeBoolean(true);
+            out.writeMap(credential, StreamOutput::writeString, StreamOutput::writeString);
+        } else {
+            out.writeBoolean(false);
+        }
+        if (parameters != null) {
+            out.writeBoolean(true);
+            out.writeMap(parameters, StreamOutput::writeString, StreamOutput::writeGenericValue);
+        } else {
+            out.writeBoolean(false);
+        }
         out.writeString(modelName);
         out.writeOptionalString(modelGroupId);
         out.writeOptionalString(version);
@@ -330,6 +369,18 @@ public class MLRegisterModelInput implements ToXContentObject, Writeable {
     public XContentBuilder toXContent(XContentBuilder builder, Params params) throws IOException {
         builder.startObject();
         builder.field(FUNCTION_NAME_FIELD, functionName);
+        if (modelId != null) {
+            builder.field(MODEL_ID_FIELD, modelId);
+        }
+        if (provider != null) {
+            builder.field(PROVIDER_FIELD, provider);
+        }
+//        if (credential != null) {
+//            builder.field(CREDENTIAL_FIELD, credential);
+//        }
+        if (parameters != null) {
+            builder.field(PARAMETERS_FIELD, parameters);
+        }
         builder.field(NAME_FIELD, modelName);
         if (version != null) {
             builder.field(VERSION_FIELD, version);
@@ -402,6 +453,10 @@ public class MLRegisterModelInput implements ToXContentObject, Writeable {
     public static MLRegisterModelInput parse(XContentParser parser, String modelName, String version, boolean deployModel)
         throws IOException {
         FunctionName functionName = null;
+        String modelId = null;
+        String provider = null;
+        Map<String, String> credential = null;
+        Map<String, Object> parameter = null;
         String modelGroupId = null;
         Boolean isEnabled = null;
         MLRateLimiter rateLimiter = null;
@@ -430,6 +485,18 @@ public class MLRegisterModelInput implements ToXContentObject, Writeable {
             switch (fieldName) {
                 case FUNCTION_NAME_FIELD:
                     functionName = FunctionName.from(parser.text().toUpperCase(Locale.ROOT));
+                    break;
+                case MODEL_ID_FIELD:
+                    modelId = parser.text();
+                    break;
+                case PROVIDER_FIELD:
+                    provider = parser.text();
+                    break;
+                case CREDENTIAL_FIELD:
+                    credential = parser.mapStrings();
+                    break;
+                case PARAMETERS_FIELD:
+                    parameter = parser.map();
                     break;
                 case MODEL_GROUP_ID_FIELD:
                     modelGroupId = parser.text();
@@ -512,6 +579,10 @@ public class MLRegisterModelInput implements ToXContentObject, Writeable {
         }
         return new MLRegisterModelInput(
             functionName,
+            modelId,
+            provider,
+            credential,
+            parameter,
             modelName,
             modelGroupId,
             version,
@@ -539,7 +610,11 @@ public class MLRegisterModelInput implements ToXContentObject, Writeable {
     }
 
     public static MLRegisterModelInput parse(XContentParser parser, boolean deployModel) throws IOException {
-        FunctionName functionName = null;
+        FunctionName functionName = FunctionName.REMOTE;
+        String modelId = null;
+        String provider = null;
+        Map<String, String> credential = null;
+        Map<String, Object> parameter = null;
         String name = null;
         String modelGroupId = null;
         String version = null;
@@ -571,6 +646,18 @@ public class MLRegisterModelInput implements ToXContentObject, Writeable {
             switch (fieldName) {
                 case FUNCTION_NAME_FIELD:
                     functionName = FunctionName.from(parser.text().toUpperCase(Locale.ROOT));
+                    break;
+                case MODEL_ID_FIELD:
+                    modelId = parser.text();
+                    break;
+                case PROVIDER_FIELD:
+                    provider = parser.text();
+                    break;
+                case CREDENTIAL_FIELD:
+                    credential = parser.mapStrings();
+                    break;
+                case PARAMETERS_FIELD:
+                    parameter = parser.map();
                     break;
                 case NAME_FIELD:
                     name = parser.text();
@@ -657,8 +744,19 @@ public class MLRegisterModelInput implements ToXContentObject, Writeable {
                     break;
             }
         }
+        if ((connector == null || connectorId == null) && provider != null && modelId != null && credential != null) {
+            ModelProvider modelProvider = ModelProvider.createModelProvider(provider, modelId, credential, parameter);
+            connector = modelProvider.createConnector();
+        }
+        if (name == null) {
+            name = modelId;
+        }
         return new MLRegisterModelInput(
             functionName,
+            modelId,
+            provider,
+            credential,
+            parameter,
             name,
             modelGroupId,
             version,
