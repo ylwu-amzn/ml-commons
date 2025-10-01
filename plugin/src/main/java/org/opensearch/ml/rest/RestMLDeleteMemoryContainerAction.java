@@ -6,8 +6,10 @@
 package org.opensearch.ml.rest;
 
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.BASE_MEMORY_CONTAINERS_PATH;
+import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.PARAMETER_DELETE_ALL_MEMORIES;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.PARAMETER_MEMORY_CONTAINER_ID;
 import static org.opensearch.ml.common.settings.MLCommonsSettings.ML_COMMONS_AGENTIC_MEMORY_DISABLED_MESSAGE;
+import static org.opensearch.ml.utils.RestActionUtils.PARAMETER_DEPLOY_MODEL;
 import static org.opensearch.ml.utils.TenantAwareHelper.getTenantID;
 
 import java.io.IOException;
@@ -61,8 +63,9 @@ public class RestMLDeleteMemoryContainerAction extends BaseRestHandler {
         }
 
         String memoryContainerId = request.param(PARAMETER_MEMORY_CONTAINER_ID);
+        boolean deleteAllMemories = request.paramAsBoolean(PARAMETER_DELETE_ALL_MEMORIES, false);
         String tenantId = getTenantID(mlFeatureEnabledSetting.isMultiTenancyEnabled(), request);
-        MLMemoryContainerDeleteRequest mlMemoryContainerDeleteRequest = new MLMemoryContainerDeleteRequest(memoryContainerId, tenantId);
+        MLMemoryContainerDeleteRequest mlMemoryContainerDeleteRequest = new MLMemoryContainerDeleteRequest(memoryContainerId, deleteAllMemories, tenantId);
         return channel -> client
             .execute(MLMemoryContainerDeleteAction.INSTANCE, mlMemoryContainerDeleteRequest, new RestToXContentListener<>(channel));
     }

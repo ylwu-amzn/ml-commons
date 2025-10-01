@@ -41,10 +41,17 @@ import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.core.xcontent.XContentParser;
 import org.opensearch.index.IndexNotFoundException;
 import org.opensearch.index.query.BoolQueryBuilder;
+import org.opensearch.index.query.ExistsQueryBuilder;
+import org.opensearch.index.query.IdsQueryBuilder;
 import org.opensearch.index.query.NestedQueryBuilder;
+import org.opensearch.index.query.PrefixQueryBuilder;
 import org.opensearch.index.query.QueryBuilder;
 import org.opensearch.index.query.QueryBuilders;
+import org.opensearch.index.query.RangeQueryBuilder;
+import org.opensearch.index.query.RegexpQueryBuilder;
 import org.opensearch.index.query.TermQueryBuilder;
+import org.opensearch.index.query.TermsQueryBuilder;
+import org.opensearch.index.query.WildcardQueryBuilder;
 import org.opensearch.ml.common.memorycontainer.MLMemoryContainer;
 import org.opensearch.ml.common.memorycontainer.MemoryConfiguration;
 import org.opensearch.remote.metadata.client.GetDataObjectRequest;
@@ -335,14 +342,40 @@ public class MemoryContainerHelper {
             ((BoolQueryBuilder) query).filter(boolQueryBuilder);
         } else {
             BoolQueryBuilder rewriteQuery = new BoolQueryBuilder();
-            rewriteQuery.must(query);
+            
+            // Preserve original query context - use filter for non-scoring queries
+            if (isFilterQuery(query)) {
+                rewriteQuery.filter(query);
+            } else {
+                rewriteQuery.must(query);
+            }
+            
             rewriteQuery.filter(boolQueryBuilder);
             searchSourceBuilder.query(rewriteQuery);
         }
         return searchSourceBuilder;
     }
 
+    /**
+     * Determines if a query should be treated as a filter (non-scoring) query
+     * 
+     * @param query the query to check
+     * @return true if the query should be in filter context, false if it should be in must context
+     */
+    private boolean isFilterQuery(QueryBuilder query) {
+        // These query types are typically used for filtering, not scoring
+        return query instanceof TermQueryBuilder ||
+               query instanceof TermsQueryBuilder ||
+               query instanceof RangeQueryBuilder ||
+               query instanceof ExistsQueryBuilder ||
+               query instanceof IdsQueryBuilder ||
+               query instanceof PrefixQueryBuilder ||
+               query instanceof WildcardQueryBuilder ||
+               query instanceof RegexpQueryBuilder;
+    }
+
     public String getOwnerId(User user) {
         return user != null ? user.getName() : null;
     }
+
 }

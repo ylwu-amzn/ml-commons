@@ -27,11 +27,15 @@ public class MLMemoryContainerDeleteRequest extends ActionRequest {
     String memoryContainerId;
 
     @Getter
+    boolean deleteAllMemories;
+
+    @Getter
     String tenantId;
 
     @Builder
-    public MLMemoryContainerDeleteRequest(String memoryContainerId, String tenantId) {
+    public MLMemoryContainerDeleteRequest(String memoryContainerId, boolean deleteAllMemories, String tenantId) {
         this.memoryContainerId = memoryContainerId;
+        this.deleteAllMemories = deleteAllMemories;
         this.tenantId = tenantId;
     }
 

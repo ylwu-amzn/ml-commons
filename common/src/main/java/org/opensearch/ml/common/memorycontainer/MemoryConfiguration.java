@@ -328,52 +328,28 @@ public class MemoryConfiguration implements ToXContentObject, Writeable {
         }
     }
 
-    public String getSessionIndexName() {
+    public String getFinalMemoryIndexPrefix() {
         if (useSystemIndex) {
-            if (indexPrefix != null && !indexPrefix.isEmpty()) {
-                return ML_AGENTIC_MEMORY_SYSTEM_INDEX_PREFIX + "-" + indexPrefix + "-memory-session";
-            } else {
-                return ML_AGENTIC_MEMORY_SYSTEM_INDEX_PREFIX + "-memory-session";
-            }
+            return ML_AGENTIC_MEMORY_SYSTEM_INDEX_PREFIX + "-" + indexPrefix + "-memory-";
         } else {
-            return indexPrefix + "-memory-session";
+            return indexPrefix;
         }
+    }
+
+    public String getSessionIndexName() {
+        return getFinalMemoryIndexPrefix() + "session";
     }
 
     public String getWorkingMemoryIndexName() {
-        if (useSystemIndex) {
-            if (indexPrefix != null && !indexPrefix.isEmpty()) {
-                return ML_AGENTIC_MEMORY_SYSTEM_INDEX_PREFIX + "-" + indexPrefix + "-memory-working";
-            } else {
-                return ML_AGENTIC_MEMORY_SYSTEM_INDEX_PREFIX + "-memory-working";
-            }
-        } else {
-            return indexPrefix + "-memory-working";
-        }
+        return getFinalMemoryIndexPrefix() + "working";
     }
 
     public String getLongMemoryIndexName() {
-        if (useSystemIndex) {
-            if (indexPrefix != null && !indexPrefix.isEmpty()) {
-                return ML_AGENTIC_MEMORY_SYSTEM_INDEX_PREFIX + "-" + indexPrefix + "-memory-long-term";
-            } else {
-                return ML_AGENTIC_MEMORY_SYSTEM_INDEX_PREFIX + "-memory-long-term";
-            }
-        } else {
-            return indexPrefix + "-memory-long-term";
-        }
+        return getFinalMemoryIndexPrefix() + "long-term";
     }
 
     public String getLongMemoryHistoryIndexName() {
-        if (useSystemIndex) {
-            if (indexPrefix != null && !indexPrefix.isEmpty()) {
-                return ML_AGENTIC_MEMORY_SYSTEM_INDEX_PREFIX + "-" + indexPrefix + "-memory-history";
-            } else {
-                return ML_AGENTIC_MEMORY_SYSTEM_INDEX_PREFIX + "-memory-history";
-            }
-        } else {
-            return indexPrefix + "-memory-history";
-        }
+        return getFinalMemoryIndexPrefix() + "history";
     }
 
     public Map<String, Object> getMemoryIndexMapping(String indexName) {

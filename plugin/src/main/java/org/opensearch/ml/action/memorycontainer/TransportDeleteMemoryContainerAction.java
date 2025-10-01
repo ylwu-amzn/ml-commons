@@ -83,6 +83,7 @@ public class TransportDeleteMemoryContainerAction extends HandledTransportAction
         MLMemoryContainerDeleteRequest deleteRequest = MLMemoryContainerDeleteRequest.fromActionRequest(request);
         String memoryContainerId = deleteRequest.getMemoryContainerId();
         String tenantId = deleteRequest.getTenantId();
+        boolean deleteAllMemories = deleteRequest.isDeleteAllMemories();
 
         if (!TenantAwareHelper.validateTenantId(mlFeatureEnabledSetting, tenantId, actionListener)) {
             return;
@@ -101,11 +102,11 @@ public class TransportDeleteMemoryContainerAction extends HandledTransportAction
             }
 
             // Delete memory container
-            deleteMemoryContainer(memoryContainerId, tenantId, actionListener);
+            deleteMemoryContainer(memoryContainerId, container.getConfiguration().getFinalMemoryIndexPrefix(), tenantId, deleteAllMemories, actionListener);
         }, actionListener::onFailure));
     }
 
-    private void deleteMemoryContainer(String memoryContainerId, String tenantId, ActionListener<DeleteResponse> listener) {
+    private void deleteMemoryContainer(String memoryContainerId, String memoryIndexPrefix, String tenantId, boolean deleteAllMemories, ActionListener<DeleteResponse> listener) {
         try (ThreadContext.StoredContext context = client.threadPool().getThreadContext().stashContext()) {
             DeleteDataObjectRequest deleteRequest = DeleteDataObjectRequest
                 .builder()
@@ -115,7 +116,7 @@ public class TransportDeleteMemoryContainerAction extends HandledTransportAction
                 .build();
             sdkClient
                 .deleteDataObjectAsync(deleteRequest)
-                .whenComplete((deleteResponse, throwable) -> handleDeleteResponse(deleteResponse, throwable, deleteRequest.id(), listener));
+                .whenComplete((deleteResponse, throwable) -> handleDeleteResponse(deleteResponse, throwable, deleteRequest.id(), deleteAllMemories, memoryIndexPrefix, listener));
         } catch (Exception e) {
             log.error("Failed to delete Memory Container: {}", memoryContainerId, e);
             listener.onFailure(e);
@@ -126,6 +127,8 @@ public class TransportDeleteMemoryContainerAction extends HandledTransportAction
         DeleteDataObjectResponse response,
         Throwable throwable,
         String memoryContainerId,
+        boolean deleteAllMemories,
+        String memoryIndexPrefix,
         ActionListener<DeleteResponse> actionListener
     ) {
         if (throwable != null) {
@@ -134,9 +137,13 @@ public class TransportDeleteMemoryContainerAction extends HandledTransportAction
             actionListener.onFailure((new OpenSearchStatusException("Failed to find memory container", RestStatus.NOT_FOUND)));
         } else {
             try {
-                DeleteResponse deleteResponse = response.deleteResponse();
-                log.debug("Completed Delete Memory Container Request, memory container id:{} deleted", response.id());
-                actionListener.onResponse(deleteResponse);
+                if (deleteAllMemories) {
+                    memoryContainerHelper.deleteIndex();
+                } else {
+                    DeleteResponse deleteResponse = response.deleteResponse();
+                    log.debug("Completed Delete Memory Container Request, memory container id:{} deleted", response.id());
+                    actionListener.onResponse(deleteResponse);
+                }
             } catch (Exception e) {
                 actionListener.onFailure(e);
             }
