@@ -120,6 +120,10 @@ public class TransportCreateSessionAction extends HandledTransportAction<MLCreat
             .tenantId(tenantId)
             .build();
         IndexRequest indexRequest = new IndexRequest(container.getConfiguration().getSessionIndexName());
+        String sessionId = input.getSessionId();
+        if (sessionId != null && !sessionId.isBlank()) {
+            indexRequest.id(sessionId);
+        }
         try (XContentBuilder builder = XContentFactory.jsonBuilder()) {
             session.toXContent(builder, ToXContent.EMPTY_PARAMS);
             indexRequest.source(builder);

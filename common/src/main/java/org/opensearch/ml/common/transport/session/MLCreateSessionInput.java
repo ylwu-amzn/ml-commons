@@ -12,6 +12,7 @@ import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.METADATA_FIELD;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.NAMESPACE_FIELD;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.OWNER_ID_FIELD;
+import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.SESSION_ID_FIELD;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.SUMMARY_FIELD;
 
 import java.io.IOException;
@@ -36,6 +37,7 @@ import lombok.Setter;
 @Builder
 public class MLCreateSessionInput implements ToXContentObject, Writeable {
 
+    private String sessionId;
     private String ownerId;
     private String summary;
     private Map<String, Object> metadata;
@@ -46,6 +48,7 @@ public class MLCreateSessionInput implements ToXContentObject, Writeable {
     private String memoryContainerId;
 
     public MLCreateSessionInput(
+        String sessionId,
         String ownerId,
         String summary,
         Map<String, Object> metadata,
@@ -55,6 +58,7 @@ public class MLCreateSessionInput implements ToXContentObject, Writeable {
         String tenantId,
         String memoryContainerId
     ) {
+        this.sessionId = sessionId;
         this.ownerId = ownerId;
         this.summary = summary;
         this.metadata = metadata;
@@ -66,6 +70,7 @@ public class MLCreateSessionInput implements ToXContentObject, Writeable {
     }
 
     public MLCreateSessionInput(StreamInput in) throws IOException {
+        this.sessionId = in.readOptionalString();
         this.ownerId = in.readOptionalString();
         this.summary = in.readOptionalString();
         if (in.readBoolean()) {
@@ -86,6 +91,7 @@ public class MLCreateSessionInput implements ToXContentObject, Writeable {
 
     @Override
     public void writeTo(StreamOutput out) throws IOException {
+        out.writeOptionalString(sessionId);
         out.writeOptionalString(ownerId);
         out.writeOptionalString(summary);
 
@@ -120,6 +126,9 @@ public class MLCreateSessionInput implements ToXContentObject, Writeable {
     @Override
     public XContentBuilder toXContent(XContentBuilder builder, Params params) throws IOException {
         builder.startObject();
+        if (sessionId != null) {
+            builder.field(SESSION_ID_FIELD, sessionId);
+        }
         if (ownerId != null) {
             builder.field(OWNER_ID_FIELD, ownerId);
         }
@@ -146,6 +155,7 @@ public class MLCreateSessionInput implements ToXContentObject, Writeable {
     }
 
     public static MLCreateSessionInput parse(XContentParser parser) throws IOException {
+        String sessionId = null;
         String ownerId = null;
         String summary = null;
         Map<String, Object> metadata = null;
@@ -160,6 +170,9 @@ public class MLCreateSessionInput implements ToXContentObject, Writeable {
             parser.nextToken();
 
             switch (fieldName) {
+                case SESSION_ID_FIELD:
+                    sessionId = parser.text();
+                    break;
                 case OWNER_ID_FIELD:
                     ownerId = parser.text();
                     break;
@@ -189,6 +202,7 @@ public class MLCreateSessionInput implements ToXContentObject, Writeable {
 
         return MLCreateSessionInput
             .builder()
+            .sessionId(sessionId)
             .ownerId(ownerId)
             .summary(summary)
             .metadata(metadata)
