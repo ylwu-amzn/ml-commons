@@ -224,7 +224,7 @@ public class MLAddMemoriesInput implements ToXContentObject, Writeable {
         }
         if (namespace != null && !namespace.isEmpty()) {
             builder.field(NAMESPACE_FIELD, namespace);
-            builder.field(NAMESPACE_SIZE_FIELD, messages.size());
+            builder.field(NAMESPACE_SIZE_FIELD, namespace.size());
         }
         builder.field(INFER_FIELD, infer);
         if (metadata != null && !metadata.isEmpty()) {
