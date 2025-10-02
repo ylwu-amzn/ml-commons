@@ -8,6 +8,8 @@ package org.opensearch.ml.common.transport.session;
 import static org.opensearch.core.xcontent.XContentParserUtils.ensureExpectedToken;
 import static org.opensearch.ml.common.CommonValue.TENANT_ID_FIELD;
 import static org.opensearch.ml.common.conversation.ActionConstants.ADDITIONAL_INFO_FIELD;
+import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.AGENTS_FIELD;
+import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.METADATA_FIELD;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.NAMESPACE_FIELD;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.OWNER_ID_FIELD;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.SUMMARY_FIELD;
@@ -36,6 +38,8 @@ public class MLCreateSessionInput implements ToXContentObject, Writeable {
 
     private String ownerId;
     private String summary;
+    private Map<String, Object> metadata;
+    private Map<String, Object> agents;
     private Map<String, Object> additionalInfo;
     private Map<String, String> namespace;
     private String tenantId;
@@ -44,6 +48,8 @@ public class MLCreateSessionInput implements ToXContentObject, Writeable {
     public MLCreateSessionInput(
         String ownerId,
         String summary,
+        Map<String, Object> metadata,
+        Map<String, Object> agents,
         Map<String, Object> additionalInfo,
         Map<String, String> namespace,
         String tenantId,
@@ -51,6 +57,8 @@ public class MLCreateSessionInput implements ToXContentObject, Writeable {
     ) {
         this.ownerId = ownerId;
         this.summary = summary;
+        this.metadata = metadata;
+        this.agents = agents;
         this.additionalInfo = additionalInfo;
         this.namespace = namespace;
         this.tenantId = tenantId;
@@ -60,6 +68,12 @@ public class MLCreateSessionInput implements ToXContentObject, Writeable {
     public MLCreateSessionInput(StreamInput in) throws IOException {
         this.ownerId = in.readOptionalString();
         this.summary = in.readOptionalString();
+        if (in.readBoolean()) {
+            this.metadata = in.readMap();
+        }
+        if (in.readBoolean()) {
+            this.agents = in.readMap();
+        }
         if (in.readBoolean()) {
             this.additionalInfo = in.readMap();
         }
@@ -75,6 +89,18 @@ public class MLCreateSessionInput implements ToXContentObject, Writeable {
         out.writeOptionalString(ownerId);
         out.writeOptionalString(summary);
 
+        if (metadata != null) {
+            out.writeBoolean(true);
+            out.writeMap(metadata);
+        } else {
+            out.writeBoolean(false);
+        }
+        if (agents != null) {
+            out.writeBoolean(true);
+            out.writeMap(agents);
+        } else {
+            out.writeBoolean(false);
+        }
         if (additionalInfo != null) {
             out.writeBoolean(true);
             out.writeMap(additionalInfo);
@@ -100,6 +126,12 @@ public class MLCreateSessionInput implements ToXContentObject, Writeable {
         if (summary != null) {
             builder.field(SUMMARY_FIELD, summary);
         }
+        if (metadata != null) {
+            builder.field(METADATA_FIELD, metadata);
+        }
+        if (metadata != null) {
+            builder.field(AGENTS_FIELD, agents);
+        }
         if (additionalInfo != null) {
             builder.field(ADDITIONAL_INFO_FIELD, additionalInfo);
         }
@@ -116,6 +148,8 @@ public class MLCreateSessionInput implements ToXContentObject, Writeable {
     public static MLCreateSessionInput parse(XContentParser parser) throws IOException {
         String ownerId = null;
         String summary = null;
+        Map<String, Object> metadata = null;
+        Map<String, Object> agents = null;
         Map<String, Object> additionalInfo = null;
         Map<String, String> namespace = null;
         String tenantId = null;
@@ -131,6 +165,12 @@ public class MLCreateSessionInput implements ToXContentObject, Writeable {
                     break;
                 case SUMMARY_FIELD:
                     summary = parser.text();
+                    break;
+                case METADATA_FIELD:
+                    metadata = parser.map();
+                    break;
+                case AGENTS_FIELD:
+                    agents = parser.map();
                     break;
                 case ADDITIONAL_INFO_FIELD:
                     additionalInfo = parser.map();
@@ -151,6 +191,8 @@ public class MLCreateSessionInput implements ToXContentObject, Writeable {
             .builder()
             .ownerId(ownerId)
             .summary(summary)
+            .metadata(metadata)
+            .agents(agents)
             .additionalInfo(additionalInfo)
             .namespace(namespace)
             .tenantId(tenantId)

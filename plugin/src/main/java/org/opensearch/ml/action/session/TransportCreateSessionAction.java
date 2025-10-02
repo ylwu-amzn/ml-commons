@@ -113,6 +113,8 @@ public class TransportCreateSessionAction extends HandledTransportAction<MLCreat
             .summary(input.getSummary())
             .createdTime(now)
             .lastUpdateTime(now)
+            .metadata(input.getMetadata())
+            .agents(input.getAgents())
             .additionalInfo(input.getAdditionalInfo())
             .namespace(input.getNamespace())
             .tenantId(tenantId)

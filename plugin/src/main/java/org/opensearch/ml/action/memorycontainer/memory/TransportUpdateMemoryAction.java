@@ -156,6 +156,12 @@ public class TransportUpdateMemoryAction extends HandledTransportAction<ActionRe
         if (updateContent.containsKey(SUMMARY_FIELD)) {
             updateFields.put(SUMMARY_FIELD, updateContent.get(SUMMARY_FIELD));
         }
+        if (updateContent.containsKey(METADATA_FIELD)) {
+            updateFields.put(METADATA_FIELD, updateContent.get(METADATA_FIELD));
+        }
+        if (updateContent.containsKey(AGENTS_FIELD)) {
+            updateFields.put(AGENTS_FIELD, updateContent.get(AGENTS_FIELD));
+        }
         if (updateContent.containsKey(ADDITIONAL_INFO_FIELD)) {
             updateFields.put(ADDITIONAL_INFO_FIELD, updateContent.get(ADDITIONAL_INFO_FIELD));
         }

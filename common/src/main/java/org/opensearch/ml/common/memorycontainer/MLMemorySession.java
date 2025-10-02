@@ -8,8 +8,10 @@ package org.opensearch.ml.common.memorycontainer;
 import static org.opensearch.core.xcontent.XContentParserUtils.ensureExpectedToken;
 import static org.opensearch.ml.common.CommonValue.TENANT_ID_FIELD;
 import static org.opensearch.ml.common.conversation.ActionConstants.ADDITIONAL_INFO_FIELD;
+import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.AGENTS_FIELD;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.CREATED_TIME_FIELD;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.LAST_UPDATED_TIME_FIELD;
+import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.METADATA_FIELD;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.NAMESPACE_FIELD;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.OWNER_ID_FIELD;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.SUMMARY_FIELD;
@@ -42,6 +44,8 @@ public class MLMemorySession implements ToXContentObject, Writeable {
     private String summary;
     private Instant createdTime;
     private Instant lastUpdateTime;
+    private Map<String, Object> metadata;
+    private Map<String, Object> agents;
     private Map<String, Object> additionalInfo;
     private Map<String, String> namespace;
     private String tenantId;
@@ -51,6 +55,8 @@ public class MLMemorySession implements ToXContentObject, Writeable {
         String summary,
         Instant createdTime,
         Instant lastUpdateTime,
+        Map<String, Object> metadata,
+        Map<String, Object> agents,
         Map<String, Object> additionalInfo,
         Map<String, String> namespace,
         String tenantId
@@ -59,6 +65,8 @@ public class MLMemorySession implements ToXContentObject, Writeable {
         this.summary = summary;
         this.createdTime = createdTime;
         this.lastUpdateTime = lastUpdateTime;
+        this.metadata = metadata;
+        this.agents = agents;
         this.additionalInfo = additionalInfo;
         this.namespace = namespace;
         this.tenantId = tenantId;
@@ -69,6 +77,12 @@ public class MLMemorySession implements ToXContentObject, Writeable {
         this.summary = in.readOptionalString();
         this.createdTime = in.readOptionalInstant();
         this.lastUpdateTime = in.readOptionalInstant();
+        if (in.readBoolean()) {
+            this.metadata = in.readMap();
+        }
+        if (in.readBoolean()) {
+            this.agents = in.readMap();
+        }
         if (in.readBoolean()) {
             this.additionalInfo = in.readMap();
         }
@@ -85,6 +99,18 @@ public class MLMemorySession implements ToXContentObject, Writeable {
         out.writeOptionalInstant(createdTime);
         out.writeOptionalInstant(lastUpdateTime);
 
+        if (metadata != null) {
+            out.writeBoolean(true);
+            out.writeMap(metadata);
+        } else {
+            out.writeBoolean(false);
+        }
+        if (agents != null) {
+            out.writeBoolean(true);
+            out.writeMap(agents);
+        } else {
+            out.writeBoolean(false);
+        }
         if (additionalInfo != null) {
             out.writeBoolean(true);
             out.writeMap(additionalInfo);
@@ -115,6 +141,12 @@ public class MLMemorySession implements ToXContentObject, Writeable {
         if (lastUpdateTime != null) {
             builder.field(LAST_UPDATED_TIME_FIELD, lastUpdateTime.toEpochMilli());
         }
+        if (metadata != null) {
+            builder.field(METADATA_FIELD, metadata);
+        }
+        if (agents != null) {
+            builder.field(AGENTS_FIELD, agents);
+        }
         if (additionalInfo != null) {
             builder.field(ADDITIONAL_INFO_FIELD, additionalInfo);
         }
@@ -133,6 +165,8 @@ public class MLMemorySession implements ToXContentObject, Writeable {
         String summary = null;
         Instant createdTime = null;
         Instant lastUpdateTime = null;
+        Map<String, Object> metadata = null;
+        Map<String, Object> agents = null;
         Map<String, Object> additionalInfo = null;
         Map<String, String> namespace = null;
         String tenantId = null;
@@ -155,6 +189,12 @@ public class MLMemorySession implements ToXContentObject, Writeable {
                 case LAST_UPDATED_TIME_FIELD:
                     lastUpdateTime = Instant.ofEpochMilli(parser.longValue());
                     break;
+                case METADATA_FIELD:
+                    metadata = parser.map();
+                    break;
+                case AGENTS_FIELD:
+                    agents = parser.map();
+                    break;
                 case ADDITIONAL_INFO_FIELD:
                     additionalInfo = parser.map();
                     break;
@@ -176,6 +216,8 @@ public class MLMemorySession implements ToXContentObject, Writeable {
             .summary(summary)
             .createdTime(createdTime)
             .lastUpdateTime(lastUpdateTime)
+            .metadata(metadata)
+            .agents(agents)
             .additionalInfo(additionalInfo)
             .namespace(namespace)
             .tenantId(tenantId)
