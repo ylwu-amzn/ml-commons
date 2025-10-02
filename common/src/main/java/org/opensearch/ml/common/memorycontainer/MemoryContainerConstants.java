@@ -76,6 +76,7 @@ public class MemoryContainerConstants {
     // Request body field names (different from storage field names)
     public static final String MESSAGE_FIELD = "message";
     public static final String MESSAGES_FIELD = "messages";
+    public static final String MESSAGE_ID_FIELD = "message_id";
     public static final String CONTENT_TEXT_FIELD = "content_text";
     public static final String CONTENT_FIELD = "content";
     public static final String INFER_FIELD = "infer";

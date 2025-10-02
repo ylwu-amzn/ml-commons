@@ -13,6 +13,7 @@ import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.LAST_UPDATED_TIME_FIELD;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.MEMORY_CONTAINER_ID_FIELD;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.MESSAGES_FIELD;
+import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.MESSAGE_ID_FIELD;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.METADATA_FIELD;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.NAMESPACE_FIELD;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.NAMESPACE_SIZE_FIELD;
@@ -56,6 +57,7 @@ public class MLAddMemoriesInput implements ToXContentObject, Writeable {
     private String memoryContainerId;
     private WorkingMemoryType memoryType;
     private List<MessageInput> messages;
+    private Integer messageId;
     private String binaryData;
     private Map<String, Object> structuredData;
 
@@ -71,6 +73,7 @@ public class MLAddMemoriesInput implements ToXContentObject, Writeable {
         String memoryContainerId,
         WorkingMemoryType memoryType,
         List<MessageInput> messages,
+        Integer messageId,
         String binaryData,
         Map<String, Object> structuredData,
         Map<String, String> namespace,
@@ -85,6 +88,7 @@ public class MLAddMemoriesInput implements ToXContentObject, Writeable {
         this.memoryContainerId = memoryContainerId;
         this.memoryType = memoryType == null ? WorkingMemoryType.CONVERSATIONAL : memoryType;
         this.messages = messages;
+        this.messageId = messageId;
         this.binaryData = binaryData;
         this.structuredData = structuredData;
         this.namespace = namespace;
@@ -121,6 +125,7 @@ public class MLAddMemoriesInput implements ToXContentObject, Writeable {
                 this.messages.add(new MessageInput(in));
             }
         }
+        this.messageId = in.readOptionalInt();
         this.binaryData = in.readOptionalString();
         if (in.readBoolean()) {
             this.structuredData = in.readMap();
@@ -154,7 +159,7 @@ public class MLAddMemoriesInput implements ToXContentObject, Writeable {
         } else {
             out.writeBoolean(false);
         }
-
+        out.writeOptionalInt(messageId);
         out.writeOptionalString(binaryData);
         if (structuredData != null) {
             out.writeBoolean(true);
@@ -208,6 +213,9 @@ public class MLAddMemoriesInput implements ToXContentObject, Writeable {
             }
             builder.endArray();
         }
+        if (messageId != null) {
+            builder.field(MESSAGE_ID_FIELD, messageId);
+        }
         if (binaryData != null) {
             builder.field(BINARY_DATA_FIELD, binaryData);
         }
@@ -243,6 +251,7 @@ public class MLAddMemoriesInput implements ToXContentObject, Writeable {
     public static MLAddMemoriesInput parse(XContentParser parser, String memoryContainerId) throws IOException {
         String memoryType = null;
         List<MessageInput> messages = null;
+        Integer messageId = null;
         String binaryData = null;
         Map<String, Object> structuredData = null;
         Map<String, String> namespace = null;
@@ -270,6 +279,9 @@ public class MLAddMemoriesInput implements ToXContentObject, Writeable {
                     while (parser.nextToken() != XContentParser.Token.END_ARRAY) {
                         messages.add(MessageInput.parse(parser));
                     }
+                    break;
+                case MESSAGE_ID_FIELD:
+                    messageId = parser.intValue();
                     break;
                 case BINARY_DATA_FIELD:
                     binaryData = parser.text();
@@ -306,6 +318,7 @@ public class MLAddMemoriesInput implements ToXContentObject, Writeable {
             .memoryContainerId(memoryContainerId)
             .memoryType(memoryType == null ? WorkingMemoryType.CONVERSATIONAL : WorkingMemoryType.fromString(memoryType))
             .messages(messages)
+            .messageId(messageId)
             .binaryData(binaryData)
             .structuredData(structuredData)
             .namespace(namespace)
