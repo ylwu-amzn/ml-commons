@@ -15,6 +15,7 @@ import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.MESSAGES_FIELD;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.METADATA_FIELD;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.NAMESPACE_FIELD;
+import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.NAMESPACE_SIZE_FIELD;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.OWNER_ID_FIELD;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.PARAMETERS_FIELD;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.SESSION_ID_FIELD;
@@ -215,6 +216,7 @@ public class MLAddMemoriesInput implements ToXContentObject, Writeable {
         }
         if (namespace != null && !namespace.isEmpty()) {
             builder.field(NAMESPACE_FIELD, namespace);
+            builder.field(NAMESPACE_SIZE_FIELD, messages.size());
         }
         builder.field(INFER_FIELD, infer);
         if (metadata != null && !metadata.isEmpty()) {

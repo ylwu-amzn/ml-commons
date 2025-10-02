@@ -16,6 +16,7 @@ import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.MESSAGES_FIELD;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.METADATA_FIELD;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.NAMESPACE_FIELD;
+import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.NAMESPACE_SIZE_FIELD;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.OWNER_ID_FIELD;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.SESSION_ID_FIELD;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.STRUCTURED_DATA_FIELD;
@@ -45,7 +46,6 @@ import lombok.Setter;
  */
 @Getter
 @Setter
-@Builder
 public class MLWorkingMemory implements ToXContentObject, Writeable {
 
     // Required fields
@@ -57,6 +57,7 @@ public class MLWorkingMemory implements ToXContentObject, Writeable {
 
     // Optional fields
     private Map<String, String> namespace;
+    private Integer namespaceSize;
     private boolean infer;
     private Map<String, String> metadata;
     private Map<String, String> tags;
@@ -64,6 +65,7 @@ public class MLWorkingMemory implements ToXContentObject, Writeable {
     private Instant lastUpdateTime;
     private String ownerId;
 
+    @Builder
     public MLWorkingMemory(
         String memoryContainerId,
         WorkingMemoryType memoryType,
@@ -86,6 +88,7 @@ public class MLWorkingMemory implements ToXContentObject, Writeable {
         this.binaryData = binaryData;
         this.structuredData = structuredData;
         this.namespace = namespace;
+        this.namespaceSize = namespace == null ? null : namespace.size();
         this.infer = infer; // default infer is false
         this.metadata = metadata;
         this.tags = tags;
@@ -111,6 +114,7 @@ public class MLWorkingMemory implements ToXContentObject, Writeable {
         if (in.readBoolean()) {
             this.namespace = in.readMap(StreamInput::readString, StreamInput::readString);
         }
+        this.namespaceSize = in.readOptionalInt();
         this.infer = in.readBoolean();
         if (in.readBoolean()) {
             this.metadata = in.readMap(StreamInput::readString, StreamInput::readString);
@@ -150,6 +154,7 @@ public class MLWorkingMemory implements ToXContentObject, Writeable {
         } else {
             out.writeBoolean(false);
         }
+        out.writeOptionalInt(namespaceSize);
         out.writeBoolean(infer);
         if (metadata != null && !metadata.isEmpty()) {
             out.writeBoolean(true);
@@ -191,6 +196,9 @@ public class MLWorkingMemory implements ToXContentObject, Writeable {
         }
         if (namespace != null && !namespace.isEmpty()) {
             builder.field(NAMESPACE_FIELD, namespace);
+        }
+        if (namespaceSize != null) {
+            builder.field(NAMESPACE_SIZE_FIELD, namespaceSize);
         }
         builder.field(INFER_FIELD, infer);
         if (metadata != null && !metadata.isEmpty()) {
