@@ -26,6 +26,18 @@
     "message_id": {
       "type": "integer"
     },
+    "sort_id": {
+      "type": "keyword"
+    },
+    "sort_number": {
+      "type": "long"
+    },
+    "sort_score": {
+      "type": "double"
+    },
+    "sort_time": {
+      "type": "date"
+    },
     "binary_data": {
       "type": "binary"
     },

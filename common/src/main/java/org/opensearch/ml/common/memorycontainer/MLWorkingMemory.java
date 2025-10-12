@@ -20,6 +20,10 @@ import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.OWNER_ID_FIELD;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.PAYLOAD_TYPE_FIELD;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.SESSION_ID_FIELD;
+import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.SORT_ID_FIELD;
+import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.SORT_NUMBER_FIELD;
+import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.SORT_SCORE_FIELD;
+import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.SORT_TIME_FIELD;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.STRUCTURED_DATA_FIELD;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.TAGS_FIELD;
 
@@ -68,6 +72,12 @@ public class MLWorkingMemory implements ToXContentObject, Writeable {
     private Instant lastUpdateTime;
     private String ownerId;
 
+    // Sort fields
+    private String sortId;
+    private Long sortNumber;
+    private Double sortScore;
+    private Instant sortTime;
+
     @Builder
     public MLWorkingMemory(
         String memoryContainerId,
@@ -82,7 +92,11 @@ public class MLWorkingMemory implements ToXContentObject, Writeable {
         Map<String, String> tags,
         Instant createdTime,
         Instant lastUpdateTime,
-        String ownerId
+        String ownerId,
+        String sortId,
+        Long sortNumber,
+        Double sortScore,
+        Instant sortTime
     ) {
         // MAX_MESSAGES_PER_REQUEST limit removed for performance testing
 
@@ -100,6 +114,10 @@ public class MLWorkingMemory implements ToXContentObject, Writeable {
         this.createdTime = createdTime;
         this.lastUpdateTime = lastUpdateTime;
         this.ownerId = ownerId;
+        this.sortId = sortId;
+        this.sortNumber = sortNumber;
+        this.sortScore = sortScore;
+        this.sortTime = sortTime;
     }
 
     public MLWorkingMemory(StreamInput in) throws IOException {
@@ -131,6 +149,10 @@ public class MLWorkingMemory implements ToXContentObject, Writeable {
         this.createdTime = in.readOptionalInstant();
         this.lastUpdateTime = in.readOptionalInstant();
         this.ownerId = in.readOptionalString();
+        this.sortId = in.readOptionalString();
+        this.sortNumber = in.readOptionalLong();
+        this.sortScore = in.readOptionalDouble();
+        this.sortTime = in.readOptionalInstant();
     }
 
     @Override
@@ -177,6 +199,10 @@ public class MLWorkingMemory implements ToXContentObject, Writeable {
         out.writeOptionalInstant(createdTime);
         out.writeOptionalInstant(lastUpdateTime);
         out.writeOptionalString(ownerId);
+        out.writeOptionalString(sortId);
+        out.writeOptionalLong(sortNumber);
+        out.writeOptionalDouble(sortScore);
+        out.writeOptionalInstant(sortTime);
     }
 
     @Override
@@ -225,6 +251,18 @@ public class MLWorkingMemory implements ToXContentObject, Writeable {
         if (ownerId != null) {
             builder.field(OWNER_ID_FIELD, ownerId);
         }
+        if (sortId != null) {
+            builder.field(SORT_ID_FIELD, sortId);
+        }
+        if (sortNumber != null) {
+            builder.field(SORT_NUMBER_FIELD, sortNumber);
+        }
+        if (sortScore != null) {
+            builder.field(SORT_SCORE_FIELD, sortScore);
+        }
+        if (sortTime != null) {
+            builder.field(SORT_TIME_FIELD, sortTime.toEpochMilli());
+        }
         builder.endObject();
         return builder;
     }
@@ -243,6 +281,10 @@ public class MLWorkingMemory implements ToXContentObject, Writeable {
         Instant createdTime = null;
         Instant lastUpdateTime = null;
         String ownerId = null;
+        String sortId = null;
+        Long sortNumber = null;
+        Double sortScore = null;
+        Instant sortTime = null;
 
         ensureExpectedToken(XContentParser.Token.START_OBJECT, parser.currentToken(), parser);
         while (parser.nextToken() != XContentParser.Token.END_OBJECT) {
@@ -293,6 +335,18 @@ public class MLWorkingMemory implements ToXContentObject, Writeable {
                 case OWNER_ID_FIELD:
                     ownerId = parser.text();
                     break;
+                case SORT_ID_FIELD:
+                    sortId = parser.text();
+                    break;
+                case SORT_NUMBER_FIELD:
+                    sortNumber = parser.longValue();
+                    break;
+                case SORT_SCORE_FIELD:
+                    sortScore = parser.doubleValue();
+                    break;
+                case SORT_TIME_FIELD:
+                    sortTime = Instant.ofEpochMilli(parser.longValue());
+                    break;
                 default:
                     parser.skipChildren();
                     break;
@@ -314,6 +368,10 @@ public class MLWorkingMemory implements ToXContentObject, Writeable {
             .createdTime(createdTime)
             .lastUpdateTime(lastUpdateTime)
             .ownerId(ownerId)
+            .sortId(sortId)
+            .sortNumber(sortNumber)
+            .sortScore(sortScore)
+            .sortTime(sortTime)
             .build();
     }
 

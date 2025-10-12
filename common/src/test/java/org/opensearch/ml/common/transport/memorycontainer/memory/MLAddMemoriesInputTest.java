@@ -190,78 +190,53 @@ public class MLAddMemoriesInputTest {
         // Test null memoryContainerId
         IllegalArgumentException exception = assertThrows(
             IllegalArgumentException.class,
-            () -> new MLAddMemoriesInput(
-                null,
-                PayloadType.CONVERSATIONAL,
-                testMessages,
-                null,
-                null,
-                null,
-                null,
-                false,
-                null,
-                null,
-                null,
-                "owner-1"
-            )
+            () -> MLAddMemoriesInput
+                .builder()
+                .memoryContainerId(null)
+                .payloadType(PayloadType.CONVERSATIONAL)
+                .messages(testMessages)
+                .ownerId("owner-1")
+                .build()
         );
         assertEquals("No memory container id provided", exception.getMessage());
 
         // Test null messages with infer=true
         exception = assertThrows(
             IllegalArgumentException.class,
-            () -> new MLAddMemoriesInput(
-                "container-1",
-                PayloadType.CONVERSATIONAL,
-                null,
-                null,
-                null,
-                null,
-                null,
-                true,
-                null,
-                null,
-                null,
-                "owner-1"
-            )
+            () -> MLAddMemoriesInput
+                .builder()
+                .memoryContainerId("container-1")
+                .payloadType(PayloadType.CONVERSATIONAL)
+                .messages(null)
+                .infer(true)
+                .ownerId("owner-1")
+                .build()
         );
         assertEquals("No messages provided when inferring memory", exception.getMessage());
 
         // Test empty messages with infer=true
         exception = assertThrows(
             IllegalArgumentException.class,
-            () -> new MLAddMemoriesInput(
-                "container-1",
-                PayloadType.CONVERSATIONAL,
-                new ArrayList<>(),
-                null,
-                null,
-                null,
-                null,
-                true,
-                null,
-                null,
-                null,
-                "owner-1"
-            )
+            () -> MLAddMemoriesInput
+                .builder()
+                .memoryContainerId("container-1")
+                .payloadType(PayloadType.CONVERSATIONAL)
+                .messages(new ArrayList<>())
+                .infer(true)
+                .ownerId("owner-1")
+                .build()
         );
         assertEquals("No messages provided when inferring memory", exception.getMessage());
 
         // Test valid case - null messages with infer=false should pass
-        MLAddMemoriesInput validInput = new MLAddMemoriesInput(
-            "container-1",
-            PayloadType.CONVERSATIONAL,
-            null,
-            null,
-            null,
-            null,
-            null,
-            false,
-            null,
-            null,
-            null,
-            "owner-1"
-        );
+        MLAddMemoriesInput validInput = MLAddMemoriesInput
+            .builder()
+            .memoryContainerId("container-1")
+            .payloadType(PayloadType.CONVERSATIONAL)
+            .messages(null)
+            .infer(false)
+            .ownerId("owner-1")
+            .build();
         assertNotNull(validInput);
     }
 
@@ -415,77 +390,50 @@ public class MLAddMemoriesInputTest {
     @Test
     public void testConstructorWithNullMemoryType() {
         // Test that null memoryType defaults to CONVERSATIONAL
-        MLAddMemoriesInput input = new MLAddMemoriesInput(
-            "container-123",
-            null, // null memoryType
-            testMessages,
-            null,
-            null,
-            null,
-            null,
-            false,
-            null,
-            null,
-            null,
-            "owner-123"
-        );
+        MLAddMemoriesInput input = MLAddMemoriesInput
+            .builder()
+            .memoryContainerId("container-123")
+            .payloadType(null) // null memoryType
+            .messages(testMessages)
+            .ownerId("owner-123")
+            .build();
         assertEquals(PayloadType.CONVERSATIONAL, input.getPayloadType());
     }
 
     @Test
     public void testConstructorWithAllMemoryTypes() {
         // Test with CONVERSATIONAL type
-        MLAddMemoriesInput conversationalInput = new MLAddMemoriesInput(
-            "container-123",
-            PayloadType.CONVERSATIONAL,
-            testMessages,
-            null,
-            null,
-            null,
-            null,
-            false,
-            null,
-            null,
-            null,
-            "owner-123"
-        );
+        MLAddMemoriesInput conversationalInput = MLAddMemoriesInput
+            .builder()
+            .memoryContainerId("container-123")
+            .payloadType(PayloadType.CONVERSATIONAL)
+            .messages(testMessages)
+            .ownerId("owner-123")
+            .build();
         assertEquals(PayloadType.CONVERSATIONAL, conversationalInput.getPayloadType());
 
         // Test with DATA type
-        MLAddMemoriesInput dataInput = new MLAddMemoriesInput(
-            "container-123",
-            PayloadType.DATA,
-            testMessages,
-            null,
-            null,
-            null,
-            null,
-            false,
-            null,
-            null,
-            null,
-            "owner-123"
-        );
+        MLAddMemoriesInput dataInput = MLAddMemoriesInput
+            .builder()
+            .memoryContainerId("container-123")
+            .payloadType(PayloadType.DATA)
+            .messages(testMessages)
+            .ownerId("owner-123")
+            .build();
         assertEquals(PayloadType.DATA, dataInput.getPayloadType());
     }
 
     @Test
     public void testConstructorWithNullParameters() {
         // Test that null parameters creates empty map
-        MLAddMemoriesInput input = new MLAddMemoriesInput(
-            "container-123",
-            PayloadType.CONVERSATIONAL,
-            testMessages,
-            null,
-            null,
-            null,
-            null,
-            false,
-            null,
-            null,
-            null, // null parameters
-            "owner-123"
-        );
+        MLAddMemoriesInput input = MLAddMemoriesInput
+            .builder()
+            .memoryContainerId("container-123")
+            .payloadType(PayloadType.CONVERSATIONAL)
+            .messages(testMessages)
+            .parameters(null) // null parameters
+            .ownerId("owner-123")
+            .build();
         assertNotNull(input.getParameters());
         assertTrue(input.getParameters().isEmpty());
     }
@@ -494,20 +442,14 @@ public class MLAddMemoriesInputTest {
     public void testConstructorWithEmptyParameters() {
         // Test that empty parameters creates empty map
         Map<String, Object> emptyParams = new HashMap<>();
-        MLAddMemoriesInput input = new MLAddMemoriesInput(
-            "container-123",
-            PayloadType.CONVERSATIONAL,
-            testMessages,
-            null,
-            null,
-            null,
-            null,
-            false,
-            null,
-            null,
-            emptyParams,
-            "owner-123"
-        );
+        MLAddMemoriesInput input = MLAddMemoriesInput
+            .builder()
+            .memoryContainerId("container-123")
+            .payloadType(PayloadType.CONVERSATIONAL)
+            .messages(testMessages)
+            .parameters(emptyParams)
+            .ownerId("owner-123")
+            .build();
         assertNotNull(input.getParameters());
         assertTrue(input.getParameters().isEmpty());
     }
@@ -519,20 +461,14 @@ public class MLAddMemoriesInputTest {
         params.put("param1", "value1");
         params.put("param2", 42);
 
-        MLAddMemoriesInput input = new MLAddMemoriesInput(
-            "container-123",
-            PayloadType.CONVERSATIONAL,
-            testMessages,
-            null,
-            null,
-            null,
-            null,
-            false,
-            null,
-            null,
-            params,
-            "owner-123"
-        );
+        MLAddMemoriesInput input = MLAddMemoriesInput
+            .builder()
+            .memoryContainerId("container-123")
+            .payloadType(PayloadType.CONVERSATIONAL)
+            .messages(testMessages)
+            .parameters(params)
+            .ownerId("owner-123")
+            .build();
         assertNotNull(input.getParameters());
         assertEquals(2, input.getParameters().size());
         assertEquals("value1", input.getParameters().get("param1"));
@@ -589,21 +525,14 @@ public class MLAddMemoriesInputTest {
     @Test
     public void testStreamInputOutputWithNullFields() throws IOException {
         // Test serialization with all optional fields as null
-        // Use constructor directly to avoid builder validation
-        MLAddMemoriesInput nullFieldsInput = new MLAddMemoriesInput(
-            "container-null",
-            PayloadType.CONVERSATIONAL,
-            null, // null messages is OK when infer=false
-            null,
-            null,
-            null,
-            null,
-            false, // infer=false allows null messages
-            null,
-            null,
-            null,
-            null
-        );
+        // Use builder with minimal fields
+        MLAddMemoriesInput nullFieldsInput = MLAddMemoriesInput
+            .builder()
+            .memoryContainerId("container-null")
+            .payloadType(PayloadType.CONVERSATIONAL)
+            .messages(null) // null messages is OK when infer=false
+            .infer(false) // infer=false allows null messages
+            .build();
 
         BytesStreamOutput out = new BytesStreamOutput();
         nullFieldsInput.writeTo(out);
@@ -794,20 +723,18 @@ public class MLAddMemoriesInputTest {
         Map<String, String> emptyTags = new HashMap<>();
         Map<String, Object> emptyParameters = new HashMap<>();
 
-        MLAddMemoriesInput inputEmptyMaps = new MLAddMemoriesInput(
-            "container-empty-maps",
-            PayloadType.DATA,
-            testMessages,
-            null,
-            null,
-            null,
-            emptyNamespace,
-            true,
-            emptyMetadata,
-            emptyTags,
-            emptyParameters,
-            "owner-empty"
-        );
+        MLAddMemoriesInput inputEmptyMaps = MLAddMemoriesInput
+            .builder()
+            .memoryContainerId("container-empty-maps")
+            .payloadType(PayloadType.DATA)
+            .messages(testMessages)
+            .namespace(emptyNamespace)
+            .infer(true)
+            .metadata(emptyMetadata)
+            .tags(emptyTags)
+            .parameters(emptyParameters)
+            .ownerId("owner-empty")
+            .build();
 
         BytesStreamOutput out = new BytesStreamOutput();
         inputEmptyMaps.writeTo(out);
@@ -830,20 +757,14 @@ public class MLAddMemoriesInputTest {
     @Test
     public void testValidateWithEmptyMessagesAndInferFalse() {
         // Test that empty messages with infer=false is valid
-        MLAddMemoriesInput validInput = new MLAddMemoriesInput(
-            "container-123",
-            PayloadType.CONVERSATIONAL,
-            new ArrayList<>(), // empty messages
-            null,
-            null,
-            null,
-            null,
-            false, // infer=false
-            null,
-            null,
-            null,
-            "owner-123"
-        );
+        MLAddMemoriesInput validInput = MLAddMemoriesInput
+            .builder()
+            .memoryContainerId("container-123")
+            .payloadType(PayloadType.CONVERSATIONAL)
+            .messages(new ArrayList<>()) // empty messages
+            .infer(false) // infer=false
+            .ownerId("owner-123")
+            .build();
 
         // Should not throw exception
         assertNotNull(validInput);
@@ -870,6 +791,99 @@ public class MLAddMemoriesInputTest {
 
         // Should throw IllegalArgumentException due to invalid memory type
         assertThrows(IllegalArgumentException.class, () -> { MLAddMemoriesInput.parse(parser, null); });
+    }
+
+    @Test
+    public void testSortFields() {
+        // Test with sort fields
+        MLAddMemoriesInput input = MLAddMemoriesInput
+            .builder()
+            .memoryContainerId("container-123")
+            .messages(testMessages)
+            .sortId("sort-123")
+            .sortNumber(42L)
+            .sortScore(0.95)
+            .sortTime(java.time.Instant.ofEpochMilli(1234567890L))
+            .ownerId("owner-sort")
+            .build();
+
+        assertEquals("sort-123", input.getSortId());
+        assertEquals(Long.valueOf(42L), input.getSortNumber());
+        assertEquals(Double.valueOf(0.95), input.getSortScore());
+        assertEquals(java.time.Instant.ofEpochMilli(1234567890L), input.getSortTime());
+    }
+
+    @Test
+    public void testSortFieldsSerialization() throws IOException {
+        // Test serialization with sort fields
+        MLAddMemoriesInput input = MLAddMemoriesInput
+            .builder()
+            .memoryContainerId("container-123")
+            .messages(testMessages)
+            .sortId("sort-456")
+            .sortNumber(100L)
+            .sortScore(0.85)
+            .sortTime(java.time.Instant.ofEpochMilli(9876543210L))
+            .ownerId("owner-sort-ser")
+            .build();
+
+        BytesStreamOutput out = new BytesStreamOutput();
+        input.writeTo(out);
+        StreamInput in = out.bytes().streamInput();
+        MLAddMemoriesInput deserialized = new MLAddMemoriesInput(in);
+
+        assertEquals(input.getSortId(), deserialized.getSortId());
+        assertEquals(input.getSortNumber(), deserialized.getSortNumber());
+        assertEquals(input.getSortScore(), deserialized.getSortScore());
+        assertEquals(input.getSortTime(), deserialized.getSortTime());
+    }
+
+    @Test
+    public void testParseWithSortFields() throws IOException {
+        // Test parsing with sort fields
+        String jsonString = "{"
+            + "\"memory_container_id\":\"container-123\","
+            + "\"messages\":["
+            + "{\"role\":\"user\",\"content\":[{\"type\":\"text\", \"text\": \"Test message\"}]}"
+            + "],"
+            + "\"sort_id\":\"sort-789\","
+            + "\"sort_number\":200,"
+            + "\"sort_score\":0.75,"
+            + "\"sort_time\":1609459200000"
+            + "}";
+
+        XContentParser parser = XContentType.JSON
+            .xContent()
+            .createParser(NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE, jsonString);
+        parser.nextToken();
+
+        MLAddMemoriesInput parsed = MLAddMemoriesInput.parse(parser, "container-123");
+
+        assertEquals("sort-789", parsed.getSortId());
+        assertEquals(Long.valueOf(200L), parsed.getSortNumber());
+        assertEquals(Double.valueOf(0.75), parsed.getSortScore());
+        assertEquals(java.time.Instant.ofEpochMilli(1609459200000L), parsed.getSortTime());
+    }
+
+    @Test
+    public void testSortFieldsSetters() {
+        // Test setters for sort fields
+        MLAddMemoriesInput input = MLAddMemoriesInput
+            .builder()
+            .memoryContainerId("container-123")
+            .messages(testMessages)
+            .ownerId("owner-setters")
+            .build();
+
+        input.setSortId("new-sort-id");
+        input.setSortNumber(999L);
+        input.setSortScore(0.99);
+        input.setSortTime(java.time.Instant.ofEpochMilli(1111111111L));
+
+        assertEquals("new-sort-id", input.getSortId());
+        assertEquals(Long.valueOf(999L), input.getSortNumber());
+        assertEquals(Double.valueOf(0.99), input.getSortScore());
+        assertEquals(java.time.Instant.ofEpochMilli(1111111111L), input.getSortTime());
     }
 
 }
