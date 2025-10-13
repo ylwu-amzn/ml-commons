@@ -794,37 +794,28 @@ public class MLAddMemoriesInputTest {
     }
 
     @Test
-    public void testSortFields() {
-        // Test with sort fields
+    public void testCheckpointIdField() {
+        // Test with checkpoint_id field
         MLAddMemoriesInput input = MLAddMemoriesInput
             .builder()
             .memoryContainerId("container-123")
             .messages(testMessages)
-            .sortId("sort-123")
-            .sortNumber(42L)
-            .sortScore(0.95)
-            .sortTime(java.time.Instant.ofEpochMilli(1234567890L))
-            .ownerId("owner-sort")
+            .checkpointId("checkpoint-123")
+            .ownerId("owner-checkpoint")
             .build();
 
-        assertEquals("sort-123", input.getSortId());
-        assertEquals(Long.valueOf(42L), input.getSortNumber());
-        assertEquals(Double.valueOf(0.95), input.getSortScore());
-        assertEquals(java.time.Instant.ofEpochMilli(1234567890L), input.getSortTime());
+        assertEquals("checkpoint-123", input.getCheckpointId());
     }
 
     @Test
-    public void testSortFieldsSerialization() throws IOException {
-        // Test serialization with sort fields
+    public void testCheckpointIdSerialization() throws IOException {
+        // Test serialization with checkpoint_id field
         MLAddMemoriesInput input = MLAddMemoriesInput
             .builder()
             .memoryContainerId("container-123")
             .messages(testMessages)
-            .sortId("sort-456")
-            .sortNumber(100L)
-            .sortScore(0.85)
-            .sortTime(java.time.Instant.ofEpochMilli(9876543210L))
-            .ownerId("owner-sort-ser")
+            .checkpointId("checkpoint-456")
+            .ownerId("owner-checkpoint-ser")
             .build();
 
         BytesStreamOutput out = new BytesStreamOutput();
@@ -832,24 +823,18 @@ public class MLAddMemoriesInputTest {
         StreamInput in = out.bytes().streamInput();
         MLAddMemoriesInput deserialized = new MLAddMemoriesInput(in);
 
-        assertEquals(input.getSortId(), deserialized.getSortId());
-        assertEquals(input.getSortNumber(), deserialized.getSortNumber());
-        assertEquals(input.getSortScore(), deserialized.getSortScore());
-        assertEquals(input.getSortTime(), deserialized.getSortTime());
+        assertEquals(input.getCheckpointId(), deserialized.getCheckpointId());
     }
 
     @Test
-    public void testParseWithSortFields() throws IOException {
-        // Test parsing with sort fields
+    public void testParseWithCheckpointId() throws IOException {
+        // Test parsing with checkpoint_id field
         String jsonString = "{"
             + "\"memory_container_id\":\"container-123\","
             + "\"messages\":["
             + "{\"role\":\"user\",\"content\":[{\"type\":\"text\", \"text\": \"Test message\"}]}"
             + "],"
-            + "\"sort_id\":\"sort-789\","
-            + "\"sort_number\":200,"
-            + "\"sort_score\":0.75,"
-            + "\"sort_time\":1609459200000"
+            + "\"checkpoint_id\":\"checkpoint-789\""
             + "}";
 
         XContentParser parser = XContentType.JSON
@@ -859,15 +844,12 @@ public class MLAddMemoriesInputTest {
 
         MLAddMemoriesInput parsed = MLAddMemoriesInput.parse(parser, "container-123");
 
-        assertEquals("sort-789", parsed.getSortId());
-        assertEquals(Long.valueOf(200L), parsed.getSortNumber());
-        assertEquals(Double.valueOf(0.75), parsed.getSortScore());
-        assertEquals(java.time.Instant.ofEpochMilli(1609459200000L), parsed.getSortTime());
+        assertEquals("checkpoint-789", parsed.getCheckpointId());
     }
 
     @Test
-    public void testSortFieldsSetters() {
-        // Test setters for sort fields
+    public void testCheckpointIdSetter() {
+        // Test setter for checkpoint_id field
         MLAddMemoriesInput input = MLAddMemoriesInput
             .builder()
             .memoryContainerId("container-123")
@@ -875,15 +857,9 @@ public class MLAddMemoriesInputTest {
             .ownerId("owner-setters")
             .build();
 
-        input.setSortId("new-sort-id");
-        input.setSortNumber(999L);
-        input.setSortScore(0.99);
-        input.setSortTime(java.time.Instant.ofEpochMilli(1111111111L));
+        input.setCheckpointId("new-checkpoint-id");
 
-        assertEquals("new-sort-id", input.getSortId());
-        assertEquals(Long.valueOf(999L), input.getSortNumber());
-        assertEquals(Double.valueOf(0.99), input.getSortScore());
-        assertEquals(java.time.Instant.ofEpochMilli(1111111111L), input.getSortTime());
+        assertEquals("new-checkpoint-id", input.getCheckpointId());
     }
 
 }

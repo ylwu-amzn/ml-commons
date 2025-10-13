@@ -86,11 +86,8 @@ public class MemoryContainerConstants {
     public static final String TEXT_FIELD = "text";
     public static final String UPDATE_CONTENT_FIELD = "update_content";
 
-    // Sort fields
-    public static final String SORT_ID_FIELD = "sort_id";
-    public static final String SORT_NUMBER_FIELD = "sort_number";
-    public static final String SORT_SCORE_FIELD = "sort_score";
-    public static final String SORT_TIME_FIELD = "sort_time";
+    // Checkpoint field
+    public static final String CHECKPOINT_ID_FIELD = "checkpoint_id";
 
     // KNN index settings
     public static final String KNN_ENGINE = "lucene";

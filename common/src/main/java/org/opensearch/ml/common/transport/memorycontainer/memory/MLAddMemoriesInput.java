@@ -8,6 +8,7 @@ package org.opensearch.ml.common.transport.memorycontainer.memory;
 import static org.opensearch.core.xcontent.XContentParserUtils.ensureExpectedToken;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.AGENT_ID_FIELD;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.BINARY_DATA_FIELD;
+import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.CHECKPOINT_ID_FIELD;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.CREATED_TIME_FIELD;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.INFER_FIELD;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.LAST_UPDATED_TIME_FIELD;
@@ -21,10 +22,6 @@ import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.PARAMETERS_FIELD;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.PAYLOAD_TYPE_FIELD;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.SESSION_ID_FIELD;
-import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.SORT_ID_FIELD;
-import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.SORT_NUMBER_FIELD;
-import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.SORT_SCORE_FIELD;
-import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.SORT_TIME_FIELD;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.STRUCTURED_DATA_FIELD;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.TAGS_FIELD;
 
@@ -73,11 +70,8 @@ public class MLAddMemoriesInput implements ToXContentObject, Writeable {
     private Map<String, Object> parameters;
     private String ownerId;
 
-    // Sort fields
-    private String sortId;
-    private Long sortNumber;
-    private Double sortScore;
-    private Instant sortTime;
+    // Checkpoint field
+    private String checkpointId;
 
     public MLAddMemoriesInput(
         String memoryContainerId,
@@ -92,10 +86,7 @@ public class MLAddMemoriesInput implements ToXContentObject, Writeable {
         Map<String, String> tags,
         Map<String, Object> parameters,
         String ownerId,
-        String sortId,
-        Long sortNumber,
-        Double sortScore,
-        Instant sortTime
+        String checkpointId
     ) {
         // MAX_MESSAGES_PER_REQUEST limit removed for performance testing
 
@@ -114,10 +105,7 @@ public class MLAddMemoriesInput implements ToXContentObject, Writeable {
             this.parameters.putAll(parameters);
         }
         this.ownerId = ownerId;
-        this.sortId = sortId;
-        this.sortNumber = sortNumber;
-        this.sortScore = sortScore;
-        this.sortTime = sortTime;
+        this.checkpointId = checkpointId;
         validate();
     }
 
@@ -162,10 +150,7 @@ public class MLAddMemoriesInput implements ToXContentObject, Writeable {
             this.parameters = in.readMap();
         }
         this.ownerId = in.readOptionalString();
-        this.sortId = in.readOptionalString();
-        this.sortNumber = in.readOptionalLong();
-        this.sortScore = in.readOptionalDouble();
-        this.sortTime = in.readOptionalInstant();
+        this.checkpointId = in.readOptionalString();
     }
 
     @Override
@@ -215,10 +200,7 @@ public class MLAddMemoriesInput implements ToXContentObject, Writeable {
             out.writeBoolean(false);
         }
         out.writeOptionalString(ownerId);
-        out.writeOptionalString(sortId);
-        out.writeOptionalLong(sortNumber);
-        out.writeOptionalDouble(sortScore);
-        out.writeOptionalInstant(sortTime);
+        out.writeOptionalString(checkpointId);
     }
 
     @Override
@@ -265,17 +247,8 @@ public class MLAddMemoriesInput implements ToXContentObject, Writeable {
         if (ownerId != null) {
             builder.field(OWNER_ID_FIELD, ownerId);
         }
-        if (sortId != null) {
-            builder.field(SORT_ID_FIELD, sortId);
-        }
-        if (sortNumber != null) {
-            builder.field(SORT_NUMBER_FIELD, sortNumber);
-        }
-        if (sortScore != null) {
-            builder.field(SORT_SCORE_FIELD, sortScore);
-        }
-        if (sortTime != null) {
-            builder.field(SORT_TIME_FIELD, sortTime.toEpochMilli());
+        if (checkpointId != null) {
+            builder.field(CHECKPOINT_ID_FIELD, checkpointId);
         }
         if (withTimeStamp) {
             Instant now = Instant.now();
@@ -298,10 +271,7 @@ public class MLAddMemoriesInput implements ToXContentObject, Writeable {
         Map<String, String> tags = null;
         Map<String, Object> parameters = null;
         String ownerId = null;
-        String sortId = null;
-        Long sortNumber = null;
-        Double sortScore = null;
-        Instant sortTime = null;
+        String checkpointId = null;
 
         ensureExpectedToken(XContentParser.Token.START_OBJECT, parser.currentToken(), parser);
         while (parser.nextToken() != XContentParser.Token.END_OBJECT) {
@@ -349,17 +319,8 @@ public class MLAddMemoriesInput implements ToXContentObject, Writeable {
                 case OWNER_ID_FIELD:
                     ownerId = parser.text();
                     break;
-                case SORT_ID_FIELD:
-                    sortId = parser.text();
-                    break;
-                case SORT_NUMBER_FIELD:
-                    sortNumber = parser.longValue();
-                    break;
-                case SORT_SCORE_FIELD:
-                    sortScore = parser.doubleValue();
-                    break;
-                case SORT_TIME_FIELD:
-                    sortTime = Instant.ofEpochMilli(parser.longValue());
+                case CHECKPOINT_ID_FIELD:
+                    checkpointId = parser.text();
                     break;
                 default:
                     parser.skipChildren();
@@ -381,10 +342,7 @@ public class MLAddMemoriesInput implements ToXContentObject, Writeable {
             .tags(tags)
             .parameters(parameters)
             .ownerId(ownerId)
-            .sortId(sortId)
-            .sortNumber(sortNumber)
-            .sortScore(sortScore)
-            .sortTime(sortTime)
+            .checkpointId(checkpointId)
             .build();
     }
 
