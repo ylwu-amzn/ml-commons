@@ -5,6 +5,7 @@
 
 package org.opensearch.ml.action.connector;
 
+import static org.opensearch.ml.common.CommonValue.CONNECTOR_ACTION_FIELD;
 import static org.opensearch.ml.common.CommonValue.ML_CONNECTOR_INDEX;
 
 import org.opensearch.ResourceNotFoundException;
@@ -76,8 +77,8 @@ public class ExecuteConnectorTransportAction extends HandledTransportAction<Acti
         String connectorId = executeConnectorRequest.getConnectorId();
         RemoteInferenceInputDataSet inputDataset = (RemoteInferenceInputDataSet)executeConnectorRequest.getMlInput().getInputDataset();
         String connectorAction = ConnectorAction.ActionType.EXECUTE.name();
-        if (inputDataset.getParameters() != null && inputDataset.getParameters().get("connector_action") != null) {
-            connectorAction =  inputDataset.getParameters().get("connector_action");
+        if (inputDataset.getParameters() != null && inputDataset.getParameters().get(CONNECTOR_ACTION_FIELD) != null) {
+            connectorAction =  inputDataset.getParameters().get(CONNECTOR_ACTION_FIELD);
         }
 
         if (MLIndicesHandler

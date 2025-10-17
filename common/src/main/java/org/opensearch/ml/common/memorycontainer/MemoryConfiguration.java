@@ -22,6 +22,7 @@ import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.MAX_INFER_SIZE_LIMIT_ERROR;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.MEMORY_INDEX_PREFIX_FIELD;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.PARAMETERS_FIELD;
+import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.REMOTE_STORE_FIELD;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.SEMANTIC_STORAGE_EMBEDDING_MODEL_ID_REQUIRED_ERROR;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.SEMANTIC_STORAGE_EMBEDDING_MODEL_TYPE_REQUIRED_ERROR;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.SPARSE_ENCODING_DIMENSION_NOT_ALLOWED_ERROR;
@@ -82,6 +83,7 @@ public class MemoryConfiguration implements ToXContentObject, Writeable {
     @Builder.Default
     private boolean useSystemIndex = true;
     private String tenantId;
+    private RemoteStore remoteStore;
 
     public MemoryConfiguration(
         String indexPrefix,
@@ -96,7 +98,8 @@ public class MemoryConfiguration implements ToXContentObject, Writeable {
         boolean disableHistory,
         boolean disableSession,
         boolean useSystemIndex,
-        String tenantId
+        String tenantId,
+        RemoteStore remoteStore
     ) {
         // Validate first
         validateInputs(embeddingModelType, embeddingModelId, dimension, maxInferSize);
@@ -124,6 +127,7 @@ public class MemoryConfiguration implements ToXContentObject, Writeable {
         this.disableSession = disableSession;
         this.useSystemIndex = useSystemIndex;
         this.tenantId = tenantId;
+        this.remoteStore = remoteStore;
     }
 
     private String buildIndexPrefix(String indexPrefix, boolean useSystemIndex) {
@@ -157,6 +161,9 @@ public class MemoryConfiguration implements ToXContentObject, Writeable {
         this.disableSession = input.readBoolean();
         this.useSystemIndex = input.readBoolean();
         this.tenantId = input.readOptionalString();
+        if (input.readBoolean()) {
+            this.remoteStore = new RemoteStore(input);
+        }
     }
 
     @Override
@@ -189,6 +196,12 @@ public class MemoryConfiguration implements ToXContentObject, Writeable {
         out.writeBoolean(disableSession);
         out.writeBoolean(useSystemIndex);
         out.writeOptionalString(tenantId);
+        if (remoteStore != null) {
+            out.writeBoolean(true);
+            remoteStore.writeTo(out);
+        } else {
+            out.writeBoolean(false);
+        }
     }
 
     @Override
@@ -239,6 +252,9 @@ public class MemoryConfiguration implements ToXContentObject, Writeable {
         if (tenantId != null) {
             builder.field(TENANT_ID_FIELD, tenantId);
         }
+        if (remoteStore != null) {
+            builder.field(REMOTE_STORE_FIELD, remoteStore);
+        }
         builder.endObject();
         return builder;
     }
@@ -257,6 +273,7 @@ public class MemoryConfiguration implements ToXContentObject, Writeable {
         boolean disableSession = true;
         boolean useSystemIndex = true;
         String tenantId = null;
+        RemoteStore remoteStore = null;
 
         ensureExpectedToken(XContentParser.Token.START_OBJECT, parser.currentToken(), parser);
         while (parser.nextToken() != XContentParser.Token.END_OBJECT) {
@@ -308,6 +325,9 @@ public class MemoryConfiguration implements ToXContentObject, Writeable {
                 case USE_SYSTEM_INDEX_FIELD:
                     useSystemIndex = parser.booleanValue();
                     break;
+                case REMOTE_STORE_FIELD:
+                    remoteStore = RemoteStore.parse(parser);
+                    break;
                 default:
                     parser.skipChildren();
                     break;
@@ -330,6 +350,7 @@ public class MemoryConfiguration implements ToXContentObject, Writeable {
             .disableSession(disableSession)
             .useSystemIndex(useSystemIndex)
             .tenantId(tenantId)
+            .remoteStore(remoteStore)
             .build();
     }
 
@@ -514,6 +535,9 @@ public class MemoryConfiguration implements ToXContentObject, Writeable {
         } else if (updateContent.getDimension() != null) {
             // Only update dimension for TEXT_EMBEDDING if provided
             this.dimension = updateContent.getDimension();
+        }
+        if (updateContent.getRemoteStore() != null) {
+            this.remoteStore = updateContent.getRemoteStore();
         }
         // Note: indexPrefix and other structural fields are intentionally not updated
         // as they would require index recreation
