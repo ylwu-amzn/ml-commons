@@ -21,6 +21,10 @@ import java.util.List;
 import org.apache.lucene.search.join.ScoreMode;
 import org.opensearch.ExceptionsHelper;
 import org.opensearch.OpenSearchStatusException;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+
 import org.opensearch.action.admin.indices.delete.DeleteIndexRequest;
 import org.opensearch.action.bulk.BulkRequest;
 import org.opensearch.action.bulk.BulkResponse;
@@ -37,9 +41,12 @@ import org.opensearch.action.update.UpdateResponse;
 import org.opensearch.common.inject.Inject;
 import org.opensearch.common.util.concurrent.ThreadContext;
 import org.opensearch.common.xcontent.LoggingDeprecationHandler;
+import org.opensearch.common.xcontent.XContentHelper;
+import org.opensearch.common.xcontent.XContentType;
 import org.opensearch.commons.authuser.User;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.common.Strings;
+import org.opensearch.core.common.bytes.BytesArray;
 import org.opensearch.core.common.util.CollectionUtils;
 import org.opensearch.core.rest.RestStatus;
 import org.opensearch.core.xcontent.NamedXContentRegistry;
@@ -57,6 +64,7 @@ import org.opensearch.ml.common.memorycontainer.MLMemoryContainer;
 import org.opensearch.ml.common.memorycontainer.MemoryConfiguration;
 import org.opensearch.ml.common.memorycontainer.MemoryStrategy;
 import org.opensearch.ml.common.memorycontainer.MemoryType;
+import org.opensearch.ml.common.utils.StringUtils;
 import org.opensearch.remote.metadata.client.GetDataObjectRequest;
 import org.opensearch.remote.metadata.client.SdkClient;
 import org.opensearch.remote.metadata.client.SearchDataObjectRequest;
@@ -223,12 +231,34 @@ public class MemoryContainerHelper {
     }
 
     public void getData(MemoryConfiguration configuration, GetRequest getRequest, ActionListener<GetResponse> listener) {
-        if (configuration.isUseSystemIndex()) {
+        if (configuration.getRemoteStore() != null && configuration.getRemoteStore().getConnectorId() != null) {
+            getDataFromRemoteStorage(configuration, getRequest, listener);
+        } else if (configuration.isUseSystemIndex()) {
             try (ThreadContext.StoredContext context = client.threadPool().getThreadContext().stashContext()) {
                 client.get(getRequest, ActionListener.runBefore(listener, context::restore));
             }
         } else {
             client.get(getRequest, listener);
+        }
+    }
+
+    private void getDataFromRemoteStorage(
+            MemoryConfiguration configuration,
+            GetRequest getRequest,
+            ActionListener<GetResponse> listener
+    ) {
+        try {
+            String connectorId = configuration.getRemoteStore().getConnectorId();
+            String indexName = getRequest.indices()[0];
+            String docId = getRequest.id();
+
+            // Convert SearchSourceBuilder to Map
+            RemoteStorageHelper.getDocument(connectorId, indexName, docId, client, ActionListener.wrap(response -> {
+                listener.onResponse(response);
+            }, listener::onFailure));
+        } catch (Exception e) {
+            log.error("Failed to search data from remote storage", e);
+            listener.onFailure(e);
         }
     }
 
@@ -238,7 +268,11 @@ public class MemoryContainerHelper {
         ActionListener<SearchResponse> listener
     ) {
         try {
-            if (configuration.isUseSystemIndex()) {
+            // Check if remote store is configured
+            if (configuration.getRemoteStore() != null && configuration.getRemoteStore().getConnectorId() != null) {
+                // Use remote storage
+                searchDataFromRemoteStorage(configuration, searchRequest, listener);
+            } else if (configuration.isUseSystemIndex()) {
                 try (ThreadContext.StoredContext context = client.threadPool().getThreadContext().stashContext()) {
                     ActionListener<SearchResponse> wrappedListener = ActionListener.runBefore(listener, context::restore);
                     final ActionListener<SearchResponse> doubleWrappedListener = ActionListener
@@ -258,8 +292,46 @@ public class MemoryContainerHelper {
         }
     }
 
+
+    private void searchDataFromRemoteStorage(
+        MemoryConfiguration configuration,
+        SearchDataObjectRequest searchRequest,
+        ActionListener<SearchResponse> listener
+    ) {
+        try {
+            String connectorId = configuration.getRemoteStore().getConnectorId();
+            String indexName = searchRequest.indices()[0]; // Get first index name
+            
+            // Convert SearchSourceBuilder to Map
+            Map<String, Object> searchBody = convertSearchSourceToMap(searchRequest.searchSourceBuilder());
+            
+            RemoteStorageHelper.searchDocuments(connectorId, indexName, searchBody, client, ActionListener.wrap(response -> {
+                listener.onResponse(response);
+            }, listener::onFailure));
+        } catch (Exception e) {
+            log.error("Failed to search data from remote storage", e);
+            listener.onFailure(e);
+        }
+    }
+
+    private Map<String, Object> convertSearchSourceToMap(SearchSourceBuilder searchSourceBuilder) throws IOException {
+        if (searchSourceBuilder == null) {
+            return new HashMap<>();
+        }
+        
+        // Convert SearchSourceBuilder to JSON string then to Map
+        String jsonString = searchSourceBuilder.toString();
+        XContentParser parser = XContentHelper
+            .createParser(NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE, new BytesArray(jsonString), XContentType.JSON);
+        return parser.mapOrdered();
+    }
+
     public void indexData(MemoryConfiguration configuration, IndexRequest indexRequest, ActionListener<IndexResponse> listener) {
-        if (configuration.isUseSystemIndex()) {
+        // Check if remote store is configured
+        if (configuration.getRemoteStore() != null && configuration.getRemoteStore().getConnectorId() != null) {
+            // Use remote storage
+            indexDataToRemoteStorage(configuration, indexRequest, listener);
+        } else if (configuration.isUseSystemIndex()) {
             try (ThreadContext.StoredContext context = client.threadPool().getThreadContext().stashContext()) {
                 client.index(indexRequest, ActionListener.runBefore(listener, context::restore));
             }
@@ -268,8 +340,33 @@ public class MemoryContainerHelper {
         }
     }
 
+    private void indexDataToRemoteStorage(
+        MemoryConfiguration configuration,
+        IndexRequest indexRequest,
+        ActionListener<IndexResponse> listener
+    ) {
+        try {
+            String connectorId = configuration.getRemoteStore().getConnectorId();
+            String indexName = indexRequest.index();
+            
+            // Convert IndexRequest source to Map
+            Map<String, Object> documentSource = indexRequest.sourceAsMap();
+            
+            RemoteStorageHelper.writeDocument(connectorId, indexName, documentSource, client, ActionListener.wrap(response -> {
+                listener.onResponse(response);
+            }, listener::onFailure));
+        } catch (Exception e) {
+            log.error("Failed to index data to remote storage", e);
+            listener.onFailure(e);
+        }
+    }
+
     public void updateData(MemoryConfiguration configuration, UpdateRequest updateRequest, ActionListener<UpdateResponse> listener) {
-        if (configuration.isUseSystemIndex()) {
+        // Check if remote store is configured
+        if (configuration.getRemoteStore() != null && configuration.getRemoteStore().getConnectorId() != null) {
+            // Use remote storage
+            updateDataInRemoteStorage(configuration, updateRequest, listener);
+        } else if (configuration.isUseSystemIndex()) {
             try (ThreadContext.StoredContext context = client.threadPool().getThreadContext().stashContext()) {
                 client.update(updateRequest, ActionListener.runBefore(listener, context::restore));
             }
@@ -278,13 +375,77 @@ public class MemoryContainerHelper {
         }
     }
 
+    private void updateDataInRemoteStorage(
+        MemoryConfiguration configuration,
+        UpdateRequest updateRequest,
+        ActionListener<UpdateResponse> listener
+    ) {
+        try {
+            String connectorId = configuration.getRemoteStore().getConnectorId();
+            String indexName = updateRequest.index();
+            String docId = updateRequest.id();
+            
+            // Convert UpdateRequest to document source
+            Map<String, Object> documentSource = convertUpdateRequestToMap(updateRequest);
+            
+            RemoteStorageHelper.updateDocument(connectorId, indexName, docId, documentSource, client, ActionListener.wrap(response -> {
+                // Create a mock UpdateResponse
+                listener.onResponse(response);
+            }, listener::onFailure));
+        } catch (Exception e) {
+            log.error("Failed to update data in remote storage", e);
+            listener.onFailure(e);
+        }
+    }
+
+    private Map<String, Object> convertUpdateRequestToMap(UpdateRequest updateRequest) throws IOException {
+        Map<String, Object> result = new HashMap<>();
+        
+        // Get the doc from update request
+        if (updateRequest.doc() != null) {
+            result.put("doc", updateRequest.doc().sourceAsMap());
+        }
+        
+        // Handle upsert if present
+        if (updateRequest.upsertRequest() != null) {
+            result.put("doc_as_upsert", true);
+            result.put("doc", updateRequest.upsertRequest().sourceAsMap());
+        }
+        
+        return result;
+    }
+
     public void deleteData(MemoryConfiguration configuration, DeleteRequest deleteRequest, ActionListener<DeleteResponse> listener) {
-        if (configuration.isUseSystemIndex()) {
+        // Check if remote store is configured
+        if (configuration.getRemoteStore() != null && configuration.getRemoteStore().getConnectorId() != null) {
+            // Use remote storage
+            deleteDataFromRemoteStorage(configuration, deleteRequest, listener);
+        } else if (configuration.isUseSystemIndex()) {
             try (ThreadContext.StoredContext context = client.threadPool().getThreadContext().stashContext()) {
                 client.delete(deleteRequest, ActionListener.runBefore(listener, context::restore));
             }
         } else {
             client.delete(deleteRequest, listener);
+        }
+    }
+
+    private void deleteDataFromRemoteStorage(
+        MemoryConfiguration configuration,
+        DeleteRequest deleteRequest,
+        ActionListener<DeleteResponse> listener
+    ) {
+        try {
+            String connectorId = configuration.getRemoteStore().getConnectorId();
+            String indexName = deleteRequest.index();
+            String docId = deleteRequest.id();
+            
+            RemoteStorageHelper.deleteDocument(connectorId, indexName, docId, client, ActionListener.wrap(response -> {
+                // Create a mock DeleteResponse
+                listener.onResponse(response);
+            }, listener::onFailure));
+        } catch (Exception e) {
+            log.error("Failed to delete data from remote storage", e);
+            listener.onFailure(e);
         }
     }
 
@@ -303,13 +464,58 @@ public class MemoryContainerHelper {
     }
 
     public void bulkIngestData(MemoryConfiguration configuration, BulkRequest bulkRequest, ActionListener<BulkResponse> listener) {
-        if (configuration.isUseSystemIndex()) {
+        // Check if remote store is configured
+        if (configuration.getRemoteStore() != null && configuration.getRemoteStore().getConnectorId() != null) {
+            // Use remote storage
+            bulkIngestDataToRemoteStorage(configuration, bulkRequest, listener);
+        } else if (configuration.isUseSystemIndex()) {
             try (ThreadContext.StoredContext context = client.threadPool().getThreadContext().stashContext()) {
                 client.bulk(bulkRequest, ActionListener.runBefore(listener, context::restore));
             }
         } else {
             client.bulk(bulkRequest, listener);
         }
+    }
+
+    private void bulkIngestDataToRemoteStorage(
+        MemoryConfiguration configuration,
+        BulkRequest bulkRequest,
+        ActionListener<BulkResponse> listener
+    ) {
+        try {
+            String connectorId = configuration.getRemoteStore().getConnectorId();
+            
+            // Convert BulkRequest to NDJSON format
+            String bulkBody = convertBulkRequestToNDJSON(bulkRequest);
+            
+            RemoteStorageHelper.bulkWrite(connectorId, bulkBody, client, ActionListener.wrap(response -> {
+                // Create a mock BulkResponse
+                listener.onResponse(response);
+            }, listener::onFailure));
+        } catch (Exception e) {
+            log.error("Failed to bulk ingest data to remote storage", e);
+            listener.onFailure(e);
+        }
+    }
+
+    private String convertBulkRequestToNDJSON(BulkRequest bulkRequest) throws IOException {
+        StringBuilder ndjson = new StringBuilder();
+        
+        for (var docWriteRequest : bulkRequest.requests()) {
+            if (docWriteRequest instanceof IndexRequest) {
+                IndexRequest indexRequest = (IndexRequest) docWriteRequest;
+                
+                // Action line
+                Map<String, Object> actionLine = new HashMap<>();
+                actionLine.put("index", Map.of("_index", indexRequest.index()));
+                ndjson.append(StringUtils.toJson(actionLine)).append("\n");
+                
+                // Document line
+                ndjson.append(indexRequest.source().utf8ToString()).append("\n");
+            }
+        }
+        
+        return ndjson.toString();
     }
 
     /**

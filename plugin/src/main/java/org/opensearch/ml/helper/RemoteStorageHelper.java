@@ -5,22 +5,34 @@
 
 package org.opensearch.ml.helper;
 
+import static org.opensearch.common.xcontent.json.JsonXContent.jsonXContent;
 import static org.opensearch.ml.common.CommonValue.CONNECTOR_ACTION_FIELD;
 import static org.opensearch.ml.common.CommonValue.ML_LONG_MEMORY_HISTORY_INDEX_MAPPING_PATH;
 import static org.opensearch.ml.common.CommonValue.ML_LONG_TERM_MEMORY_INDEX_MAPPING_PATH;
 import static org.opensearch.ml.common.CommonValue.ML_MEMORY_SESSION_INDEX_MAPPING_PATH;
 import static org.opensearch.ml.common.CommonValue.ML_WORKING_MEMORY_INDEX_MAPPING_PATH;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.KNN_EF_CONSTRUCTION;
+import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.KNN_EF_SEARCH;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.KNN_ENGINE;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.KNN_M;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.KNN_METHOD_NAME;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.KNN_SPACE_TYPE;
+import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.LONG_TERM_MEMORY_HISTORY_INDEX;
+import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.LONG_TERM_MEMORY_INDEX;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.MEMORY_EMBEDDING_FIELD;
+import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.SESSION_INDEX;
+import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.WORKING_MEMORY_INDEX;
 
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.opensearch.action.bulk.BulkResponse;
+import org.opensearch.action.delete.DeleteResponse;
+import org.opensearch.action.get.GetResponse;
+import org.opensearch.action.index.IndexResponse;
+import org.opensearch.action.search.SearchResponse;
+import org.opensearch.action.update.UpdateResponse;
 import org.opensearch.common.xcontent.LoggingDeprecationHandler;
 import org.opensearch.common.xcontent.XContentHelper;
 import org.opensearch.common.xcontent.XContentType;
@@ -49,7 +61,14 @@ import lombok.extern.log4j.Log4j2;
 public class RemoteStorageHelper {
 
     private static final String CREATE_INDEX_ACTION = "create_index";
+    private static final String WRITE_DOC_ACTION = "write_doc";
+    private static final String BULK_LOAD_ACTION = "bulk_load";
+    private static final String SEARCH_INDEX_ACTION = "search_index";
+    private static final String UPDATE_DOC_ACTION = "update_doc";
+    private static final String GET_DOC_ACTION = "get_doc";
+    private static final String DELETE_DOC_ACTION = "delete_doc";
     private static final String INDEX_NAME_PARAM = "index_name";
+    private static final String DOC_ID_PARAM = "doc_id";
     private static final String INPUT_PARAM = "input";
 
     /**
@@ -68,6 +87,27 @@ public class RemoteStorageHelper {
         Client client,
         ActionListener<Boolean> listener
     ) {
+        createRemoteIndex(connectorId, indexName, indexMapping, null, client, listener);
+    }
+
+    /**
+     * Creates a memory index in remote storage using a connector with custom settings
+     *
+     * @param connectorId The connector ID to use for remote storage
+     * @param indexName The name of the index to create
+     * @param indexMapping The index mapping as a JSON string
+     * @param indexSettings The index settings as a Map (can be null)
+     * @param client The OpenSearch client
+     * @param listener The action listener
+     */
+    public static void createRemoteIndex(
+        String connectorId,
+        String indexName,
+        String indexMapping,
+        Map<String, Object> indexSettings,
+        Client client,
+        ActionListener<Boolean> listener
+    ) {
         try {
             // Parse the mapping string to a Map
             Map<String, Object> mappingMap = parseMappingToMap(indexMapping);
@@ -75,6 +115,11 @@ public class RemoteStorageHelper {
             // Build the request body for creating the index
             Map<String, Object> requestBody = new HashMap<>();
             requestBody.put("mappings", mappingMap);
+            
+            // Add settings if provided
+            if (indexSettings != null && !indexSettings.isEmpty()) {
+                requestBody.put("settings", indexSettings);
+            }
 
             // Prepare parameters for connector execution
             Map<String, String> parameters = new HashMap<>();
@@ -109,7 +154,8 @@ public class RemoteStorageHelper {
         ActionListener<Boolean> listener
     ) {
         String indexMappings = mlIndicesHandler.getMapping(ML_MEMORY_SESSION_INDEX_MAPPING_PATH);
-        createRemoteIndex(connectorId, indexName, indexMappings, client, listener);
+        Map<String, Object> indexSettings = configuration.getMemoryIndexMapping(SESSION_INDEX);
+        createRemoteIndex(connectorId, indexName, indexMappings, indexSettings, client, listener);
     }
 
     /**
@@ -124,7 +170,8 @@ public class RemoteStorageHelper {
         ActionListener<Boolean> listener
     ) {
         String indexMappings = mlIndicesHandler.getMapping(ML_WORKING_MEMORY_INDEX_MAPPING_PATH);
-        createRemoteIndex(connectorId, indexName, indexMappings, client, listener);
+        Map<String, Object> indexSettings = configuration.getMemoryIndexMapping(WORKING_MEMORY_INDEX);
+        createRemoteIndex(connectorId, indexName, indexMappings, indexSettings, client, listener);
     }
 
     /**
@@ -139,7 +186,8 @@ public class RemoteStorageHelper {
         ActionListener<Boolean> listener
     ) {
         String indexMappings = mlIndicesHandler.getMapping(ML_LONG_MEMORY_HISTORY_INDEX_MAPPING_PATH);
-        createRemoteIndex(connectorId, indexName, indexMappings, client, listener);
+        Map<String, Object> indexSettings = configuration.getMemoryIndexMapping(LONG_TERM_MEMORY_HISTORY_INDEX);
+        createRemoteIndex(connectorId, indexName, indexMappings, indexSettings, client, listener);
     }
 
     /**
@@ -155,7 +203,8 @@ public class RemoteStorageHelper {
     ) {
         try {
             String indexMapping = buildLongTermMemoryMapping(memoryConfig, mlIndicesHandler);
-            createRemoteIndex(connectorId, indexName, indexMapping, client, listener);
+            Map<String, Object> indexSettings = buildLongTermMemorySettings(memoryConfig);
+            createRemoteIndex(connectorId, indexName, indexMapping, indexSettings, client, listener);
         } catch (Exception e) {
             log.error("Failed to build long-term memory mapping for remote index: {}", indexName, e);
             listener.onFailure(e);
@@ -207,15 +256,42 @@ public class RemoteStorageHelper {
     }
 
     /**
-     * Executes a connector action
+     * Builds the long-term memory index settings dynamically based on configuration
+     */
+    private static Map<String, Object> buildLongTermMemorySettings(MemoryConfiguration memoryConfig) {
+        Map<String, Object> indexSettings = new HashMap<>();
+
+        // Add KNN settings for text embeddings
+        if (memoryConfig.getEmbeddingModelType() == FunctionName.TEXT_EMBEDDING) {
+            indexSettings.put("index.knn", true);
+            indexSettings.put("index.knn.algo_param.ef_search", KNN_EF_SEARCH);
+        }
+
+        // Add custom settings from configuration
+        if (!memoryConfig.getIndexSettings().isEmpty() 
+            && memoryConfig.getIndexSettings().containsKey(LONG_TERM_MEMORY_INDEX)) {
+            Map<String, Object> configuredIndexSettings = memoryConfig.getMemoryIndexMapping(LONG_TERM_MEMORY_INDEX);
+            indexSettings.putAll(configuredIndexSettings);
+        }
+
+        return indexSettings;
+    }
+
+    /**
+     * Executes a connector action with a specific action name
      */
     private static void executeConnectorAction(
         String connectorId,
+        String actionName,
         Map<String, String> parameters,
         Client client,
         ActionListener<ModelTensorOutput> listener
     ) {
-        RemoteInferenceInputDataSet inputDataSet = RemoteInferenceInputDataSet.builder().parameters(parameters).build();
+        // Add connector_action parameter to specify which action to execute
+        Map<String, String> allParameters = new HashMap<>(parameters);
+        allParameters.put(CONNECTOR_ACTION_FIELD, actionName);
+        
+        RemoteInferenceInputDataSet inputDataSet = RemoteInferenceInputDataSet.builder().parameters(allParameters).build();
         MLInput mlInput = RemoteInferenceMLInput.builder().algorithm(FunctionName.CONNECTOR).inputDataset(inputDataSet).build();
         MLExecuteConnectorRequest request = new MLExecuteConnectorRequest(connectorId, mlInput);
 
@@ -223,9 +299,270 @@ public class RemoteStorageHelper {
             ModelTensorOutput output = (ModelTensorOutput) r.getOutput();
             listener.onResponse(output);
         }, e -> {
-            log.error("Failed to execute connector action for connector: {}", connectorId, e);
+            log.error("Failed to execute connector action {} for connector: {}", actionName, connectorId, e);
             listener.onFailure(e);
         }));
+    }
+
+    /**
+     * Executes a connector action (backward compatibility - defaults to create_index)
+     */
+    private static void executeConnectorAction(
+        String connectorId,
+        Map<String, String> parameters,
+        Client client,
+        ActionListener<ModelTensorOutput> listener
+    ) {
+        executeConnectorAction(connectorId, CREATE_INDEX_ACTION, parameters, client, listener);
+    }
+
+    /**
+     * Writes a single document to remote storage
+     *
+     * @param connectorId The connector ID to use for remote storage
+     * @param indexName The name of the index
+     * @param documentSource The document source as a Map
+     * @param client The OpenSearch client
+     * @param listener The action listener
+     */
+    public static void writeDocument(
+        String connectorId,
+        String indexName,
+        Map<String, Object> documentSource,
+        Client client,
+        ActionListener<IndexResponse> listener
+    ) {
+        try {
+            // Prepare parameters for connector execution
+            Map<String, String> parameters = new HashMap<>();
+            parameters.put(INDEX_NAME_PARAM, indexName);
+            parameters.put(INPUT_PARAM, StringUtils.toJson(documentSource));
+
+            // Execute the connector action with write_doc action name
+            executeConnectorAction(connectorId, WRITE_DOC_ACTION, parameters, client, ActionListener.wrap(response -> {
+                // Extract document ID from response
+                XContentParser parser = createParserFromTensorOutput(response);
+                IndexResponse indexResponse = IndexResponse.fromXContent(parser);
+                String docId = extractDocIdFromResponse(response);
+                log.info("Successfully wrote document to remote index: {}, doc_id: {}", indexName, docId);
+                listener.onResponse(indexResponse);
+            }, e -> {
+                log.error("Failed to write document to remote index: {}", indexName, e);
+                listener.onFailure(e);
+            }));
+
+        } catch (Exception e) {
+            log.error("Error preparing remote document write for index: {}", indexName, e);
+            listener.onFailure(e);
+        }
+    }
+
+    /**
+     * Performs bulk write operations to remote storage
+     *
+     * @param connectorId The connector ID to use for remote storage
+     * @param bulkBody The bulk request body in NDJSON format
+     * @param client The OpenSearch client
+     * @param listener The action listener
+     */
+    public static void bulkWrite(
+        String connectorId,
+        String bulkBody,
+        Client client,
+        ActionListener<BulkResponse> listener
+    ) {
+        try {
+            // Prepare parameters for connector execution
+            Map<String, String> parameters = new HashMap<>();
+            parameters.put(INPUT_PARAM, bulkBody);
+
+            // Execute the connector action with bulk_load action name
+            executeConnectorAction(connectorId, BULK_LOAD_ACTION, parameters, client, ActionListener.wrap(response -> {
+                log.info("Successfully executed bulk write to remote storage");
+                XContentParser parser = createParserFromTensorOutput(response);
+                BulkResponse bulkResponse = BulkResponse.fromXContent(parser);
+                listener.onResponse(bulkResponse);
+            }, e -> {
+                log.error("Failed to execute bulk write to remote storage", e);
+                listener.onFailure(e);
+            }));
+
+        } catch (Exception e) {
+            log.error("Error preparing remote bulk write", e);
+            listener.onFailure(e);
+        }
+    }
+
+    /**
+     * Searches documents in remote storage
+     *
+     * @param connectorId The connector ID to use for remote storage
+     * @param indexName The name of the index to search
+     * @param searchBody The search request body as a Map
+     * @param client The OpenSearch client
+     * @param listener The action listener
+     */
+    public static void searchDocuments(
+        String connectorId,
+        String indexName,
+        Map<String, Object> searchBody,
+        Client client,
+        ActionListener<SearchResponse> listener
+    ) {
+        try {
+            // Prepare parameters for connector execution
+            Map<String, String> parameters = new HashMap<>();
+            parameters.put(INDEX_NAME_PARAM, indexName);
+            parameters.put(INPUT_PARAM, StringUtils.toJson(searchBody));
+
+            // Execute the connector action with search_index action name
+            executeConnectorAction(connectorId, SEARCH_INDEX_ACTION, parameters, client, ActionListener.wrap(response -> {
+                log.info("Successfully searched documents in remote index: {}", indexName);
+                XContentParser parser = createParserFromTensorOutput(response);
+                SearchResponse searchResponse = SearchResponse.fromXContent(parser);
+                listener.onResponse(searchResponse);
+            }, e -> {
+                log.error("Failed to search documents in remote index: {}", indexName, e);
+                listener.onFailure(e);
+            }));
+
+        } catch (Exception e) {
+            log.error("Error preparing remote search for index: {}", indexName, e);
+            listener.onFailure(e);
+        }
+    }
+
+    /**
+     * Updates a document in remote storage
+     *
+     * @param connectorId The connector ID to use for remote storage
+     * @param indexName The name of the index
+     * @param docId The document ID to update
+     * @param documentSource The document source as a Map
+     * @param client The OpenSearch client
+     * @param listener The action listener
+     */
+    public static void updateDocument(
+        String connectorId,
+        String indexName,
+        String docId,
+        Map<String, Object> documentSource,
+        Client client,
+        ActionListener<UpdateResponse> listener
+    ) {
+        try {
+            // Prepare parameters for connector execution
+            Map<String, String> parameters = new HashMap<>();
+            parameters.put(INDEX_NAME_PARAM, indexName);
+            parameters.put(DOC_ID_PARAM, docId);
+            parameters.put(INPUT_PARAM, StringUtils.toJson(documentSource));
+
+            // Execute the connector action with update_doc action name
+            executeConnectorAction(connectorId, UPDATE_DOC_ACTION, parameters, client, ActionListener.wrap(response -> {
+                log.info("Successfully updated document in remote index: {}, doc_id: {}", indexName, docId);
+                XContentParser parser = createParserFromTensorOutput(response);
+                UpdateResponse updateResponse = UpdateResponse.fromXContent(parser);
+                listener.onResponse(updateResponse);
+            }, e -> {
+                log.error("Failed to update document in remote index: {}, doc_id: {}", indexName, docId, e);
+                listener.onFailure(e);
+            }));
+
+        } catch (Exception e) {
+            log.error("Error preparing remote document update for index: {}, doc_id: {}", indexName, docId, e);
+            listener.onFailure(e);
+        }
+    }
+
+    public static void getDocument(
+            String connectorId,
+            String indexName,
+            String docId,
+            Client client,
+            ActionListener<GetResponse> listener
+    ) {
+        try {
+            // Prepare parameters for connector execution
+            Map<String, String> parameters = new HashMap<>();
+            parameters.put(INDEX_NAME_PARAM, indexName);
+            parameters.put(DOC_ID_PARAM, docId);
+            // input parameter is optional for delete, use empty string as default
+            parameters.put(INPUT_PARAM, "");
+
+            // Execute the connector action with delete_doc action name
+            executeConnectorAction(connectorId, GET_DOC_ACTION, parameters, client, ActionListener.wrap(response -> {
+                log.info("Successfully deleted document from remote index: {}, doc_id: {}", indexName, docId);
+                XContentParser parser = createParserFromTensorOutput(response);
+                GetResponse getResponse = GetResponse.fromXContent(parser);
+                listener.onResponse(getResponse);
+            }, e -> {
+                log.error("Failed to delete document from remote index: {}, doc_id: {}", indexName, docId, e);
+                listener.onFailure(e);
+            }));
+
+        } catch (Exception e) {
+            log.error("Error preparing remote document delete for index: {}, doc_id: {}", indexName, docId, e);
+            listener.onFailure(e);
+        }
+    }
+
+    /**
+     * Deletes a document from remote storage
+     *
+     * @param connectorId The connector ID to use for remote storage
+     * @param indexName The name of the index
+     * @param docId The document ID to delete
+     * @param client The OpenSearch client
+     * @param listener The action listener
+     */
+    public static void deleteDocument(
+        String connectorId,
+        String indexName,
+        String docId,
+        Client client,
+        ActionListener<DeleteResponse> listener
+    ) {
+        try {
+            // Prepare parameters for connector execution
+            Map<String, String> parameters = new HashMap<>();
+            parameters.put(INDEX_NAME_PARAM, indexName);
+            parameters.put(DOC_ID_PARAM, docId);
+            // input parameter is optional for delete, use empty string as default
+            parameters.put(INPUT_PARAM, "");
+
+            // Execute the connector action with delete_doc action name
+            executeConnectorAction(connectorId, DELETE_DOC_ACTION, parameters, client, ActionListener.wrap(response -> {
+                log.info("Successfully deleted document from remote index: {}, doc_id: {}", indexName, docId);
+                XContentParser parser = createParserFromTensorOutput(response);
+                DeleteResponse deleteResponse = DeleteResponse.fromXContent(parser);
+                listener.onResponse(deleteResponse);
+            }, e -> {
+                log.error("Failed to delete document from remote index: {}, doc_id: {}", indexName, docId, e);
+                listener.onFailure(e);
+            }));
+
+        } catch (Exception e) {
+            log.error("Error preparing remote document delete for index: {}, doc_id: {}", indexName, docId, e);
+            listener.onFailure(e);
+        }
+    }
+
+    /**
+     * Extracts document ID from connector response
+     */
+    private static String extractDocIdFromResponse(ModelTensorOutput response) {
+        try {
+            if (response != null && response.getMlModelOutputs() != null && !response.getMlModelOutputs().isEmpty()) {
+                // Try to extract _id from response
+                // The response format depends on the connector configuration
+                // For now, return a placeholder - this should be enhanced based on actual response format
+                return "remote_doc_id";
+            }
+            return "unknown";
+        } catch (Exception e) {
+            log.warn("Failed to extract document ID from response", e);
+            return "unknown";
+        }
     }
 
     /**
@@ -235,5 +572,12 @@ public class RemoteStorageHelper {
         XContentParser parser = XContentHelper
             .createParser(NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE, new BytesArray(mappingJson), XContentType.JSON);
         return parser.mapOrdered();
+    }
+
+    public static XContentParser createParserFromTensorOutput(ModelTensorOutput output) throws IOException {
+        Map<String, ?> dataAsMap = output.getMlModelOutputs().get(0).getMlModelTensors().get(0).getDataAsMap();
+        String json = StringUtils.toJson(dataAsMap);
+        XContentParser parser = jsonXContent.createParser(NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE, json);
+        return parser;
     }
 }
