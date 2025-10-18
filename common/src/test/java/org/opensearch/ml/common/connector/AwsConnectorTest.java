@@ -221,7 +221,7 @@ public class AwsConnectorTest {
         String postProcessFunction = MLPostProcessFunction.OPENAI_EMBEDDING;
 
         ConnectorAction action = new ConnectorAction(
-            actionType,
+            actionType,null,
             method,
             url,
             headers,

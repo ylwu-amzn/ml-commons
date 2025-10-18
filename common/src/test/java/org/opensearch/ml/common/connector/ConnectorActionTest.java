@@ -99,7 +99,7 @@ public class ConnectorActionTest {
     public void constructor_NullActionType() {
         Throwable exception = assertThrows(
             IllegalArgumentException.class,
-            () -> new ConnectorAction(null, TEST_METHOD_POST, URL, null, TEST_REQUEST_BODY, null, null)
+            () -> new ConnectorAction(null, null, TEST_METHOD_POST, URL, null, TEST_REQUEST_BODY, null, null)
         );
         assertEquals("action type can't be null", exception.getMessage());
 
@@ -109,7 +109,7 @@ public class ConnectorActionTest {
     public void constructor_NullUrl() {
         Throwable exception = assertThrows(
             IllegalArgumentException.class,
-            () -> new ConnectorAction(TEST_ACTION_TYPE, TEST_METHOD_POST, null, null, TEST_REQUEST_BODY, null, null)
+            () -> new ConnectorAction(TEST_ACTION_TYPE, null, TEST_METHOD_POST, null, null, TEST_REQUEST_BODY, null, null)
         );
         assertEquals("url can't be null", exception.getMessage());
     }
@@ -118,14 +118,14 @@ public class ConnectorActionTest {
     public void constructor_NullMethod() {
         Throwable exception = assertThrows(
             IllegalArgumentException.class,
-            () -> new ConnectorAction(TEST_ACTION_TYPE, null, URL, null, TEST_REQUEST_BODY, null, null)
+            () -> new ConnectorAction(TEST_ACTION_TYPE, null, null, URL, null, TEST_REQUEST_BODY, null, null)
         );
         assertEquals("method can't be null", exception.getMessage());
     }
 
     @Test
     public void testValidatePrePostProcessFunctionsWithNullPreProcessFunctionSuccess() {
-        ConnectorAction action = new ConnectorAction(TEST_ACTION_TYPE, TEST_METHOD_HTTP, OPENAI_URL, null, TEST_REQUEST_BODY, null, null);
+        ConnectorAction action = new ConnectorAction(TEST_ACTION_TYPE, null, TEST_METHOD_HTTP, OPENAI_URL, null, TEST_REQUEST_BODY, null, null);
         action.validatePrePostProcessFunctions(Map.of());
         assertFalse(testAppender.getLogEvents().stream().anyMatch(event -> event.getLevel() == Level.WARN));
     }
@@ -134,6 +134,7 @@ public class ConnectorActionTest {
     public void testValidatePrePostProcessFunctionsWithExternalServers() {
         ConnectorAction action = new ConnectorAction(
             TEST_ACTION_TYPE,
+                null,
             TEST_METHOD_HTTP,
             URL,
             null,
@@ -150,7 +151,7 @@ public class ConnectorActionTest {
         String preProcessFunction =
             "\"\\n    StringBuilder builder = new StringBuilder();\\n    builder.append(\\\"\\\\\\\"\\\");\\n    String first = params.text_docs[0];\\n    builder.append(first);\\n    builder.append(\\\"\\\\\\\"\\\");\\n    def parameters = \\\"{\\\" +\\\"\\\\\\\"text_inputs\\\\\\\":\\\" + builder + \\\"}\\\";\\n    return  \\\"{\\\" +\\\"\\\\\\\"parameters\\\\\\\":\\\" + parameters + \\\"}\\\";\"";
         ConnectorAction action = new ConnectorAction(
-            TEST_ACTION_TYPE,
+            TEST_ACTION_TYPE, null,
             TEST_METHOD_HTTP,
             OPENAI_URL,
             null,
@@ -165,7 +166,7 @@ public class ConnectorActionTest {
     @Test
     public void testValidatePrePostProcessFunctionsWithOpenAIConnectorCorrectInBuiltPrePostProcessFunctionSuccess() {
         ConnectorAction action = new ConnectorAction(
-            TEST_ACTION_TYPE,
+            TEST_ACTION_TYPE,null,
             TEST_METHOD_HTTP,
             "https://${parameters.endpoint}/v1/chat/completions",
             null,
@@ -180,7 +181,7 @@ public class ConnectorActionTest {
     @Test
     public void testValidatePrePostProcessFunctionsWithOpenAIConnectorWrongInBuiltPreProcessFunction() {
         ConnectorAction action = new ConnectorAction(
-            TEST_ACTION_TYPE,
+            TEST_ACTION_TYPE,null,
             TEST_METHOD_HTTP,
             OPENAI_URL,
             null,
@@ -205,7 +206,7 @@ public class ConnectorActionTest {
     @Test
     public void testValidatePrePostProcessFunctionsWithOpenAIConnectorWrongInBuiltPostProcessFunction() {
         ConnectorAction action = new ConnectorAction(
-            TEST_ACTION_TYPE,
+            TEST_ACTION_TYPE,null,
             TEST_METHOD_HTTP,
             OPENAI_URL,
             null,
@@ -230,7 +231,7 @@ public class ConnectorActionTest {
     @Test
     public void testValidatePrePostProcessFunctionsWithCohereConnectorCorrectInBuiltPrePostProcessFunctionSuccess() {
         ConnectorAction action = new ConnectorAction(
-            TEST_ACTION_TYPE,
+            TEST_ACTION_TYPE,null,
             TEST_METHOD_HTTP,
             COHERE_URL,
             null,
@@ -242,7 +243,7 @@ public class ConnectorActionTest {
         assertFalse(testAppender.getLogEvents().stream().anyMatch(event -> event.getLevel() == Level.WARN));
 
         action = new ConnectorAction(
-            TEST_ACTION_TYPE,
+            TEST_ACTION_TYPE,null,
             TEST_METHOD_HTTP,
             COHERE_URL,
             null,
@@ -254,7 +255,7 @@ public class ConnectorActionTest {
         assertFalse(testAppender.getLogEvents().stream().anyMatch(event -> event.getLevel() == Level.WARN));
 
         action = new ConnectorAction(
-            TEST_ACTION_TYPE,
+            TEST_ACTION_TYPE,null,
             TEST_METHOD_HTTP,
             COHERE_URL,
             null,
@@ -269,7 +270,7 @@ public class ConnectorActionTest {
     @Test
     public void testValidatePrePostProcessFunctionsWithCohereConnectorWrongInBuiltPreProcessFunction() {
         ConnectorAction action = new ConnectorAction(
-            TEST_ACTION_TYPE,
+            TEST_ACTION_TYPE,null,
             TEST_METHOD_HTTP,
             COHERE_URL,
             null,
@@ -294,7 +295,7 @@ public class ConnectorActionTest {
     @Test
     public void testValidatePrePostProcessFunctionsWithCohereConnectorWrongInBuiltPostProcessFunction() {
         ConnectorAction action = new ConnectorAction(
-            TEST_ACTION_TYPE,
+            TEST_ACTION_TYPE,null,
             TEST_METHOD_HTTP,
             COHERE_URL,
             null,
@@ -319,7 +320,7 @@ public class ConnectorActionTest {
     @Test
     public void testValidatePrePostProcessFunctionsWithBedrockConnectorCorrectInBuiltPrePostProcessFunctionSuccess() {
         ConnectorAction action = new ConnectorAction(
-            TEST_ACTION_TYPE,
+            TEST_ACTION_TYPE,null,
             TEST_METHOD_HTTP,
             BEDROCK_URL,
             null,
@@ -331,7 +332,7 @@ public class ConnectorActionTest {
         assertFalse(testAppender.getLogEvents().stream().anyMatch(event -> event.getLevel() == Level.WARN));
 
         action = new ConnectorAction(
-            TEST_ACTION_TYPE,
+            TEST_ACTION_TYPE,null,
             TEST_METHOD_HTTP,
             BEDROCK_URL,
             null,
@@ -343,7 +344,7 @@ public class ConnectorActionTest {
         assertFalse(testAppender.getLogEvents().stream().anyMatch(event -> event.getLevel() == Level.WARN));
 
         action = new ConnectorAction(
-            TEST_ACTION_TYPE,
+            TEST_ACTION_TYPE,null,
             TEST_METHOD_HTTP,
             BEDROCK_URL,
             null,
@@ -358,7 +359,7 @@ public class ConnectorActionTest {
     @Test
     public void testValidatePrePostProcessFunctionsWithBedrockConnectorWrongInBuiltPreProcessFunction() {
         ConnectorAction action = new ConnectorAction(
-            TEST_ACTION_TYPE,
+            TEST_ACTION_TYPE,null,
             TEST_METHOD_HTTP,
             BEDROCK_URL,
             null,
@@ -383,7 +384,7 @@ public class ConnectorActionTest {
     @Test
     public void testValidatePrePostProcessFunctionsWithBedrockConnectorWrongInBuiltPostProcessFunction() {
         ConnectorAction action = new ConnectorAction(
-            TEST_ACTION_TYPE,
+            TEST_ACTION_TYPE,null,
             TEST_METHOD_HTTP,
             BEDROCK_URL,
             null,
@@ -408,7 +409,7 @@ public class ConnectorActionTest {
     @Test
     public void testValidatePrePostProcessFunctionsWithSagemakerConnectorWithCorrectInBuiltPrePostProcessFunctionSuccess() {
         ConnectorAction action = new ConnectorAction(
-            TEST_ACTION_TYPE,
+            TEST_ACTION_TYPE,null,
             TEST_METHOD_HTTP,
             SAGEMAKER_URL,
             null,
@@ -420,7 +421,7 @@ public class ConnectorActionTest {
         assertFalse(testAppender.getLogEvents().stream().anyMatch(event -> event.getLevel() == Level.WARN));
 
         action = new ConnectorAction(
-            TEST_ACTION_TYPE,
+            TEST_ACTION_TYPE,null,
             TEST_METHOD_HTTP,
             SAGEMAKER_URL,
             null,
@@ -435,7 +436,7 @@ public class ConnectorActionTest {
     @Test
     public void testValidatePrePostProcessFunctionsWithSagemakerConnectorWrongInBuiltPreProcessFunction() {
         ConnectorAction action = new ConnectorAction(
-            TEST_ACTION_TYPE,
+            TEST_ACTION_TYPE,null,
             TEST_METHOD_HTTP,
             SAGEMAKER_URL,
             null,
@@ -462,7 +463,7 @@ public class ConnectorActionTest {
     @Test
     public void testValidatePrePostProcessFunctionsWithSagemakerConnectorWrongInBuiltPostProcessFunction() {
         ConnectorAction action = new ConnectorAction(
-            TEST_ACTION_TYPE,
+            TEST_ACTION_TYPE,null,
             TEST_METHOD_HTTP,
             SAGEMAKER_URL,
             null,
@@ -488,7 +489,7 @@ public class ConnectorActionTest {
 
     @Test
     public void writeTo_NullValue() throws IOException {
-        ConnectorAction action = new ConnectorAction(TEST_ACTION_TYPE, TEST_METHOD_HTTP, URL, null, TEST_REQUEST_BODY, null, null);
+        ConnectorAction action = new ConnectorAction(TEST_ACTION_TYPE, null,TEST_METHOD_HTTP, URL, null, TEST_REQUEST_BODY, null, null);
         BytesStreamOutput output = new BytesStreamOutput();
         action.writeTo(output);
         ConnectorAction action2 = new ConnectorAction(output.bytes().streamInput());
@@ -503,7 +504,7 @@ public class ConnectorActionTest {
         String postProcessFunction = MLPostProcessFunction.OPENAI_EMBEDDING;
 
         ConnectorAction action = new ConnectorAction(
-            TEST_ACTION_TYPE,
+            TEST_ACTION_TYPE,null,
             TEST_METHOD_HTTP,
             URL,
             headers,
@@ -519,7 +520,7 @@ public class ConnectorActionTest {
 
     @Test
     public void toXContent_NullValue() throws IOException {
-        ConnectorAction action = new ConnectorAction(TEST_ACTION_TYPE, TEST_METHOD_HTTP, URL, null, TEST_REQUEST_BODY, null, null);
+        ConnectorAction action = new ConnectorAction(TEST_ACTION_TYPE, null,TEST_METHOD_HTTP, URL, null, TEST_REQUEST_BODY, null, null);
 
         XContentBuilder builder = XContentBuilder.builder(XContentType.JSON.xContent());
         action.toXContent(builder, ToXContent.EMPTY_PARAMS);
@@ -539,7 +540,7 @@ public class ConnectorActionTest {
         String postProcessFunction = MLPostProcessFunction.OPENAI_EMBEDDING;
 
         ConnectorAction action = new ConnectorAction(
-            TEST_ACTION_TYPE,
+            TEST_ACTION_TYPE,null,
             TEST_METHOD_HTTP,
             URL,
             headers,

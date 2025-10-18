@@ -26,6 +26,7 @@ import org.opensearch.ml.common.transport.memorycontainer.memory.MLSearchMemorie
 import org.opensearch.ml.common.transport.memorycontainer.memory.MLSearchMemoriesRequest;
 import org.opensearch.ml.helper.ConnectorAccessControlHelper;
 import org.opensearch.ml.helper.MemoryContainerHelper;
+import org.opensearch.ml.utils.MemorySearchQueryBuilder;
 import org.opensearch.ml.utils.RestActionUtils;
 import org.opensearch.ml.utils.TenantAwareHelper;
 import org.opensearch.remote.metadata.client.SearchDataObjectRequest;
@@ -141,7 +142,13 @@ public class TransportSearchMemoriesAction extends HandledTransportAction<MLSear
                 log.error("Search execution failed", e);
                 actionListener.onFailure(new OpenSearchException("Search execution failed: " + e.getMessage(), e));
             });
-            memoryContainerHelper.searchData(container.getConfiguration(), searchDataObjecRequest, searchResponseActionListener);
+
+            if (memoryConfig.getRemoteStore() == null) {
+                memoryContainerHelper.searchData(container.getConfiguration(), searchDataObjecRequest, searchResponseActionListener);
+            } else {
+                String query = input.getSearchSourceBuilder().toString();
+                memoryContainerHelper.searchDataFromRemoteStorage(memoryConfig, indexName, query, searchResponseActionListener);
+            }
 
         } catch (Exception e) {
             log.error("Failed to build search request", e);

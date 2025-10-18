@@ -271,7 +271,8 @@ public class MemoryContainerHelper {
             // Check if remote store is configured
             if (configuration.getRemoteStore() != null && configuration.getRemoteStore().getConnectorId() != null) {
                 // Use remote storage
-                searchDataFromRemoteStorage(configuration, searchRequest, listener);
+                //searchDataFromRemoteStorage(configuration, searchRequest, listener);
+                throw new RuntimeException("Remote store is not yet implemented");
             } else if (configuration.isUseSystemIndex()) {
                 try (ThreadContext.StoredContext context = client.threadPool().getThreadContext().stashContext()) {
                     ActionListener<SearchResponse> wrappedListener = ActionListener.runBefore(listener, context::restore);
@@ -293,19 +294,19 @@ public class MemoryContainerHelper {
     }
 
 
-    private void searchDataFromRemoteStorage(
+    public void searchDataFromRemoteStorage(
         MemoryConfiguration configuration,
-        SearchDataObjectRequest searchRequest,
+        String indexName,
+        String query,
         ActionListener<SearchResponse> listener
     ) {
         try {
             String connectorId = configuration.getRemoteStore().getConnectorId();
-            String indexName = searchRequest.indices()[0]; // Get first index name
-            
+
             // Convert SearchSourceBuilder to Map
-            Map<String, Object> searchBody = convertSearchSourceToMap(searchRequest.searchSourceBuilder());
+//            Map<String, Object> searchBody = convertSearchSourceToMap(searchRequest.searchSourceBuilder());
             
-            RemoteStorageHelper.searchDocuments(connectorId, indexName, searchBody, client, ActionListener.wrap(response -> {
+            RemoteStorageHelper.searchDocuments(connectorId, indexName, query, client, ActionListener.wrap(response -> {
                 listener.onResponse(response);
             }, listener::onFailure));
         } catch (Exception e) {
@@ -498,20 +499,64 @@ public class MemoryContainerHelper {
         }
     }
 
-    private String convertBulkRequestToNDJSON(BulkRequest bulkRequest) throws IOException {
+    private String convertBulkRequestToNDJSON(BulkRequest bulkRequest) {
         StringBuilder ndjson = new StringBuilder();
         
         for (var docWriteRequest : bulkRequest.requests()) {
             if (docWriteRequest instanceof IndexRequest) {
                 IndexRequest indexRequest = (IndexRequest) docWriteRequest;
                 
-                // Action line
+                // Action line for index operation
+                Map<String, Object> actionMetadata = new HashMap<>();
+                actionMetadata.put("_index", indexRequest.index());
+                if (indexRequest.id() != null) {
+                    actionMetadata.put("_id", indexRequest.id());
+                }
                 Map<String, Object> actionLine = new HashMap<>();
-                actionLine.put("index", Map.of("_index", indexRequest.index()));
-                ndjson.append(StringUtils.toJson(actionLine)).append("\n");
+                actionLine.put("index", actionMetadata);
+                ndjson.append(StringUtils.toJson(actionLine)).append('\n');
                 
                 // Document line
-                ndjson.append(indexRequest.source().utf8ToString()).append("\n");
+                ndjson.append(indexRequest.source().utf8ToString()).append('\n');
+                
+            } else if (docWriteRequest instanceof UpdateRequest) {
+                UpdateRequest updateRequest = (UpdateRequest) docWriteRequest;
+                
+                // Action line for update operation
+                Map<String, Object> actionMetadata = new HashMap<>();
+                actionMetadata.put("_index", updateRequest.index());
+                actionMetadata.put("_id", updateRequest.id());
+                Map<String, Object> actionLine = new HashMap<>();
+                actionLine.put("update", actionMetadata);
+                ndjson.append(StringUtils.toJson(actionLine)).append('\n');
+                
+                // Document line - for update, we need to wrap in "doc" or "script"
+                Map<String, Object> updateDoc = new HashMap<>();
+                if (updateRequest.doc() != null) {
+                    updateDoc.put("doc", XContentHelper.convertToMap(updateRequest.doc().source(), false, XContentType.JSON).v2());
+                    if (updateRequest.docAsUpsert()) {
+                        updateDoc.put("doc_as_upsert", true);
+                    }
+                } else if (updateRequest.script() != null) {
+                    updateDoc.put("script", updateRequest.script());
+                }
+                if (updateRequest.upsertRequest() != null) {
+                    updateDoc.put("upsert", XContentHelper.convertToMap(updateRequest.upsertRequest().source(), false, XContentType.JSON).v2());
+                }
+                ndjson.append(StringUtils.toJson(updateDoc)).append('\n');
+                
+            } else if (docWriteRequest instanceof DeleteRequest) {
+                DeleteRequest deleteRequest = (DeleteRequest) docWriteRequest;
+                
+                // Action line for delete operation
+                Map<String, Object> actionMetadata = new HashMap<>();
+                actionMetadata.put("_index", deleteRequest.index());
+                actionMetadata.put("_id", deleteRequest.id());
+                Map<String, Object> actionLine = new HashMap<>();
+                actionLine.put("delete", actionMetadata);
+                ndjson.append(StringUtils.toJson(actionLine)).append('\n');
+                
+                // Delete operations don't have a document line, just the action line
             }
         }
         

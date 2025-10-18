@@ -181,4 +181,81 @@ public class MemorySearchQueryBuilder {
 
         return boolQuery;
     }
+
+    public static String buildFactSearchQueryForAoss(
+            MemoryStrategy strategy,
+            String fact,
+            Map<String, String> namespace,
+            String ownerId,
+            MemoryConfiguration memoryConfig,
+            String memoryContainerId,
+            int maxInferSize
+    ) {
+        StringBuilder queryBuilder = new StringBuilder();
+        queryBuilder.append("{\"size\":").append(maxInferSize).append(",\"query\":{\"bool\":{\"filter\":[");
+
+        // Add filter conditions
+        boolean firstFilter = true;
+        for (String key : strategy.getNamespace()) {
+            if (!namespace.containsKey(key)) {
+                throw new IllegalArgumentException("Namespace does not contain key: " + key);
+            }
+            if (!firstFilter) {
+                queryBuilder.append(",");
+            }
+            queryBuilder.append("{\"term\":{\"")
+                    .append(NAMESPACE_FIELD)
+                    .append(".")
+                    .append(key)
+                    .append("\":\"")
+                    .append(StringEscapeUtils.escapeJson(namespace.get(key)))
+                    .append("\"}}");
+            firstFilter = false;
+        }
+
+        if (ownerId != null) {
+            if (!firstFilter) {
+                queryBuilder.append(",");
+            }
+            queryBuilder.append("{\"term\":{\"")
+                    .append(OWNER_ID_FIELD)
+                    .append("\":\"")
+                    .append(StringEscapeUtils.escapeJson(ownerId))
+                    .append("\"}}");
+            firstFilter = false;
+        }
+
+        if (!firstFilter) {
+            queryBuilder.append(",");
+        }
+        queryBuilder.append("{\"term\":{\"")
+                .append(NAMESPACE_SIZE_FIELD)
+                .append("\":")
+                .append(strategy.getNamespace().size())
+                .append("}}");
+
+        // Filter by strategy_id to prevent cross-strategy interference (sufficient for uniqueness)
+        queryBuilder.append(",{\"term\":{\"")
+                .append(STRATEGY_ID_FIELD)
+                .append("\":\"")
+                .append(StringEscapeUtils.escapeJson(strategy.getId()))
+                .append("\"}}");
+
+        // Filter by memory_container_id to prevent cross-container access when containers share the same index prefix
+        if (memoryContainerId != null && !memoryContainerId.isBlank()) {
+            queryBuilder.append(",{\"term\":{\"")
+                    .append(MEMORY_CONTAINER_ID_FIELD)
+                    .append("\":\"")
+                    .append(StringEscapeUtils.escapeJson(memoryContainerId))
+                    .append("\"}}");
+        }
+
+        queryBuilder.append("],\"must\":[{\"match\":{\"")
+                .append(MEMORY_FIELD)
+                .append("\":\"")
+                .append(StringEscapeUtils.escapeJson(fact))
+                .append("\"}}]}}}");
+
+        return queryBuilder.toString();
+    }
 }

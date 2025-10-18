@@ -19,18 +19,27 @@ import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.KNN_SPACE_TYPE;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.LONG_TERM_MEMORY_HISTORY_INDEX;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.LONG_TERM_MEMORY_INDEX;
+import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.MEMORY_CONTAINER_ID_FIELD;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.MEMORY_EMBEDDING_FIELD;
+import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.MEMORY_FIELD;
+import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.NAMESPACE_FIELD;
+import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.NAMESPACE_SIZE_FIELD;
+import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.OWNER_ID_FIELD;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.SESSION_INDEX;
+import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.STRATEGY_ID_FIELD;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.WORKING_MEMORY_INDEX;
+import static org.opensearch.ml.common.utils.ToolUtils.NO_ESCAPE_PARAMS;
 
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.apache.commons.text.StringEscapeUtils;
 import org.opensearch.action.bulk.BulkResponse;
 import org.opensearch.action.delete.DeleteResponse;
 import org.opensearch.action.get.GetResponse;
 import org.opensearch.action.index.IndexResponse;
+import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.action.update.UpdateResponse;
 import org.opensearch.common.xcontent.LoggingDeprecationHandler;
@@ -40,16 +49,21 @@ import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.common.bytes.BytesArray;
 import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.core.xcontent.XContentParser;
+import org.opensearch.index.query.BoolQueryBuilder;
+import org.opensearch.index.query.QueryBuilder;
+import org.opensearch.index.query.QueryBuilders;
 import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.common.dataset.remote.RemoteInferenceInputDataSet;
 import org.opensearch.ml.common.input.MLInput;
 import org.opensearch.ml.common.input.remote.RemoteInferenceMLInput;
 import org.opensearch.ml.common.memorycontainer.MemoryConfiguration;
+import org.opensearch.ml.common.memorycontainer.MemoryStrategy;
 import org.opensearch.ml.common.output.model.ModelTensorOutput;
 import org.opensearch.ml.common.transport.connector.MLExecuteConnectorAction;
 import org.opensearch.ml.common.transport.connector.MLExecuteConnectorRequest;
 import org.opensearch.ml.common.utils.StringUtils;
 import org.opensearch.ml.engine.indices.MLIndicesHandler;
+import org.opensearch.remote.metadata.client.SearchDataObjectRequest;
 import org.opensearch.transport.client.Client;
 
 import lombok.extern.log4j.Log4j2;
@@ -239,12 +253,12 @@ public class RemoteStorageHelper {
             knnVector.put("type", "knn_vector");
             knnVector.put("dimension", memoryConfig.getDimension());
 
-            Map<String, Object> method = new HashMap<>();
-            method.put("name", KNN_METHOD_NAME);
-            method.put("space_type", KNN_SPACE_TYPE);
-            method.put("engine", KNN_ENGINE);
-            method.put("parameters", Map.of("ef_construction", KNN_EF_CONSTRUCTION, "m", KNN_M));
-            knnVector.put("method", method);
+//            Map<String, Object> method = new HashMap<>();
+//            method.put("name", KNN_METHOD_NAME);
+//            method.put("space_type", KNN_SPACE_TYPE);
+//            method.put("engine", KNN_ENGINE);
+//            method.put("parameters", Map.of("ef_construction", KNN_EF_CONSTRUCTION, "m", KNN_M));
+//            knnVector.put("method", method);
 
             properties.put(MEMORY_EMBEDDING_FIELD, knnVector);
         } else if (memoryConfig.getEmbeddingModelType() == FunctionName.SPARSE_ENCODING) {
@@ -264,7 +278,7 @@ public class RemoteStorageHelper {
         // Add KNN settings for text embeddings
         if (memoryConfig.getEmbeddingModelType() == FunctionName.TEXT_EMBEDDING) {
             indexSettings.put("index.knn", true);
-            indexSettings.put("index.knn.algo_param.ef_search", KNN_EF_SEARCH);
+//            indexSettings.put("index.knn.algo_param.ef_search", KNN_EF_SEARCH);
         }
 
         // Add custom settings from configuration
@@ -375,6 +389,7 @@ public class RemoteStorageHelper {
             // Prepare parameters for connector execution
             Map<String, String> parameters = new HashMap<>();
             parameters.put(INPUT_PARAM, bulkBody);
+            parameters.put(NO_ESCAPE_PARAMS, INPUT_PARAM);
 
             // Execute the connector action with bulk_load action name
             executeConnectorAction(connectorId, BULK_LOAD_ACTION, parameters, client, ActionListener.wrap(response -> {
@@ -393,19 +408,10 @@ public class RemoteStorageHelper {
         }
     }
 
-    /**
-     * Searches documents in remote storage
-     *
-     * @param connectorId The connector ID to use for remote storage
-     * @param indexName The name of the index to search
-     * @param searchBody The search request body as a Map
-     * @param client The OpenSearch client
-     * @param listener The action listener
-     */
     public static void searchDocuments(
         String connectorId,
         String indexName,
-        Map<String, Object> searchBody,
+        String query,
         Client client,
         ActionListener<SearchResponse> listener
     ) {
@@ -413,7 +419,7 @@ public class RemoteStorageHelper {
             // Prepare parameters for connector execution
             Map<String, String> parameters = new HashMap<>();
             parameters.put(INDEX_NAME_PARAM, indexName);
-            parameters.put(INPUT_PARAM, StringUtils.toJson(searchBody));
+            parameters.put(INPUT_PARAM, query);
 
             // Execute the connector action with search_index action name
             executeConnectorAction(connectorId, SEARCH_INDEX_ACTION, parameters, client, ActionListener.wrap(response -> {
@@ -579,5 +585,65 @@ public class RemoteStorageHelper {
         String json = StringUtils.toJson(dataAsMap);
         XContentParser parser = jsonXContent.createParser(NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE, json);
         return parser;
+    }
+
+    public static QueryBuilder buildFactSearchQuery(
+            MemoryStrategy strategy,
+            String fact,
+            Map<String, String> namespace,
+            String ownerId,
+            MemoryConfiguration memoryConfig,
+            String memoryContainerId
+    ) {
+        BoolQueryBuilder boolQuery = QueryBuilders.boolQuery();
+
+        // Add filter conditions
+        for (String key : strategy.getNamespace()) {
+            if (!namespace.containsKey(key)) {
+                throw new IllegalArgumentException("Namespace does not contain key: " + key);
+            }
+            boolQuery.filter(QueryBuilders.termQuery(NAMESPACE_FIELD + "." + key, namespace.get(key)));
+        }
+        if (ownerId != null) {
+            boolQuery.filter(QueryBuilders.termQuery(OWNER_ID_FIELD, ownerId));
+        }
+        boolQuery.filter(QueryBuilders.termQuery(NAMESPACE_SIZE_FIELD, strategy.getNamespace().size()));
+        // Filter by strategy_id to prevent cross-strategy interference (sufficient for uniqueness)
+        boolQuery.filter(QueryBuilders.termQuery(STRATEGY_ID_FIELD, strategy.getId()));
+        // Filter by memory_container_id to prevent cross-container access when containers share the same index prefix
+        if (memoryContainerId != null && !memoryContainerId.isBlank()) {
+            boolQuery.filter(QueryBuilders.termQuery(MEMORY_CONTAINER_ID_FIELD, memoryContainerId));
+        }
+
+        // Add the search query
+        if (memoryConfig != null) {
+            if (memoryConfig.getEmbeddingModelType() == FunctionName.TEXT_EMBEDDING) {
+                StringBuilder neuralSearchQuery = new StringBuilder()
+                        .append("{\"neural\":{\"")
+                        .append(MEMORY_EMBEDDING_FIELD)
+                        .append("\":{\"query_text\":\"")
+                        .append(StringEscapeUtils.escapeJson(fact))
+                        .append("\",\"model_id\":\"")
+                        .append(memoryConfig.getEmbeddingModelId())
+                        .append("\"}}}");
+                boolQuery.must(QueryBuilders.wrapperQuery(neuralSearchQuery.toString()));
+            } else if (memoryConfig.getEmbeddingModelType() == FunctionName.SPARSE_ENCODING) {
+                StringBuilder neuralSparseQuery = new StringBuilder()
+                        .append("{\"neural_sparse\":{\"")
+                        .append(MEMORY_EMBEDDING_FIELD)
+                        .append("\":{\"query_text\":\"")
+                        .append(StringEscapeUtils.escapeJson(fact))
+                        .append("\",\"model_id\":\"")
+                        .append(memoryConfig.getEmbeddingModelId())
+                        .append("\"}}}");
+                boolQuery.must(QueryBuilders.wrapperQuery(neuralSparseQuery.toString()));
+            } else {
+                throw new IllegalStateException("Unsupported embedding model type: " + memoryConfig.getEmbeddingModelType());
+            }
+        } else {
+            boolQuery.must(QueryBuilders.matchQuery(MEMORY_FIELD, fact));
+        }
+
+        return boolQuery;
     }
 }

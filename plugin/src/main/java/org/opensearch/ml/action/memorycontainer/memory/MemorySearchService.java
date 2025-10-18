@@ -110,7 +110,12 @@ public class MemorySearchService {
                 log.error("Failed to search for similar facts for: {}", fact, e);
                 searchFactsSequentially(strategy, input, facts, currentIndex + 1, memoryConfig, maxInferSize, allResults, listener);
             });
-            memoryContainerHelper.searchData(memoryConfig, searchRequest, searchResponseActionListener);
+            if (memoryConfig.getRemoteStore() == null) {
+                memoryContainerHelper.searchData(memoryConfig, searchRequest, searchResponseActionListener);
+            } else {
+                String query = MemorySearchQueryBuilder.buildFactSearchQueryForAoss(strategy, fact, input.getNamespace(), input.getOwnerId(), memoryConfig, input.getMemoryContainerId(), maxInferSize);
+                memoryContainerHelper.searchDataFromRemoteStorage(memoryConfig, indexName, query, searchResponseActionListener);
+            }
         } catch (Exception e) {
             log.error("Failed to build search query for fact: {}", fact, e);
             searchFactsSequentially(strategy, input, facts, currentIndex + 1, memoryConfig, maxInferSize, allResults, listener);
