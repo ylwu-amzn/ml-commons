@@ -16,6 +16,9 @@ import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.OWNER_ID_FIELD;
 import static org.opensearch.ml.utils.RestActionUtils.wrapListenerToHandleSearchIndexNotFound;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 
 import org.apache.lucene.search.join.ScoreMode;
@@ -26,6 +29,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.opensearch.action.admin.indices.delete.DeleteIndexRequest;
+import org.opensearch.action.bulk.BulkItemResponse;
 import org.opensearch.action.bulk.BulkRequest;
 import org.opensearch.action.bulk.BulkResponse;
 import org.opensearch.action.delete.DeleteRequest;
@@ -479,29 +483,85 @@ public class MemoryContainerHelper {
     }
 
     private void bulkIngestDataToRemoteStorage(
-        MemoryConfiguration configuration,
-        BulkRequest bulkRequest,
-        ActionListener<BulkResponse> listener
+            MemoryConfiguration configuration,
+            BulkRequest bulkRequest,
+            ActionListener<BulkResponse> listener
     ) {
         try {
             String connectorId = configuration.getRemoteStore().getConnectorId();
-            
-            // Convert BulkRequest to NDJSON format
-            String bulkBody = convertBulkRequestToNDJSON(bulkRequest);
-            
-            RemoteStorageHelper.bulkWrite(connectorId, bulkBody, client, ActionListener.wrap(response -> {
-                // Create a mock BulkResponse
-                listener.onResponse(response);
-            }, listener::onFailure));
+            List<String> bulkBodyList = convertBulkRequestToNDJSON(bulkRequest);
+
+            if (bulkBodyList.isEmpty()) {
+                listener.onFailure(new IllegalArgumentException("Empty bulk request"));
+                return;
+            }
+
+            // Process sequentially
+            bulkIngestSequentially(connectorId, bulkBodyList, 0, new ArrayList<>(), listener);
+
         } catch (Exception e) {
             log.error("Failed to bulk ingest data to remote storage", e);
             listener.onFailure(e);
         }
     }
 
-    private String convertBulkRequestToNDJSON(BulkRequest bulkRequest) {
-        StringBuilder ndjson = new StringBuilder();
-        
+    private void bulkIngestSequentially(
+            String connectorId,
+            List<String> bulkBodyList,
+            int index,
+            List<BulkResponse> responses,
+            ActionListener<BulkResponse> finalListener
+    ) {
+        if (index >= bulkBodyList.size()) {
+            // All done, merge responses
+            BulkResponse mergedResponse = mergeBulkResponses(responses);
+            finalListener.onResponse(mergedResponse);
+            return;
+        }
+
+        RemoteStorageHelper.bulkWrite(
+                connectorId,
+                bulkBodyList.get(index),
+                client,
+                ActionListener.wrap(
+                        response -> {
+                            responses.add(response);
+                            // Process next
+                            bulkIngestSequentially(connectorId, bulkBodyList, index + 1, responses, finalListener);
+                        },
+                        finalListener::onFailure
+                )
+        );
+    }
+
+    private BulkResponse mergeBulkResponses(Collection<BulkResponse> responses) {
+        List<BulkItemResponse> allItems = new ArrayList<>();
+        long totalTook = 0;
+        long totalIngestTook = 0;
+        boolean hasErrors = false;
+
+        for (BulkResponse response : responses) {
+            allItems.addAll(Arrays.asList(response.getItems()));
+            totalTook += response.getTook().millis();
+            totalIngestTook += response.getIngestTookInMillis();
+            hasErrors |= response.hasFailures();
+        }
+
+        return new BulkResponse(
+                allItems.toArray(new BulkItemResponse[0]),
+                totalTook,
+                totalIngestTook
+        );
+    }
+
+    private List<String> convertBulkRequestToNDJSON(BulkRequest bulkRequest) {
+
+        StringBuilder ndjsonForIndex = new StringBuilder();
+        StringBuilder ndjsonForUpdateDelete = new StringBuilder();
+
+        boolean indexExists = false;
+        boolean updateDeleteExists = false;
+
         for (var docWriteRequest : bulkRequest.requests()) {
             if (docWriteRequest instanceof IndexRequest) {
                 IndexRequest indexRequest = (IndexRequest) docWriteRequest;
@@ -509,16 +569,16 @@ public class MemoryContainerHelper {
                 // Action line for index operation
                 Map<String, Object> actionMetadata = new HashMap<>();
                 actionMetadata.put("_index", indexRequest.index());
-                if (indexRequest.id() != null) {
+                if (indexRequest.id() != null) { //TODO: throw exception AOSS doesn't support doc id
                     actionMetadata.put("_id", indexRequest.id());
                 }
                 Map<String, Object> actionLine = new HashMap<>();
                 actionLine.put("index", actionMetadata);
-                ndjson.append(StringUtils.toJson(actionLine)).append('\n');
+                ndjsonForIndex.append(StringUtils.toJson(actionLine)).append('\n');
                 
                 // Document line
-                ndjson.append(indexRequest.source().utf8ToString()).append('\n');
-                
+                ndjsonForIndex.append(indexRequest.source().utf8ToString()).append('\n');
+                indexExists = true;
             } else if (docWriteRequest instanceof UpdateRequest) {
                 UpdateRequest updateRequest = (UpdateRequest) docWriteRequest;
                 
@@ -528,7 +588,7 @@ public class MemoryContainerHelper {
                 actionMetadata.put("_id", updateRequest.id());
                 Map<String, Object> actionLine = new HashMap<>();
                 actionLine.put("update", actionMetadata);
-                ndjson.append(StringUtils.toJson(actionLine)).append('\n');
+                ndjsonForUpdateDelete.append(StringUtils.toJson(actionLine)).append('\n');
                 
                 // Document line - for update, we need to wrap in "doc" or "script"
                 Map<String, Object> updateDoc = new HashMap<>();
@@ -543,8 +603,8 @@ public class MemoryContainerHelper {
                 if (updateRequest.upsertRequest() != null) {
                     updateDoc.put("upsert", XContentHelper.convertToMap(updateRequest.upsertRequest().source(), false, XContentType.JSON).v2());
                 }
-                ndjson.append(StringUtils.toJson(updateDoc)).append('\n');
-                
+                ndjsonForUpdateDelete.append(StringUtils.toJson(updateDoc)).append('\n');
+                updateDeleteExists  = true;
             } else if (docWriteRequest instanceof DeleteRequest) {
                 DeleteRequest deleteRequest = (DeleteRequest) docWriteRequest;
                 
@@ -554,13 +614,21 @@ public class MemoryContainerHelper {
                 actionMetadata.put("_id", deleteRequest.id());
                 Map<String, Object> actionLine = new HashMap<>();
                 actionLine.put("delete", actionMetadata);
-                ndjson.append(StringUtils.toJson(actionLine)).append('\n');
-                
+                ndjsonForUpdateDelete.append(StringUtils.toJson(actionLine)).append('\n');
+                updateDeleteExists  = true;
                 // Delete operations don't have a document line, just the action line
             }
         }
-        
-        return ndjson.toString();
+
+        List<String> result = new ArrayList<>();
+        if (indexExists) {
+            result.add(ndjsonForIndex.toString());
+        }
+        if (updateDeleteExists) {
+            result.add(ndjsonForUpdateDelete.toString());
+        }
+
+        return result;
     }
 
     /**

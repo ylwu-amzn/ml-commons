@@ -393,10 +393,10 @@ public class TransportCreateMemoryContainerAction extends
             .createRemoteLongTermMemoryHistoryIndex(connectorId, indexName, configuration, mlIndicesHandler, client, listener);
     }
 
-    private void createRemoteLongTermMemoryIndex(MemoryConfiguration configuration, String indexName, ActionListener<Boolean> listener) {
-        String connectorId = configuration.getRemoteStore().getConnectorId();
-        RemoteStorageHelper.createRemoteLongTermMemoryIndex(connectorId, indexName, configuration, mlIndicesHandler, client, listener);
-    }
+//    private void createRemoteLongTermMemoryIndex(MemoryConfiguration configuration, String indexName, ActionListener<Boolean> listener) {
+//        String connectorId = configuration.getRemoteStore().getConnectorId();
+//        RemoteStorageHelper.createRemoteLongTermMemoryIndex(connectorId, indexName, configuration, mlIndicesHandler, client, listener);
+//    }
 
     private void createRemoteMemoryIndexes(
         MLMemoryContainer container,
@@ -407,18 +407,39 @@ public class TransportCreateMemoryContainerAction extends
         String longTermMemoryHistoryIndexName
     ) {
         createRemoteWorkingMemoryIndex(configuration, workingMemoryIndexName, ActionListener.wrap(success -> {
-            createRemoteLongTermMemoryIndex(configuration, longTermMemoryIndexName, ActionListener.wrap(success1 -> {
-                if (!configuration.isDisableHistory()) {
-                    createRemoteLongTermMemoryHistoryIndex(
-                        configuration,
-                        longTermMemoryHistoryIndexName,
-                        ActionListener.wrap(success2 -> { listener.onResponse(longTermMemoryIndexName); }, listener::onFailure)
-                    );
-                } else {
-                    listener.onResponse(longTermMemoryIndexName);
-                }
-            }, listener::onFailure));
+            // Create long-term memory index with pipeline if embedding is configured
+            createRemoteLongTermMemoryIngestPipeline(
+                configuration,
+                longTermMemoryIndexName,
+                ActionListener.wrap(success1 -> {
+                    if (!configuration.isDisableHistory()) {
+                        createRemoteLongTermMemoryHistoryIndex(
+                            configuration,
+                            longTermMemoryHistoryIndexName,
+                            ActionListener.wrap(success2 -> { listener.onResponse(longTermMemoryIndexName); }, listener::onFailure)
+                        );
+                    } else {
+                        listener.onResponse(longTermMemoryIndexName);
+                    }
+                }, listener::onFailure)
+            );
         }, listener::onFailure));
+    }
+
+    private void createRemoteLongTermMemoryIngestPipeline(
+        MemoryConfiguration configuration,
+        String indexName,
+        ActionListener<Boolean> listener
+    ) {
+        String connectorId = configuration.getRemoteStore().getConnectorId();
+        MemoryContainerPipelineHelper.createRemoteLongTermMemoryIngestPipeline(
+            connectorId,
+            indexName,
+            configuration,
+            mlIndicesHandler,
+            client,
+            listener
+        );
     }
 
 }

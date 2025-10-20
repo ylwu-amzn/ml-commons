@@ -484,6 +484,10 @@ public class MemoryConfiguration implements ToXContentObject, Writeable {
         boolean hasLlm = config.getLlmId() != null;
         boolean hasEmbedding = config.getEmbeddingModelId() != null && config.getEmbeddingModelType() != null;
 
+        if (config.getRemoteStore() != null) {
+            hasEmbedding = config.getRemoteStore().getEmbeddingModelId() != null && config.getRemoteStore().getEmbeddingModelId() != null;
+        }
+
         if (!hasLlm || !hasEmbedding) {
             String missing = !hasLlm && !hasEmbedding ? "LLM model and embedding model"
                 : !hasLlm ? "LLM model (llm_id)"

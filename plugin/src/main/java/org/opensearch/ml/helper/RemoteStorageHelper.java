@@ -58,6 +58,7 @@ import org.opensearch.ml.common.input.MLInput;
 import org.opensearch.ml.common.input.remote.RemoteInferenceMLInput;
 import org.opensearch.ml.common.memorycontainer.MemoryConfiguration;
 import org.opensearch.ml.common.memorycontainer.MemoryStrategy;
+import org.opensearch.ml.common.memorycontainer.RemoteStore;
 import org.opensearch.ml.common.output.model.ModelTensorOutput;
 import org.opensearch.ml.common.transport.connector.MLExecuteConnectorAction;
 import org.opensearch.ml.common.transport.connector.MLExecuteConnectorRequest;
@@ -74,6 +75,7 @@ import lombok.extern.log4j.Log4j2;
 @Log4j2
 public class RemoteStorageHelper {
 
+    private static final String CREATE_INGEST_PIPELINE_ACTION = "create_ingest_pipeline";
     private static final String CREATE_INDEX_ACTION = "create_index";
     private static final String WRITE_DOC_ACTION = "write_doc";
     private static final String BULK_LOAD_ACTION = "bulk_load";
@@ -130,7 +132,7 @@ public class RemoteStorageHelper {
             Map<String, Object> requestBody = new HashMap<>();
             requestBody.put("mappings", mappingMap);
             
-            // Add settings if provided
+            // Add settings if provided (settings should already have "index." prefix)
             if (indexSettings != null && !indexSettings.isEmpty()) {
                 requestBody.put("settings", indexSettings);
             }
@@ -247,11 +249,12 @@ public class RemoteStorageHelper {
         mapping.put("_meta", baseMapping.get("_meta"));
         properties.putAll((Map<String, Object>) baseMapping.get("properties"));
 
+        RemoteStore remoteStore = memoryConfig.getRemoteStore();
         // Add embedding field based on configuration
-        if (memoryConfig.getEmbeddingModelType() == FunctionName.TEXT_EMBEDDING) {
+        if (remoteStore.getEmbeddingModelType() == FunctionName.TEXT_EMBEDDING) {
             Map<String, Object> knnVector = new HashMap<>();
             knnVector.put("type", "knn_vector");
-            knnVector.put("dimension", memoryConfig.getDimension());
+            knnVector.put("dimension", remoteStore.getEmbeddingDimension());
 
 //            Map<String, Object> method = new HashMap<>();
 //            method.put("name", KNN_METHOD_NAME);
@@ -261,7 +264,7 @@ public class RemoteStorageHelper {
 //            knnVector.put("method", method);
 
             properties.put(MEMORY_EMBEDDING_FIELD, knnVector);
-        } else if (memoryConfig.getEmbeddingModelType() == FunctionName.SPARSE_ENCODING) {
+        } else if (remoteStore.getEmbeddingModelType() == FunctionName.SPARSE_ENCODING) {
             properties.put(MEMORY_EMBEDDING_FIELD, Map.of("type", "rank_features"));
         }
 
@@ -271,12 +274,14 @@ public class RemoteStorageHelper {
 
     /**
      * Builds the long-term memory index settings dynamically based on configuration
+     * Returns settings with "index." prefix as required by OpenSearch/AOSS
      */
     private static Map<String, Object> buildLongTermMemorySettings(MemoryConfiguration memoryConfig) {
         Map<String, Object> indexSettings = new HashMap<>();
 
-        // Add KNN settings for text embeddings
-        if (memoryConfig.getEmbeddingModelType() == FunctionName.TEXT_EMBEDDING) {
+        RemoteStore remoteStore = memoryConfig.getRemoteStore();
+        // Add KNN settings for text embeddings (with "index." prefix as required by AOSS)
+        if (remoteStore.getEmbeddingModelType() == FunctionName.TEXT_EMBEDDING) {
             indexSettings.put("index.knn", true);
 //            indexSettings.put("index.knn.algo_param.ef_search", KNN_EF_SEARCH);
         }
@@ -645,5 +650,100 @@ public class RemoteStorageHelper {
         }
 
         return boolQuery;
+    }
+
+    /**
+     * Creates an ingest pipeline in remote storage
+     *
+     * @param connectorId The connector ID to use for remote storage
+     * @param pipelineName The name of the pipeline to create
+     * @param pipelineBody The pipeline configuration as a JSON string
+     * @param client The OpenSearch client
+     * @param listener The action listener
+     */
+    public static void createRemotePipeline(
+        String connectorId,
+        String pipelineName,
+        String pipelineBody,
+        Client client,
+        ActionListener<Boolean> listener
+    ) {
+        try {
+            // Prepare parameters for connector execution
+            Map<String, String> parameters = new HashMap<>();
+            parameters.put("pipeline_name", pipelineName);
+            parameters.put(INPUT_PARAM, pipelineBody);
+            parameters.put(CONNECTOR_ACTION_FIELD, "create_ingest_pipeline");
+
+            // Execute the connector action
+            executeConnectorAction(connectorId, CREATE_INGEST_PIPELINE_ACTION, parameters, client, ActionListener.wrap(response -> {
+                log.info("Successfully created remote pipeline: {}", pipelineName);
+                listener.onResponse(true);
+            }, e -> {
+                log.error("Failed to create remote pipeline: {}", pipelineName, e);
+                listener.onFailure(e);
+            }));
+
+        } catch (Exception e) {
+            log.error("Error preparing remote pipeline creation for: {}", pipelineName, e);
+            listener.onFailure(e);
+        }
+    }
+
+    /**
+     * Creates long-term memory index in remote storage with a pipeline attached
+     *
+     * @param connectorId The connector ID to use for remote storage
+     * @param indexName The name of the index to create
+     * @param pipelineName The name of the pipeline to attach
+     * @param memoryConfig The memory configuration
+     * @param mlIndicesHandler The ML indices handler
+     * @param client The OpenSearch client
+     * @param listener The action listener
+     */
+    public static void createRemoteLongTermMemoryIndexWithPipeline(
+        String connectorId,
+        String indexName,
+        String pipelineName,
+        MemoryConfiguration memoryConfig,
+        MLIndicesHandler mlIndicesHandler,
+        Client client,
+        ActionListener<Boolean> listener
+    ) {
+        try {
+            String indexMapping = buildLongTermMemoryMapping(memoryConfig, mlIndicesHandler);
+            Map<String, Object> indexSettings = buildLongTermMemorySettings(memoryConfig);
+            
+            // Parse the mapping string to a Map
+            Map<String, Object> mappingMap = parseMappingToMap(indexMapping);
+
+            // Build the request body for creating the index with pipeline
+            Map<String, Object> requestBody = new HashMap<>();
+            requestBody.put("mappings", mappingMap);
+            
+            // Add settings with default pipeline (settings already have "index." prefix)
+            Map<String, Object> settings = new HashMap<>(indexSettings);
+            settings.put("index.default_pipeline", pipelineName);
+            requestBody.put("settings", settings);
+
+            // Prepare parameters for connector execution
+            Map<String, String> parameters = new HashMap<>();
+            parameters.put(INDEX_NAME_PARAM, indexName);
+            parameters.put(INPUT_PARAM, StringUtils.toJson(requestBody));
+            parameters.put(CONNECTOR_ACTION_FIELD, CREATE_INDEX_ACTION);
+
+            // Execute the connector action
+            executeConnectorAction(connectorId, parameters, client, ActionListener.wrap(response -> {
+                log.info("Successfully created remote long-term memory index with pipeline: {}", indexName);
+                listener.onResponse(true);
+            }, e -> {
+                log.error("Failed to create remote long-term memory index with pipeline: {}", indexName, e);
+                listener.onFailure(e);
+            }));
+
+        } catch (Exception e) {
+            log.error("Error preparing remote long-term memory index creation with pipeline for: {}", indexName, e);
+            listener.onFailure(e);
+        }
     }
 }

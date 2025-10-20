@@ -6,6 +6,10 @@
 package org.opensearch.ml.common.memorycontainer;
 
 import static org.opensearch.core.xcontent.XContentParserUtils.ensureExpectedToken;
+import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.DIMENSION_FIELD;
+import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.EMBEDDING_MODEL_ID_FIELD;
+import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.EMBEDDING_MODEL_TYPE_FIELD;
+import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.TEXT_EMBEDDING_DIMENSION_REQUIRED_ERROR;
 
 import java.io.IOException;
 
@@ -21,6 +25,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
+import org.opensearch.ml.common.FunctionName;
 
 /**
  * Remote store configuration for storing memory in remote locations like AWS OpenSearch Serverless
@@ -34,19 +39,35 @@ public class RemoteStore implements ToXContentObject, Writeable {
     
     public static final String TYPE_FIELD = "type";
     public static final String CONNECTOR_ID_FIELD = "connector_id";
-    
+
     private String type;
     private String connectorId;
+    private FunctionName embeddingModelType;
+    private String embeddingModelId;
+    private Integer embeddingDimension;
     
     public RemoteStore(StreamInput input) throws IOException {
         this.type = input.readOptionalString();
         this.connectorId = input.readOptionalString();
+        if (input.readOptionalBoolean()) {
+            this.embeddingModelType = input.readEnum(FunctionName.class);
+        }
+        this.embeddingModelId = input.readOptionalString();
+        this.embeddingDimension = input.readOptionalInt();
     }
     
     @Override
     public void writeTo(StreamOutput out) throws IOException {
         out.writeOptionalString(type);
         out.writeOptionalString(connectorId);
+        if (embeddingModelType != null) {
+            out.writeBoolean(true);
+            out.writeEnum(embeddingModelType);
+        } else {
+            out.writeBoolean(false);
+        }
+        out.writeOptionalString(embeddingModelId);
+        out.writeOptionalInt(embeddingDimension);
     }
     
     @Override
@@ -58,6 +79,15 @@ public class RemoteStore implements ToXContentObject, Writeable {
         if (connectorId != null) {
             builder.field(CONNECTOR_ID_FIELD, connectorId);
         }
+        if (embeddingModelType != null) {
+            builder.field(EMBEDDING_MODEL_TYPE_FIELD, embeddingModelType);
+        }
+        if (embeddingModelId != null) {
+            builder.field(EMBEDDING_MODEL_ID_FIELD, embeddingModelId);
+        }
+        if (embeddingDimension != null) {
+            builder.field(DIMENSION_FIELD, embeddingDimension);
+        }
         builder.endObject();
         return builder;
     }
@@ -65,7 +95,10 @@ public class RemoteStore implements ToXContentObject, Writeable {
     public static RemoteStore parse(XContentParser parser) throws IOException {
         String type = null;
         String connectorId = null;
-        
+        FunctionName embeddingModelType = null;
+        String embeddingModelId = null;
+        Integer embeddingDimension = null;
+
         ensureExpectedToken(XContentParser.Token.START_OBJECT, parser.currentToken(), parser);
         while (parser.nextToken() != XContentParser.Token.END_OBJECT) {
             String fieldName = parser.currentName();
@@ -78,6 +111,15 @@ public class RemoteStore implements ToXContentObject, Writeable {
                 case CONNECTOR_ID_FIELD:
                     connectorId = parser.text();
                     break;
+                case EMBEDDING_MODEL_TYPE_FIELD:
+                    embeddingModelType = FunctionName.from(parser.text());
+                    break;
+                case EMBEDDING_MODEL_ID_FIELD:
+                    embeddingModelId = parser.text();
+                    break;
+                case DIMENSION_FIELD:
+                    embeddingDimension = parser.intValue();
+                    break;
                 default:
                     parser.skipChildren();
                     break;
@@ -87,6 +129,9 @@ public class RemoteStore implements ToXContentObject, Writeable {
         return RemoteStore.builder()
             .type(type)
             .connectorId(connectorId)
+            .embeddingModelType(embeddingModelType)
+            .embeddingModelId(embeddingModelId)
+            .embeddingDimension(embeddingDimension)
             .build();
     }
 }
