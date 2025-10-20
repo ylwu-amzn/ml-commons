@@ -72,45 +72,65 @@ public class MemorySearchService {
         }
 
         String fact = facts.get(currentIndex);
+        ActionListener<SearchResponse> searchResponseActionListener = ActionListener.wrap(response -> {
+            for (SearchHit hit : response.getHits().getHits()) {
+                Map<String, Object> sourceMap = hit.getSourceAsMap();
+                String memory = (String) sourceMap.get(MEMORY_FIELD);
+                if (memory != null) {
+                    allResults.add(new FactSearchResult(hit.getId(), memory, hit.getScore()));
+                }
+            }
+
+            log.debug("Found {} similar facts for: {}", response.getHits().getHits().length, fact);
+
+            searchFactsSequentially(strategy, input, facts, currentIndex + 1, memoryConfig, maxInferSize, allResults, listener);
+        }, e -> {
+            log.error("Failed to search for similar facts for: {}", fact, e);
+            searchFactsSequentially(strategy, input, facts, currentIndex + 1, memoryConfig, maxInferSize, allResults, listener);
+        });
 
         try {
-            QueryBuilder queryBuilder = MemorySearchQueryBuilder
-                .buildFactSearchQuery(strategy, fact, input.getNamespace(), input.getOwnerId(), memoryConfig, input.getMemoryContainerId());
-
-            log.debug("Searching for similar facts with query: {}", queryBuilder.toString());
-
-            SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
-            searchSourceBuilder.query(queryBuilder);
-            searchSourceBuilder.size(maxInferSize);
-            searchSourceBuilder.fetchSource(new String[] { MEMORY_FIELD }, null);
-
             String indexName = memoryConfig.getLongMemoryIndexName();
             String tenantId = memoryConfig.getTenantId();
+            if (memoryConfig.getRemoteStore() == null) {
+                QueryBuilder queryBuilder = MemorySearchQueryBuilder
+                    .buildFactSearchQuery(
+                        strategy,
+                        fact,
+                        input.getNamespace(),
+                        input.getOwnerId(),
+                        memoryConfig,
+                        input.getMemoryContainerId()
+                    );
 
-            SearchDataObjectRequest searchRequest = SearchDataObjectRequest
-                .builder()
-                .indices(indexName)
-                .searchSourceBuilder(searchSourceBuilder)
-                .tenantId(tenantId)
-                .build();
+                log.debug("Searching for similar facts with query: {}", queryBuilder.toString());
 
-            ActionListener<SearchResponse> searchResponseActionListener = ActionListener.wrap(response -> {
-                for (SearchHit hit : response.getHits().getHits()) {
-                    Map<String, Object> sourceMap = hit.getSourceAsMap();
-                    String memory = (String) sourceMap.get(MEMORY_FIELD);
-                    if (memory != null) {
-                        allResults.add(new FactSearchResult(hit.getId(), memory, hit.getScore()));
-                    }
-                }
+                SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+                searchSourceBuilder.query(queryBuilder);
+                searchSourceBuilder.size(maxInferSize);
+                searchSourceBuilder.fetchSource(new String[] { MEMORY_FIELD }, null);
 
-                log.debug("Found {} similar facts for: {}", response.getHits().getHits().length, fact);
+                SearchDataObjectRequest searchRequest = SearchDataObjectRequest
+                    .builder()
+                    .indices(indexName)
+                    .searchSourceBuilder(searchSourceBuilder)
+                    .tenantId(tenantId)
+                    .build();
 
-                searchFactsSequentially(strategy, input, facts, currentIndex + 1, memoryConfig, maxInferSize, allResults, listener);
-            }, e -> {
-                log.error("Failed to search for similar facts for: {}", fact, e);
-                searchFactsSequentially(strategy, input, facts, currentIndex + 1, memoryConfig, maxInferSize, allResults, listener);
-            });
-            memoryContainerHelper.searchData(memoryConfig, searchRequest, searchResponseActionListener);
+                memoryContainerHelper.searchData(memoryConfig, searchRequest, searchResponseActionListener);
+            } else {
+                String query = MemorySearchQueryBuilder
+                    .buildFactSearchQueryForAoss(
+                        strategy,
+                        fact,
+                        input.getNamespace(),
+                        input.getOwnerId(),
+                        memoryConfig,
+                        input.getMemoryContainerId(),
+                        maxInferSize
+                    );
+                memoryContainerHelper.searchDataFromRemoteStorage(memoryConfig, indexName, query, searchResponseActionListener);
+            }
         } catch (Exception e) {
             log.error("Failed to build search query for fact: {}", fact, e);
             searchFactsSequentially(strategy, input, facts, currentIndex + 1, memoryConfig, maxInferSize, allResults, listener);
