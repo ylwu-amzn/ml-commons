@@ -31,23 +31,32 @@ import org.opensearch.ml.common.FunctionName;
  * Remote store configuration for storing memory in remote locations like AWS OpenSearch Serverless
  */
 @Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
 @EqualsAndHashCode
 public class RemoteStore implements ToXContentObject, Writeable {
     
     public static final String TYPE_FIELD = "type";
     public static final String CONNECTOR_ID_FIELD = "connector_id";
 
-    private String type;
+    private RemoteStoreType type;
     private String connectorId;
     private FunctionName embeddingModelType;
     private String embeddingModelId;
     private Integer embeddingDimension;
-    
+
+    @Builder
+    public RemoteStore(RemoteStoreType type, String connectorId, FunctionName embeddingModelType, String embeddingModelId, Integer embeddingDimension) {
+        if (type == null) {
+            throw new IllegalArgumentException("Invalid remote store type");
+        }
+        this.type = type;
+        this.connectorId = connectorId;
+        this.embeddingModelType = embeddingModelType;
+        this.embeddingModelId = embeddingModelId;
+        this.embeddingDimension = embeddingDimension;
+    }
+
     public RemoteStore(StreamInput input) throws IOException {
-        this.type = input.readOptionalString();
+        this.type = input.readEnum(RemoteStoreType.class);
         this.connectorId = input.readOptionalString();
         if (input.readOptionalBoolean()) {
             this.embeddingModelType = input.readEnum(FunctionName.class);
@@ -58,7 +67,7 @@ public class RemoteStore implements ToXContentObject, Writeable {
     
     @Override
     public void writeTo(StreamOutput out) throws IOException {
-        out.writeOptionalString(type);
+        out.writeEnum(type);
         out.writeOptionalString(connectorId);
         if (embeddingModelType != null) {
             out.writeBoolean(true);
@@ -93,7 +102,7 @@ public class RemoteStore implements ToXContentObject, Writeable {
     }
     
     public static RemoteStore parse(XContentParser parser) throws IOException {
-        String type = null;
+        RemoteStoreType type = null;
         String connectorId = null;
         FunctionName embeddingModelType = null;
         String embeddingModelId = null;
@@ -106,7 +115,7 @@ public class RemoteStore implements ToXContentObject, Writeable {
             
             switch (fieldName) {
                 case TYPE_FIELD:
-                    type = parser.text();
+                    type = RemoteStoreType.fromString(parser.text());
                     break;
                 case CONNECTOR_ID_FIELD:
                     connectorId = parser.text();

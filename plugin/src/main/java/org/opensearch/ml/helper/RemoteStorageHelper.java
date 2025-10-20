@@ -11,12 +11,6 @@ import static org.opensearch.ml.common.CommonValue.ML_LONG_MEMORY_HISTORY_INDEX_
 import static org.opensearch.ml.common.CommonValue.ML_LONG_TERM_MEMORY_INDEX_MAPPING_PATH;
 import static org.opensearch.ml.common.CommonValue.ML_MEMORY_SESSION_INDEX_MAPPING_PATH;
 import static org.opensearch.ml.common.CommonValue.ML_WORKING_MEMORY_INDEX_MAPPING_PATH;
-import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.KNN_EF_CONSTRUCTION;
-import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.KNN_EF_SEARCH;
-import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.KNN_ENGINE;
-import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.KNN_M;
-import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.KNN_METHOD_NAME;
-import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.KNN_SPACE_TYPE;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.LONG_TERM_MEMORY_HISTORY_INDEX;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.LONG_TERM_MEMORY_INDEX;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.MEMORY_CONTAINER_ID_FIELD;
@@ -355,15 +349,13 @@ public class RemoteStorageHelper {
             // Prepare parameters for connector execution
             Map<String, String> parameters = new HashMap<>();
             parameters.put(INDEX_NAME_PARAM, indexName);
-            parameters.put(INPUT_PARAM, StringUtils.toJson(documentSource));
+            parameters.put(INPUT_PARAM, StringUtils.toJsonWithPlainNumbers(documentSource));
 
             // Execute the connector action with write_doc action name
             executeConnectorAction(connectorId, WRITE_DOC_ACTION, parameters, client, ActionListener.wrap(response -> {
                 // Extract document ID from response
                 XContentParser parser = createParserFromTensorOutput(response);
                 IndexResponse indexResponse = IndexResponse.fromXContent(parser);
-                String docId = extractDocIdFromResponse(response);
-                log.info("Successfully wrote document to remote index: {}, doc_id: {}", indexName, docId);
                 listener.onResponse(indexResponse);
             }, e -> {
                 log.error("Failed to write document to remote index: {}", indexName, e);
@@ -466,7 +458,7 @@ public class RemoteStorageHelper {
             Map<String, String> parameters = new HashMap<>();
             parameters.put(INDEX_NAME_PARAM, indexName);
             parameters.put(DOC_ID_PARAM, docId);
-            parameters.put(INPUT_PARAM, StringUtils.toJson(documentSource));
+            parameters.put(INPUT_PARAM, StringUtils.toJsonWithPlainNumbers(documentSource));
 
             // Execute the connector action with update_doc action name
             executeConnectorAction(connectorId, UPDATE_DOC_ACTION, parameters, client, ActionListener.wrap(response -> {

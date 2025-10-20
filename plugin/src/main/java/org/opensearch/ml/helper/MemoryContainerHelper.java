@@ -345,6 +345,36 @@ public class MemoryContainerHelper {
         }
     }
 
+    public void updateDataToRemoteStorage(
+            MemoryConfiguration configuration,
+            IndexRequest indexRequest,
+            ActionListener<IndexResponse> listener
+    ) {
+        try {
+            String connectorId = configuration.getRemoteStore().getConnectorId();
+            String indexName = indexRequest.index();
+            String docId = indexRequest.id();
+
+            // Convert IndexRequest source to Map
+            Map<String, Object> documentSource = indexRequest.sourceAsMap();
+
+            RemoteStorageHelper.updateDocument(connectorId, indexName, docId, documentSource, client, ActionListener.wrap(updateResponse -> {
+                IndexResponse response = new IndexResponse(
+                        updateResponse.getShardId(),
+                        updateResponse.getId(),
+                        updateResponse.getSeqNo(),
+                        updateResponse.getPrimaryTerm(),
+                        updateResponse.getVersion(),
+                        false
+                        );
+                listener.onResponse(response);
+            }, listener::onFailure));
+        } catch (Exception e) {
+            log.error("Failed to index data to remote storage", e);
+            listener.onFailure(e);
+        }
+    }
+
     private void indexDataToRemoteStorage(
         MemoryConfiguration configuration,
         IndexRequest indexRequest,

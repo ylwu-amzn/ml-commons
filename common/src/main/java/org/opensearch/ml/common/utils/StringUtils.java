@@ -336,6 +336,29 @@ public class StringUtils {
         }
     }
 
+    /**
+     * Converts an object to JSON string using plain number formatting (no scientific notation).
+     * This is particularly useful for serializing documents with timestamp fields that need to be
+     * sent to remote storage systems that expect epoch milliseconds as plain long integers.
+     *
+     * @param value the object to convert to JSON
+     * @return JSON string representation with plain number formatting
+     */
+    @SuppressWarnings("removal")
+    public static String toJsonWithPlainNumbers(Object value) {
+        try {
+            return AccessController.doPrivileged((PrivilegedExceptionAction<String>) () -> {
+                if (value instanceof String) {
+                    return (String) value;
+                } else {
+                    return PLAIN_NUMBER_GSON.toJson(value);
+                }
+            });
+        } catch (PrivilegedActionException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     @SuppressWarnings("removal")
     public static Map<String, String> convertScriptStringToJsonString(Map<String, Object> processedInput) {
         Map<String, String> parameterStringMap = new HashMap<>();
