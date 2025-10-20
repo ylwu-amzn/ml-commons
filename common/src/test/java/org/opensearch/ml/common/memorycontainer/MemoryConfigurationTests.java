@@ -993,4 +993,46 @@ public class MemoryConfigurationTests {
         Map<String, Object> result = config.getMemoryIndexMapping("any-index");
         assertNull(result);
     }
+
+    // ==================== RemoteStore Tests ====================
+
+    @Test
+    public void testMemoryConfiguration_WithRemoteStore() {
+        RemoteStore remoteStore = RemoteStore.builder().type("aoss").connectorId("ySf08JkBym-3qj1O2uub").build();
+
+        MemoryConfiguration config = MemoryConfiguration
+            .builder()
+            .indexPrefix("test")
+            .useSystemIndex(false)
+            .remoteStore(remoteStore)
+            .build();
+
+        assertNotNull(config.getRemoteStore());
+        assertEquals("aoss", config.getRemoteStore().getType());
+        assertEquals("ySf08JkBym-3qj1O2uub", config.getRemoteStore().getConnectorId());
+    }
+
+    @Test
+    public void testMemoryConfiguration_WithoutRemoteStore() {
+        MemoryConfiguration config = MemoryConfiguration.builder().indexPrefix("test").useSystemIndex(false).build();
+
+        assertNull(config.getRemoteStore());
+    }
+
+    @Test
+    public void testMemoryConfiguration_UpdateRemoteStore() {
+        MemoryConfiguration config = MemoryConfiguration.builder().indexPrefix("test").useSystemIndex(false).build();
+
+        assertNull(config.getRemoteStore());
+
+        RemoteStore remoteStore = RemoteStore.builder().type("aoss").connectorId("ySf08JkBym-3qj1O2uub").build();
+
+        MemoryConfiguration updateContent = MemoryConfiguration.builder().remoteStore(remoteStore).build();
+
+        config.update(updateContent);
+
+        assertNotNull(config.getRemoteStore());
+        assertEquals("aoss", config.getRemoteStore().getType());
+        assertEquals("ySf08JkBym-3qj1O2uub", config.getRemoteStore().getConnectorId());
+    }
 }
