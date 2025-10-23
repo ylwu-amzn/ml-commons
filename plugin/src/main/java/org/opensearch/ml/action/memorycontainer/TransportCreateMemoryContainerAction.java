@@ -7,8 +7,22 @@ package org.opensearch.ml.action.memorycontainer;
 
 import static org.opensearch.ml.common.CommonValue.ML_MEMORY_CONTAINER_INDEX;
 import static org.opensearch.ml.common.settings.MLCommonsSettings.ML_COMMONS_AGENTIC_MEMORY_DISABLED_MESSAGE;
+import static org.opensearch.ml.helper.RemoteStorageHelper.BULK_LOAD_ACTION;
+import static org.opensearch.ml.helper.RemoteStorageHelper.CREATE_INDEX_ACTION;
+import static org.opensearch.ml.helper.RemoteStorageHelper.CREATE_INGEST_PIPELINE_ACTION;
+import static org.opensearch.ml.helper.RemoteStorageHelper.DELETE_DOC_ACTION;
+import static org.opensearch.ml.helper.RemoteStorageHelper.GET_DOC_ACTION;
+import static org.opensearch.ml.helper.RemoteStorageHelper.REGISTER_MODEL_ACTION;
+import static org.opensearch.ml.helper.RemoteStorageHelper.SEARCH_INDEX_ACTION;
+import static org.opensearch.ml.helper.RemoteStorageHelper.UPDATE_DOC_ACTION;
+import static org.opensearch.ml.helper.RemoteStorageHelper.WRITE_DOC_ACTION;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 import org.opensearch.OpenSearchStatusException;
 import org.opensearch.action.DocWriteResponse;
@@ -21,6 +35,7 @@ import org.opensearch.common.util.concurrent.ThreadContext;
 import org.opensearch.commons.authuser.User;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.rest.RestStatus;
+import org.opensearch.ml.common.connector.ConnectorAction;
 import org.opensearch.ml.common.memorycontainer.MLMemoryContainer;
 import org.opensearch.ml.common.memorycontainer.MemoryConfiguration;
 import org.opensearch.ml.common.memorycontainer.MemoryStrategy;
@@ -476,14 +491,14 @@ public class TransportCreateMemoryContainerAction extends
             String connectorName = "auto_"
                 + remoteStore.getType().name().toLowerCase()
                 + "_connector_"
-                + java.util.UUID.randomUUID().toString().substring(0, 8);
+                + UUID.randomUUID().toString().substring(0, 8);
 
             // Build connector actions based on remote store type
-            java.util.List<org.opensearch.ml.common.connector.ConnectorAction> actions = buildConnectorActions(remoteStore);
+            List<org.opensearch.ml.common.connector.ConnectorAction> actions = buildConnectorActions(remoteStore);
 
             // Get credential and parameters from remote store
-            java.util.Map<String, String> credential = remoteStore.getCredential();
-            java.util.Map<String, String> parameters = remoteStore.getParameters();
+            Map<String, String> credential = remoteStore.getCredential();
+            Map<String, String> parameters = remoteStore.getParameters();
 
             // Determine protocol based on parameters or credential
             String protocol = determineProtocol(parameters, credential);
@@ -527,7 +542,7 @@ public class TransportCreateMemoryContainerAction extends
     /**
      * Determines the protocol based on parameters and credentials
      */
-    private String determineProtocol(java.util.Map<String, String> parameters, java.util.Map<String, String> credential) {
+    private String determineProtocol(Map<String, String> parameters, Map<String, String> credential) {
         // Check if service_name is in parameters (indicates AWS SigV4)
         if (parameters != null && parameters.containsKey("service_name")) {
             return "aws_sigv4";
@@ -547,11 +562,11 @@ public class TransportCreateMemoryContainerAction extends
     /**
      * Builds connector actions based on remote store type
      */
-    private java.util.List<org.opensearch.ml.common.connector.ConnectorAction> buildConnectorActions(RemoteStore remoteStore) {
-        java.util.List<org.opensearch.ml.common.connector.ConnectorAction> actions = new java.util.ArrayList<>();
+    private List<ConnectorAction> buildConnectorActions(RemoteStore remoteStore) {
+        List<org.opensearch.ml.common.connector.ConnectorAction> actions = new ArrayList<>();
         String endpoint = remoteStore.getEndpoint();
-        java.util.Map<String, String> parameters = remoteStore.getParameters();
-        java.util.Map<String, String> credential = remoteStore.getCredential();
+        Map<String, String> parameters = remoteStore.getParameters();
+        Map<String, String> credential = remoteStore.getCredential();
 
         // Determine if AWS SigV4 or basic auth
         boolean isAwsSigV4 = (parameters != null && parameters.containsKey("service_name"))
@@ -559,7 +574,7 @@ public class TransportCreateMemoryContainerAction extends
         boolean isBasicAuth = credential != null && credential.containsKey("basic_auth_key");
 
         // Common headers for JSON
-        java.util.Map<String, String> jsonHeaders = new java.util.HashMap<>();
+        Map<String, String> jsonHeaders = new HashMap<>();
         jsonHeaders.put("content-type", "application/json");
         if (isAwsSigV4) {
             jsonHeaders.put("x-amz-content-sha256", "required");
@@ -568,13 +583,27 @@ public class TransportCreateMemoryContainerAction extends
             jsonHeaders.put("Authorization", "Basic ${credential.basic_auth_key}");
         }
 
+        // Register model action - for creating embedding models in remote AOSS
+        actions
+            .add(
+                org.opensearch.ml.common.connector.ConnectorAction
+                    .builder()
+                    .actionType(org.opensearch.ml.common.connector.ConnectorAction.ActionType.EXECUTE)
+                    .name(REGISTER_MODEL_ACTION)
+                    .method("POST")
+                    .url(endpoint + "/_plugins/_ml/models/_register")
+                    .headers(jsonHeaders)
+                    .requestBody("${parameters.input}")
+                    .build()
+            );
+
         // Create ingest pipeline action
         actions
             .add(
                 org.opensearch.ml.common.connector.ConnectorAction
                     .builder()
                     .actionType(org.opensearch.ml.common.connector.ConnectorAction.ActionType.EXECUTE)
-                    .name("create_ingest_pipeline")
+                    .name(CREATE_INGEST_PIPELINE_ACTION)
                     .method("PUT")
                     .url(endpoint + "/_ingest/pipeline/${parameters.pipeline_name}")
                     .headers(jsonHeaders)
@@ -588,7 +617,7 @@ public class TransportCreateMemoryContainerAction extends
                 org.opensearch.ml.common.connector.ConnectorAction
                     .builder()
                     .actionType(org.opensearch.ml.common.connector.ConnectorAction.ActionType.EXECUTE)
-                    .name("create_index")
+                    .name(CREATE_INDEX_ACTION)
                     .method("PUT")
                     .url(endpoint + "/${parameters.index_name}")
                     .headers(jsonHeaders)
@@ -602,7 +631,7 @@ public class TransportCreateMemoryContainerAction extends
                 org.opensearch.ml.common.connector.ConnectorAction
                     .builder()
                     .actionType(org.opensearch.ml.common.connector.ConnectorAction.ActionType.EXECUTE)
-                    .name("write_doc")
+                    .name(WRITE_DOC_ACTION)
                     .method("POST")
                     .url(endpoint + "/${parameters.index_name}/_doc")
                     .headers(jsonHeaders)
@@ -611,13 +640,13 @@ public class TransportCreateMemoryContainerAction extends
             );
 
         // Bulk load action
-        java.util.Map<String, String> bulkHeaders = new java.util.HashMap<>();
+        Map<String, String> bulkHeaders = new HashMap<>();
         bulkHeaders.put("content-type", "application/x-ndjson");
         if (isAwsSigV4) {
             bulkHeaders.put("x-amz-content-sha256", "required");
         }
         if (isBasicAuth) {
-            bulkHeaders.put("Authorization", "Basic ${credential.auth_key}");
+            bulkHeaders.put("Authorization", "Basic ${credential.basic_auth_key}");
         }
 
         actions
@@ -625,7 +654,7 @@ public class TransportCreateMemoryContainerAction extends
                 org.opensearch.ml.common.connector.ConnectorAction
                     .builder()
                     .actionType(org.opensearch.ml.common.connector.ConnectorAction.ActionType.EXECUTE)
-                    .name("bulk_load")
+                    .name(BULK_LOAD_ACTION)
                     .method("POST")
                     .url(endpoint + "/_bulk")
                     .headers(bulkHeaders)
@@ -639,7 +668,7 @@ public class TransportCreateMemoryContainerAction extends
                 org.opensearch.ml.common.connector.ConnectorAction
                     .builder()
                     .actionType(org.opensearch.ml.common.connector.ConnectorAction.ActionType.EXECUTE)
-                    .name("search_index")
+                    .name(SEARCH_INDEX_ACTION)
                     .method("POST")
                     .url(endpoint + "/${parameters.index_name}/_search")
                     .headers(jsonHeaders)
@@ -653,7 +682,7 @@ public class TransportCreateMemoryContainerAction extends
                 org.opensearch.ml.common.connector.ConnectorAction
                     .builder()
                     .actionType(org.opensearch.ml.common.connector.ConnectorAction.ActionType.EXECUTE)
-                    .name("get_doc")
+                    .name(GET_DOC_ACTION)
                     .method("GET")
                     .url(endpoint + "/${parameters.index_name}/_doc/${parameters.doc_id}")
                     .headers(jsonHeaders)
@@ -666,7 +695,7 @@ public class TransportCreateMemoryContainerAction extends
                 org.opensearch.ml.common.connector.ConnectorAction
                     .builder()
                     .actionType(org.opensearch.ml.common.connector.ConnectorAction.ActionType.EXECUTE)
-                    .name("delete_doc")
+                    .name(DELETE_DOC_ACTION)
                     .method("DELETE")
                     .url(endpoint + "/${parameters.index_name}/_doc/${parameters.doc_id}")
                     .headers(jsonHeaders)
@@ -680,25 +709,11 @@ public class TransportCreateMemoryContainerAction extends
                 org.opensearch.ml.common.connector.ConnectorAction
                     .builder()
                     .actionType(org.opensearch.ml.common.connector.ConnectorAction.ActionType.EXECUTE)
-                    .name("update_doc")
+                    .name(UPDATE_DOC_ACTION)
                     .method("POST")
                     .url(endpoint + "/${parameters.index_name}/_update/${parameters.doc_id}")
                     .headers(jsonHeaders)
                     .requestBody("{ \"doc\": ${parameters.input:-} }")
-                    .build()
-            );
-
-        // Register model action - for creating embedding models in remote AOSS
-        actions
-            .add(
-                org.opensearch.ml.common.connector.ConnectorAction
-                    .builder()
-                    .actionType(org.opensearch.ml.common.connector.ConnectorAction.ActionType.EXECUTE)
-                    .name("register_model")
-                    .method("POST")
-                    .url(endpoint + "/_plugins/_ml/models/_register")
-                    .headers(jsonHeaders)
-                    .requestBody("${parameters.input}")
                     .build()
             );
 
