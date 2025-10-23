@@ -391,6 +391,6 @@ public class TransportUpdateMemoryContainerAction extends HandledTransportAction
      * Creates ingest pipeline and long-term index.
      */
     private void createLongTermMemoryIngestPipeline(String indexName, MemoryConfiguration config, ActionListener<Boolean> listener) {
-        MemoryContainerPipelineHelper.createLongTermMemoryIngestPipeline(indexName, config, mlIndicesHandler, client, listener);
+        memoryContainerPipelineHelper.createLongTermMemoryIngestPipeline(indexName, config, mlIndicesHandler, listener);
     }
 }

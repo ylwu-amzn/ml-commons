@@ -25,7 +25,6 @@ import org.opensearch.ml.common.memorycontainer.MLMemoryContainer;
 import org.opensearch.ml.common.memorycontainer.MemoryConfiguration;
 import org.opensearch.ml.common.memorycontainer.MemoryStrategy;
 import org.opensearch.ml.common.memorycontainer.RemoteEmbeddingModel;
-import org.opensearch.ml.common.memorycontainer.RemoteStore;
 import org.opensearch.ml.common.settings.MLFeatureEnabledSetting;
 import org.opensearch.ml.common.transport.memorycontainer.MLCreateMemoryContainerAction;
 import org.opensearch.ml.common.transport.memorycontainer.MLCreateMemoryContainerInput;
@@ -62,6 +61,8 @@ public class TransportCreateMemoryContainerAction extends
     private final ConnectorAccessControlHelper connectorAccessControlHelper;
     private final MLFeatureEnabledSetting mlFeatureEnabledSetting;
     private final MLModelManager mlModelManager;
+    private final RemoteStorageHelper remoteStorageHelper;
+    private final MemoryContainerPipelineHelper memoryContainerPipelineHelper;
 
     @Inject
     public TransportCreateMemoryContainerAction(
@@ -72,7 +73,9 @@ public class TransportCreateMemoryContainerAction extends
         MLIndicesHandler mlIndicesHandler,
         ConnectorAccessControlHelper connectorAccessControlHelper,
         MLFeatureEnabledSetting mlFeatureEnabledSetting,
-        MLModelManager mlModelManager
+        MLModelManager mlModelManager,
+        RemoteStorageHelper remoteStorageHelper,
+        MemoryContainerPipelineHelper memoryContainerPipelineHelper
     ) {
         super(MLCreateMemoryContainerAction.NAME, transportService, actionFilters, MLCreateMemoryContainerRequest::new);
         this.client = client;
@@ -81,6 +84,8 @@ public class TransportCreateMemoryContainerAction extends
         this.connectorAccessControlHelper = connectorAccessControlHelper;
         this.mlFeatureEnabledSetting = mlFeatureEnabledSetting;
         this.mlModelManager = mlModelManager;
+        this.remoteStorageHelper = remoteStorageHelper;
+        this.memoryContainerPipelineHelper = memoryContainerPipelineHelper;
     }
 
     @Override
@@ -277,7 +282,7 @@ public class TransportCreateMemoryContainerAction extends
     }
 
     private void createLongTermMemoryIngestPipeline(String indexName, MemoryConfiguration memoryConfig, ActionListener<Boolean> listener) {
-        MemoryContainerPipelineHelper.createLongTermMemoryIngestPipeline(indexName, memoryConfig, mlIndicesHandler, client, listener);
+        memoryContainerPipelineHelper.createLongTermMemoryIngestPipeline(indexName, memoryConfig, listener);
     }
 
     private void indexMemoryContainer(MLMemoryContainer container, ActionListener<String> listener) {
@@ -331,19 +336,18 @@ public class TransportCreateMemoryContainerAction extends
             && config.getRemoteStore().getConnectorId() == null
             && config.getRemoteStore().getEndpoint() != null) {
             // Auto-create connector first
-            createConnectorForRemoteStore(config.getRemoteStore(), ActionListener.wrap(connectorId -> {
+            remoteStorageHelper.createConnectorForRemoteStore(config.getRemoteStore(), ActionListener.wrap(connectorId -> {
                 // Set the connector ID in the remote store config
                 config.getRemoteStore().setConnectorId(connectorId);
                 log.info("Auto-created connector with ID: {} for remote store", connectorId);
 
                 // Check if we need to auto-create embedding model
                 if (config.getRemoteStore().getEmbeddingModel() != null) {
-                    RemoteStorageHelper
+                    remoteStorageHelper
                         .createRemoteEmbeddingModel(
                             connectorId,
                             config.getRemoteStore().getEmbeddingModel(),
                             config.getRemoteStore().getCredential(),
-                            client,
                             ActionListener.wrap(modelId -> {
                                 // Set the embedding model ID in the remote store config
                                 config.getRemoteStore().setEmbeddingModelId(modelId);
@@ -418,12 +422,12 @@ public class TransportCreateMemoryContainerAction extends
 
     private void createRemoteSessionMemoryIndex(MemoryConfiguration configuration, String indexName, ActionListener<Boolean> listener) {
         String connectorId = configuration.getRemoteStore().getConnectorId();
-        RemoteStorageHelper.createRemoteSessionMemoryIndex(connectorId, indexName, configuration, mlIndicesHandler, client, listener);
+        remoteStorageHelper.createRemoteSessionMemoryIndex(connectorId, indexName, configuration, listener);
     }
 
     private void createRemoteWorkingMemoryIndex(MemoryConfiguration configuration, String indexName, ActionListener<Boolean> listener) {
         String connectorId = configuration.getRemoteStore().getConnectorId();
-        RemoteStorageHelper.createRemoteWorkingMemoryIndex(connectorId, indexName, configuration, mlIndicesHandler, client, listener);
+        remoteStorageHelper.createRemoteWorkingMemoryIndex(connectorId, indexName, configuration, listener);
     }
 
     private void createRemoteLongTermMemoryHistoryIndex(
@@ -432,8 +436,7 @@ public class TransportCreateMemoryContainerAction extends
         ActionListener<Boolean> listener
     ) {
         String connectorId = configuration.getRemoteStore().getConnectorId();
-        RemoteStorageHelper
-            .createRemoteLongTermMemoryHistoryIndex(connectorId, indexName, configuration, mlIndicesHandler, client, listener);
+        remoteStorageHelper.createRemoteLongTermMemoryHistoryIndex(connectorId, indexName, configuration, listener);
     }
 
     private void createRemoteMemoryIndexes(
@@ -464,245 +467,7 @@ public class TransportCreateMemoryContainerAction extends
         ActionListener<Boolean> listener
     ) {
         String connectorId = configuration.getRemoteStore().getConnectorId();
-        MemoryContainerPipelineHelper
-            .createRemoteLongTermMemoryIngestPipeline(connectorId, indexName, configuration, mlIndicesHandler, client, listener);
-    }
-
-    /**
-     * Auto-creates a connector for remote store based on provided endpoint and credentials
-     */
-    private void createConnectorForRemoteStore(RemoteStore remoteStore, ActionListener<String> listener) {
-        try {
-            String connectorName = "auto_"
-                + remoteStore.getType().name().toLowerCase()
-                + "_connector_"
-                + java.util.UUID.randomUUID().toString().substring(0, 8);
-
-            // Build connector actions based on remote store type
-            java.util.List<org.opensearch.ml.common.connector.ConnectorAction> actions = buildConnectorActions(remoteStore);
-
-            // Get credential and parameters from remote store
-            java.util.Map<String, String> credential = remoteStore.getCredential();
-            java.util.Map<String, String> parameters = remoteStore.getParameters();
-
-            // Determine protocol based on parameters or credential
-            String protocol = determineProtocol(parameters, credential);
-
-            // Create connector input
-            org.opensearch.ml.common.transport.connector.MLCreateConnectorInput connectorInput =
-                org.opensearch.ml.common.transport.connector.MLCreateConnectorInput
-                    .builder()
-                    .name(connectorName)
-                    .description("Auto-generated connector for " + remoteStore.getType() + " remote memory store")
-                    .version("1")
-                    .protocol(protocol)
-                    .parameters(parameters)
-                    .credential(credential)
-                    .actions(actions)
-                    .build();
-
-            // Create connector request
-            org.opensearch.ml.common.transport.connector.MLCreateConnectorRequest request =
-                new org.opensearch.ml.common.transport.connector.MLCreateConnectorRequest(connectorInput);
-
-            // Execute connector creation
-            client
-                .execute(
-                    org.opensearch.ml.common.transport.connector.MLCreateConnectorAction.INSTANCE,
-                    request,
-                    ActionListener.wrap(response -> {
-                        log.info("Successfully created connector: {}", response.getConnectorId());
-                        listener.onResponse(response.getConnectorId());
-                    }, e -> {
-                        log.error("Failed to create connector for remote store", e);
-                        listener.onFailure(e);
-                    })
-                );
-        } catch (Exception e) {
-            log.error("Error building connector for remote store", e);
-            listener.onFailure(e);
-        }
-    }
-
-    /**
-     * Determines the protocol based on parameters and credentials
-     */
-    private String determineProtocol(java.util.Map<String, String> parameters, java.util.Map<String, String> credential) {
-        // Check if service_name is in parameters (indicates AWS SigV4)
-        if (parameters != null && parameters.containsKey("service_name")) {
-            return "aws_sigv4";
-        }
-        // Check if roleArn is in credential (indicates AWS SigV4)
-        if (credential != null && credential.containsKey("roleArn")) {
-            return "aws_sigv4";
-        }
-        // Check if access_key and secret_key are in credential (indicates AWS SigV4)
-        if (credential != null && credential.containsKey("access_key") && credential.containsKey("secret_key")) {
-            return "aws_sigv4";
-        }
-        // Default to http (for basic auth or other)
-        return "http";
-    }
-
-    /**
-     * Builds connector actions based on remote store type
-     */
-    private java.util.List<org.opensearch.ml.common.connector.ConnectorAction> buildConnectorActions(RemoteStore remoteStore) {
-        java.util.List<org.opensearch.ml.common.connector.ConnectorAction> actions = new java.util.ArrayList<>();
-        String endpoint = remoteStore.getEndpoint();
-        java.util.Map<String, String> parameters = remoteStore.getParameters();
-        java.util.Map<String, String> credential = remoteStore.getCredential();
-
-        // Determine if AWS SigV4 or basic auth
-        boolean isAwsSigV4 = (parameters != null && parameters.containsKey("service_name"))
-            || (credential != null && (credential.containsKey("roleArn") || credential.containsKey("access_key")));
-        boolean isBasicAuth = credential != null && credential.containsKey("basic_auth_key");
-
-        // Common headers for JSON
-        java.util.Map<String, String> jsonHeaders = new java.util.HashMap<>();
-        jsonHeaders.put("content-type", "application/json");
-        if (isAwsSigV4) {
-            jsonHeaders.put("x-amz-content-sha256", "required");
-        }
-        if (isBasicAuth) {
-            jsonHeaders.put("Authorization", "Basic ${credential.basic_auth_key}");
-        }
-
-        // Create ingest pipeline action
-        actions
-            .add(
-                org.opensearch.ml.common.connector.ConnectorAction
-                    .builder()
-                    .actionType(org.opensearch.ml.common.connector.ConnectorAction.ActionType.EXECUTE)
-                    .name("create_ingest_pipeline")
-                    .method("PUT")
-                    .url(endpoint + "/_ingest/pipeline/${parameters.pipeline_name}")
-                    .headers(jsonHeaders)
-                    .requestBody("${parameters.input}")
-                    .build()
-            );
-
-        // Create index action
-        actions
-            .add(
-                org.opensearch.ml.common.connector.ConnectorAction
-                    .builder()
-                    .actionType(org.opensearch.ml.common.connector.ConnectorAction.ActionType.EXECUTE)
-                    .name("create_index")
-                    .method("PUT")
-                    .url(endpoint + "/${parameters.index_name}")
-                    .headers(jsonHeaders)
-                    .requestBody("${parameters.input}")
-                    .build()
-            );
-
-        // Write doc action
-        actions
-            .add(
-                org.opensearch.ml.common.connector.ConnectorAction
-                    .builder()
-                    .actionType(org.opensearch.ml.common.connector.ConnectorAction.ActionType.EXECUTE)
-                    .name("write_doc")
-                    .method("POST")
-                    .url(endpoint + "/${parameters.index_name}/_doc")
-                    .headers(jsonHeaders)
-                    .requestBody("${parameters.input}")
-                    .build()
-            );
-
-        // Bulk load action
-        java.util.Map<String, String> bulkHeaders = new java.util.HashMap<>();
-        bulkHeaders.put("content-type", "application/x-ndjson");
-        if (isAwsSigV4) {
-            bulkHeaders.put("x-amz-content-sha256", "required");
-        }
-        if (isBasicAuth) {
-            bulkHeaders.put("Authorization", "Basic ${credential.auth_key}");
-        }
-
-        actions
-            .add(
-                org.opensearch.ml.common.connector.ConnectorAction
-                    .builder()
-                    .actionType(org.opensearch.ml.common.connector.ConnectorAction.ActionType.EXECUTE)
-                    .name("bulk_load")
-                    .method("POST")
-                    .url(endpoint + "/_bulk")
-                    .headers(bulkHeaders)
-                    .requestBody("${parameters.input}")
-                    .build()
-            );
-
-        // Search index action
-        actions
-            .add(
-                org.opensearch.ml.common.connector.ConnectorAction
-                    .builder()
-                    .actionType(org.opensearch.ml.common.connector.ConnectorAction.ActionType.EXECUTE)
-                    .name("search_index")
-                    .method("POST")
-                    .url(endpoint + "/${parameters.index_name}/_search")
-                    .headers(jsonHeaders)
-                    .requestBody("${parameters.input}")
-                    .build()
-            );
-
-        // Get doc action
-        actions
-            .add(
-                org.opensearch.ml.common.connector.ConnectorAction
-                    .builder()
-                    .actionType(org.opensearch.ml.common.connector.ConnectorAction.ActionType.EXECUTE)
-                    .name("get_doc")
-                    .method("GET")
-                    .url(endpoint + "/${parameters.index_name}/_doc/${parameters.doc_id}")
-                    .headers(jsonHeaders)
-                    .build()
-            );
-
-        // Delete doc action
-        actions
-            .add(
-                org.opensearch.ml.common.connector.ConnectorAction
-                    .builder()
-                    .actionType(org.opensearch.ml.common.connector.ConnectorAction.ActionType.EXECUTE)
-                    .name("delete_doc")
-                    .method("DELETE")
-                    .url(endpoint + "/${parameters.index_name}/_doc/${parameters.doc_id}")
-                    .headers(jsonHeaders)
-                    .build()
-            );
-
-        // Update doc action - POST /_update/<doc_id> works on both OpenSearch and AOSS
-        // Uses partial update with "doc" wrapper for flexibility
-        actions
-            .add(
-                org.opensearch.ml.common.connector.ConnectorAction
-                    .builder()
-                    .actionType(org.opensearch.ml.common.connector.ConnectorAction.ActionType.EXECUTE)
-                    .name("update_doc")
-                    .method("POST")
-                    .url(endpoint + "/${parameters.index_name}/_update/${parameters.doc_id}")
-                    .headers(jsonHeaders)
-                    .requestBody("{ \"doc\": ${parameters.input:-} }")
-                    .build()
-            );
-
-        // Register model action - for creating embedding models in remote AOSS
-        actions
-            .add(
-                org.opensearch.ml.common.connector.ConnectorAction
-                    .builder()
-                    .actionType(org.opensearch.ml.common.connector.ConnectorAction.ActionType.EXECUTE)
-                    .name("register_model")
-                    .method("POST")
-                    .url(endpoint + "/_plugins/_ml/models/_register")
-                    .headers(jsonHeaders)
-                    .requestBody("${parameters.input}")
-                    .build()
-            );
-
-        return actions;
+        memoryContainerPipelineHelper.createRemoteLongTermMemoryIngestPipeline(connectorId, indexName, configuration, listener);
     }
 
 }

@@ -90,12 +90,19 @@ public class MemoryContainerHelper {
     Client client;
     SdkClient sdkClient;
     NamedXContentRegistry xContentRegistry;
+    RemoteStorageHelper remoteStorageHelper;
 
     @Inject
-    public MemoryContainerHelper(Client client, SdkClient sdkClient, NamedXContentRegistry xContentRegistry) {
+    public MemoryContainerHelper(
+        Client client,
+        SdkClient sdkClient,
+        NamedXContentRegistry xContentRegistry,
+        RemoteStorageHelper remoteStorageHelper
+    ) {
         this.client = client;
         this.sdkClient = sdkClient;
         this.xContentRegistry = xContentRegistry;
+        this.remoteStorageHelper = remoteStorageHelper;
     }
 
     /**
@@ -252,12 +259,11 @@ public class MemoryContainerHelper {
             String docId = getRequest.id();
 
             // Convert SearchSourceBuilder to Map
-            RemoteStorageHelper
+            remoteStorageHelper
                 .getDocument(
                     connectorId,
                     indexName,
                     docId,
-                    client,
                     ActionListener.wrap(response -> { listener.onResponse(response); }, listener::onFailure)
                 );
         } catch (Exception e) {
@@ -305,9 +311,13 @@ public class MemoryContainerHelper {
     ) {
         try {
             String connectorId = configuration.getRemoteStore().getConnectorId();
-            RemoteStorageHelper.searchDocuments(connectorId, indexName, query, client, ActionListener.wrap(response -> {
-                listener.onResponse(response);
-            }, listener::onFailure));
+            remoteStorageHelper
+                .searchDocuments(
+                    connectorId,
+                    indexName,
+                    query,
+                    ActionListener.wrap(response -> { listener.onResponse(response); }, listener::onFailure)
+                );
         } catch (Exception e) {
             log.error("Failed to search data from remote storage", e);
             listener.onFailure(e);
@@ -353,18 +363,17 @@ public class MemoryContainerHelper {
             // Convert IndexRequest source to Map
             Map<String, Object> documentSource = indexRequest.sourceAsMap();
 
-            RemoteStorageHelper
-                .updateDocument(connectorId, indexName, docId, documentSource, client, ActionListener.wrap(updateResponse -> {
-                    IndexResponse response = new IndexResponse(
-                        updateResponse.getShardId(),
-                        updateResponse.getId(),
-                        updateResponse.getSeqNo(),
-                        updateResponse.getPrimaryTerm(),
-                        updateResponse.getVersion(),
-                        false
-                    );
-                    listener.onResponse(response);
-                }, listener::onFailure));
+            remoteStorageHelper.updateDocument(connectorId, indexName, docId, documentSource, ActionListener.wrap(updateResponse -> {
+                IndexResponse response = new IndexResponse(
+                    updateResponse.getShardId(),
+                    updateResponse.getId(),
+                    updateResponse.getSeqNo(),
+                    updateResponse.getPrimaryTerm(),
+                    updateResponse.getVersion(),
+                    false
+                );
+                listener.onResponse(response);
+            }, listener::onFailure));
         } catch (Exception e) {
             log.error("Failed to index data to remote storage", e);
             listener.onFailure(e);
@@ -383,9 +392,13 @@ public class MemoryContainerHelper {
             // Convert IndexRequest source to Map
             Map<String, Object> documentSource = indexRequest.sourceAsMap();
 
-            RemoteStorageHelper.writeDocument(connectorId, indexName, documentSource, client, ActionListener.wrap(response -> {
-                listener.onResponse(response);
-            }, listener::onFailure));
+            remoteStorageHelper
+                .writeDocument(
+                    connectorId,
+                    indexName,
+                    documentSource,
+                    ActionListener.wrap(response -> { listener.onResponse(response); }, listener::onFailure)
+                );
         } catch (Exception e) {
             log.error("Failed to index data to remote storage", e);
             listener.onFailure(e);
@@ -415,7 +428,7 @@ public class MemoryContainerHelper {
             String docId = updateRequest.id();
 
             Map<String, Object> documentSource = convertUpdateRequestToMap(updateRequest);
-            RemoteStorageHelper.updateDocument(connectorId, indexName, docId, documentSource, client, ActionListener.wrap(response -> {
+            remoteStorageHelper.updateDocument(connectorId, indexName, docId, documentSource, ActionListener.wrap(response -> {
                 listener.onResponse(response);
             }, listener::onFailure));
         } catch (Exception e) {
@@ -462,12 +475,11 @@ public class MemoryContainerHelper {
             String indexName = deleteRequest.index();
             String docId = deleteRequest.id();
 
-            RemoteStorageHelper
+            remoteStorageHelper
                 .deleteDocument(
                     connectorId,
                     indexName,
                     docId,
-                    client,
                     ActionListener.wrap(response -> { listener.onResponse(response); }, listener::onFailure)
                 );
         } catch (Exception e) {
@@ -539,7 +551,7 @@ public class MemoryContainerHelper {
             return;
         }
 
-        RemoteStorageHelper.bulkWrite(connectorId, bulkBodyList.get(index), client, ActionListener.wrap(response -> {
+        remoteStorageHelper.bulkWrite(connectorId, bulkBodyList.get(index), ActionListener.wrap(response -> {
             responses.add(response);
             // Process next
             bulkIngestSequentially(connectorId, bulkBodyList, index + 1, responses, finalListener);

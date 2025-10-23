@@ -285,7 +285,9 @@ import org.opensearch.ml.engine.tools.VisualizationsTool;
 import org.opensearch.ml.engine.tools.WriteToScratchPadTool;
 import org.opensearch.ml.engine.utils.AgentModelsSearcher;
 import org.opensearch.ml.helper.ConnectorAccessControlHelper;
+import org.opensearch.ml.helper.MemoryContainerPipelineHelper;
 import org.opensearch.ml.helper.ModelAccessControlHelper;
+import org.opensearch.ml.helper.RemoteStorageHelper;
 import org.opensearch.ml.jobs.MLJobParameter;
 import org.opensearch.ml.jobs.MLJobRunner;
 import org.opensearch.ml.memory.ConversationalMemoryHandler;
@@ -523,6 +525,8 @@ public class MachineLearningPlugin extends Plugin
     private Encryptor encryptor;
     private McpToolsHelper mcpToolsHelper;
     private McpStatelessServerHolder statelessServerHolder;
+    private RemoteStorageHelper remoteStorageHelper;
+    private MemoryContainerPipelineHelper memoryContainerPipelineHelper;
 
     public MachineLearningPlugin() {}
 
@@ -914,6 +918,9 @@ public class MachineLearningPlugin extends Plugin
         mcpToolsHelper = new McpToolsHelper(client, toolFactoryWrapper);
         statelessServerHolder = new McpStatelessServerHolder(mcpToolsHelper, client, threadPool);
 
+        remoteStorageHelper = new RemoteStorageHelper(client, mlIndicesHandler);
+        memoryContainerPipelineHelper = new MemoryContainerPipelineHelper(client, mlIndicesHandler, remoteStorageHelper);
+
         return ImmutableList
             .of(
                 encryptor,
@@ -945,7 +952,9 @@ public class MachineLearningPlugin extends Plugin
                 sdkClient,
                 toolFactoryWrapper,
                 mcpToolsHelper,
-                statelessServerHolder
+                statelessServerHolder,
+                remoteStorageHelper,
+                memoryContainerPipelineHelper
             );
     }
 

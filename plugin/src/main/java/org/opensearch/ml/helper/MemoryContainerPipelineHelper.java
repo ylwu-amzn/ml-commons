@@ -23,8 +23,7 @@ import org.opensearch.ml.common.memorycontainer.RemoteStore;
 import org.opensearch.ml.engine.indices.MLIndicesHandler;
 import org.opensearch.transport.client.Client;
 
-import lombok.AccessLevel;
-import lombok.NoArgsConstructor;
+import lombok.Builder;
 import lombok.extern.log4j.Log4j2;
 
 /**
@@ -32,8 +31,18 @@ import lombok.extern.log4j.Log4j2;
  * Provides reusable pipeline creation logic for long-term memory indices.
  */
 @Log4j2
-@NoArgsConstructor(access = AccessLevel.PRIVATE)
-public final class MemoryContainerPipelineHelper {
+public class MemoryContainerPipelineHelper {
+
+    private final Client client;
+    private final MLIndicesHandler mlIndicesHandler;
+    private final RemoteStorageHelper remoteStorageHelper;
+
+    @Builder
+    public MemoryContainerPipelineHelper(Client client, MLIndicesHandler mlIndicesHandler, RemoteStorageHelper remoteStorageHelper) {
+        this.client = client;
+        this.mlIndicesHandler = mlIndicesHandler;
+        this.remoteStorageHelper = remoteStorageHelper;
+    }
 
     /**
      * Creates an ingest pipeline and long-term memory index.
@@ -44,30 +53,22 @@ public final class MemoryContainerPipelineHelper {
      *
      * @param indexName       The long-term memory index name
      * @param config          The memory configuration
-     * @param indicesHandler  The ML indices handler
-     * @param client          The OpenSearch client
      * @param listener        Action listener that receives true on success, or error on failure
      */
-    public static void createLongTermMemoryIngestPipeline(
-        String indexName,
-        MemoryConfiguration config,
-        MLIndicesHandler indicesHandler,
-        Client client,
-        ActionListener<Boolean> listener
-    ) {
+    public void createLongTermMemoryIngestPipeline(String indexName, MemoryConfiguration config, ActionListener<Boolean> listener) {
         try {
             if (config.getEmbeddingModelType() != null) {
                 String pipelineName = indexName + "-embedding";
 
-                createTextEmbeddingPipeline(pipelineName, config, client, ActionListener.wrap(success -> {
+                createTextEmbeddingPipeline(pipelineName, config, ActionListener.wrap(success -> {
                     log.info("Successfully created text embedding pipeline: {}", pipelineName);
-                    indicesHandler.createLongTermMemoryIndex(pipelineName, indexName, config, listener);
+                    mlIndicesHandler.createLongTermMemoryIndex(pipelineName, indexName, config, listener);
                 }, e -> {
                     log.error("Failed to create text embedding pipeline '{}'", pipelineName, e);
                     listener.onFailure(e);
                 }));
             } else {
-                indicesHandler.createLongTermMemoryIndex(null, indexName, config, listener);
+                mlIndicesHandler.createLongTermMemoryIndex(null, indexName, config, listener);
             }
         } catch (Exception e) {
             log.error("Failed to create long-term memory infrastructure for index: {}", indexName, e);
@@ -83,15 +84,9 @@ public final class MemoryContainerPipelineHelper {
      *
      * @param pipelineName  The pipeline name
      * @param config        The memory configuration
-     * @param client        The OpenSearch client
      * @param listener      Action listener that receives true on success, or error on failure
      */
-    public static void createTextEmbeddingPipeline(
-        String pipelineName,
-        MemoryConfiguration config,
-        Client client,
-        ActionListener<Boolean> listener
-    ) {
+    public void createTextEmbeddingPipeline(String pipelineName, MemoryConfiguration config, ActionListener<Boolean> listener) {
         // Check if pipeline already exists (shared index scenario)
         client.admin().cluster().getPipeline(new GetPipelineRequest(pipelineName), ActionListener.wrap(response -> {
             if (!response.pipelines().isEmpty()) {
@@ -103,7 +98,7 @@ public final class MemoryContainerPipelineHelper {
 
             // Pipeline doesn't exist - create it
             try {
-                createPipelineInternal(pipelineName, config, client, listener);
+                createPipelineInternal(pipelineName, config, listener);
             } catch (IOException e) {
                 log.error("Failed to build pipeline configuration for '{}'", pipelineName, e);
                 listener.onFailure(e);
@@ -111,7 +106,7 @@ public final class MemoryContainerPipelineHelper {
         }, error -> {
             // Pipeline doesn't exist (404 error expected) - create it
             try {
-                createPipelineInternal(pipelineName, config, client, listener);
+                createPipelineInternal(pipelineName, config, listener);
             } catch (IOException e) {
                 log.error("Failed to build pipeline configuration for '{}'", pipelineName, e);
                 listener.onFailure(e);
@@ -124,16 +119,11 @@ public final class MemoryContainerPipelineHelper {
      *
      * @param pipelineName  The pipeline name
      * @param config        The memory configuration
-     * @param client        The OpenSearch client
      * @param listener      Action listener that receives true on success, or error on failure
      * @throws IOException if XContentBuilder fails
      */
-    private static void createPipelineInternal(
-        String pipelineName,
-        MemoryConfiguration config,
-        Client client,
-        ActionListener<Boolean> listener
-    ) throws IOException {
+    private void createPipelineInternal(String pipelineName, MemoryConfiguration config, ActionListener<Boolean> listener)
+        throws IOException {
         String processorName = config.getEmbeddingModelType() == FunctionName.TEXT_EMBEDDING ? "text_embedding" : "sparse_encoding";
 
         XContentBuilder builder = XContentFactory
@@ -175,18 +165,12 @@ public final class MemoryContainerPipelineHelper {
      *
      * @param config             The memory configuration
      * @param historyIndexName   The history index name
-     * @param indicesHandler     The ML indices handler
      * @param listener           Action listener that receives true on success, or error on failure
      */
-    public static void createHistoryIndexIfEnabled(
-        MemoryConfiguration config,
-        String historyIndexName,
-        MLIndicesHandler indicesHandler,
-        ActionListener<Boolean> listener
-    ) {
+    public void createHistoryIndexIfEnabled(MemoryConfiguration config, String historyIndexName, ActionListener<Boolean> listener) {
         if (!config.isDisableHistory()) {
             log.debug("Creating history index: {}", historyIndexName);
-            indicesHandler.createLongTermMemoryHistoryIndex(historyIndexName, config, listener);
+            mlIndicesHandler.createLongTermMemoryHistoryIndex(historyIndexName, config, listener);
         } else {
             log.debug("History index disabled, skipping creation");
             listener.onResponse(true);
@@ -203,43 +187,29 @@ public final class MemoryContainerPipelineHelper {
      * @param connectorId     The connector ID for remote storage
      * @param indexName       The long-term memory index name
      * @param config          The memory configuration
-     * @param indicesHandler  The ML indices handler
-     * @param client          The OpenSearch client
      * @param listener        Action listener that receives true on success, or error on failure
      */
-    public static void createRemoteLongTermMemoryIngestPipeline(
+    public void createRemoteLongTermMemoryIngestPipeline(
         String connectorId,
         String indexName,
         MemoryConfiguration config,
-        MLIndicesHandler indicesHandler,
-        Client client,
         ActionListener<Boolean> listener
     ) {
         try {
             if (config.getRemoteStore().getEmbeddingModelType() != null) {
                 String pipelineName = indexName + "-embedding";
 
-                createRemoteTextEmbeddingPipeline(connectorId, pipelineName, config, client, ActionListener.wrap(success -> {
+                createRemoteTextEmbeddingPipeline(connectorId, pipelineName, config, ActionListener.wrap(success -> {
                     log.info("Successfully created remote text embedding pipeline: {}", pipelineName);
                     // Now create the remote long-term memory index with the pipeline
-                    org.opensearch.ml.helper.RemoteStorageHelper
-                        .createRemoteLongTermMemoryIndexWithPipeline(
-                            connectorId,
-                            indexName,
-                            pipelineName,
-                            config,
-                            indicesHandler,
-                            client,
-                            listener
-                        );
+                    remoteStorageHelper.createRemoteLongTermMemoryIndexWithPipeline(connectorId, indexName, pipelineName, config, listener);
                 }, e -> {
                     log.error("Failed to create remote text embedding pipeline '{}'", pipelineName, e);
                     listener.onFailure(e);
                 }));
             } else {
                 // No embedding configured, create index without pipeline
-                org.opensearch.ml.helper.RemoteStorageHelper
-                    .createRemoteLongTermMemoryIndex(connectorId, indexName, config, indicesHandler, client, listener);
+                remoteStorageHelper.createRemoteLongTermMemoryIndex(connectorId, indexName, config, listener);
             }
         } catch (Exception e) {
             log.error("Failed to create remote long-term memory infrastructure for index: {}", indexName, e);
@@ -257,14 +227,12 @@ public final class MemoryContainerPipelineHelper {
      * @param connectorId   The connector ID for remote storage
      * @param pipelineName  The pipeline name
      * @param config        The memory configuration
-     * @param client        The OpenSearch client
      * @param listener      Action listener that receives true on success, or error on failure
      */
-    public static void createRemoteTextEmbeddingPipeline(
+    public void createRemoteTextEmbeddingPipeline(
         String connectorId,
         String pipelineName,
         MemoryConfiguration config,
-        Client client,
         ActionListener<Boolean> listener
     ) {
         try {
@@ -294,7 +262,7 @@ public final class MemoryContainerPipelineHelper {
             String pipelineBody = builder.toString();
 
             // Use RemoteStorageHelper to create the pipeline in remote storage
-            org.opensearch.ml.helper.RemoteStorageHelper.createRemotePipeline(connectorId, pipelineName, pipelineBody, client, listener);
+            remoteStorageHelper.createRemotePipeline(connectorId, pipelineName, pipelineBody, listener);
         } catch (IOException e) {
             log.error("Failed to build remote pipeline configuration for '{}'", pipelineName, e);
             listener.onFailure(e);
