@@ -5,7 +5,11 @@
 
 package org.opensearch.ml.helper;
 
-import lombok.extern.log4j.Log4j2;
+import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.MEMORY_EMBEDDING_FIELD;
+import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.MEMORY_FIELD;
+
+import java.io.IOException;
+
 import org.opensearch.action.ingest.GetPipelineRequest;
 import org.opensearch.action.ingest.PutPipelineRequest;
 import org.opensearch.common.xcontent.XContentFactory;
@@ -20,10 +24,7 @@ import org.opensearch.ml.common.memorycontainer.RemoteStore;
 import org.opensearch.ml.engine.indices.MLIndicesHandler;
 import org.opensearch.transport.client.Client;
 
-import java.io.IOException;
-
-import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.MEMORY_EMBEDDING_FIELD;
-import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.MEMORY_FIELD;
+import lombok.extern.log4j.Log4j2;
 
 /**
  * Helper class for creating and managing ingest pipelines for memory containers.

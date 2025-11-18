@@ -5,7 +5,27 @@
 
 package org.opensearch.ml.action.memorycontainer;
 
-import lombok.extern.log4j.Log4j2;
+import static org.opensearch.ml.common.CommonValue.ML_MEMORY_CONTAINER_INDEX;
+import static org.opensearch.ml.common.settings.MLCommonsSettings.ML_COMMONS_AGENTIC_MEMORY_DISABLED_MESSAGE;
+import static org.opensearch.ml.common.settings.MLCommonsSettings.ML_COMMONS_TRUSTED_CONNECTOR_ENDPOINTS_REGEX;
+import static org.opensearch.ml.engine.algorithms.remote.ConnectorUtils.determineProtocol;
+import static org.opensearch.ml.helper.RemoteMemoryStoreHelper.BULK_LOAD_ACTION;
+import static org.opensearch.ml.helper.RemoteMemoryStoreHelper.CREATE_INDEX_ACTION;
+import static org.opensearch.ml.helper.RemoteMemoryStoreHelper.CREATE_INGEST_PIPELINE_ACTION;
+import static org.opensearch.ml.helper.RemoteMemoryStoreHelper.DELETE_DOC_ACTION;
+import static org.opensearch.ml.helper.RemoteMemoryStoreHelper.GET_DOC_ACTION;
+import static org.opensearch.ml.helper.RemoteMemoryStoreHelper.REGISTER_MODEL_ACTION;
+import static org.opensearch.ml.helper.RemoteMemoryStoreHelper.SEARCH_INDEX_ACTION;
+import static org.opensearch.ml.helper.RemoteMemoryStoreHelper.UPDATE_DOC_ACTION;
+import static org.opensearch.ml.helper.RemoteMemoryStoreHelper.WRITE_DOC_ACTION;
+
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
 import org.opensearch.OpenSearchStatusException;
 import org.opensearch.action.DocWriteResponse;
 import org.opensearch.action.index.IndexResponse;
@@ -52,26 +72,7 @@ import org.opensearch.tasks.Task;
 import org.opensearch.transport.TransportService;
 import org.opensearch.transport.client.Client;
 
-import java.time.Instant;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-
-import static org.opensearch.ml.common.CommonValue.ML_MEMORY_CONTAINER_INDEX;
-import static org.opensearch.ml.common.settings.MLCommonsSettings.ML_COMMONS_AGENTIC_MEMORY_DISABLED_MESSAGE;
-import static org.opensearch.ml.common.settings.MLCommonsSettings.ML_COMMONS_TRUSTED_CONNECTOR_ENDPOINTS_REGEX;
-import static org.opensearch.ml.engine.algorithms.remote.ConnectorUtils.determineProtocol;
-import static org.opensearch.ml.helper.RemoteMemoryStoreHelper.BULK_LOAD_ACTION;
-import static org.opensearch.ml.helper.RemoteMemoryStoreHelper.CREATE_INDEX_ACTION;
-import static org.opensearch.ml.helper.RemoteMemoryStoreHelper.CREATE_INGEST_PIPELINE_ACTION;
-import static org.opensearch.ml.helper.RemoteMemoryStoreHelper.DELETE_DOC_ACTION;
-import static org.opensearch.ml.helper.RemoteMemoryStoreHelper.GET_DOC_ACTION;
-import static org.opensearch.ml.helper.RemoteMemoryStoreHelper.REGISTER_MODEL_ACTION;
-import static org.opensearch.ml.helper.RemoteMemoryStoreHelper.SEARCH_INDEX_ACTION;
-import static org.opensearch.ml.helper.RemoteMemoryStoreHelper.UPDATE_DOC_ACTION;
-import static org.opensearch.ml.helper.RemoteMemoryStoreHelper.WRITE_DOC_ACTION;
+import lombok.extern.log4j.Log4j2;
 
 /**
  * Transport action for creating a memory container
@@ -577,17 +578,16 @@ public class TransportCreateMemoryContainerAction extends
             String protocol = determineProtocol(parameters, credential);
 
             // Create connector input
-            MLCreateConnectorInput connectorInput =
-                MLCreateConnectorInput
-                    .builder()
-                    .name(connectorName)
-                    .description("Auto-generated connector for " + remoteStore.getType() + " remote memory store")
-                    .version("1")
-                    .protocol(protocol)
-                    .parameters(parameters)
-                    .credential(credential)
-                    .actions(actions)
-                    .build();
+            MLCreateConnectorInput connectorInput = MLCreateConnectorInput
+                .builder()
+                .name(connectorName)
+                .description("Auto-generated connector for " + remoteStore.getType() + " remote memory store")
+                .version("1")
+                .protocol(protocol)
+                .parameters(parameters)
+                .credential(credential)
+                .actions(actions)
+                .build();
 
             // Create connector request
             org.opensearch.ml.common.transport.connector.MLCreateConnectorRequest request =

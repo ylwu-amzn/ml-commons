@@ -5,9 +5,23 @@
 
 package org.opensearch.ml.action.memorycontainer.memory;
 
-import lombok.AccessLevel;
-import lombok.experimental.FieldDefaults;
-import lombok.extern.log4j.Log4j2;
+import static org.opensearch.ml.common.conversation.ActionConstants.ADDITIONAL_INFO_FIELD;
+import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.AGENTS_FIELD;
+import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.BINARY_DATA_FIELD;
+import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.LAST_UPDATED_TIME_FIELD;
+import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.MEMORY_FIELD;
+import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.MESSAGES_FIELD;
+import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.METADATA_FIELD;
+import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.OWNER_ID_FIELD;
+import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.STRUCTURED_DATA_BLOB_FIELD;
+import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.STRUCTURED_DATA_FIELD;
+import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.SUMMARY_FIELD;
+import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.TAGS_FIELD;
+
+import java.time.Instant;
+import java.util.HashMap;
+import java.util.Map;
+
 import org.opensearch.OpenSearchStatusException;
 import org.opensearch.action.ActionRequest;
 import org.opensearch.action.get.GetRequest;
@@ -34,22 +48,9 @@ import org.opensearch.tasks.Task;
 import org.opensearch.transport.TransportService;
 import org.opensearch.transport.client.Client;
 
-import java.time.Instant;
-import java.util.HashMap;
-import java.util.Map;
-
-import static org.opensearch.ml.common.conversation.ActionConstants.ADDITIONAL_INFO_FIELD;
-import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.AGENTS_FIELD;
-import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.BINARY_DATA_FIELD;
-import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.LAST_UPDATED_TIME_FIELD;
-import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.MEMORY_FIELD;
-import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.MESSAGES_FIELD;
-import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.METADATA_FIELD;
-import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.OWNER_ID_FIELD;
-import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.STRUCTURED_DATA_BLOB_FIELD;
-import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.STRUCTURED_DATA_FIELD;
-import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.SUMMARY_FIELD;
-import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.TAGS_FIELD;
+import lombok.AccessLevel;
+import lombok.experimental.FieldDefaults;
+import lombok.extern.log4j.Log4j2;
 
 @Log4j2
 @FieldDefaults(level = AccessLevel.PRIVATE)

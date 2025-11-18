@@ -5,7 +5,8 @@
 
 package org.opensearch.ml.action.memorycontainer.memory;
 
-import lombok.extern.log4j.Log4j2;
+import static org.opensearch.ml.common.settings.MLCommonsSettings.ML_COMMONS_AGENTIC_MEMORY_DISABLED_MESSAGE;
+
 import org.apache.commons.lang3.StringUtils;
 import org.opensearch.OpenSearchException;
 import org.opensearch.OpenSearchStatusException;
@@ -32,7 +33,7 @@ import org.opensearch.tasks.Task;
 import org.opensearch.transport.TransportService;
 import org.opensearch.transport.client.Client;
 
-import static org.opensearch.ml.common.settings.MLCommonsSettings.ML_COMMONS_AGENTIC_MEMORY_DISABLED_MESSAGE;
+import lombok.extern.log4j.Log4j2;
 
 @Log4j2
 public class TransportSearchMemoriesAction extends HandledTransportAction<MLSearchMemoriesRequest, SearchResponse> {

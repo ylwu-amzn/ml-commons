@@ -367,8 +367,9 @@ public class ConnectorUtils {
         } else {
             requestBody = RequestBody.empty();
         }
-        if (SdkHttpMethod.POST == method && 0 == requestBody.optionalContentLength().get() &&
-                !action.equals(CANCEL_BATCH_PREDICT.toString())) {
+        if (SdkHttpMethod.POST == method
+            && 0 == requestBody.optionalContentLength().get()
+            && !action.equals(CANCEL_BATCH_PREDICT.toString())) {
             log.error("Content length is 0. Aborting request to remote model");
             throw new IllegalArgumentException("Content length is 0. Aborting request to remote model");
         }
@@ -449,7 +450,13 @@ public class ConnectorUtils {
         return buildOKHttpStreamingRequest(action, connector, parameters, payload, null);
     }
 
-    public static Request buildOKHttpStreamingRequest(String action, Connector connector, Map<String, String> parameters, String payload, Map<String, String> sanitizedHeaders) {
+    public static Request buildOKHttpStreamingRequest(
+        String action,
+        Connector connector,
+        Map<String, String> parameters,
+        String payload,
+        Map<String, String> sanitizedHeaders
+    ) {
         okhttp3.RequestBody requestBody;
         if (payload != null) {
             requestBody = okhttp3.RequestBody.create(payload, MediaType.parse("application/json; charset=utf-8"));
