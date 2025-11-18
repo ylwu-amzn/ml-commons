@@ -26,6 +26,7 @@ import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.PARAMETERS_FIELD;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.REMOTE_STORE_FIELD;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.SEARCH_PIPELINE_FIELD;
+import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.SEMANTIC_STORAGE_EMBEDDING_MODEL_ID_REQUIRED_ERROR;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.SEMANTIC_STORAGE_EMBEDDING_MODEL_TYPE_REQUIRED_ERROR;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.SPARSE_ENCODING_DIMENSION_NOT_ALLOWED_ERROR;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.STRATEGIES_FIELD;
@@ -453,22 +454,24 @@ public class MemoryConfiguration implements ToXContentObject, Writeable {
     /**
      * Validates input parameters before construction.
      */
-    private static void validateInputs(FunctionName embeddingModelType, String embeddingModelId, Integer dimension, Integer maxInferSize) {
-        validateEmbeddingConfiguration(embeddingModelType, embeddingModelId, dimension);
+    private void validateInputs(FunctionName embeddingModelType, String embeddingModelId, Integer dimension, Integer maxInferSize) {
+        if (this.remoteStore == null) {
+            validateEmbeddingConfiguration(embeddingModelType, embeddingModelId, dimension);
+        }
         validateMaxInferSize(maxInferSize);
     }
 
     /**
      * Validates embedding configuration including model pairing and dimension requirements.
      */
-    private static void validateEmbeddingConfiguration(FunctionName embeddingModelType, String embeddingModelId, Integer dimension) {
+    private void validateEmbeddingConfiguration(FunctionName embeddingModelType, String embeddingModelId, Integer dimension) {
         // Check for partial embedding configuration
         if (embeddingModelId != null && embeddingModelType == null) {
             throw new IllegalArgumentException(SEMANTIC_STORAGE_EMBEDDING_MODEL_TYPE_REQUIRED_ERROR);
         }
-        // if (embeddingModelType != null && embeddingModelId == null) {
-        // throw new IllegalArgumentException(SEMANTIC_STORAGE_EMBEDDING_MODEL_ID_REQUIRED_ERROR);
-        // }
+        if (embeddingModelType != null && embeddingModelId == null) {
+            throw new IllegalArgumentException(SEMANTIC_STORAGE_EMBEDDING_MODEL_ID_REQUIRED_ERROR);
+        }
 
         // If embedding model type is provided, validate it
         if (embeddingModelType != null) {
@@ -524,28 +527,22 @@ public class MemoryConfiguration implements ToXContentObject, Writeable {
         boolean hasLlm = config.getLlmId() != null;
         boolean hasEmbedding = config.getEmbeddingModelId() != null && config.getEmbeddingModelType() != null;
 
-        if (config.getRemoteStore() != null) {
-            hasEmbedding = config.getRemoteStore().getEmbeddingModelId() != null && config.getRemoteStore().getEmbeddingModelId() != null;
-        }
+        if (config.getRemoteStore() == null) { // TODO: add validation for remote store
+            if (!hasLlm || !hasEmbedding) {
+                String missing = !hasLlm && !hasEmbedding ? "LLM model and embedding model"
+                    : !hasLlm ? "LLM model (llm_id)"
+                    : "embedding model (embedding_model_id, embedding_model_type, dimension)";
 
-        if (!hasLlm) {
-            throw new IllegalArgumentException("Strategies require an LLM model to be configured.");
+                throw new IllegalArgumentException(
+                    String
+                        .format(
+                            "Strategies require both an LLM model and embedding model to be configured. Missing: %s. "
+                                + "Strategies use LLM for fact extraction and embedding model for semantic search.",
+                            missing
+                        )
+                );
+            }
         }
-
-        // if (!hasLlm || !hasEmbedding) {
-        // String missing = !hasLlm && !hasEmbedding ? "LLM model and embedding model"
-        // : !hasLlm ? "LLM model (llm_id)"
-        // : "embedding model (embedding_model_id, embedding_model_type, dimension)";
-        //
-        // throw new IllegalArgumentException(
-        // String
-        // .format(
-        // "Strategies require both an LLM model and embedding model to be configured. Missing: %s. "
-        // + "Strategies use LLM for fact extraction and embedding model for semantic search.",
-        // missing
-        // )
-        // );
-        // }
     }
 
     /**

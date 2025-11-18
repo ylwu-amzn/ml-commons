@@ -23,16 +23,16 @@ public class RemoteStoreTest {
 
     @Test
     public void testRemoteStoreConstruction() {
-        RemoteStore remoteStore = RemoteStore.builder().type("aoss").connectorId("ySf08JkBym-3qj1O2uub").build();
+        RemoteStore remoteStore = RemoteStore.builder().type(RemoteStoreType.AOSS).connectorId("ySf08JkBym-3qj1O2uub").build();
 
         assertNotNull(remoteStore);
-        assertEquals("aoss", remoteStore.getType());
+        assertEquals(RemoteStoreType.AOSS, remoteStore.getType());
         assertEquals("ySf08JkBym-3qj1O2uub", remoteStore.getConnectorId());
     }
 
     @Test
     public void testRemoteStoreToXContent() throws IOException {
-        RemoteStore remoteStore = RemoteStore.builder().type("aoss").connectorId("ySf08JkBym-3qj1O2uub").build();
+        RemoteStore remoteStore = RemoteStore.builder().type(RemoteStoreType.AOSS).connectorId("ySf08JkBym-3qj1O2uub").build();
 
         XContentBuilder builder = MediaTypeRegistry.contentBuilder(XContentType.JSON);
         remoteStore.toXContent(builder, ToXContent.EMPTY_PARAMS);
@@ -52,13 +52,13 @@ public class RemoteStoreTest {
         RemoteStore remoteStore = RemoteStore.parse(parser);
 
         assertNotNull(remoteStore);
-        assertEquals("aoss", remoteStore.getType());
+        assertEquals(RemoteStoreType.AOSS, remoteStore.getType());
         assertEquals("ySf08JkBym-3qj1O2uub", remoteStore.getConnectorId());
     }
 
     @Test
     public void testRemoteStoreSerialization() throws IOException {
-        RemoteStore remoteStore = RemoteStore.builder().type("aoss").connectorId("ySf08JkBym-3qj1O2uub").build();
+        RemoteStore remoteStore = RemoteStore.builder().type(RemoteStoreType.AOSS).connectorId("ySf08JkBym-3qj1O2uub").build();
 
         BytesStreamOutput output = new BytesStreamOutput();
         remoteStore.writeTo(output);

@@ -1085,7 +1085,7 @@ public class MemoryConfigurationTests {
 
     @Test
     public void testMemoryConfiguration_WithRemoteStore() {
-        RemoteStore remoteStore = RemoteStore.builder().type("aoss").connectorId("ySf08JkBym-3qj1O2uub").build();
+        RemoteStore remoteStore = RemoteStore.builder().type(RemoteStoreType.AOSS).connectorId("ySf08JkBym-3qj1O2uub").build();
 
         MemoryConfiguration config = MemoryConfiguration
             .builder()
@@ -1095,7 +1095,7 @@ public class MemoryConfigurationTests {
             .build();
 
         assertNotNull(config.getRemoteStore());
-        assertEquals("aoss", config.getRemoteStore().getType());
+        assertEquals(RemoteStoreType.AOSS, config.getRemoteStore().getType());
         assertEquals("ySf08JkBym-3qj1O2uub", config.getRemoteStore().getConnectorId());
     }
 
@@ -1112,14 +1112,14 @@ public class MemoryConfigurationTests {
 
         assertNull(config.getRemoteStore());
 
-        RemoteStore remoteStore = RemoteStore.builder().type("aoss").connectorId("ySf08JkBym-3qj1O2uub").build();
+        RemoteStore remoteStore = RemoteStore.builder().type(RemoteStoreType.AOSS).connectorId("ySf08JkBym-3qj1O2uub").build();
 
         MemoryConfiguration updateContent = MemoryConfiguration.builder().remoteStore(remoteStore).build();
 
         config.update(updateContent);
 
         assertNotNull(config.getRemoteStore());
-        assertEquals("aoss", config.getRemoteStore().getType());
+        assertEquals(RemoteStoreType.AOSS, config.getRemoteStore().getType());
         assertEquals("ySf08JkBym-3qj1O2uub", config.getRemoteStore().getConnectorId());
     }
 }
