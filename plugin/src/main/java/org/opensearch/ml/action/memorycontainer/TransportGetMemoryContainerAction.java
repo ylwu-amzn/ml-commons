@@ -5,11 +5,9 @@
 
 package org.opensearch.ml.action.memorycontainer;
 
-import static org.opensearch.common.xcontent.json.JsonXContent.jsonXContent;
-import static org.opensearch.core.xcontent.XContentParserUtils.ensureExpectedToken;
-import static org.opensearch.ml.common.CommonValue.ML_MEMORY_CONTAINER_INDEX;
-import static org.opensearch.ml.common.settings.MLCommonsSettings.ML_COMMONS_AGENTIC_MEMORY_DISABLED_MESSAGE;
-
+import lombok.AccessLevel;
+import lombok.experimental.FieldDefaults;
+import lombok.extern.log4j.Log4j2;
 import org.opensearch.ExceptionsHelper;
 import org.opensearch.OpenSearchStatusException;
 import org.opensearch.action.ActionRequest;
@@ -45,9 +43,10 @@ import org.opensearch.tasks.Task;
 import org.opensearch.transport.TransportService;
 import org.opensearch.transport.client.Client;
 
-import lombok.AccessLevel;
-import lombok.experimental.FieldDefaults;
-import lombok.extern.log4j.Log4j2;
+import static org.opensearch.common.xcontent.json.JsonXContent.jsonXContent;
+import static org.opensearch.core.xcontent.XContentParserUtils.ensureExpectedToken;
+import static org.opensearch.ml.common.CommonValue.ML_MEMORY_CONTAINER_INDEX;
+import static org.opensearch.ml.common.settings.MLCommonsSettings.ML_COMMONS_AGENTIC_MEMORY_DISABLED_MESSAGE;
 
 @Log4j2
 @FieldDefaults(level = AccessLevel.PRIVATE)
@@ -168,6 +167,13 @@ public class TransportGetMemoryContainerAction extends HandledTransportAction<Ac
                 ) {
                     ensureExpectedToken(XContentParser.Token.START_OBJECT, parser.nextToken(), parser);
                     MLMemoryContainer mlMemoryContainer = MLMemoryContainer.parse(parser);
+
+                    if (mlMemoryContainer != null
+                        && mlMemoryContainer.getConfiguration() != null
+                        && mlMemoryContainer.getConfiguration().getRemoteStore() != null
+                        && mlMemoryContainer.getConfiguration().getRemoteStore().getConnector() != null) {
+                        mlMemoryContainer.getConfiguration().getRemoteStore().getConnector().removeCredential();
+                    }
 
                     if (TenantAwareHelper
                         .validateTenantResource(mlFeatureEnabledSetting, tenantId, mlMemoryContainer.getTenantId(), wrappedListener)) {

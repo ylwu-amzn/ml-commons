@@ -5,18 +5,9 @@
 
 package org.opensearch.ml.action.memorycontainer;
 
-import static org.opensearch.ml.common.CommonValue.BACKEND_ROLES_FIELD;
-import static org.opensearch.ml.common.CommonValue.ML_MEMORY_CONTAINER_INDEX;
-import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.DESCRIPTION_FIELD;
-import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.LAST_UPDATED_TIME_FIELD;
-import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.MEMORY_STORAGE_CONFIG_FIELD;
-import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.NAME_FIELD;
-
-import java.time.Instant;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
+import lombok.AccessLevel;
+import lombok.experimental.FieldDefaults;
+import lombok.extern.log4j.Log4j2;
 import org.opensearch.OpenSearchStatusException;
 import org.opensearch.action.ActionRequest;
 import org.opensearch.action.support.ActionFilters;
@@ -50,9 +41,17 @@ import org.opensearch.tasks.Task;
 import org.opensearch.transport.TransportService;
 import org.opensearch.transport.client.Client;
 
-import lombok.AccessLevel;
-import lombok.experimental.FieldDefaults;
-import lombok.extern.log4j.Log4j2;
+import java.time.Instant;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import static org.opensearch.ml.common.CommonValue.BACKEND_ROLES_FIELD;
+import static org.opensearch.ml.common.CommonValue.ML_MEMORY_CONTAINER_INDEX;
+import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.DESCRIPTION_FIELD;
+import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.LAST_UPDATED_TIME_FIELD;
+import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.MEMORY_STORAGE_CONFIG_FIELD;
+import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.NAME_FIELD;
 
 @Log4j2
 @FieldDefaults(level = AccessLevel.PRIVATE)
@@ -66,6 +65,7 @@ public class TransportUpdateMemoryContainerAction extends HandledTransportAction
     final MLModelManager mlModelManager;
     final MemoryContainerHelper memoryContainerHelper;
     final MLIndicesHandler mlIndicesHandler;
+    final MemoryContainerPipelineHelper memoryContainerPipelineHelper;
 
     @Inject
     public TransportUpdateMemoryContainerAction(
@@ -78,7 +78,8 @@ public class TransportUpdateMemoryContainerAction extends HandledTransportAction
         MLFeatureEnabledSetting mlFeatureEnabledSetting,
         MLModelManager mlModelManager,
         MemoryContainerHelper memoryContainerHelper,
-        MLIndicesHandler mlIndicesHandler
+        MLIndicesHandler mlIndicesHandler,
+        MemoryContainerPipelineHelper memoryContainerPipelineHelper
     ) {
         super(MLUpdateMemoryContainerAction.NAME, transportService, actionFilters, MLUpdateMemoryContainerRequest::new);
         this.client = client;
@@ -89,6 +90,7 @@ public class TransportUpdateMemoryContainerAction extends HandledTransportAction
         this.mlModelManager = mlModelManager;
         this.memoryContainerHelper = memoryContainerHelper;
         this.mlIndicesHandler = mlIndicesHandler;
+        this.memoryContainerPipelineHelper = memoryContainerPipelineHelper;
     }
 
     @Override
@@ -281,21 +283,24 @@ public class TransportUpdateMemoryContainerAction extends HandledTransportAction
         String memoryContainerId,
         ActionListener<UpdateResponse> listener
     ) {
+        String tenantId = container.getTenantId();
         // Validate LLM model using helper
-        MemoryContainerModelValidator.validateLlmModel(config.getLlmId(), mlModelManager, client, ActionListener.wrap(llmValid -> {
-            // LLM validated, now validate embedding model
-            MemoryContainerModelValidator
-                .validateEmbeddingModel(
-                    config.getEmbeddingModelId(),
-                    config.getEmbeddingModelType(),
-                    mlModelManager,
-                    client,
-                    ActionListener.wrap(embeddingValid -> {
-                        // Both models validated, proceed to shared index validation and creation
-                        validateSharedIndexAndCreateIndices(container, config, updateFields, memoryContainerId, listener);
-                    }, listener::onFailure)
-                );
-        }, listener::onFailure));
+        MemoryContainerModelValidator
+            .validateLlmModel(tenantId, config.getLlmId(), mlModelManager, client, ActionListener.wrap(llmValid -> {
+                // LLM validated, now validate embedding model
+                MemoryContainerModelValidator
+                    .validateEmbeddingModel(
+                        tenantId,
+                        config.getEmbeddingModelId(),
+                        config.getEmbeddingModelType(),
+                        mlModelManager,
+                        client,
+                        ActionListener.wrap(embeddingValid -> {
+                            // Both models validated, proceed to shared index validation and creation
+                            validateSharedIndexAndCreateIndices(container, config, updateFields, memoryContainerId, listener);
+                        }, listener::onFailure)
+                    );
+            }, listener::onFailure));
     }
 
     /**
@@ -394,6 +399,6 @@ public class TransportUpdateMemoryContainerAction extends HandledTransportAction
      * Creates ingest pipeline and long-term index.
      */
     private void createLongTermMemoryIngestPipeline(String indexName, MemoryConfiguration config, ActionListener<Boolean> listener) {
-        MemoryContainerPipelineHelper.createLongTermMemoryIngestPipeline(indexName, config, mlIndicesHandler, client, listener);
+        memoryContainerPipelineHelper.createLongTermMemoryIngestPipeline(indexName, config, listener);
     }
 }

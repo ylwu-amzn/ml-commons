@@ -5,13 +5,9 @@
 
 package org.opensearch.ml.action.memorycontainer.memory;
 
-import static org.opensearch.ml.common.conversation.ActionConstants.ADDITIONAL_INFO_FIELD;
-import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.*;
-
-import java.time.Instant;
-import java.util.HashMap;
-import java.util.Map;
-
+import lombok.AccessLevel;
+import lombok.experimental.FieldDefaults;
+import lombok.extern.log4j.Log4j2;
 import org.opensearch.OpenSearchStatusException;
 import org.opensearch.action.ActionRequest;
 import org.opensearch.action.get.GetRequest;
@@ -38,9 +34,22 @@ import org.opensearch.tasks.Task;
 import org.opensearch.transport.TransportService;
 import org.opensearch.transport.client.Client;
 
-import lombok.AccessLevel;
-import lombok.experimental.FieldDefaults;
-import lombok.extern.log4j.Log4j2;
+import java.time.Instant;
+import java.util.HashMap;
+import java.util.Map;
+
+import static org.opensearch.ml.common.conversation.ActionConstants.ADDITIONAL_INFO_FIELD;
+import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.AGENTS_FIELD;
+import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.BINARY_DATA_FIELD;
+import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.LAST_UPDATED_TIME_FIELD;
+import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.MEMORY_FIELD;
+import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.MESSAGES_FIELD;
+import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.METADATA_FIELD;
+import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.OWNER_ID_FIELD;
+import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.STRUCTURED_DATA_BLOB_FIELD;
+import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.STRUCTURED_DATA_FIELD;
+import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.SUMMARY_FIELD;
+import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.TAGS_FIELD;
 
 @Log4j2
 @FieldDefaults(level = AccessLevel.PRIVATE)
@@ -81,9 +90,10 @@ public class TransportUpdateMemoryAction extends HandledTransportAction<ActionRe
         String memoryContainerId = updateRequest.getMemoryContainerId();
         MemoryType memoryType = updateRequest.getMemoryType();
         String memoryId = updateRequest.getMemoryId();
+        String tenantId = updateRequest.getTenantId();
 
         // Get memory container to validate access and get memory index name
-        memoryContainerHelper.getMemoryContainer(memoryContainerId, ActionListener.wrap(container -> {
+        memoryContainerHelper.getMemoryContainer(memoryContainerId, tenantId, ActionListener.wrap(container -> {
             // Validate access permissions
             User user = RestActionUtils.getUserContext(client);
             if (!memoryContainerHelper.checkMemoryContainerAccess(user, container)) {
@@ -129,8 +139,11 @@ public class TransportUpdateMemoryAction extends HandledTransportAction<ActionRe
                 Map<String, Object> newDoc = constructNewDoc(updateRequest.getMlUpdateMemoryInput(), memoryType, originalDoc);
                 IndexRequest indexRequest = new IndexRequest(memoryIndexName).id(memoryId).source(newDoc);
                 indexRequest.setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE);
-                memoryContainerHelper.indexData(container.getConfiguration(), indexRequest, actionListener);
-
+                if (container.getConfiguration().getRemoteStore() == null) {
+                    memoryContainerHelper.indexData(container.getConfiguration(), indexRequest, actionListener);
+                } else {
+                    memoryContainerHelper.updateDataToRemoteStorage(container.getConfiguration(), indexRequest, actionListener);
+                }
             }, actionListener::onFailure);
             memoryContainerHelper.getData(container.getConfiguration(), getRequest, getResponseActionListener);
 
@@ -187,6 +200,9 @@ public class TransportUpdateMemoryAction extends HandledTransportAction<ActionRe
         }
         if (updateContent.containsKey(STRUCTURED_DATA_FIELD)) {
             updateFields.put(STRUCTURED_DATA_FIELD, updateContent.get(STRUCTURED_DATA_FIELD));
+        }
+        if (updateContent.containsKey(STRUCTURED_DATA_BLOB_FIELD)) {
+            updateFields.put(STRUCTURED_DATA_BLOB_FIELD, updateContent.get(STRUCTURED_DATA_BLOB_FIELD));
         }
         if (updateContent.containsKey(METADATA_FIELD)) {
             updateFields.put(METADATA_FIELD, updateContent.get(METADATA_FIELD));
