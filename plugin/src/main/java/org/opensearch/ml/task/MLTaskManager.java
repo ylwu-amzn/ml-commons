@@ -585,8 +585,8 @@ public class MLTaskManager implements SettingsChangeListener {
         try {
             MLJobParameter jobParameter = new MLJobParameter(
                 MLJobType.STATS_COLLECTOR.name(),
-                new IntervalSchedule(Instant.now(), 5, ChronoUnit.MINUTES),
-                60L,
+                new IntervalSchedule(Instant.now(), 10, ChronoUnit.SECONDS),
+                5L,
                 null,
                 MLJobType.STATS_COLLECTOR,
                 enabled
