@@ -359,6 +359,8 @@ public class HttpConnector extends AbstractConnector {
             StringSubstitutor substitutor = new StringSubstitutor(parameters, "${parameters.", "}");
             payload = substitutor.replace(payload);
 
+            log.info("ylwudebug: payload to llm: \n{}", payload);
+
             if (!isJsonOrNdjson(payload)) {
                 throw new IllegalArgumentException("Invalid payload: " + payload);
             } else if (neededStreamParameterInPayload(parameters)) {
