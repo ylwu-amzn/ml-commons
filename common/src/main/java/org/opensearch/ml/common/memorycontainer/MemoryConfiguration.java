@@ -29,6 +29,15 @@ import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.STRATEGIES_FIELD;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.TEXT_EMBEDDING_DIMENSION_REQUIRED_ERROR;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.USE_SYSTEM_INDEX_FIELD;
+import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.ENABLE_GRAPH_FIELD;
+import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.ENTITY_SCOPE_FIELD;
+import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.GRAPH_ENTITY_THRESHOLD_FIELD;
+import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.GRAPH_RELATIONSHIP_THRESHOLD_FIELD;
+import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.MAX_ENTITIES_PER_EXTRACTION_FIELD;
+import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.MAX_GRAPH_TRAVERSAL_HOPS_FIELD;
+import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.CUSTOM_ENTITY_EXTRACTION_PROMPT_FIELD;
+import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.CUSTOM_RELATIONSHIP_EXTRACTION_PROMPT_FIELD;
+import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.GRAPH_INDEX_SETTINGS_FIELD;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -86,6 +95,23 @@ public class MemoryConfiguration implements ToXContentObject, Writeable {
     private boolean useSystemIndex = true;
     private String tenantId;
 
+    // Graph configuration fields
+    @Builder.Default
+    private Boolean enableGraph = false;
+    @Builder.Default
+    private String entityScope = "user_id";  // Configurable: user_id, container_id, tenant_id
+    @Builder.Default
+    private Double graphEntityThreshold = 0.7;
+    @Builder.Default
+    private Double graphRelationshipThreshold = 0.6;
+    @Builder.Default
+    private Integer maxEntitiesPerExtraction = 10;
+    @Builder.Default
+    private Integer maxGraphTraversalHops = 3;
+    private String customEntityExtractionPrompt;
+    private String customRelationshipExtractionPrompt;
+    private Map<String, Object> graphIndexSettings;
+
     public MemoryConfiguration(
         String indexPrefix,
         FunctionName embeddingModelType,
@@ -99,10 +125,21 @@ public class MemoryConfiguration implements ToXContentObject, Writeable {
         boolean disableHistory,
         boolean disableSession,
         boolean useSystemIndex,
-        String tenantId
+        String tenantId,
+        Boolean enableGraph,
+        String entityScope,
+        Double graphEntityThreshold,
+        Double graphRelationshipThreshold,
+        Integer maxEntitiesPerExtraction,
+        Integer maxGraphTraversalHops,
+        String customEntityExtractionPrompt,
+        String customRelationshipExtractionPrompt,
+        Map<String, Object> graphIndexSettings
     ) {
         // Validate first
         validateInputs(embeddingModelType, embeddingModelId, dimension, maxInferSize);
+        validateGraphConfiguration(enableGraph, entityScope, graphEntityThreshold, graphRelationshipThreshold,
+                                   maxEntitiesPerExtraction, maxGraphTraversalHops);
 
         // Assign values after validation
         this.indexPrefix = buildIndexPrefix(indexPrefix, useSystemIndex);
@@ -127,6 +164,17 @@ public class MemoryConfiguration implements ToXContentObject, Writeable {
         this.disableSession = disableSession;
         this.useSystemIndex = useSystemIndex;
         this.tenantId = tenantId;
+
+        // Graph configuration assignments
+        this.enableGraph = enableGraph != null ? enableGraph : false;
+        this.entityScope = entityScope != null ? entityScope : "user_id";
+        this.graphEntityThreshold = graphEntityThreshold != null ? graphEntityThreshold : 0.7;
+        this.graphRelationshipThreshold = graphRelationshipThreshold != null ? graphRelationshipThreshold : 0.6;
+        this.maxEntitiesPerExtraction = maxEntitiesPerExtraction != null ? maxEntitiesPerExtraction : 10;
+        this.maxGraphTraversalHops = maxGraphTraversalHops != null ? maxGraphTraversalHops : 3;
+        this.customEntityExtractionPrompt = customEntityExtractionPrompt;
+        this.customRelationshipExtractionPrompt = customRelationshipExtractionPrompt;
+        this.graphIndexSettings = graphIndexSettings != null ? new HashMap<>(graphIndexSettings) : new HashMap<>();
     }
 
     private String buildIndexPrefix(String indexPrefix, boolean useSystemIndex) {
@@ -168,6 +216,21 @@ public class MemoryConfiguration implements ToXContentObject, Writeable {
         this.disableSession = input.readBoolean();
         this.useSystemIndex = input.readBoolean();
         this.tenantId = input.readOptionalString();
+
+        // Read graph configuration fields
+        this.enableGraph = input.readOptionalBoolean();
+        this.entityScope = input.readOptionalString();
+        this.graphEntityThreshold = input.readOptionalDouble();
+        this.graphRelationshipThreshold = input.readOptionalDouble();
+        this.maxEntitiesPerExtraction = input.readOptionalInt();
+        this.maxGraphTraversalHops = input.readOptionalInt();
+        this.customEntityExtractionPrompt = input.readOptionalString();
+        this.customRelationshipExtractionPrompt = input.readOptionalString();
+        if (input.readBoolean()) {
+            this.graphIndexSettings = input.readMap();
+        } else {
+            this.graphIndexSettings = new HashMap<>();
+        }
     }
 
     @Override
@@ -200,6 +263,22 @@ public class MemoryConfiguration implements ToXContentObject, Writeable {
         out.writeBoolean(disableSession);
         out.writeBoolean(useSystemIndex);
         out.writeOptionalString(tenantId);
+
+        // Write graph configuration fields
+        out.writeOptionalBoolean(enableGraph);
+        out.writeOptionalString(entityScope);
+        out.writeOptionalDouble(graphEntityThreshold);
+        out.writeOptionalDouble(graphRelationshipThreshold);
+        out.writeOptionalInt(maxEntitiesPerExtraction);
+        out.writeOptionalInt(maxGraphTraversalHops);
+        out.writeOptionalString(customEntityExtractionPrompt);
+        out.writeOptionalString(customRelationshipExtractionPrompt);
+        if (graphIndexSettings != null && !graphIndexSettings.isEmpty()) {
+            out.writeBoolean(true);
+            out.writeMap(graphIndexSettings);
+        } else {
+            out.writeBoolean(false);
+        }
     }
 
     @Override
@@ -250,6 +329,36 @@ public class MemoryConfiguration implements ToXContentObject, Writeable {
         if (tenantId != null) {
             builder.field(TENANT_ID_FIELD, tenantId);
         }
+
+        // Graph configuration fields
+        if (enableGraph != null) {
+            builder.field(ENABLE_GRAPH_FIELD, enableGraph);
+        }
+        if (entityScope != null) {
+            builder.field(ENTITY_SCOPE_FIELD, entityScope);
+        }
+        if (graphEntityThreshold != null) {
+            builder.field(GRAPH_ENTITY_THRESHOLD_FIELD, graphEntityThreshold);
+        }
+        if (graphRelationshipThreshold != null) {
+            builder.field(GRAPH_RELATIONSHIP_THRESHOLD_FIELD, graphRelationshipThreshold);
+        }
+        if (maxEntitiesPerExtraction != null) {
+            builder.field(MAX_ENTITIES_PER_EXTRACTION_FIELD, maxEntitiesPerExtraction);
+        }
+        if (maxGraphTraversalHops != null) {
+            builder.field(MAX_GRAPH_TRAVERSAL_HOPS_FIELD, maxGraphTraversalHops);
+        }
+        if (customEntityExtractionPrompt != null) {
+            builder.field(CUSTOM_ENTITY_EXTRACTION_PROMPT_FIELD, customEntityExtractionPrompt);
+        }
+        if (customRelationshipExtractionPrompt != null) {
+            builder.field(CUSTOM_RELATIONSHIP_EXTRACTION_PROMPT_FIELD, customRelationshipExtractionPrompt);
+        }
+        if (graphIndexSettings != null && !graphIndexSettings.isEmpty()) {
+            builder.field(GRAPH_INDEX_SETTINGS_FIELD, graphIndexSettings);
+        }
+
         builder.endObject();
         return builder;
     }
@@ -268,6 +377,17 @@ public class MemoryConfiguration implements ToXContentObject, Writeable {
         boolean disableSession = false;
         boolean useSystemIndex = true;
         String tenantId = null;
+
+        // Graph configuration variables
+        Boolean enableGraph = null;
+        String entityScope = null;
+        Double graphEntityThreshold = null;
+        Double graphRelationshipThreshold = null;
+        Integer maxEntitiesPerExtraction = null;
+        Integer maxGraphTraversalHops = null;
+        String customEntityExtractionPrompt = null;
+        String customRelationshipExtractionPrompt = null;
+        Map<String, Object> graphIndexSettings = new HashMap<>();
 
         ensureExpectedToken(XContentParser.Token.START_OBJECT, parser.currentToken(), parser);
         while (parser.nextToken() != XContentParser.Token.END_OBJECT) {
@@ -319,6 +439,33 @@ public class MemoryConfiguration implements ToXContentObject, Writeable {
                 case USE_SYSTEM_INDEX_FIELD:
                     useSystemIndex = parser.booleanValue();
                     break;
+                case ENABLE_GRAPH_FIELD:
+                    enableGraph = parser.booleanValue();
+                    break;
+                case ENTITY_SCOPE_FIELD:
+                    entityScope = parser.text();
+                    break;
+                case GRAPH_ENTITY_THRESHOLD_FIELD:
+                    graphEntityThreshold = parser.doubleValue();
+                    break;
+                case GRAPH_RELATIONSHIP_THRESHOLD_FIELD:
+                    graphRelationshipThreshold = parser.doubleValue();
+                    break;
+                case MAX_ENTITIES_PER_EXTRACTION_FIELD:
+                    maxEntitiesPerExtraction = parser.intValue();
+                    break;
+                case MAX_GRAPH_TRAVERSAL_HOPS_FIELD:
+                    maxGraphTraversalHops = parser.intValue();
+                    break;
+                case CUSTOM_ENTITY_EXTRACTION_PROMPT_FIELD:
+                    customEntityExtractionPrompt = parser.text();
+                    break;
+                case CUSTOM_RELATIONSHIP_EXTRACTION_PROMPT_FIELD:
+                    customRelationshipExtractionPrompt = parser.text();
+                    break;
+                case GRAPH_INDEX_SETTINGS_FIELD:
+                    graphIndexSettings = parser.map();
+                    break;
                 default:
                     parser.skipChildren();
                     break;
@@ -341,6 +488,15 @@ public class MemoryConfiguration implements ToXContentObject, Writeable {
             .disableSession(disableSession)
             .useSystemIndex(useSystemIndex)
             .tenantId(tenantId)
+            .enableGraph(enableGraph)
+            .entityScope(entityScope)
+            .graphEntityThreshold(graphEntityThreshold)
+            .graphRelationshipThreshold(graphRelationshipThreshold)
+            .maxEntitiesPerExtraction(maxEntitiesPerExtraction)
+            .maxGraphTraversalHops(maxGraphTraversalHops)
+            .customEntityExtractionPrompt(customEntityExtractionPrompt)
+            .customRelationshipExtractionPrompt(customRelationshipExtractionPrompt)
+            .graphIndexSettings(graphIndexSettings)
             .build();
     }
 
@@ -359,6 +515,13 @@ public class MemoryConfiguration implements ToXContentObject, Writeable {
         return getLlmId() == null || getStrategies() == null || getStrategies().isEmpty();
     }
 
+    /**
+     * Returns true if graph memory is disabled.
+     */
+    private boolean isGraphDisabled() {
+        return getEnableGraph() == null || !getEnableGraph();
+    }
+
     public String getIndexName(MemoryType memoryType) {
         if (memoryType == null) {
             return null;
@@ -370,6 +533,9 @@ public class MemoryConfiguration implements ToXContentObject, Writeable {
             return null;
         }
         if (memoryType == MemoryType.HISTORY && (isDisableHistory() || isLongTermMemoryDisabled())) {
+            return null;
+        }
+        if ((memoryType == MemoryType.GRAPH_NODES || memoryType == MemoryType.GRAPH_EDGES) && isGraphDisabled()) {
             return null;
         }
         return getFinalMemoryIndexPrefix() + memoryType.getIndexSuffix();
@@ -391,6 +557,15 @@ public class MemoryConfiguration implements ToXContentObject, Writeable {
         return getIndexName(MemoryType.HISTORY);
     }
 
+    // Graph index naming methods
+    public String getGraphNodesIndexName() {
+        return getIndexName(MemoryType.GRAPH_NODES);
+    }
+
+    public String getGraphEdgesIndexName() {
+        return getIndexName(MemoryType.GRAPH_EDGES);
+    }
+
     public Map<String, Object> getMemoryIndexMapping(String indexName) {
         Map<String, Map<String, Object>> indexSettings = this.getIndexSettings();
         if (indexSettings != null) {
@@ -407,6 +582,9 @@ public class MemoryConfiguration implements ToXContentObject, Writeable {
      */
     public void validate() {
         validateInputs(this.embeddingModelType, this.embeddingModelId, this.dimension, this.maxInferSize);
+        validateGraphConfiguration(this.enableGraph, this.entityScope, this.graphEntityThreshold,
+                                   this.graphRelationshipThreshold, this.maxEntitiesPerExtraction,
+                                   this.maxGraphTraversalHops);
     }
 
     /**
@@ -415,6 +593,50 @@ public class MemoryConfiguration implements ToXContentObject, Writeable {
     private static void validateInputs(FunctionName embeddingModelType, String embeddingModelId, Integer dimension, Integer maxInferSize) {
         validateEmbeddingConfiguration(embeddingModelType, embeddingModelId, dimension);
         validateMaxInferSize(maxInferSize);
+    }
+
+    /**
+     * Validates graph configuration parameters.
+     */
+    private static void validateGraphConfiguration(
+        Boolean enableGraph,
+        String entityScope,
+        Double graphEntityThreshold,
+        Double graphRelationshipThreshold,
+        Integer maxEntitiesPerExtraction,
+        Integer maxGraphTraversalHops
+    ) {
+        if (enableGraph != null && enableGraph) {
+            // Validate entity scope
+            if (entityScope != null && !isValidEntityScope(entityScope)) {
+                throw new IllegalArgumentException(
+                    "entity_scope must be one of: user_id, container_id, tenant_id. Found: " + entityScope
+                );
+            }
+
+            // Validate thresholds
+            if (graphEntityThreshold != null && (graphEntityThreshold < 0.0 || graphEntityThreshold > 1.0)) {
+                throw new IllegalArgumentException("graph_entity_threshold must be between 0.0 and 1.0");
+            }
+            if (graphRelationshipThreshold != null && (graphRelationshipThreshold < 0.0 || graphRelationshipThreshold > 1.0)) {
+                throw new IllegalArgumentException("graph_relationship_threshold must be between 0.0 and 1.0");
+            }
+
+            // Validate extraction limits
+            if (maxEntitiesPerExtraction != null && maxEntitiesPerExtraction <= 0) {
+                throw new IllegalArgumentException("max_entities_per_extraction must be positive");
+            }
+            if (maxGraphTraversalHops != null && maxGraphTraversalHops <= 0) {
+                throw new IllegalArgumentException("max_graph_traversal_hops must be positive");
+            }
+        }
+    }
+
+    /**
+     * Checks if the entity scope value is valid.
+     */
+    private static boolean isValidEntityScope(String entityScope) {
+        return "user_id".equals(entityScope) || "container_id".equals(entityScope) || "tenant_id".equals(entityScope);
     }
 
     /**
@@ -535,6 +757,36 @@ public class MemoryConfiguration implements ToXContentObject, Writeable {
             // Only update dimension for TEXT_EMBEDDING if provided
             this.dimension = updateContent.getDimension();
         }
+
+        // Update graph configuration fields
+        if (updateContent.getEnableGraph() != null) {
+            this.enableGraph = updateContent.getEnableGraph();
+        }
+        if (updateContent.getEntityScope() != null) {
+            this.entityScope = updateContent.getEntityScope();
+        }
+        if (updateContent.getGraphEntityThreshold() != null) {
+            this.graphEntityThreshold = updateContent.getGraphEntityThreshold();
+        }
+        if (updateContent.getGraphRelationshipThreshold() != null) {
+            this.graphRelationshipThreshold = updateContent.getGraphRelationshipThreshold();
+        }
+        if (updateContent.getMaxEntitiesPerExtraction() != null) {
+            this.maxEntitiesPerExtraction = updateContent.getMaxEntitiesPerExtraction();
+        }
+        if (updateContent.getMaxGraphTraversalHops() != null) {
+            this.maxGraphTraversalHops = updateContent.getMaxGraphTraversalHops();
+        }
+        if (updateContent.getCustomEntityExtractionPrompt() != null) {
+            this.customEntityExtractionPrompt = updateContent.getCustomEntityExtractionPrompt();
+        }
+        if (updateContent.getCustomRelationshipExtractionPrompt() != null) {
+            this.customRelationshipExtractionPrompt = updateContent.getCustomRelationshipExtractionPrompt();
+        }
+        if (updateContent.getGraphIndexSettings() != null && !updateContent.getGraphIndexSettings().isEmpty()) {
+            this.graphIndexSettings = new HashMap<>(updateContent.getGraphIndexSettings());
+        }
+
         // Note: indexPrefix and other structural fields are intentionally not updated
         // as they would require index recreation
     }

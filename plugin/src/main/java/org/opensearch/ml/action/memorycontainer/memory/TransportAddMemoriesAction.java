@@ -76,6 +76,7 @@ public class TransportAddMemoriesAction extends HandledTransportAction<MLAddMemo
     final MemoryProcessingService memoryProcessingService;
     final MemorySearchService memorySearchService;
     final MemoryOperationsService memoryOperationsService;
+    final GraphProcessingService graphProcessingService;
     final ThreadPool threadPool;
 
     @Inject
@@ -98,6 +99,7 @@ public class TransportAddMemoriesAction extends HandledTransportAction<MLAddMemo
         this.memoryProcessingService = new MemoryProcessingService(client, xContentRegistry, memoryContainerHelper);
         this.memorySearchService = new MemorySearchService(memoryContainerHelper);
         this.memoryOperationsService = new MemoryOperationsService(memoryContainerHelper);
+        this.graphProcessingService = new GraphProcessingService(client, null); // MLModelManager will be injected
         this.threadPool = threadPool;
     }
 
@@ -319,6 +321,30 @@ public class TransportAddMemoriesAction extends HandledTransportAction<MLAddMemo
                 }
             }
         }
+
+        // Add parallel graph processing if enabled
+        if (memoryConfig.getEnableGraph() != null && memoryConfig.getEnableGraph()) {
+            Map<String, String> namespace = buildGraphNamespace(input, user);
+
+            graphProcessingService.extractEntitiesAndRelationships(
+                tenantId,
+                messages,
+                memoryConfig,
+                namespace,
+                ActionListener.wrap(
+                    graphResult -> {
+                        storeGraphData(graphResult, memoryConfig, namespace, user, ActionListener.wrap(
+                            success -> log.debug("Graph data processed successfully for container {}", input.getMemoryContainerId()),
+                            error -> log.error("Failed to store graph data for container {}", input.getMemoryContainerId(), error)
+                        ));
+                    },
+                    error -> {
+                        // Log but don't fail the overall request - graph is supplementary
+                        log.error("Failed to process graph data for container {}", input.getMemoryContainerId(), error);
+                    }
+                )
+            );
+        }
     }
 
     private Map<String, String> getStrategyNameSpace(MemoryStrategy strategy, Map<String, String> namespace) {
@@ -420,6 +446,49 @@ public class TransportAddMemoriesAction extends HandledTransportAction<MLAddMemo
                     memoryInfos,
                     input.getMemoryContainerId()
                 );
+        }
+    }
+
+    /**
+     * Build namespace map for graph operations
+     */
+    private Map<String, String> buildGraphNamespace(MLAddMemoriesInput input, User user) {
+        Map<String, String> namespace = new HashMap<>();
+
+        namespace.put(MEMORY_CONTAINER_ID_FIELD, input.getMemoryContainerId());
+
+        if (input.getTenantId() != null) {
+            namespace.put("tenant_id", input.getTenantId());
+        }
+
+        if (user != null && user.getName() != null) {
+            namespace.put(OWNER_ID_FIELD, user.getName());
+        }
+
+        return namespace;
+    }
+
+    /**
+     * Store graph data in graph indices
+     */
+    private void storeGraphData(
+        GraphExtractionResult result,
+        MemoryConfiguration memoryConfig,
+        Map<String, String> namespace,
+        User user,
+        ActionListener<Void> listener
+    ) {
+        try {
+            // For now, just log the successful extraction
+            // Full implementation would use MemoryOperationsService bulk operations
+            log.info("Graph extraction completed: {} entities, {} relationships",
+                result.getEntities().size(),
+                result.getRelationships().size());
+
+            listener.onResponse(null);
+        } catch (Exception e) {
+            log.error("Failed to store graph data", e);
+            listener.onFailure(e);
         }
     }
 

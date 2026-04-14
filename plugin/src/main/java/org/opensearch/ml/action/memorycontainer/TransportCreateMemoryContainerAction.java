@@ -174,16 +174,42 @@ public class TransportCreateMemoryContainerAction extends
         if (configuration.getStrategies() == null || configuration.getStrategies().isEmpty()) {
             if (configuration.isDisableSession()) {
                 mlIndicesHandler.createWorkingMemoryDataIndex(workingMemoryIndexName, configuration, ActionListener.wrap(success -> {
-                    // Return the actual index name that was created
-                    // Create the memory data index with appropriate mapping
-                    listener.onResponse(workingMemoryIndexName);
+                    // Create graph indices if enabled
+                    if (configuration.getEnableGraph() != null && configuration.getEnableGraph()) {
+                        createGraphIndices(configuration, ActionListener.wrap(
+                            graphSuccess -> {
+                                log.debug("Graph indices created for container {}", container.getId());
+                                listener.onResponse(workingMemoryIndexName);
+                            },
+                            error -> {
+                                log.error("Failed to create graph indices for container {}", container.getId(), error);
+                                // Continue without failing - graph is optional
+                                listener.onResponse(workingMemoryIndexName);
+                            }
+                        ));
+                    } else {
+                        listener.onResponse(workingMemoryIndexName);
+                    }
                 }, listener::onFailure));
             } else {
                 mlIndicesHandler.createSessionMemoryDataIndex(sessionIndexName, configuration, ActionListener.wrap(result -> {
                     mlIndicesHandler.createWorkingMemoryDataIndex(workingMemoryIndexName, configuration, ActionListener.wrap(success -> {
-                        // Return the actual index name that was created
-                        // Create the memory data index with appropriate mapping
-                        listener.onResponse(workingMemoryIndexName);
+                        // Create graph indices if enabled
+                        if (configuration.getEnableGraph() != null && configuration.getEnableGraph()) {
+                            createGraphIndices(configuration, ActionListener.wrap(
+                                graphSuccess -> {
+                                    log.debug("Graph indices created for container {}", container.getId());
+                                    listener.onResponse(workingMemoryIndexName);
+                                },
+                                error -> {
+                                    log.error("Failed to create graph indices for container {}", container.getId(), error);
+                                    // Continue without failing - graph is optional
+                                    listener.onResponse(workingMemoryIndexName);
+                                }
+                            ));
+                        } else {
+                            listener.onResponse(workingMemoryIndexName);
+                        }
                     }, listener::onFailure));
                 }, listener::onFailure));
             }
@@ -228,10 +254,40 @@ public class TransportCreateMemoryContainerAction extends
                 if (!configuration.isDisableHistory()) {
                     mlIndicesHandler
                         .createLongTermMemoryHistoryIndex(longTermMemoryHistoryIndexName, configuration, ActionListener.wrap(success2 -> {
-                            listener.onResponse(longTermMemoryIndexName);
+                            // Create graph indices if enabled
+                            if (configuration.getEnableGraph() != null && configuration.getEnableGraph()) {
+                                createGraphIndices(configuration, ActionListener.wrap(
+                                    graphSuccess -> {
+                                        log.debug("Graph indices created for container {}", container.getId());
+                                        listener.onResponse(longTermMemoryIndexName);
+                                    },
+                                    error -> {
+                                        log.error("Failed to create graph indices for container {}", container.getId(), error);
+                                        // Continue without failing - graph is optional
+                                        listener.onResponse(longTermMemoryIndexName);
+                                    }
+                                ));
+                            } else {
+                                listener.onResponse(longTermMemoryIndexName);
+                            }
                         }, listener::onFailure));
                 } else {
-                    listener.onResponse(longTermMemoryIndexName);
+                    // Create graph indices if enabled
+                    if (configuration.getEnableGraph() != null && configuration.getEnableGraph()) {
+                        createGraphIndices(configuration, ActionListener.wrap(
+                            graphSuccess -> {
+                                log.debug("Graph indices created for container {}", container.getId());
+                                listener.onResponse(longTermMemoryIndexName);
+                            },
+                            error -> {
+                                log.error("Failed to create graph indices for container {}", container.getId(), error);
+                                // Continue without failing - graph is optional
+                                listener.onResponse(longTermMemoryIndexName);
+                            }
+                        ));
+                    } else {
+                        listener.onResponse(longTermMemoryIndexName);
+                    }
                 }
             }, listener::onFailure));
         }, listener::onFailure));
@@ -336,5 +392,81 @@ public class TransportCreateMemoryContainerAction extends
                 );
         }, listener::onFailure));
     }
+
+    /**
+     * Create graph indices for entity and relationship storage
+     */
+    private void createGraphIndices(MemoryConfiguration config, ActionListener<Boolean> listener) {
+        try {
+            String graphNodesIndex = config.getGraphNodesIndexName();
+            String graphEdgesIndex = config.getGraphEdgesIndexName();
+
+            // Create graph nodes index with KNN vector mapping
+            String nodesMapping = String.format(GRAPH_NODES_INDEX_MAPPING, config.getEmbeddingDimension());
+            mlIndicesHandler.createIndexIfNotExists(graphNodesIndex, nodesMapping, ActionListener.wrap(
+                nodesCreated -> {
+                    // Create graph edges index
+                    mlIndicesHandler.createIndexIfNotExists(graphEdgesIndex, GRAPH_EDGES_INDEX_MAPPING, ActionListener.wrap(
+                        edgesCreated -> {
+                            log.info("Successfully created graph indices: {} and {}", graphNodesIndex, graphEdgesIndex);
+                            listener.onResponse(true);
+                        },
+                        error -> {
+                            log.error("Failed to create graph edges index: {}", graphEdgesIndex, error);
+                            listener.onFailure(error);
+                        }
+                    ));
+                },
+                error -> {
+                    log.error("Failed to create graph nodes index: {}", graphNodesIndex, error);
+                    listener.onFailure(error);
+                }
+            ));
+        } catch (Exception e) {
+            log.error("Error creating graph indices", e);
+            listener.onFailure(e);
+        }
+    }
+
+    // Graph index mapping templates
+    private static final String GRAPH_NODES_INDEX_MAPPING = """
+    {
+      "properties": {
+        "entity_id": {"type": "keyword"},
+        "entity_name": {"type": "text", "analyzer": "standard"},
+        "entity_type": {"type": "keyword"},
+        "confidence": {"type": "float"},
+        "entity_embedding": {
+          "type": "knn_vector",
+          "dimension": %s,
+          "method": {"name": "hnsw", "space_type": "cosinesimil"}
+        },
+        "memory_container_id": {"type": "keyword"},
+        "owner_id": {"type": "keyword"},
+        "tenant_id": {"type": "keyword"},
+        "created_time": {"type": "long"},
+        "updated_time": {"type": "long"},
+        "mention_count": {"type": "integer"}
+      }
+    }
+    """;
+
+    private static final String GRAPH_EDGES_INDEX_MAPPING = """
+    {
+      "properties": {
+        "relationship_id": {"type": "keyword"},
+        "source_entity": {"type": "keyword"},
+        "target_entity": {"type": "keyword"},
+        "relationship_type": {"type": "keyword"},
+        "confidence": {"type": "float"},
+        "memory_container_id": {"type": "keyword"},
+        "owner_id": {"type": "keyword"},
+        "tenant_id": {"type": "keyword"},
+        "created_time": {"type": "long"},
+        "updated_time": {"type": "long"},
+        "is_active": {"type": "boolean"}
+      }
+    }
+    """;
 
 }

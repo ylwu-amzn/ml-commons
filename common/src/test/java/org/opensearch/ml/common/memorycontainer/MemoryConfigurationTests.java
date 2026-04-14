@@ -1098,4 +1098,245 @@ public class MemoryConfigurationTests {
         MemoryConfiguration config = MemoryConfiguration.builder().indexPrefix("valid_prefix-with-chars").build();
         assertEquals("valid_prefix-with-chars", config.getIndexPrefix());
     }
+
+    // ==================== Graph Configuration Tests ====================
+
+    @Test
+    public void testGraphConfiguration_DefaultValues() {
+        MemoryConfiguration config = MemoryConfiguration.builder().build();
+
+        assertEquals(false, config.getEnableGraph());
+        assertEquals("user_id", config.getEntityScope());
+        assertEquals(Double.valueOf(0.7), config.getGraphEntityThreshold());
+        assertEquals(Double.valueOf(0.6), config.getGraphRelationshipThreshold());
+        assertEquals(Integer.valueOf(10), config.getMaxEntitiesPerExtraction());
+        assertEquals(Integer.valueOf(3), config.getMaxGraphTraversalHops());
+        assertNull(config.getCustomEntityExtractionPrompt());
+        assertNull(config.getCustomRelationshipExtractionPrompt());
+        assertNotNull(config.getGraphIndexSettings());
+        assertTrue(config.getGraphIndexSettings().isEmpty());
+    }
+
+    @Test
+    public void testGraphConfiguration_CustomValues() {
+        Map<String, Object> graphSettings = new HashMap<>();
+        graphSettings.put("refresh_interval", "1s");
+
+        MemoryConfiguration config = MemoryConfiguration
+            .builder()
+            .enableGraph(true)
+            .entityScope("container_id")
+            .graphEntityThreshold(0.8)
+            .graphRelationshipThreshold(0.7)
+            .maxEntitiesPerExtraction(15)
+            .maxGraphTraversalHops(5)
+            .customEntityExtractionPrompt("Custom entity prompt")
+            .customRelationshipExtractionPrompt("Custom relationship prompt")
+            .graphIndexSettings(graphSettings)
+            .build();
+
+        assertTrue(config.getEnableGraph());
+        assertEquals("container_id", config.getEntityScope());
+        assertEquals(Double.valueOf(0.8), config.getGraphEntityThreshold());
+        assertEquals(Double.valueOf(0.7), config.getGraphRelationshipThreshold());
+        assertEquals(Integer.valueOf(15), config.getMaxEntitiesPerExtraction());
+        assertEquals(Integer.valueOf(5), config.getMaxGraphTraversalHops());
+        assertEquals("Custom entity prompt", config.getCustomEntityExtractionPrompt());
+        assertEquals("Custom relationship prompt", config.getCustomRelationshipExtractionPrompt());
+        assertNotNull(config.getGraphIndexSettings());
+        assertEquals("1s", config.getGraphIndexSettings().get("refresh_interval"));
+    }
+
+    @Test
+    public void testGraphValidation_ValidEntityScope() {
+        // Valid entity scopes should not throw exceptions
+        MemoryConfiguration.builder().enableGraph(true).entityScope("user_id").build();
+        MemoryConfiguration.builder().enableGraph(true).entityScope("container_id").build();
+        MemoryConfiguration.builder().enableGraph(true).entityScope("tenant_id").build();
+    }
+
+    @Test
+    public void testGraphValidation_InvalidEntityScope() {
+        try {
+            MemoryConfiguration.builder().enableGraph(true).entityScope("invalid_scope").build();
+            fail("Expected IllegalArgumentException for invalid entity scope");
+        } catch (IllegalArgumentException e) {
+            assertTrue(e.getMessage().contains("entity_scope must be one of"));
+            assertTrue(e.getMessage().contains("invalid_scope"));
+        }
+    }
+
+    @Test
+    public void testGraphValidation_InvalidEntityThreshold() {
+        try {
+            MemoryConfiguration.builder().enableGraph(true).graphEntityThreshold(-0.1).build();
+            fail("Expected IllegalArgumentException for negative threshold");
+        } catch (IllegalArgumentException e) {
+            assertTrue(e.getMessage().contains("graph_entity_threshold must be between 0.0 and 1.0"));
+        }
+
+        try {
+            MemoryConfiguration.builder().enableGraph(true).graphEntityThreshold(1.5).build();
+            fail("Expected IllegalArgumentException for threshold > 1.0");
+        } catch (IllegalArgumentException e) {
+            assertTrue(e.getMessage().contains("graph_entity_threshold must be between 0.0 and 1.0"));
+        }
+    }
+
+    @Test
+    public void testGraphValidation_InvalidRelationshipThreshold() {
+        try {
+            MemoryConfiguration.builder().enableGraph(true).graphRelationshipThreshold(-0.1).build();
+            fail("Expected IllegalArgumentException for negative threshold");
+        } catch (IllegalArgumentException e) {
+            assertTrue(e.getMessage().contains("graph_relationship_threshold must be between 0.0 and 1.0"));
+        }
+
+        try {
+            MemoryConfiguration.builder().enableGraph(true).graphRelationshipThreshold(1.5).build();
+            fail("Expected IllegalArgumentException for threshold > 1.0");
+        } catch (IllegalArgumentException e) {
+            assertTrue(e.getMessage().contains("graph_relationship_threshold must be between 0.0 and 1.0"));
+        }
+    }
+
+    @Test
+    public void testGraphValidation_InvalidMaxEntities() {
+        try {
+            MemoryConfiguration.builder().enableGraph(true).maxEntitiesPerExtraction(0).build();
+            fail("Expected IllegalArgumentException for zero max entities");
+        } catch (IllegalArgumentException e) {
+            assertTrue(e.getMessage().contains("max_entities_per_extraction must be positive"));
+        }
+
+        try {
+            MemoryConfiguration.builder().enableGraph(true).maxEntitiesPerExtraction(-5).build();
+            fail("Expected IllegalArgumentException for negative max entities");
+        } catch (IllegalArgumentException e) {
+            assertTrue(e.getMessage().contains("max_entities_per_extraction must be positive"));
+        }
+    }
+
+    @Test
+    public void testGraphValidation_InvalidMaxTraversalHops() {
+        try {
+            MemoryConfiguration.builder().enableGraph(true).maxGraphTraversalHops(0).build();
+            fail("Expected IllegalArgumentException for zero traversal hops");
+        } catch (IllegalArgumentException e) {
+            assertTrue(e.getMessage().contains("max_graph_traversal_hops must be positive"));
+        }
+
+        try {
+            MemoryConfiguration.builder().enableGraph(true).maxGraphTraversalHops(-3).build();
+            fail("Expected IllegalArgumentException for negative traversal hops");
+        } catch (IllegalArgumentException e) {
+            assertTrue(e.getMessage().contains("max_graph_traversal_hops must be positive"));
+        }
+    }
+
+    @Test
+    public void testGraphIndexNames_GraphDisabled() {
+        MemoryConfiguration config = MemoryConfiguration.builder().enableGraph(false).build();
+
+        assertNull(config.getIndexName(MemoryType.GRAPH_NODES));
+        assertNull(config.getIndexName(MemoryType.GRAPH_EDGES));
+        assertNull(config.getGraphNodesIndexName());
+        assertNull(config.getGraphEdgesIndexName());
+    }
+
+    @Test
+    public void testGraphIndexNames_GraphEnabled() {
+        MemoryConfiguration config = MemoryConfiguration.builder().enableGraph(true).build();
+
+        String nodesIndexName = config.getGraphNodesIndexName();
+        String edgesIndexName = config.getGraphEdgesIndexName();
+
+        assertNotNull(nodesIndexName);
+        assertNotNull(edgesIndexName);
+        assertTrue(nodesIndexName.endsWith("-memory-lpg-nodes"));
+        assertTrue(edgesIndexName.endsWith("-memory-lpg-edges"));
+
+        assertEquals(nodesIndexName, config.getIndexName(MemoryType.GRAPH_NODES));
+        assertEquals(edgesIndexName, config.getIndexName(MemoryType.GRAPH_EDGES));
+    }
+
+    @Test
+    public void testGraphIndexNames_WithCustomPrefix() {
+        MemoryConfiguration config = MemoryConfiguration
+            .builder()
+            .indexPrefix("graph-test")
+            .enableGraph(true)
+            .build();
+
+        String nodesIndexName = config.getGraphNodesIndexName();
+        String edgesIndexName = config.getGraphEdgesIndexName();
+
+        assertNotNull(nodesIndexName);
+        assertNotNull(edgesIndexName);
+        assertTrue(nodesIndexName.contains("graph-test"));
+        assertTrue(edgesIndexName.contains("graph-test"));
+        assertTrue(nodesIndexName.endsWith("-memory-lpg-nodes"));
+        assertTrue(edgesIndexName.endsWith("-memory-lpg-edges"));
+    }
+
+    @Test
+    public void testUpdate_UpdateGraphConfiguration() {
+        MemoryConfiguration config = MemoryConfiguration.builder().enableGraph(false).build();
+
+        Map<String, Object> newGraphSettings = new HashMap<>();
+        newGraphSettings.put("number_of_replicas", 1);
+
+        MemoryConfiguration updateContent = MemoryConfiguration
+            .builder()
+            .enableGraph(true)
+            .entityScope("tenant_id")
+            .graphEntityThreshold(0.9)
+            .graphRelationshipThreshold(0.8)
+            .maxEntitiesPerExtraction(20)
+            .maxGraphTraversalHops(7)
+            .customEntityExtractionPrompt("Updated entity prompt")
+            .customRelationshipExtractionPrompt("Updated relationship prompt")
+            .graphIndexSettings(newGraphSettings)
+            .build();
+
+        config.update(updateContent);
+
+        assertTrue(config.getEnableGraph());
+        assertEquals("tenant_id", config.getEntityScope());
+        assertEquals(Double.valueOf(0.9), config.getGraphEntityThreshold());
+        assertEquals(Double.valueOf(0.8), config.getGraphRelationshipThreshold());
+        assertEquals(Integer.valueOf(20), config.getMaxEntitiesPerExtraction());
+        assertEquals(Integer.valueOf(7), config.getMaxGraphTraversalHops());
+        assertEquals("Updated entity prompt", config.getCustomEntityExtractionPrompt());
+        assertEquals("Updated relationship prompt", config.getCustomRelationshipExtractionPrompt());
+        assertEquals(Integer.valueOf(1), config.getGraphIndexSettings().get("number_of_replicas"));
+    }
+
+    @Test
+    public void testUpdate_GraphConfigurationSpecificFields() {
+        MemoryConfiguration config = MemoryConfiguration
+            .builder()
+            .enableGraph(false)
+            .entityScope("user_id")
+            .graphEntityThreshold(0.5)
+            .build();
+
+        // Update specific fields with explicit values
+        MemoryConfiguration updateContent = MemoryConfiguration
+            .builder()
+            .enableGraph(true)
+            .entityScope("tenant_id")
+            .graphEntityThreshold(0.9)
+            .customEntityExtractionPrompt("Updated prompt")
+            .build();
+
+        config.update(updateContent);
+
+        // All specified values should be updated
+        assertTrue("EnableGraph should be updated to true", config.getEnableGraph());
+        assertEquals("tenant_id", config.getEntityScope());
+        assertEquals(Double.valueOf(0.9), config.getGraphEntityThreshold());
+        assertEquals("Updated prompt", config.getCustomEntityExtractionPrompt());
+    }
+
 }

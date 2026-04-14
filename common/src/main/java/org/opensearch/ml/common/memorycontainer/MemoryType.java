@@ -32,7 +32,17 @@ public enum MemoryType {
     /**
      * History index - complete audit trail of memory operations
      */
-    HISTORY("history", "history");
+    HISTORY("history", "history"),
+
+    /**
+     * Graph nodes index - stores entities extracted from conversations
+     */
+    GRAPH_NODES("graph-nodes", "lpg-nodes"),
+
+    /**
+     * Graph edges index - stores relationships between entities
+     */
+    GRAPH_EDGES("graph-edges", "lpg-edges");
 
     private final String value;
     private final String indexSuffix;

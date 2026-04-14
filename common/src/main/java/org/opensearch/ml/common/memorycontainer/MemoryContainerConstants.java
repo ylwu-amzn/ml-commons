@@ -45,6 +45,17 @@ public class MemoryContainerConstants {
     public static final String ROLE_ARN_FIELD = "roleArn";
     public static final String ROLE_ARN_SNAKE_CASE_FIELD = "role_arn";
 
+    // Graph configuration field names
+    public static final String ENABLE_GRAPH_FIELD = "enable_graph";
+    public static final String ENTITY_SCOPE_FIELD = "entity_scope";
+    public static final String GRAPH_ENTITY_THRESHOLD_FIELD = "graph_entity_threshold";
+    public static final String GRAPH_RELATIONSHIP_THRESHOLD_FIELD = "graph_relationship_threshold";
+    public static final String MAX_ENTITIES_PER_EXTRACTION_FIELD = "max_entities_per_extraction";
+    public static final String MAX_GRAPH_TRAVERSAL_HOPS_FIELD = "max_graph_traversal_hops";
+    public static final String CUSTOM_ENTITY_EXTRACTION_PROMPT_FIELD = "custom_entity_extraction_prompt";
+    public static final String CUSTOM_RELATIONSHIP_EXTRACTION_PROMPT_FIELD = "custom_relationship_extraction_prompt";
+    public static final String GRAPH_INDEX_SETTINGS_FIELD = "graph_index_settings";
+
     // Default values
     public static final int MAX_INFER_SIZE_DEFAULT_VALUE = 5;
     public static final String DEFAULT_MEMORY_INDEX_PREFIX = "default";
@@ -80,6 +91,19 @@ public class MemoryContainerConstants {
     public static final String PAYLOAD_TYPE_FIELD = "payload_type";
     public static final String MEMORY_STRATEGY_TYPE_FIELD = "strategy_type";
     public static final String ROLE_FIELD = "role";
+
+    // Graph index field names
+    public static final String ENTITY_ID_FIELD = "entity_id";
+    public static final String ENTITY_NAME_FIELD = "entity_name";
+    public static final String ENTITY_TYPE_FIELD = "entity_type";
+    public static final String ENTITY_EMBEDDING_FIELD = "entity_embedding";
+    public static final String RELATIONSHIP_ID_FIELD = "relationship_id";
+    public static final String SOURCE_ENTITY_FIELD = "source_entity";
+    public static final String TARGET_ENTITY_FIELD = "target_entity";
+    public static final String RELATIONSHIP_TYPE_FIELD = "relationship_type";
+    public static final String CONFIDENCE_FIELD = "confidence";
+    public static final String MENTION_COUNT_FIELD = "mention_count";
+    public static final String IS_ACTIVE_FIELD = "is_active";
 
     // Request body field names (different from storage field names)
     public static final String MESSAGE_FIELD = "message";
@@ -232,4 +256,44 @@ public class MemoryContainerConstants {
 
     public static final String SESSION_SUMMARY_PROMPT =
         "You are a helpful assistant. Your task is to summarize the following conversation between a human and an AI. The summary must be clear, concise, and not exceed ${parameters.max_summary_size} words. The summary should be generic. For example the user asks about how to cook, the conversation may contains a lot of details. Your summary could be: how to cook, how to cook Italy food. Don't include AI message content. For example you should not return: Ask how to cook, AI give some instructions.\n Also don't include user's personal information like user name, age etc. You could say user. For example: \nuser asks how to cook\nuser introduced their hobby";
+
+    // Graph LLM prompts
+    public static final String ENTITY_EXTRACTION_PROMPT =
+        """
+        <ROLE>You are an entity extraction agent. Extract entities (people, organizations, locations, concepts) from the conversation.</ROLE>
+
+        <SCOPE>
+        • Extract entities from both USER and ASSISTANT messages.
+        • Focus on concrete, meaningful entities that could be part of a knowledge graph.
+        • Include names of people, organizations, places, products, technologies, concepts.
+        • Normalize entity names to a standard form (e.g., "OpenSearch" not "opensearch" or "Open Search").
+        </SCOPE>
+
+        <OUTPUT>
+        Return ONLY a single JSON object exactly as {"entities": [{"name": "entity_name", "type": "entity_type", "confidence": 0.9}]}.
+        Entity types: PERSON, ORGANIZATION, LOCATION, TECHNOLOGY, CONCEPT, PRODUCT, EVENT, OTHER.
+        Confidence: 0.0-1.0 based on certainty of extraction.
+        No code fences, no extra text, one line only.
+        If no entities found, return {"entities": []}.
+        </OUTPUT>""";
+
+    public static final String RELATIONSHIP_EXTRACTION_PROMPT =
+        """
+        <ROLE>You are a relationship extraction agent. Extract relationships between entities from the conversation.</ROLE>
+
+        <SCOPE>
+        • Extract relationships that connect entities mentioned in the conversation.
+        • Focus on meaningful relationships that provide value in a knowledge graph.
+        • Use clear, standardized relationship types.
+        • Only extract relationships where both source and target entities are clearly mentioned.
+        </SCOPE>
+
+        <OUTPUT>
+        Return ONLY a single JSON object exactly as {"relationships": [{"source": "entity1", "target": "entity2", "type": "RELATIONSHIP_TYPE", "confidence": 0.8}]}.
+        Relationship types: WORKS_AT, KNOWS, CREATED, USES, PART_OF, LOCATED_IN, MANAGES, COLLABORATES_WITH, DEVELOPED_BY, OTHER.
+        Use exact entity names as they appear in your entity extraction.
+        Confidence: 0.0-1.0 based on certainty of relationship.
+        No code fences, no extra text, one line only.
+        If no relationships found, return {"relationships": []}.
+        </OUTPUT>""";
 }

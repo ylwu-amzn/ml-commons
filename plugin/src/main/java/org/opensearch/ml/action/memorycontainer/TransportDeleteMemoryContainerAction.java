@@ -275,6 +275,16 @@ public class TransportDeleteMemoryContainerAction extends HandledTransportAction
                 case HISTORY:
                     indexName = configuration.getLongMemoryHistoryIndexName();
                     break;
+                case GRAPH_NODES:
+                    if (configuration.getEnableGraph() != null && configuration.getEnableGraph()) {
+                        indexName = configuration.getGraphNodesIndexName();
+                    }
+                    break;
+                case GRAPH_EDGES:
+                    if (configuration.getEnableGraph() != null && configuration.getEnableGraph()) {
+                        indexName = configuration.getGraphEdgesIndexName();
+                    }
+                    break;
             }
             if (indexName != null) {
                 indicesToDelete.add(indexName);
