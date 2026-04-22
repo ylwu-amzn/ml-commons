@@ -15,6 +15,7 @@ import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.SOURCE_ENTITY_FIELD;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.TARGET_ENTITY_FIELD;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.RELATIONSHIP_TYPE_FIELD;
+import static org.opensearch.common.xcontent.json.JsonXContent.jsonXContent;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -34,26 +35,20 @@ import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.commons.authuser.User;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.common.Strings;
+import org.opensearch.core.xcontent.XContentBuilder;
 import org.opensearch.index.query.BoolQueryBuilder;
 import org.opensearch.index.query.QueryBuilders;
-import org.opensearch.knn.index.query.KNNQueryBuilder;
-import org.opensearch.ml.common.input.MLInput;
-import org.opensearch.ml.common.input.parameter.MLAlgoParams;
+import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.common.memorycontainer.MemoryConfiguration;
 import org.opensearch.ml.common.memorycontainer.graph.GraphEntity;
 import org.opensearch.ml.common.memorycontainer.graph.GraphRelationship;
 import org.opensearch.ml.common.memorycontainer.graph.GraphSearchResult;
-import org.opensearch.ml.common.transport.MLTaskResponse;
-import org.opensearch.ml.common.transport.prediction.MLPredictionTaskAction;
-import org.opensearch.ml.common.transport.prediction.MLPredictionTaskRequest;
-import org.opensearch.ml.engine.algorithms.remote.TextEmbeddingMLRemoteInferenceInput;
 import org.opensearch.ml.helper.MemoryContainerHelper;
 import org.opensearch.search.SearchHit;
 import org.opensearch.search.builder.SearchSourceBuilder;
 import org.opensearch.transport.client.Client;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.jayway.jsonpath.JsonPath;
 
 import lombok.extern.log4j.Log4j2;
 
@@ -82,7 +77,9 @@ public class GraphSearchService {
     }
 
     /**
-     * Search for entities by text query using semantic search
+     * Search for entities by text query using neural (semantic) search.
+     * The neural-search plugin handles embedding generation server-side,
+     * so no client-side embedding round-trip is required.
      */
     public void searchEntitiesByText(
         String queryText,
@@ -93,58 +90,40 @@ public class GraphSearchService {
         ActionListener<List<GraphEntity>> listener
     ) {
         try {
-            // Generate query embedding first
-            generateQueryEmbedding(queryText, config, ActionListener.wrap(
-                embedding -> {
-                    // Perform KNN search
-                    searchEntitiesByEmbedding(embedding, config, namespace, user, topK, listener);
-                },
-                error -> {
-                    log.error("Failed to generate embedding for query: {}", queryText, error);
-                    listener.onFailure(error);
-                }
-            ));
-        } catch (Exception e) {
-            log.error("Error in entity text search for query: {}", queryText, e);
-            listener.onFailure(e);
-        }
-    }
-
-    /**
-     * Search for entities using pre-computed embedding
-     */
-    @VisibleForTesting
-    void searchEntitiesByEmbedding(
-        String embedding,
-        MemoryConfiguration config,
-        Map<String, String> namespace,
-        User user,
-        int topK,
-        ActionListener<List<GraphEntity>> listener
-    ) {
-        try {
             String graphNodesIndex = config.getGraphNodesIndexName();
+            int k = Math.min(topK, 100);
 
-            // Create KNN query
-            KNNQueryBuilder knnQuery = new KNNQueryBuilder(
-                ENTITY_EMBEDDING_FIELD,
-                parseEmbeddingVector(embedding),
-                Math.min(topK, 100) // Cap at 100 for performance
-            );
+            if (config.getEmbeddingModelType() != FunctionName.TEXT_EMBEDDING
+                && config.getEmbeddingModelType() != FunctionName.SPARSE_ENCODING) {
+                listener.onFailure(
+                    new IllegalStateException("Unsupported embedding model type for entity search: " + config.getEmbeddingModelType())
+                );
+                return;
+            }
+            String neuralType = config.getEmbeddingModelType() == FunctionName.TEXT_EMBEDDING ? "neural" : "neural_sparse";
 
-            // Apply security and tenant filters
+            String neuralQuery;
+            try (XContentBuilder builder = XContentBuilder.builder(jsonXContent)) {
+                neuralQuery = builder
+                    .startObject()
+                    .startObject(neuralType)
+                    .startObject(ENTITY_EMBEDDING_FIELD)
+                    .field("query_text", queryText)
+                    .field("model_id", config.getEmbeddingModelId())
+                    .field("k", k)
+                    .endObject()
+                    .endObject()
+                    .endObject()
+                    .toString();
+            }
+
             BoolQueryBuilder boolQuery = QueryBuilders.boolQuery()
-                .must(knnQuery);
+                .must(QueryBuilders.wrapperQuery(neuralQuery))
+                .filter(QueryBuilders.termQuery(MEMORY_CONTAINER_ID_FIELD, namespace.get(MEMORY_CONTAINER_ID_FIELD)));
 
-            // Add container filter
-            boolQuery.filter(QueryBuilders.termQuery(MEMORY_CONTAINER_ID_FIELD, namespace.get(MEMORY_CONTAINER_ID_FIELD)));
-
-            // Add tenant isolation
             if (namespace.containsKey(TENANT_ID_FIELD)) {
                 boolQuery.filter(QueryBuilders.termQuery(TENANT_ID_FIELD, namespace.get(TENANT_ID_FIELD)));
             }
-
-            // Add user access control if applicable
             if (user != null && !Strings.isNullOrEmpty(user.getName())) {
                 boolQuery.filter(QueryBuilders.termQuery(OWNER_ID_FIELD, user.getName()));
             }
@@ -157,17 +136,17 @@ public class GraphSearchService {
                 );
 
             client.execute(SearchAction.INSTANCE, searchRequest, ActionListener.wrap(
-                searchResponse -> {
-                    List<GraphEntity> entities = parseGraphEntities(searchResponse);
-                    listener.onResponse(entities);
-                },
+                searchResponse -> listener.onResponse(parseGraphEntities(searchResponse)),
                 error -> {
-                    log.error("Entity search failed for embedding", error);
+                    log.error("Entity search failed for query: {}", queryText, error);
                     listener.onFailure(error);
                 }
             ));
+        } catch (IOException e) {
+            log.error("Failed to build neural query for: {}", queryText, e);
+            listener.onFailure(e);
         } catch (Exception e) {
-            log.error("Error in entity embedding search", e);
+            log.error("Error in entity text search for query: {}", queryText, e);
             listener.onFailure(e);
         }
     }
@@ -597,74 +576,6 @@ public class GraphSearchService {
             .sorted((a, b) -> Float.compare(b.getScore(), a.getScore()))
             .limit(topK)
             .toList();
-    }
-
-    // Helper methods for parsing and embedding generation
-
-    /**
-     * Generate embedding for search query
-     */
-    @VisibleForTesting
-    void generateQueryEmbedding(
-        String queryText,
-        MemoryConfiguration config,
-        ActionListener<String> listener
-    ) {
-        try {
-            TextEmbeddingMLRemoteInferenceInput embeddingInput = TextEmbeddingMLRemoteInferenceInput.builder()
-                .inputText(List.of(queryText))
-                .build();
-
-            MLInput mlInput = MLInput.builder()
-                .algorithm(MLAlgoParams.TEXT_EMBEDDING)
-                .inputDataset(embeddingInput)
-                .build();
-
-            MLPredictionTaskRequest embeddingRequest = new MLPredictionTaskRequest(
-                config.getEmbeddingModelId(),
-                mlInput,
-                null
-            );
-
-            client.execute(MLPredictionTaskAction.INSTANCE, embeddingRequest, ActionListener.wrap(
-                response -> {
-                    try {
-                        String embeddingJson = parseEmbeddingFromResponse(response);
-                        listener.onResponse(embeddingJson);
-                    } catch (Exception e) {
-                        log.error("Failed to parse embedding response for query: {}", queryText, e);
-                        listener.onFailure(e);
-                    }
-                },
-                error -> {
-                    log.error("Embedding generation failed for query: {}", queryText, error);
-                    listener.onFailure(error);
-                }
-            ));
-        } catch (Exception e) {
-            log.error("Error creating embedding request for query: {}", queryText, e);
-            listener.onFailure(e);
-        }
-    }
-
-    /**
-     * Parse embedding from ML response
-     */
-    private String parseEmbeddingFromResponse(MLTaskResponse response) throws IOException {
-        String responseJson = response.getOutput().toString();
-        return JsonPath.read(responseJson, "$.inference_results[0].output[0].data");
-    }
-
-    /**
-     * Parse embedding vector from JSON string
-     */
-    private float[] parseEmbeddingVector(String embeddingJson) throws IOException {
-        List<Float> values = JsonPath.read(embeddingJson, "$");
-        float[] array = new float[values.size()];
-        for (int i = 0; i < values.size(); i++) {
-            array[i] = values.get(i);
-        }
-        return array;
     }
 
     /**
