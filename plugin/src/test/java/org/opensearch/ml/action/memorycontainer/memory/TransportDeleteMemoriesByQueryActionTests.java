@@ -507,6 +507,11 @@ public class TransportDeleteMemoriesByQueryActionTests extends OpenSearchTestCas
                 QueryBuilders.matchAllQuery()
             );
 
+            // Graph memory types require enableGraph on the container configuration
+            if (memoryType == MemoryType.GRAPH_NODES || memoryType == MemoryType.GRAPH_EDGES) {
+                mockContainer.getConfiguration().setEnableGraph(true);
+            }
+
             doAnswer(invocation -> {
                 ActionListener<MLMemoryContainer> listener = invocation.getArgument(1);
                 listener.onResponse(mockContainer);

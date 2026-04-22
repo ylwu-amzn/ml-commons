@@ -157,6 +157,10 @@ public class TransportDeleteMemoriesByQueryAction extends
                 return config.getLongMemoryIndexName();
             case HISTORY:
                 return config.isDisableHistory() ? null : config.getLongMemoryHistoryIndexName();
+            case GRAPH_NODES:
+                return Boolean.TRUE.equals(config.getEnableGraph()) ? config.getGraphNodesIndexName() : null;
+            case GRAPH_EDGES:
+                return Boolean.TRUE.equals(config.getEnableGraph()) ? config.getGraphEdgesIndexName() : null;
             default:
                 return null;
         }
