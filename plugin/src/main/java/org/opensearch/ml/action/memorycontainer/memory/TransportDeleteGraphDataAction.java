@@ -7,6 +7,7 @@ package org.opensearch.ml.action.memorycontainer.memory;
 
 import java.util.Map;
 
+import org.opensearch.OpenSearchStatusException;
 import org.opensearch.action.delete.DeleteResponse;
 import org.opensearch.action.support.ActionFilters;
 import org.opensearch.action.support.HandledTransportAction;
@@ -14,13 +15,12 @@ import org.opensearch.common.inject.Inject;
 import org.opensearch.commons.authuser.User;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.rest.RestStatus;
-import org.opensearch.ml.common.exception.MLException;
 import org.opensearch.ml.common.memorycontainer.MLMemoryContainer;
 import org.opensearch.ml.common.settings.MLFeatureEnabledSetting;
 import org.opensearch.ml.common.transport.memory.MLDeleteGraphDataAction;
 import org.opensearch.ml.common.transport.memory.MLDeleteGraphDataRequest;
 import org.opensearch.ml.helper.MemoryContainerHelper;
-import org.opensearch.ml.utils.TenantAwareHelper;
+import org.opensearch.ml.utils.RestActionUtils;
 import org.opensearch.tasks.Task;
 import org.opensearch.transport.TransportService;
 import org.opensearch.transport.client.Client;
@@ -53,21 +53,22 @@ public class TransportDeleteGraphDataAction extends HandledTransportAction<MLDel
 
     @Override
     protected void doExecute(Task task, MLDeleteGraphDataRequest request, ActionListener<DeleteResponse> listener) {
+        String memoryContainerId = request.getMemoryContainerId();
         try {
             // Check if agentic memory feature is enabled
             if (!mlFeatureEnabledSetting.isAgenticMemoryEnabled()) {
-                throw new MLException("Agentic memory feature is not enabled", RestStatus.FORBIDDEN);
+                throw new OpenSearchStatusException("Agentic memory feature is not enabled", RestStatus.FORBIDDEN);
             }
 
             // Get memory container and validate access
-            memoryContainerHelper.getMemoryContainer(request.getMemoryContainerId(), request.getTenantId(), ActionListener.wrap(
+            memoryContainerHelper.getMemoryContainer(memoryContainerId, request.getTenantId(), ActionListener.wrap(
                 container -> {
-                    User user = TenantAwareHelper.getUser();
+                    User user = RestActionUtils.getUserContext(client);
 
                     // Check if user has access to the container
-                    if (!memoryContainerHelper.checkMemoryContainerAccess(container, user)) {
-                        listener.onFailure(new MLException(
-                            "User does not have access to memory container: " + container.getId(),
+                    if (!memoryContainerHelper.checkMemoryContainerAccess(user, container)) {
+                        listener.onFailure(new OpenSearchStatusException(
+                            "User does not have access to memory container: " + memoryContainerId,
                             RestStatus.FORBIDDEN
                         ));
                         return;
@@ -76,7 +77,7 @@ public class TransportDeleteGraphDataAction extends HandledTransportAction<MLDel
                     // Check if graph is enabled for this container
                     if (container.getConfiguration().getEnableGraph() == null ||
                         !container.getConfiguration().getEnableGraph()) {
-                        listener.onFailure(new MLException(
+                        listener.onFailure(new OpenSearchStatusException(
                             "Graph functionality is not enabled for this memory container",
                             RestStatus.BAD_REQUEST
                         ));
@@ -84,7 +85,7 @@ public class TransportDeleteGraphDataAction extends HandledTransportAction<MLDel
                     }
 
                     // Delete graph data
-                    deleteGraphIndices(container, listener);
+                    deleteGraphIndices(memoryContainerId, container, listener);
                 },
                 error -> {
                     log.error("Failed to retrieve memory container: {}", request.getMemoryContainerId(), error);
@@ -101,7 +102,7 @@ public class TransportDeleteGraphDataAction extends HandledTransportAction<MLDel
     /**
      * Delete graph data by clearing the graph indices
      */
-    private void deleteGraphIndices(MLMemoryContainer container, ActionListener<DeleteResponse> listener) {
+    private void deleteGraphIndices(String memoryContainerId, MLMemoryContainer container, ActionListener<DeleteResponse> listener) {
         try {
             String nodesIndex = container.getConfiguration().getGraphNodesIndexName();
             String edgesIndex = container.getConfiguration().getGraphEdgesIndexName();
@@ -112,7 +113,7 @@ public class TransportDeleteGraphDataAction extends HandledTransportAction<MLDel
             // For now, we'll return a success response - the actual deletion logic would involve
             // delete-by-query operations filtered by memory_container_id
 
-            log.info("Graph data deletion requested for container: {}", container.getId());
+            log.info("Graph data deletion requested for container: {}", memoryContainerId);
 
             // Create a dummy delete response indicating success
             DeleteResponse response = new DeleteResponse(
@@ -127,7 +128,7 @@ public class TransportDeleteGraphDataAction extends HandledTransportAction<MLDel
             listener.onResponse(response);
 
         } catch (Exception e) {
-            log.error("Failed to delete graph indices for container: {}", container.getId(), e);
+            log.error("Failed to delete graph indices for container: {}", memoryContainerId, e);
             listener.onFailure(e);
         }
     }

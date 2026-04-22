@@ -178,11 +178,11 @@ public class TransportCreateMemoryContainerAction extends
                     if (configuration.getEnableGraph() != null && configuration.getEnableGraph()) {
                         createGraphIndices(configuration, ActionListener.wrap(
                             graphSuccess -> {
-                                log.debug("Graph indices created for container {}", container.getId());
+                                log.debug("Graph indices created for container {}", container.getName());
                                 listener.onResponse(workingMemoryIndexName);
                             },
                             error -> {
-                                log.error("Failed to create graph indices for container {}", container.getId(), error);
+                                log.error("Failed to create graph indices for container {}", container.getName(), error);
                                 // Continue without failing - graph is optional
                                 listener.onResponse(workingMemoryIndexName);
                             }
@@ -198,11 +198,11 @@ public class TransportCreateMemoryContainerAction extends
                         if (configuration.getEnableGraph() != null && configuration.getEnableGraph()) {
                             createGraphIndices(configuration, ActionListener.wrap(
                                 graphSuccess -> {
-                                    log.debug("Graph indices created for container {}", container.getId());
+                                    log.debug("Graph indices created for container {}", container.getName());
                                     listener.onResponse(workingMemoryIndexName);
                                 },
                                 error -> {
-                                    log.error("Failed to create graph indices for container {}", container.getId(), error);
+                                    log.error("Failed to create graph indices for container {}", container.getName(), error);
                                     // Continue without failing - graph is optional
                                     listener.onResponse(workingMemoryIndexName);
                                 }
@@ -258,11 +258,11 @@ public class TransportCreateMemoryContainerAction extends
                             if (configuration.getEnableGraph() != null && configuration.getEnableGraph()) {
                                 createGraphIndices(configuration, ActionListener.wrap(
                                     graphSuccess -> {
-                                        log.debug("Graph indices created for container {}", container.getId());
+                                        log.debug("Graph indices created for container {}", container.getName());
                                         listener.onResponse(longTermMemoryIndexName);
                                     },
                                     error -> {
-                                        log.error("Failed to create graph indices for container {}", container.getId(), error);
+                                        log.error("Failed to create graph indices for container {}", container.getName(), error);
                                         // Continue without failing - graph is optional
                                         listener.onResponse(longTermMemoryIndexName);
                                     }
@@ -276,11 +276,11 @@ public class TransportCreateMemoryContainerAction extends
                     if (configuration.getEnableGraph() != null && configuration.getEnableGraph()) {
                         createGraphIndices(configuration, ActionListener.wrap(
                             graphSuccess -> {
-                                log.debug("Graph indices created for container {}", container.getId());
+                                log.debug("Graph indices created for container {}", container.getName());
                                 listener.onResponse(longTermMemoryIndexName);
                             },
                             error -> {
-                                log.error("Failed to create graph indices for container {}", container.getId(), error);
+                                log.error("Failed to create graph indices for container {}", container.getName(), error);
                                 // Continue without failing - graph is optional
                                 listener.onResponse(longTermMemoryIndexName);
                             }
@@ -402,11 +402,12 @@ public class TransportCreateMemoryContainerAction extends
             String graphEdgesIndex = config.getGraphEdgesIndexName();
 
             // Create graph nodes index with KNN vector mapping
-            String nodesMapping = String.format(GRAPH_NODES_INDEX_MAPPING, config.getEmbeddingDimension());
-            mlIndicesHandler.createIndexIfNotExists(graphNodesIndex, nodesMapping, ActionListener.wrap(
+            String nodesMapping = String.format(GRAPH_NODES_INDEX_MAPPING, config.getDimension());
+            boolean useSystemIndex = config.isUseSystemIndex();
+            mlIndicesHandler.initIndexIfAbsent(graphNodesIndex, nodesMapping, 1, ActionListener.wrap(
                 nodesCreated -> {
                     // Create graph edges index
-                    mlIndicesHandler.createIndexIfNotExists(graphEdgesIndex, GRAPH_EDGES_INDEX_MAPPING, ActionListener.wrap(
+                    mlIndicesHandler.initIndexIfAbsent(graphEdgesIndex, GRAPH_EDGES_INDEX_MAPPING, 1, ActionListener.wrap(
                         edgesCreated -> {
                             log.info("Successfully created graph indices: {} and {}", graphNodesIndex, graphEdgesIndex);
                             listener.onResponse(true);
@@ -415,13 +416,13 @@ public class TransportCreateMemoryContainerAction extends
                             log.error("Failed to create graph edges index: {}", graphEdgesIndex, error);
                             listener.onFailure(error);
                         }
-                    ));
+                    ), useSystemIndex);
                 },
                 error -> {
                     log.error("Failed to create graph nodes index: {}", graphNodesIndex, error);
                     listener.onFailure(error);
                 }
-            ));
+            ), useSystemIndex);
         } catch (Exception e) {
             log.error("Error creating graph indices", e);
             listener.onFailure(e);

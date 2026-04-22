@@ -62,7 +62,7 @@ public class RestMLDeleteGraphDataAction extends BaseRestHandler {
         }
 
         String memoryContainerId = request.param(PARAMETER_MEMORY_CONTAINER_ID);
-        String tenantId = TenantAwareHelper.getTenantID(request);
+        String tenantId = TenantAwareHelper.getTenantID(mlFeatureEnabledSetting.isMultiTenancyEnabled(), request);
 
         MLDeleteGraphDataRequest deleteRequest = MLDeleteGraphDataRequest.builder()
             .memoryContainerId(memoryContainerId)

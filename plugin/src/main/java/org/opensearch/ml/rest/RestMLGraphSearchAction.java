@@ -7,8 +7,6 @@ package org.opensearch.ml.rest;
 
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.PARAMETER_MEMORY_CONTAINER_ID;
 import static org.opensearch.ml.plugin.MachineLearningPlugin.ML_BASE_URI;
-import static org.opensearch.ml.utils.RestActionUtils.getAllNodes;
-import static org.opensearch.ml.utils.RestActionUtils.returnContent;
 
 import java.io.IOException;
 import java.util.List;
@@ -66,32 +64,33 @@ public class RestMLGraphSearchAction extends BaseRestHandler {
         }
 
         String memoryContainerId = request.param(PARAMETER_MEMORY_CONTAINER_ID);
-        String tenantId = TenantAwareHelper.getTenantID(request);
+        String tenantId = TenantAwareHelper.getTenantID(mlFeatureEnabledSetting.isMultiTenancyEnabled(), request);
 
-        MLGraphSearchRequest mlGraphSearchRequest;
-        if (request.hasContent()) {
-            XContentParser parser = request.contentParser();
-            mlGraphSearchRequest = MLGraphSearchRequest.parse(parser, tenantId);
-
-            // Override memory container ID from URL path if not provided in body
-            if (mlGraphSearchRequest.getInput().getMemoryContainerId() == null) {
-                MLGraphSearchInput updatedInput = MLGraphSearchInput.builder()
-                    .memoryContainerId(memoryContainerId)
-                    .query(mlGraphSearchRequest.getInput().getQuery())
-                    .topK(mlGraphSearchRequest.getInput().getTopK())
-                    .entityId(mlGraphSearchRequest.getInput().getEntityId())
-                    .maxDepth(mlGraphSearchRequest.getInput().getMaxDepth())
-                    .searchType(mlGraphSearchRequest.getInput().getSearchType())
-                    .entityType(mlGraphSearchRequest.getInput().getEntityType())
-                    .build();
-
-                mlGraphSearchRequest = MLGraphSearchRequest.builder()
-                    .input(updatedInput)
-                    .tenantId(tenantId)
-                    .build();
-            }
-        } else {
+        if (!request.hasContent()) {
             throw new IllegalArgumentException("Request body is required for graph search");
+        }
+        XContentParser parser = request.contentParser();
+        MLGraphSearchRequest parsedRequest = MLGraphSearchRequest.parse(parser, tenantId);
+
+        // Override memory container ID from URL path if not provided in body
+        final MLGraphSearchRequest mlGraphSearchRequest;
+        if (parsedRequest.getInput().getMemoryContainerId() == null) {
+            MLGraphSearchInput updatedInput = MLGraphSearchInput.builder()
+                .memoryContainerId(memoryContainerId)
+                .query(parsedRequest.getInput().getQuery())
+                .topK(parsedRequest.getInput().getTopK())
+                .entityId(parsedRequest.getInput().getEntityId())
+                .maxDepth(parsedRequest.getInput().getMaxDepth())
+                .searchType(parsedRequest.getInput().getSearchType())
+                .entityType(parsedRequest.getInput().getEntityType())
+                .build();
+
+            mlGraphSearchRequest = MLGraphSearchRequest.builder()
+                .input(updatedInput)
+                .tenantId(tenantId)
+                .build();
+        } else {
+            mlGraphSearchRequest = parsedRequest;
         }
 
         return channel -> client.execute(
@@ -99,11 +98,5 @@ public class RestMLGraphSearchAction extends BaseRestHandler {
             mlGraphSearchRequest,
             new RestToXContentListener<>(channel)
         );
-    }
-
-    @Override
-    protected RestChannelConsumer prepareRequest(RestRequest request, NodeClient client, String[] targetNodes) throws IOException {
-        // Graph search should run on all nodes for distributed search capability
-        return prepareRequest(request, client);
     }
 }

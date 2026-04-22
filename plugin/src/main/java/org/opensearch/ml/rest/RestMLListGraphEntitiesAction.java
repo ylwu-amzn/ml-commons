@@ -63,7 +63,7 @@ public class RestMLListGraphEntitiesAction extends BaseRestHandler {
         }
 
         String memoryContainerId = request.param(PARAMETER_MEMORY_CONTAINER_ID);
-        String tenantId = TenantAwareHelper.getTenantID(request);
+        String tenantId = TenantAwareHelper.getTenantID(mlFeatureEnabledSetting.isMultiTenancyEnabled(), request);
 
         // Parse query parameters
         String entityType = request.param("entity_type");

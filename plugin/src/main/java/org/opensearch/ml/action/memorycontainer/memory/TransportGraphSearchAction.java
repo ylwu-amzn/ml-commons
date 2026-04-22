@@ -8,13 +8,13 @@ package org.opensearch.ml.action.memorycontainer.memory;
 import java.util.List;
 import java.util.Map;
 
+import org.opensearch.OpenSearchStatusException;
 import org.opensearch.action.support.ActionFilters;
 import org.opensearch.action.support.HandledTransportAction;
 import org.opensearch.common.inject.Inject;
 import org.opensearch.commons.authuser.User;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.rest.RestStatus;
-import org.opensearch.ml.common.exception.MLException;
 import org.opensearch.ml.common.memorycontainer.MLMemoryContainer;
 import org.opensearch.ml.common.memorycontainer.graph.GraphEntity;
 import org.opensearch.ml.common.memorycontainer.graph.GraphSearchResult;
@@ -24,9 +24,10 @@ import org.opensearch.ml.common.transport.memory.MLGraphSearchInput;
 import org.opensearch.ml.common.transport.memory.MLGraphSearchRequest;
 import org.opensearch.ml.common.transport.memory.MLGraphSearchResponse;
 import org.opensearch.ml.helper.MemoryContainerHelper;
-import org.opensearch.ml.utils.TenantAwareHelper;
+import org.opensearch.ml.utils.RestActionUtils;
 import org.opensearch.tasks.Task;
 import org.opensearch.transport.TransportService;
+import org.opensearch.transport.client.Client;
 
 import com.google.common.collect.ImmutableMap;
 
@@ -41,6 +42,7 @@ public class TransportGraphSearchAction extends HandledTransportAction<MLGraphSe
     private final MLFeatureEnabledSetting mlFeatureEnabledSetting;
     private final MemoryContainerHelper memoryContainerHelper;
     private final GraphSearchService graphSearchService;
+    private final Client client;
 
     @Inject
     public TransportGraphSearchAction(
@@ -48,11 +50,13 @@ public class TransportGraphSearchAction extends HandledTransportAction<MLGraphSe
         ActionFilters actionFilters,
         MLFeatureEnabledSetting mlFeatureEnabledSetting,
         MemoryContainerHelper memoryContainerHelper,
-        GraphSearchService graphSearchService
+        GraphSearchService graphSearchService,
+        Client client
     ) {
         super(MLGraphSearchAction.NAME, transportService, actionFilters, MLGraphSearchRequest::new);
         this.mlFeatureEnabledSetting = mlFeatureEnabledSetting;
         this.memoryContainerHelper = memoryContainerHelper;
+        this.client = client;
         this.graphSearchService = graphSearchService;
     }
 
@@ -64,18 +68,18 @@ public class TransportGraphSearchAction extends HandledTransportAction<MLGraphSe
         try {
             // Check if agentic memory feature is enabled
             if (!mlFeatureEnabledSetting.isAgenticMemoryEnabled()) {
-                throw new MLException("Agentic memory feature is not enabled", RestStatus.FORBIDDEN);
+                throw new OpenSearchStatusException("Agentic memory feature is not enabled", RestStatus.FORBIDDEN);
             }
 
             // Get memory container and validate access
             memoryContainerHelper.getMemoryContainer(input.getMemoryContainerId(), tenantId, ActionListener.wrap(
                 container -> {
-                    User user = TenantAwareHelper.getUser();
+                    User user = RestActionUtils.getUserContext(client);
 
                     // Check if user has access to the container
-                    if (!memoryContainerHelper.checkMemoryContainerAccess(container, user)) {
-                        listener.onFailure(new MLException(
-                            "User does not have access to memory container: " + container.getId(),
+                    if (!memoryContainerHelper.checkMemoryContainerAccess(user, container)) {
+                        listener.onFailure(new OpenSearchStatusException(
+                            "User does not have access to memory container: " + input.getMemoryContainerId(),
                             RestStatus.FORBIDDEN
                         ));
                         return;
@@ -84,7 +88,7 @@ public class TransportGraphSearchAction extends HandledTransportAction<MLGraphSe
                     // Check if graph is enabled for this container
                     if (container.getConfiguration().getEnableGraph() == null ||
                         !container.getConfiguration().getEnableGraph()) {
-                        listener.onFailure(new MLException(
+                        listener.onFailure(new OpenSearchStatusException(
                             "Graph functionality is not enabled for this memory container",
                             RestStatus.BAD_REQUEST
                         ));
@@ -92,7 +96,7 @@ public class TransportGraphSearchAction extends HandledTransportAction<MLGraphSe
                     }
 
                     // Build namespace for search
-                    Map<String, String> namespace = buildNamespace(input, user, container);
+                    Map<String, String> namespace = buildNamespace(input.getMemoryContainerId(), tenantId, user);
 
                     // Execute search based on search type
                     executeGraphSearch(input, container, namespace, user, listener);
@@ -179,7 +183,7 @@ public class TransportGraphSearchAction extends HandledTransportAction<MLGraphSe
         ActionListener<MLGraphSearchResponse> listener
     ) {
         if (input.getEntityId() == null) {
-            listener.onFailure(new MLException(
+            listener.onFailure(new OpenSearchStatusException(
                 "Entity ID is required for traversal search",
                 RestStatus.BAD_REQUEST
             ));
@@ -252,13 +256,13 @@ public class TransportGraphSearchAction extends HandledTransportAction<MLGraphSe
     /**
      * Build namespace map for search operations
      */
-    private Map<String, String> buildNamespace(MLGraphSearchInput input, User user, MLMemoryContainer container) {
+    private Map<String, String> buildNamespace(String memoryContainerId, String tenantId, User user) {
         ImmutableMap.Builder<String, String> builder = ImmutableMap.builder();
 
-        builder.put("memory_container_id", container.getId());
+        builder.put("memory_container_id", memoryContainerId);
 
-        if (input.getTenantId() != null) {
-            builder.put("tenant_id", input.getTenantId());
+        if (tenantId != null) {
+            builder.put("tenant_id", tenantId);
         }
 
         if (user != null && user.getName() != null) {
