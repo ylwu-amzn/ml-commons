@@ -7,22 +7,23 @@ package org.opensearch.ml.action.memorycontainer.memory;
 
 import java.util.Map;
 
-import org.opensearch.action.ActionListener;
 import org.opensearch.action.delete.DeleteResponse;
 import org.opensearch.action.support.ActionFilters;
 import org.opensearch.action.support.HandledTransportAction;
-import org.opensearch.client.Client;
 import org.opensearch.common.inject.Inject;
+import org.opensearch.commons.authuser.User;
+import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.rest.RestStatus;
 import org.opensearch.ml.common.exception.MLException;
 import org.opensearch.ml.common.memorycontainer.MLMemoryContainer;
+import org.opensearch.ml.common.settings.MLFeatureEnabledSetting;
 import org.opensearch.ml.common.transport.memory.MLDeleteGraphDataAction;
 import org.opensearch.ml.common.transport.memory.MLDeleteGraphDataRequest;
-import org.opensearch.ml.helper.TenantAwareHelper;
-import org.opensearch.ml.settings.MLFeatureEnabledSetting;
+import org.opensearch.ml.helper.MemoryContainerHelper;
+import org.opensearch.ml.utils.TenantAwareHelper;
 import org.opensearch.tasks.Task;
 import org.opensearch.transport.TransportService;
-import org.opensearch.commons.authuser.User;
+import org.opensearch.transport.client.Client;
 
 import lombok.extern.log4j.Log4j2;
 

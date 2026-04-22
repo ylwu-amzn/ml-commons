@@ -8,24 +8,25 @@ package org.opensearch.ml.action.memorycontainer.memory;
 import java.util.List;
 import java.util.Map;
 
-import org.opensearch.action.ActionListener;
 import org.opensearch.action.support.ActionFilters;
 import org.opensearch.action.support.HandledTransportAction;
 import org.opensearch.common.inject.Inject;
+import org.opensearch.commons.authuser.User;
+import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.rest.RestStatus;
 import org.opensearch.ml.common.exception.MLException;
 import org.opensearch.ml.common.memorycontainer.MLMemoryContainer;
 import org.opensearch.ml.common.memorycontainer.graph.GraphEntity;
 import org.opensearch.ml.common.memorycontainer.graph.GraphSearchResult;
+import org.opensearch.ml.common.settings.MLFeatureEnabledSetting;
 import org.opensearch.ml.common.transport.memory.MLGraphSearchAction;
 import org.opensearch.ml.common.transport.memory.MLGraphSearchInput;
 import org.opensearch.ml.common.transport.memory.MLGraphSearchRequest;
 import org.opensearch.ml.common.transport.memory.MLGraphSearchResponse;
-import org.opensearch.ml.helper.TenantAwareHelper;
-import org.opensearch.ml.settings.MLFeatureEnabledSetting;
+import org.opensearch.ml.helper.MemoryContainerHelper;
+import org.opensearch.ml.utils.TenantAwareHelper;
 import org.opensearch.tasks.Task;
 import org.opensearch.transport.TransportService;
-import org.opensearch.commons.authuser.User;
 
 import com.google.common.collect.ImmutableMap;
 

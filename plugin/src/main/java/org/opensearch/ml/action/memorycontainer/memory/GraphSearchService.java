@@ -5,9 +5,9 @@
 
 package org.opensearch.ml.action.memorycontainer.memory;
 
+import static org.opensearch.ml.common.CommonValue.TENANT_ID_FIELD;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.MEMORY_CONTAINER_ID_FIELD;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.OWNER_ID_FIELD;
-import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.TENANT_ID_FIELD;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.ENTITY_ID_FIELD;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.ENTITY_NAME_FIELD;
 import static org.opensearch.ml.common.memorycontainer.MemoryContainerConstants.ENTITY_TYPE_FIELD;
@@ -24,32 +24,33 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.opensearch.action.ActionListener;
 import org.opensearch.action.search.MultiSearchAction;
 import org.opensearch.action.search.MultiSearchRequest;
 import org.opensearch.action.search.MultiSearchResponse;
 import org.opensearch.action.search.SearchAction;
 import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.search.SearchResponse;
-import org.opensearch.client.Client;
 import org.opensearch.cluster.service.ClusterService;
+import org.opensearch.commons.authuser.User;
+import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.common.Strings;
 import org.opensearch.index.query.BoolQueryBuilder;
 import org.opensearch.index.query.QueryBuilders;
 import org.opensearch.knn.index.query.KNNQueryBuilder;
-import org.opensearch.ml.action.prediction.MLPredictionTaskAction;
-import org.opensearch.ml.action.prediction.MLPredictionTaskRequest;
-import org.opensearch.ml.action.prediction.MLPredictionTaskResponse;
 import org.opensearch.ml.common.input.MLInput;
 import org.opensearch.ml.common.input.parameter.MLAlgoParams;
 import org.opensearch.ml.common.memorycontainer.MemoryConfiguration;
 import org.opensearch.ml.common.memorycontainer.graph.GraphEntity;
 import org.opensearch.ml.common.memorycontainer.graph.GraphRelationship;
 import org.opensearch.ml.common.memorycontainer.graph.GraphSearchResult;
+import org.opensearch.ml.common.transport.MLTaskResponse;
+import org.opensearch.ml.common.transport.prediction.MLPredictionTaskAction;
+import org.opensearch.ml.common.transport.prediction.MLPredictionTaskRequest;
 import org.opensearch.ml.engine.algorithms.remote.TextEmbeddingMLRemoteInferenceInput;
+import org.opensearch.ml.helper.MemoryContainerHelper;
 import org.opensearch.search.SearchHit;
 import org.opensearch.search.builder.SearchSourceBuilder;
-import org.opensearch.commons.authuser.User;
+import org.opensearch.transport.client.Client;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.jayway.jsonpath.JsonPath;
@@ -649,7 +650,7 @@ public class GraphSearchService {
     /**
      * Parse embedding from ML response
      */
-    private String parseEmbeddingFromResponse(MLPredictionTaskResponse response) throws IOException {
+    private String parseEmbeddingFromResponse(MLTaskResponse response) throws IOException {
         String responseJson = response.getOutput().toString();
         return JsonPath.read(responseJson, "$.inference_results[0].output[0].data");
     }

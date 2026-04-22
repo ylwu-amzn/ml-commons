@@ -5,14 +5,14 @@
 
 package org.opensearch.ml.action.memorycontainer.memory;
 
-import org.opensearch.action.ActionListener;
 import org.opensearch.action.support.ActionFilters;
 import org.opensearch.action.support.HandledTransportAction;
 import org.opensearch.common.inject.Inject;
+import org.opensearch.core.action.ActionListener;
+import org.opensearch.ml.common.settings.MLFeatureEnabledSetting;
 import org.opensearch.ml.common.transport.memory.MLGraphSearchRequest;
 import org.opensearch.ml.common.transport.memory.MLGraphSearchResponse;
 import org.opensearch.ml.common.transport.memory.MLListGraphEntitiesAction;
-import org.opensearch.ml.settings.MLFeatureEnabledSetting;
 import org.opensearch.tasks.Task;
 import org.opensearch.transport.TransportService;
 
