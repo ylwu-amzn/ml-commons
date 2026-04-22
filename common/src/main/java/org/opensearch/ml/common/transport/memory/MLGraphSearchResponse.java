@@ -13,9 +13,9 @@ import org.opensearch.core.common.io.stream.StreamInput;
 import org.opensearch.core.common.io.stream.StreamOutput;
 import org.opensearch.core.xcontent.ToXContentObject;
 import org.opensearch.core.xcontent.XContentBuilder;
-import org.opensearch.ml.action.memorycontainer.memory.GraphEntity;
-import org.opensearch.ml.action.memorycontainer.memory.GraphRelationship;
-import org.opensearch.ml.action.memorycontainer.memory.GraphSearchResult;
+import org.opensearch.ml.common.memorycontainer.graph.GraphEntity;
+import org.opensearch.ml.common.memorycontainer.graph.GraphRelationship;
+import org.opensearch.ml.common.memorycontainer.graph.GraphSearchResult;
 
 import lombok.Builder;
 import lombok.Getter;
@@ -76,17 +76,17 @@ public class MLGraphSearchResponse extends ActionResponse implements ToXContentO
     public void writeTo(StreamOutput out) throws IOException {
         out.writeBoolean(entities != null);
         if (entities != null) {
-            out.writeList(entities, this::writeGraphEntity);
+            out.writeCollection(entities, this::writeGraphEntity);
         }
 
         out.writeBoolean(relationships != null);
         if (relationships != null) {
-            out.writeList(relationships, this::writeGraphRelationship);
+            out.writeCollection(relationships, this::writeGraphRelationship);
         }
 
         out.writeBoolean(searchResults != null);
         if (searchResults != null) {
-            out.writeList(searchResults, this::writeGraphSearchResult);
+            out.writeCollection(searchResults, this::writeGraphSearchResult);
         }
 
         out.writeOptionalVInt(totalCount);

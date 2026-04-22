@@ -7,6 +7,9 @@ package org.opensearch.ml.action.memorycontainer.memory;
 
 import java.util.List;
 
+import org.opensearch.ml.common.memorycontainer.graph.GraphEntity;
+import org.opensearch.ml.common.memorycontainer.graph.GraphRelationship;
+
 import lombok.Builder;
 import lombok.Data;
 

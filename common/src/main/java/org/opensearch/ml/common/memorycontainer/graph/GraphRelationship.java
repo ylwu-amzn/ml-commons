@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package org.opensearch.ml.action.memorycontainer.memory;
+package org.opensearch.ml.common.memorycontainer.graph;
 
 import lombok.Builder;
 import lombok.Data;

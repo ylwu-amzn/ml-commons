@@ -16,6 +16,7 @@ import org.opensearch.core.xcontent.ToXContentObject;
 import org.opensearch.core.xcontent.XContentBuilder;
 import org.opensearch.core.xcontent.XContentParser;
 
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -24,6 +25,7 @@ import lombok.Getter;
  */
 @Getter
 @Builder
+@AllArgsConstructor
 public class MLGraphSearchInput implements ToXContentObject, Writeable {
 
     public static final String MEMORY_CONTAINER_ID_FIELD = "memory_container_id";

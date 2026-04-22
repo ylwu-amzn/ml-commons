@@ -15,6 +15,8 @@ import org.opensearch.common.inject.Inject;
 import org.opensearch.core.rest.RestStatus;
 import org.opensearch.ml.common.exception.MLException;
 import org.opensearch.ml.common.memorycontainer.MLMemoryContainer;
+import org.opensearch.ml.common.memorycontainer.graph.GraphEntity;
+import org.opensearch.ml.common.memorycontainer.graph.GraphSearchResult;
 import org.opensearch.ml.common.transport.memory.MLGraphSearchAction;
 import org.opensearch.ml.common.transport.memory.MLGraphSearchInput;
 import org.opensearch.ml.common.transport.memory.MLGraphSearchRequest;
