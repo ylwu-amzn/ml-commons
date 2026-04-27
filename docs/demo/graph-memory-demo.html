@@ -97,8 +97,11 @@
   <div class="sub">
     Single <code>POST /memories</code> call populates both stores. Vanilla uses the real
     <code>/memories/long-term/_semantic_search</code> endpoint. Graph uses
-    <code>/memories/graph/_search</code> plus a few stitched edge queries. All results below are
-    verbatim from a live OpenSearch 3.5 cluster + ml-commons plugin (branch <code>local-test/3.5</code>).
+    <code>/memories/graph/_search</code> plus a few stitched edge queries.
+    <br>
+    All results below are verbatim from a live OpenSearch 3.5 cluster + ml-commons plugin
+    (branch <code>local-test/3.5</code>, container <code>hV4x0Z0BrnKV8q3htQqt</code>).
+    Container state at capture: <strong>22 long-term facts, 18 entities, 29 relationships</strong>.
   </div>
 </header>
 
@@ -408,14 +411,16 @@ POST /demo-memory-lpg-edges/_search
       <div class="hit bad"><span class="score">0.701</span><div class="text">Northwind Traders runs all their analytics on PostgreSQL. <span class="mark">✗</span></div></div>
     </div>
     <div class="col">
-      <h3>Graph hybrid <span class="badge good">3/3 ranked</span></h3>
+      <h3>Graph hybrid <span class="badge good">3/3 ranked + 1 adjacent</span></h3>
       <ul class="graph-result" style="padding-left:0; margin:6px 0 10px">
-        <li><strong>Elena Torres</strong><span class="meta">relationship_expansion, score 1.30</span></li>
-        <li><strong>Tom Becker</strong><span class="meta">text_similarity, score 1.00</span></li>
+        <li><strong>Jordan Lee</strong><span class="meta">relationship_expansion, score 1.10</span></li>
+        <li><strong>Elena Torres</strong><span class="meta">text_similarity, score 1.00</span></li>
+        <li><strong>Tom Becker</strong><span class="meta">relationship_expansion, score 1.00</span></li>
         <li><strong>Marcus Webb</strong><span class="meta">relationship_expansion, score 0.60</span></li>
       </ul>
       <div class="intent" style="margin-top:12px">
         Agent gets structured results with match-type labels — no need to re-parse passages.
+        Marcus appears because he touches the network via KNOWS edges.
       </div>
     </div>
   </div>
@@ -423,6 +428,26 @@ POST /demo-memory-lpg-edges/_search
   <h3 class="section-heading">Run this in Dev Tools</h3>
   <pre class="devtools">POST /_plugins/_ml/memory_containers/hV4x0Z0BrnKV8q3htQqt/memories/graph/_search
 { "query": "vector databases", "top_k": 10 }</pre>
+  <details>
+    <summary>Raw response (trimmed)</summary>
+    <pre>{
+  "entities": [
+    { "entity_id": "ent:...:jordan-lee",        "name": "Jordan Lee",    "type": "PERSON"        },
+    { "entity_id": "ent:...:elena-torres",      "name": "Elena Torres",  "type": "PERSON"        },
+    { "entity_id": "ent:...:postgresql",        "name": "PostgreSQL",    "type": "TECHNOLOGY"    },
+    { "entity_id": "ent:...:tom-becker",        "name": "Tom Becker",    "type": "PERSON"        },
+    { "entity_id": "ent:...:marcus-webb",       "name": "Marcus Webb",   "type": "PERSON"        }
+  ],
+  "search_results": [
+    { "entity": { "name": "Jordan Lee"    }, "score": 1.10, "match_type": "relationship_expansion" },
+    { "entity": { "name": "Elena Torres"  }, "score": 1.00, "match_type": "text_similarity"        },
+    { "entity": { "name": "Tom Becker"    }, "score": 1.00, "match_type": "relationship_expansion" },
+    { "entity": { "name": "Marcus Webb"   }, "score": 0.60, "match_type": "relationship_expansion" }
+  ],
+  "total_count": 10,
+  "query": "vector databases"
+}</pre>
+  </details>
 </section>
 
 
@@ -445,7 +470,7 @@ POST /demo-memory-lpg-edges/_search
       <tr><td class="q">Q2</td><td>PostgreSQL customers</td><td class="num">1</td><td class="num v">2/5 correct</td><td class="num g">2/2</td></tr>
       <tr><td class="q">Q3</td><td>Known contacts at MongoDB cos</td><td class="num">2</td><td class="num v">0/5 (only passages)</td><td class="num g">2/2</td></tr>
       <tr><td class="q">Q4</td><td>Contacts at competitors</td><td class="num">3</td><td class="num v">0/5</td><td class="num g">2/2 with competitor named</td></tr>
-      <tr><td class="q">Q5</td><td>Vector-DB leads</td><td class="num">1</td><td class="num w">3/5 buried</td><td class="num g">3/3 ranked</td></tr>
+      <tr><td class="q">Q5</td><td>Vector-DB leads</td><td class="num">1</td><td class="num w">3/5 buried</td><td class="num g">3/3 ranked + network</td></tr>
     </tbody>
   </table>
   <div class="callout" style="margin-top:16px">

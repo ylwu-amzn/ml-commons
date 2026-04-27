@@ -96,8 +96,9 @@ VANILLA  query="who is interested in vector databases", k=5
   0.701  Northwind Traders runs all their analytics on PostgreSQL.              ✗
 
 GRAPH  hybrid search around "vector databases"
-  - Elena Torres   (relationship_expansion, score 1.30)
-  - Tom Becker     (text_similarity,        score 1.00)
+  - Jordan Lee     (relationship_expansion, score 1.10)
+  - Elena Torres   (text_similarity,        score 1.00)
+  - Tom Becker     (relationship_expansion, score 1.00)
   - Marcus Webb    (relationship_expansion, score 0.60)
 ```
 
@@ -109,7 +110,7 @@ GRAPH  hybrid search around "vector databases"
 | Q2 | PostgreSQL customers | 1 | 2/5 correct | **2/2** |
 | Q3 | Known contacts at MongoDB cos | 2 | **0/5** | **2/2** |
 | Q4 | Contacts at competitors | 3 | **0/5** | **2/2 with competitor named** |
-| Q5 | Vector-DB leads | 1 | 3/5 buried | **3/3 ranked** |
+| Q5 | Vector-DB leads | 1 | 3/5 buried | **3/3 ranked + Marcus via network** |
 
 - **1-hop gap is real but narrow** — an LLM consumer can usually sift vanilla's 2/5 correct.
 - **2- and 3-hop gap is categorical** — vanilla returns only passages that the LLM cannot join.
