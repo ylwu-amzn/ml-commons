@@ -1,27 +1,49 @@
 #!/usr/bin/env python3
-"""
-Graph-memory demo — ingest 3 call notes through the full LLM extraction pipeline.
+"""Ingest 3 realistic call notes through the agentic-memory API so the LLM builds
+both long-term memory (vanilla) AND the graph in one call.
 
-Expects:
- - OpenSearch cluster on https://localhost:9200 with admin creds below
- - Text embedding model registered & deployed: EMB_MODEL
- - LLM model (Bedrock Claude Sonnet 4.6 via Converse API) registered: LLM_MODEL
- - Memory container created with enable_graph=true: CID
- - Parallel vanilla-memory index for the baseline comparison: VANILLA
+Prerequisites:
+  - OpenSearch 3.5 cluster with ml-commons plugin (local-test/3.5 branch)
+  - Text embedding model deployed:      EMB_MODEL
+  - LLM model (Bedrock Claude Sonnet):  LLM_MODEL
+  - Memory container CID created with:
+      * enable_graph: true
+      * at least one SEMANTIC strategy with namespace ['owner_id']
+      * custom_relationship_extraction_prompt including COMPETES_WITH
+      * llm_result_path:  $.output.message.content[0].text  (Bedrock Converse)
 
-The same 3 call notes are used for both stores:
- - Graph store: server-side LLM extraction via POST /memories?infer=true
- - Vanilla store: sentence-chunked + embedded for neural search
+Each POST /memories with infer=true returns quickly; in the background the server:
+  1) Summarizes and writes session + working memory
+  2) Runs each SEMANTIC strategy to extract facts into long-term memory
+  3) (Parallel) Runs GraphProcessingService to extract entities + typed edges
+     into the lpg-nodes/lpg-edges indices
+
+Both memory layers come from the same Sonnet call chain over the same 3 notes.
 """
-import json
-import subprocess
+import json, subprocess, time
 
 AUTH = "admin:RUIwNTVGTDc2MDhDM0JNRC4u"
 BASE = "https://localhost:9200"
-EMB_MODEL = "BWxf0J0BTxnG51e8Pch9"
-LLM_MODEL = "3qRp0J0BQ4F7Y_V3OOKT"
-CID = "_YWw0J0BFKsTOMMlBkoK"
-VANILLA = "demo-vanilla-memory"
+CID  = "hV4x0Z0BrnKV8q3htQqt"  # your container id
+
+NOTES = [
+    "Daisy Chen had a great call with Elena Torres today. Elena is VP of Engineering at "
+    "Northwind Traders. Northwind runs all their analytics on PostgreSQL. Elena is researching "
+    "vector databases for their next platform. Daisy met Elena at KubeCon last quarter. Sarah Kim "
+    "is the manager of Daisy Chen, and Sarah said Daisy should loop in Ravi Patel from the SE team. "
+    "Ravi used to work with Tom Becker at Acme five years ago; Tom is now Data Architect at Umbrella Corp.",
+
+    "Jordan Lee from Globex emailed Daisy Chen about vector-search capabilities. Globex is a fintech "
+    "firm that runs on MongoDB. Jordan is their CTO and wants to add semantic search to their trading "
+    "product. Jordan mentioned Initech is doing something similar; Initech competes with Northwind "
+    "Traders in retail analytics. Marcus Webb, one of Sarah Kim SDRs, booked a discovery call with "
+    "Jordan for next Tuesday.",
+
+    "Mia Rossi at Initech ran into Daisy Chen at the MongoDB conference. Mia is Platform Lead at "
+    "Initech and Daisy Chen knows her from Daisy Chen previous job at Acme. Initech runs on MongoDB "
+    "like Globex does. Mia mentioned Tom Becker at Umbrella Corp is evaluating vector search; Tom runs "
+    "the data platform there and Umbrella uses PostgreSQL.",
+]
 
 
 def curl(method, path, body=None):
@@ -31,73 +53,31 @@ def curl(method, path, body=None):
     return json.loads(subprocess.run(cmd, capture_output=True, text=True).stdout)
 
 
-def embed(text):
-    r = curl(
-        "POST",
-        f"/_plugins/_ml/_predict/text_embedding/{EMB_MODEL}",
-        {"text_docs": [text], "target_response": ["sentence_embedding"]},
-    )
-    return r["inference_results"][0]["output"][0]["data"]
+def ingest():
+    for i, note in enumerate(NOTES, 1):
+        r = curl("POST", f"/_plugins/_ml/memory_containers/{CID}/memories", {
+            "messages": [{"role": "user", "content": [{"type": "text", "text": note}]}],
+            "infer": True,
+            "namespace": {"owner_id": "admin"},
+        })
+        print(f"  call-note {i}: session={r.get('session_id')}")
+        # Give the background graph + long-term extraction time to finish before next POST
+        time.sleep(6)
 
 
-# The three realistic call notes (what Daisy's assistant captured from her calls)
-call_notes = [
-    "Had a great call with Elena Torres today. She is VP of Engineering at Northwind Traders. "
-    "Northwind runs all their analytics on PostgreSQL. Elena is researching vector databases for "
-    "their next platform. I met her at KubeCon last quarter. My manager Sarah Kim said I should "
-    "loop in Ravi Patel from our SE team. Ravi used to work with Tom Becker at Acme five years "
-    "ago; Tom is now Data Architect at Umbrella Corp.",
-
-    "Jordan Lee from Globex emailed about our new vector-search capabilities. Globex is a fintech "
-    "firm and they run on MongoDB. Jordan is their CTO and wants to add semantic search to their "
-    "trading product. He mentioned Initech is doing something similar — Initech competes with "
-    "Northwind Traders in retail analytics. Marcus Webb, one of Sarah Kim's SDRs, booked a "
-    "discovery call with Jordan for next Tuesday.",
-
-    "Mia Rossi at Initech ran into me at the MongoDB conference. Mia is Platform Lead at Initech "
-    "and I know her from my previous job at Acme. Initech runs on MongoDB like Globex does. Mia "
-    "mentioned Tom Becker at Umbrella Corp is evaluating vector search — Tom runs the data "
-    "platform there and Umbrella uses PostgreSQL.",
-]
-
-
-def ingest_graph():
-    print("---- graph memory: ingest 3 call notes via LLM extraction ----")
-    for i, note in enumerate(call_notes, 1):
-        r = curl(
-            "POST",
-            f"/_plugins/_ml/memory_containers/{CID}/memories",
-            {"messages": [{"role": "user", "content": [{"type": "text", "text": note}]}],
-             "infer": True},
-        )
-        print(f"  call-note {i}: session_id={r.get('session_id')}")
-
-
-def ingest_vanilla():
-    print("---- vanilla memory: sentence-chunk + embed the same notes ----")
-    # Split on '. ' to mimic a naive sentence-chunk retriever
-    sentences = []
-    for note in call_notes:
-        for s in note.split(". "):
-            s = s.strip().rstrip(".")
-            if s:
-                sentences.append(s + ".")
-    for i, s in enumerate(sentences):
-        curl("POST", f"/{VANILLA}/_doc/v-{i}?refresh=true", {"text": s, "embedding": embed(s)})
-    print(f"  {len(sentences)} vanilla-memory documents indexed")
-
-
-def report_graph_state():
-    nodes = curl("POST", f"/demo-memory-lpg-nodes/_count", None)["count"]
-    edges = curl("POST", f"/demo-memory-lpg-edges/_count", None)["count"]
-    vanilla = curl("POST", f"/{VANILLA}/_count", None)["count"]
-    print("\n---- resulting state ----")
-    print(f"  graph entities:       {nodes}")
-    print(f"  graph relationships:  {edges}")
-    print(f"  vanilla documents:    {vanilla}")
+def report():
+    for idx, label in [
+        ("demo-memory-long-term", "long-term facts"),
+        ("demo-memory-lpg-nodes", "graph entities"),
+        ("demo-memory-lpg-edges", "graph edges"),
+    ]:
+        c = curl("POST", f"/{idx}/_count")
+        print(f"  {label:20s}: {c.get('count')}")
 
 
 if __name__ == "__main__":
-    ingest_graph()
-    ingest_vanilla()
-    report_graph_state()
+    print("---- ingest 3 call notes via POST /memories ?infer=true ----")
+    ingest()
+    time.sleep(8)
+    print("\n---- result state ----")
+    report()
