@@ -12,6 +12,8 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Locale;
 
+import org.opensearch.OpenSearchStatusException;
+import org.opensearch.core.rest.RestStatus;
 import org.opensearch.ml.common.settings.MLFeatureEnabledSetting;
 import org.opensearch.ml.common.transport.memory.MLDeleteGraphDataAction;
 import org.opensearch.ml.common.transport.memory.MLDeleteGraphDataRequest;
@@ -58,7 +60,7 @@ public class RestMLDeleteGraphDataAction extends BaseRestHandler {
     @Override
     public RestChannelConsumer prepareRequest(RestRequest request, NodeClient client) throws IOException {
         if (!mlFeatureEnabledSetting.isAgenticMemoryEnabled()) {
-            throw new IllegalStateException("Agentic memory feature is not enabled");
+            throw new OpenSearchStatusException("Agentic memory feature is not enabled", RestStatus.FORBIDDEN);
         }
 
         String memoryContainerId = request.param(PARAMETER_MEMORY_CONTAINER_ID);
