@@ -1,0 +1,746 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Graph Memory — Vanilla vs Graph Comparison</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --surface: #161a22;
+    --surface-2: #1d222c;
+    --border: #262c38;
+    --text: #e6e9ef;
+    --muted: #9aa3b2;
+    --accent: #4f8cff;
+    --good: #26d07c;
+    --bad: #ff6b6b;
+    --warn: #f0b429;
+    --code-bg: #0b0d12;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    font-size: 14px;
+    line-height: 1.55;
+  }
+  header {
+    padding: 28px 40px 20px;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, #1a1f2a 0%, #0f1115 100%);
+  }
+  header h1 {
+    margin: 0 0 6px;
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  header .sub {
+    color: var(--muted);
+    font-size: 13px;
+  }
+  main {
+    max-width: 1320px;
+    margin: 0 auto;
+    padding: 28px 40px 80px;
+  }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 22px 26px;
+    margin-bottom: 22px;
+  }
+  .card h2 {
+    margin: 0 0 4px;
+    font-size: 17px;
+    font-weight: 600;
+  }
+  .card .intent {
+    color: var(--muted);
+    font-size: 13px;
+    margin-bottom: 18px;
+  }
+  .cmp {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-top: 6px;
+  }
+  .col {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+  }
+  .col h3 {
+    margin: 0 0 10px;
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .badge {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: #2a3142;
+    color: var(--muted);
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
+  }
+  .badge.good { background: rgba(38, 208, 124, 0.15); color: var(--good); }
+  .badge.bad  { background: rgba(255, 107, 107, 0.15); color: var(--bad); }
+  .badge.warn { background: rgba(240, 180, 41, 0.15); color: var(--warn); }
+  pre, code {
+    font-family: "SF Mono", "Menlo", "Monaco", "Consolas", monospace;
+    font-size: 12.5px;
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 14px;
+    overflow-x: auto;
+    margin: 0 0 10px;
+    color: #d7dbe3;
+  }
+  pre.devtools {
+    position: relative;
+  }
+  pre.devtools::before {
+    content: "DEV TOOLS";
+    position: absolute;
+    top: 6px;
+    right: 10px;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    color: #5b6474;
+    font-weight: 600;
+  }
+  .hit {
+    display: grid;
+    grid-template-columns: 54px 1fr;
+    gap: 10px;
+    font-size: 12.5px;
+    padding: 4px 0;
+    border-bottom: 1px solid #20252f;
+  }
+  .hit:last-child { border: none; }
+  .hit .score { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .hit .text { color: #d7dbe3; }
+  .hit.ok .score    { color: var(--good); }
+  .hit.bad .score   { color: var(--bad); }
+  .hit.partial .score { color: var(--warn); }
+  .hit .mark {
+    font-size: 11px;
+    color: var(--muted);
+    margin-left: 6px;
+  }
+  .hit.ok .mark { color: var(--good); }
+  .hit.bad .mark { color: var(--bad); }
+  .hit.partial .mark { color: var(--warn); }
+  .graph-result {
+    font-size: 12.5px;
+  }
+  .graph-result li {
+    padding: 3px 0;
+    list-style: none;
+    border-bottom: 1px solid #20252f;
+  }
+  .graph-result li:last-child { border: none; }
+  .graph-result .meta { color: var(--muted); font-size: 11.5px; margin-left: 8px; }
+
+  table.scoreboard {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  table.scoreboard th, table.scoreboard td {
+    padding: 9px 12px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+  table.scoreboard th { color: var(--muted); font-weight: 500; }
+  table.scoreboard td.num { font-variant-numeric: tabular-nums; text-align: center; }
+  table.scoreboard .q { color: var(--muted); width: 32px; }
+  table.scoreboard .v { color: var(--bad); }
+  table.scoreboard .g { color: var(--good); }
+  table.scoreboard .w { color: var(--warn); }
+
+  details {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin-top: 8px;
+  }
+  details summary {
+    padding: 8px 14px;
+    cursor: pointer;
+    user-select: none;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 500;
+  }
+  details[open] summary { border-bottom: 1px solid var(--border); }
+  details pre { margin: 0; border: none; border-radius: 0; }
+
+  .tldr {
+    background: linear-gradient(90deg, #1e2a3d 0%, #1a2130 100%);
+    border-left: 3px solid var(--accent);
+  }
+  .tldr p { margin: 0; font-size: 14px; color: #dfe4ee; }
+  .tldr p + p { margin-top: 10px; }
+
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 22px;
+  }
+  .two-col .col-card {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 18px;
+  }
+  .two-col h4 {
+    margin: 0 0 8px;
+    font-size: 13px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-weight: 600;
+  }
+
+  .entity-chip {
+    display: inline-block;
+    padding: 2px 8px;
+    margin: 2px 3px;
+    border-radius: 4px;
+    font-size: 11.5px;
+    background: #252b38;
+    color: #c4cbd9;
+    border: 1px solid #2f3647;
+  }
+  .entity-chip.PERSON { background: rgba(79, 140, 255, 0.15); color: #9cc0ff; border-color: rgba(79, 140, 255, 0.35); }
+  .entity-chip.ORGANIZATION { background: rgba(240, 180, 41, 0.15); color: #ffcf70; border-color: rgba(240, 180, 41, 0.35); }
+  .entity-chip.TECHNOLOGY { background: rgba(38, 208, 124, 0.15); color: #6fe3a8; border-color: rgba(38, 208, 124, 0.35); }
+  .entity-chip.EVENT,
+  .entity-chip.CONCEPT { background: #2a2335; color: #c9b5f0; border-color: #3a3048; }
+
+  .edges {
+    font-family: "SF Mono", Menlo, monospace;
+    font-size: 12px;
+    color: #c4cbd9;
+    line-height: 1.7;
+  }
+  .edges .type { color: var(--accent); }
+
+  h3.section-heading {
+    margin: 28px 0 12px;
+    font-size: 13px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: 600;
+  }
+  .lede {
+    font-size: 13px;
+    color: var(--muted);
+    margin: 0 0 12px;
+  }
+  .footer-note {
+    color: var(--muted);
+    font-size: 12px;
+    padding-top: 18px;
+    border-top: 1px solid var(--border);
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Graph Memory vs Vanilla Memory — Live Comparison</h1>
+  <div class="sub">
+    Same 3 call notes ingested into both stores. All queries ran on
+    OpenSearch 3.5 + ml-commons plugin (branch <code>local-test/3.5</code>, commit
+    <code>e19a0b368</code>). Outputs below are verbatim from the live cluster.
+  </div>
+</header>
+
+<main>
+
+<section class="card tldr">
+  <p>
+    <strong>Vanilla agentic memory stores conversation text.</strong>
+    Neural search returns <em>passages</em> — good for "what did we discuss?",
+    weak for "who is who, and how are they connected?"
+  </p>
+  <p>
+    <strong>Graph memory adds a structured layer.</strong>
+    On every <code>POST /memories</code>, Claude Sonnet extracts entities and typed
+    relationships automatically. The agent gets a queryable knowledge graph, not a
+    bag of text.
+  </p>
+  <p>
+    Graph is opt-in per container via one line:
+    <code>"enable_graph": true</code>.
+  </p>
+</section>
+
+<section class="card">
+  <h2>Setup</h2>
+  <div class="intent">What was ingested. Both stores saw identical source text.</div>
+
+  <div class="two-col">
+    <div class="col-card">
+      <h4>Vanilla memory (baseline)</h4>
+      <p style="margin:0 0 8px">Each call note is sentence-chunked and embedded by MiniLM. The resulting
+        <strong>21 documents</strong> live in <code>demo-vanilla-memory</code>, searchable by
+        neural KNN.</p>
+    </div>
+    <div class="col-card">
+      <h4>Graph memory</h4>
+      <p style="margin:0 0 8px">Same 3 call notes sent to <code>POST /memories</code> with
+        <code>infer: true</code>. Bedrock Claude Sonnet 4.6 extracts entities and relationships
+        automatically. Result: <strong>20 entities, 26 relationships</strong> in
+        <code>demo-memory-lpg-nodes</code> / <code>demo-memory-lpg-edges</code>.</p>
+    </div>
+  </div>
+
+  <h3 class="section-heading">The automatically extracted graph</h3>
+  <div style="margin-bottom: 14px">
+    <span class="entity-chip PERSON">Elena Torres</span>
+    <span class="entity-chip PERSON">Jordan Lee</span>
+    <span class="entity-chip PERSON">Sarah Kim</span>
+    <span class="entity-chip PERSON">Marcus Webb</span>
+    <span class="entity-chip PERSON">Ravi Patel</span>
+    <span class="entity-chip PERSON">Mia Rossi</span>
+    <span class="entity-chip PERSON">Tom Becker</span>
+    <span class="entity-chip ORGANIZATION">Northwind Traders</span>
+    <span class="entity-chip ORGANIZATION">Globex</span>
+    <span class="entity-chip ORGANIZATION">Initech</span>
+    <span class="entity-chip ORGANIZATION">Umbrella Corp</span>
+    <span class="entity-chip ORGANIZATION">Acme</span>
+    <span class="entity-chip TECHNOLOGY">PostgreSQL</span>
+    <span class="entity-chip TECHNOLOGY">MongoDB</span>
+    <span class="entity-chip TECHNOLOGY">Vector Database</span>
+    <span class="entity-chip TECHNOLOGY">Vector Search</span>
+    <span class="entity-chip TECHNOLOGY">Semantic Search</span>
+    <span class="entity-chip EVENT">KubeCon</span>
+    <span class="entity-chip EVENT">MongoDB conference</span>
+    <span class="entity-chip CONCEPT">Fintech</span>
+  </div>
+  <div class="edges">
+Elena Torres <span class="type">-[WORKS_AT]-&gt;</span> Northwind Traders
+Northwind Traders <span class="type">-[USES]-&gt;</span> PostgreSQL
+Umbrella Corp <span class="type">-[USES]-&gt;</span> PostgreSQL
+Sarah Kim <span class="type">-[MANAGES]-&gt;</span> Ravi Patel
+Sarah Kim <span class="type">-[MANAGES]-&gt;</span> Marcus Webb
+Jordan Lee <span class="type">-[WORKS_AT]-&gt;</span> Globex
+Globex <span class="type">-[USES]-&gt;</span> MongoDB
+Initech <span class="type">-[USES]-&gt;</span> MongoDB
+Mia Rossi <span class="type">-[WORKS_AT]-&gt;</span> Initech
+Tom Becker <span class="type">-[WORKS_AT]-&gt;</span> Umbrella Corp
+Marcus Webb <span class="type">-[KNOWS]-&gt;</span> Jordan Lee
+Ravi Patel <span class="type">-[KNOWS]-&gt;</span> Tom Becker
+Jordan Lee <span class="type">-[USES]-&gt;</span> Vector Search
+Elena Torres <span class="type">-[OTHER]-&gt;</span> Vector Database
+… and 12 more
+  </div>
+
+  <h3 class="section-heading">Reproduce the setup (Dev Tools)</h3>
+  <pre class="devtools">POST /_plugins/_ml/memory_containers/_create
+{
+  "name": "demo-graph-crm",
+  "configuration": {
+    "embedding_model_type": "TEXT_EMBEDDING",
+    "embedding_model_id": "BWxf0J0BTxnG51e8Pch9",
+    "embedding_dimension": 384,
+    "llm_id": "3qRp0J0BQ4F7Y_V3OOKT",
+    "index_prefix": "demo",
+    "enable_graph": true,
+    "use_system_index": false,
+    "parameters": { "llm_result_path": "$.output.message.content[0].text" }
+  }
+}</pre>
+  <pre class="devtools">POST /_plugins/_ml/memory_containers/_YWw0J0BFKsTOMMlBkoK/memories
+{
+  "messages": [{
+    "role": "user",
+    "content": [{
+      "type": "text",
+      "text": "Had a great call with Elena Torres today. She is VP of Engineering at Northwind Traders. Northwind runs all their analytics on PostgreSQL. Elena is researching vector databases for their next platform. I met her at KubeCon last quarter. My manager Sarah Kim said I should loop in Ravi Patel from our SE team. Ravi used to work with Tom Becker at Acme five years ago; Tom is now Data Architect at Umbrella Corp."
+    }]
+  }],
+  "infer": true
+}</pre>
+  <div class="intent">
+    Repeat the second request for each call note. The server runs Sonnet in parallel with the normal
+    memory write and indexes the extracted entities/relationships automatically.
+  </div>
+</section>
+
+
+<!-- ============================= Q1 ============================= -->
+<section class="card">
+  <h2>Q1. Who's on Sarah Kim's team?</h2>
+  <div class="intent">1-hop structural question. Vanilla returns 3/5 correct, 2/5 noise. Graph returns exactly 2.</div>
+
+  <div class="cmp">
+    <div class="col">
+      <h3>Vanilla <span class="badge bad">2/5 correct</span></h3>
+      <div class="hit partial"><span class="score">0.713</span><div class="text">My manager Sarah Kim said I should loop in Ravi Patel from our SE team. <span class="mark">✓ relevant</span></div></div>
+      <div class="hit bad"><span class="score">0.662</span><div class="text">Mia Rossi is Platform Lead at Initech. <span class="mark">✗ wrong</span></div></div>
+      <div class="hit bad"><span class="score">0.655</span><div class="text">Elena Torres is VP of Engineering at Northwind Traders. <span class="mark">✗ wrong</span></div></div>
+      <div class="hit ok"><span class="score">0.645</span><div class="text">Marcus Webb, one of Sarah Kim's SDRs, booked a discovery call with Jordan Lee. <span class="mark">✓ relevant</span></div></div>
+      <div class="hit bad"><span class="score">0.641</span><div class="text">I know Mia Rossi from my previous job at Acme. <span class="mark">✗ wrong</span></div></div>
+    </div>
+    <div class="col">
+      <h3>Graph <span class="badge good">2/2 exact</span></h3>
+      <ul class="graph-result" style="padding-left:0; margin:6px 0 10px">
+        <li>Ravi Patel</li>
+        <li>Marcus Webb</li>
+      </ul>
+      <div class="intent" style="margin-top:12px">
+        The agent receives a flat list of names instead of 5 sentences to re-parse.
+      </div>
+    </div>
+  </div>
+
+  <h3 class="section-heading">Run this in Dev Tools</h3>
+  <pre class="devtools">POST /demo-memory-lpg-edges/_search
+{
+  "size": 10,
+  "query": {
+    "bool": {
+      "must": [
+        { "term": { "source_entity": "ent:_YWw0J0BFKsTOMMlBkoK:person:sarah-kim" } },
+        { "term": { "relationship_type": "MANAGES" } }
+      ]
+    }
+  }
+}</pre>
+  <details>
+    <summary>Raw response</summary>
+    <pre>{
+  "hits": {
+    "total": { "value": 2, "relation": "eq" },
+    "hits": [
+      {
+        "_source": {
+          "source_entity": "ent:_YWw0J0BFKsTOMMlBkoK:person:sarah-kim",
+          "target_entity": "ent:_YWw0J0BFKsTOMMlBkoK:person:ravi-patel",
+          "relationship_type": "MANAGES",
+          "confidence": 0.75
+        }
+      },
+      {
+        "_source": {
+          "source_entity": "ent:_YWw0J0BFKsTOMMlBkoK:person:sarah-kim",
+          "target_entity": "ent:_YWw0J0BFKsTOMMlBkoK:person:marcus-webb",
+          "relationship_type": "MANAGES",
+          "confidence": 0.9
+        }
+      }
+    ]
+  }
+}</pre>
+  </details>
+</section>
+
+
+<!-- ============================= Q2 ============================= -->
+<section class="card">
+  <h2>Q2. Which customers run on PostgreSQL?</h2>
+  <div class="intent">1-hop filtered query. Vanilla scatters 2 right hits among 3 wrong ones; graph returns the 2 organizations directly.</div>
+
+  <div class="cmp">
+    <div class="col">
+      <h3>Vanilla <span class="badge warn">2/5 correct</span></h3>
+      <div class="hit ok"><span class="score">0.794</span><div class="text">Umbrella Corp uses PostgreSQL. <span class="mark">✓</span></div></div>
+      <div class="hit ok"><span class="score">0.751</span><div class="text">Northwind Traders runs all their analytics on PostgreSQL. <span class="mark">✓</span></div></div>
+      <div class="hit bad"><span class="score">0.651</span><div class="text">Initech competes with Northwind Traders in retail analytics. <span class="mark">✗ wrong</span></div></div>
+      <div class="hit partial"><span class="score">0.626</span><div class="text">Tom Becker runs the data platform at Umbrella Corp. <span class="mark">~ partial</span></div></div>
+      <div class="hit bad"><span class="score">0.614</span><div class="text">Elena Torres is researching vector databases… <span class="mark">✗ wrong</span></div></div>
+    </div>
+    <div class="col">
+      <h3>Graph <span class="badge good">2/2 exact</span></h3>
+      <ul class="graph-result" style="padding-left:0; margin:6px 0 10px">
+        <li>Northwind Traders</li>
+        <li>Umbrella Corp</li>
+      </ul>
+      <div class="intent" style="margin-top:12px">
+        Filter in one query: edges of type <code>USES</code> targeting PostgreSQL, restricted to entity_type <code>ORGANIZATION</code>.
+      </div>
+    </div>
+  </div>
+
+  <h3 class="section-heading">Run this in Dev Tools</h3>
+  <pre class="devtools">POST /demo-memory-lpg-edges/_search
+{
+  "size": 10,
+  "query": {
+    "bool": {
+      "must": [
+        { "term": { "target_entity": "ent:_YWw0J0BFKsTOMMlBkoK:technology:postgresql" } },
+        { "term": { "relationship_type": "USES" } }
+      ]
+    }
+  }
+}</pre>
+</section>
+
+
+<!-- ============================= Q3 ============================= -->
+<section class="card">
+  <h2>Q3. People I have a connection to, at companies using MongoDB</h2>
+  <div class="intent">2-hop question — vanilla cannot cross the join. Graph answers in three edge lookups.</div>
+
+  <div class="cmp">
+    <div class="col">
+      <h3>Vanilla <span class="badge bad">0/5 correct</span></h3>
+      <div class="hit bad"><span class="score">0.809</span><div class="text">Initech runs on MongoDB like Globex does. <span class="mark">not a person</span></div></div>
+      <div class="hit bad"><span class="score">0.771</span><div class="text">Globex is a fintech firm and they run on MongoDB. <span class="mark">not a person</span></div></div>
+      <div class="hit bad"><span class="score">0.721</span><div class="text">Umbrella Corp uses PostgreSQL. <span class="mark">wrong tech</span></div></div>
+      <div class="hit partial"><span class="score">0.706</span><div class="text">Mia Rossi at Initech ran into me at the MongoDB conference. <span class="mark">mentions Mia but can't reason about "I know"</span></div></div>
+      <div class="hit bad"><span class="score">0.689</span><div class="text">Tom Becker runs the data platform at Umbrella Corp. <span class="mark">wrong</span></div></div>
+    </div>
+    <div class="col">
+      <h3>Graph <span class="badge good">1/1</span></h3>
+      <ul class="graph-result" style="padding-left:0; margin:6px 0 10px">
+        <li>Jordan Lee @ Globex</li>
+      </ul>
+      <div class="intent" style="margin-top:12px">
+        Traversal: <code>USES(company, Mongo)</code> &rarr; <code>WORKS_AT(person, company)</code>
+        &rarr; filter to people touching a <code>KNOWS</code> edge.
+      </div>
+    </div>
+  </div>
+
+  <h3 class="section-heading">Run this in Dev Tools (3 chained calls)</h3>
+  <pre class="devtools"># 1. Companies that USE MongoDB
+POST /demo-memory-lpg-edges/_search
+{
+  "size": 10,
+  "query": {
+    "bool": {
+      "must": [
+        { "term": { "target_entity": "ent:_YWw0J0BFKsTOMMlBkoK:technology:mongodb" } },
+        { "term": { "relationship_type": "USES" } }
+      ]
+    }
+  }
+}</pre>
+  <pre class="devtools"># 2. People who WORKS_AT any of those companies
+POST /demo-memory-lpg-edges/_search
+{
+  "size": 20,
+  "query": {
+    "bool": {
+      "must": [
+        { "terms": { "target_entity": [
+            "ent:_YWw0J0BFKsTOMMlBkoK:organization:globex",
+            "ent:_YWw0J0BFKsTOMMlBkoK:organization:initech"
+        ] } },
+        { "term": { "relationship_type": "WORKS_AT" } }
+      ]
+    }
+  }
+}</pre>
+  <pre class="devtools"># 3. Filter to people the sales rep KNOWS
+POST /demo-memory-lpg-edges/_search
+{
+  "size": 30,
+  "query": { "term": { "relationship_type": "KNOWS" } }
+}</pre>
+</section>
+
+
+<!-- ============================= Q4 ============================= -->
+<section class="card">
+  <h2>Q4. Contacts at companies that compete with our customers</h2>
+  <div class="intent">
+    Honest limit: the LLM's default relationship vocabulary doesn't include <code>COMPETES_WITH</code>,
+    so Sonnet labeled competition as <code>OTHER</code>. Fixable by pointing the container at a
+    <code>custom_relationship_extraction_prompt</code> with a domain vocabulary.
+  </div>
+
+  <div class="cmp">
+    <div class="col">
+      <h3>Vanilla <span class="badge bad">1/5 partial</span></h3>
+      <div class="hit partial"><span class="score">0.649</span><div class="text">Initech competes with Northwind Traders in retail analytics. <span class="mark">context only, no contacts</span></div></div>
+      <div class="hit bad"><span class="score">0.647</span><div class="text">Umbrella Corp uses PostgreSQL.</div></div>
+      <div class="hit bad"><span class="score">0.623</span><div class="text">Tom Becker runs the data platform at Umbrella Corp.</div></div>
+      <div class="hit bad"><span class="score">0.613</span><div class="text">Jordan Lee from Globex emailed about our new vector-search capabilities.</div></div>
+      <div class="hit bad"><span class="score">0.609</span><div class="text">Globex is a fintech firm and they run on MongoDB.</div></div>
+    </div>
+    <div class="col">
+      <h3>Graph <span class="badge warn">same limit — blocked at schema</span></h3>
+      <div class="intent" style="margin-top:4px">
+        Typed <code>COMPETES_WITH</code> edge doesn't exist because the default prompt's vocabulary is:
+        <br><code>WORKS_AT / KNOWS / CREATED / USES / PART_OF / LOCATED_IN / MANAGES / COLLABORATES_WITH / DEVELOPED_BY / OTHER</code>.
+      </div>
+      <div class="intent" style="margin-top:10px">
+        Remediation is already plumbed in: the <code>configuration.parameters</code> field accepts a
+        <code>custom_relationship_extraction_prompt</code>. Exposing this in Dashboards closes the gap
+        without code changes.
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ============================= Q5 ============================= -->
+<section class="card">
+  <h2>Q5. Who is interested in vector databases?</h2>
+  <div class="intent">Hybrid search — neural relevance blended with 1-hop relationship expansion.</div>
+
+  <div class="cmp">
+    <div class="col">
+      <h3>Vanilla <span class="badge warn">3/5 correct (2 buried)</span></h3>
+      <div class="hit ok"><span class="score">0.872</span><div class="text">Elena Torres is researching vector databases for their next platform. <span class="mark">✓</span></div></div>
+      <div class="hit ok"><span class="score">0.776</span><div class="text">Jordan Lee from Globex emailed about our new vector-search capabilities. <span class="mark">✓</span></div></div>
+      <div class="hit ok"><span class="score">0.727</span><div class="text">Mia Rossi mentioned Tom Becker at Umbrella Corp is evaluating vector search. <span class="mark">✓ adjacent</span></div></div>
+      <div class="hit bad"><span class="score">0.727</span><div class="text">Tom Becker runs the data platform at Umbrella Corp. <span class="mark">wrong context</span></div></div>
+      <div class="hit bad"><span class="score">0.703</span><div class="text">Umbrella Corp uses PostgreSQL. <span class="mark">wrong</span></div></div>
+    </div>
+    <div class="col">
+      <h3>Graph <span class="badge good">3/3 ranked</span></h3>
+      <ul class="graph-result" style="padding-left:0; margin:6px 0 10px">
+        <li><strong>Jordan Lee</strong><span class="meta">relationship_expansion, score 1.00</span></li>
+        <li><strong>Elena Torres</strong><span class="meta">relationship_expansion, score 0.90</span></li>
+        <li><strong>Tom Becker</strong><span class="meta">relationship_expansion, score 0.60</span></li>
+      </ul>
+      <div class="intent" style="margin-top:12px">
+        <code>match_type</code> and score come from the hybrid pipeline. No text-parsing required on the client.
+      </div>
+    </div>
+  </div>
+
+  <h3 class="section-heading">Run this in Dev Tools</h3>
+  <pre class="devtools">POST /_plugins/_ml/memory_containers/_YWw0J0BFKsTOMMlBkoK/memories/graph/_search
+{
+  "query": "vector databases",
+  "top_k": 10
+}</pre>
+  <details>
+    <summary>Raw response (trimmed)</summary>
+    <pre>{
+  "search_results": [
+    {
+      "entity": {
+        "entity_id": "ent:_YWw0J0BFKsTOMMlBkoK:person:jordan-lee",
+        "name": "Jordan Lee",
+        "type": "PERSON"
+      },
+      "score": 1.0,
+      "match_type": "relationship_expansion",
+      "relationship_count": 2
+    },
+    {
+      "entity": {
+        "entity_id": "ent:_YWw0J0BFKsTOMMlBkoK:person:elena-torres",
+        "name": "Elena Torres",
+        "type": "PERSON"
+      },
+      "score": 0.9,
+      "match_type": "relationship_expansion",
+      "relationship_count": 1
+    },
+    {
+      "entity": {
+        "entity_id": "ent:_YWw0J0BFKsTOMMlBkoK:person:tom-becker",
+        "name": "Tom Becker",
+        "type": "PERSON"
+      },
+      "score": 0.6,
+      "match_type": "relationship_expansion",
+      "relationship_count": 1
+    }
+  ],
+  "total_count": 10,
+  "query": "vector databases"
+}</pre>
+  </details>
+</section>
+
+
+<!-- ============================= SCOREBOARD ============================= -->
+<section class="card">
+  <h2>Scoreboard</h2>
+  <div class="intent">Vanilla degrades with every hop. Graph degrades gracefully at schema gaps.</div>
+  <table class="scoreboard">
+    <thead>
+      <tr>
+        <th class="q">#</th>
+        <th>Question</th>
+        <th class="num">Hops</th>
+        <th class="num">Vanilla precision</th>
+        <th class="num">Graph precision</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td class="q">Q1</td><td>Sarah's team</td><td class="num">1</td><td class="num v">2/5</td><td class="num g">2/2</td></tr>
+      <tr><td class="q">Q2</td><td>PostgreSQL customers</td><td class="num">1</td><td class="num v">2/5</td><td class="num g">2/2</td></tr>
+      <tr><td class="q">Q3</td><td>Known contacts at MongoDB cos</td><td class="num">2</td><td class="num v">0/5</td><td class="num g">1/1</td></tr>
+      <tr><td class="q">Q4</td><td>Contacts at competitors</td><td class="num">3</td><td class="num w">1/5 partial</td><td class="num w">same — schema limit</td></tr>
+      <tr><td class="q">Q5</td><td>Vector-DB leads</td><td class="num">1</td><td class="num w">3/5 buried</td><td class="num g">3/3 ranked</td></tr>
+    </tbody>
+  </table>
+</section>
+
+
+<!-- ============================= DEV TOOLS APPENDIX ============================= -->
+<section class="card">
+  <h2>Dev Tools — native graph search endpoint</h2>
+  <div class="intent">
+    The <code>/_plugins/_ml/memory_containers/{id}/memories/graph/_search</code> endpoint supports
+    three modes with one REST shape.
+  </div>
+
+  <h3 class="section-heading">1) Text search — neural entity lookup by name</h3>
+  <pre class="devtools">POST /_plugins/_ml/memory_containers/_YWw0J0BFKsTOMMlBkoK/memories/graph/_search
+{
+  "query": "Elena",
+  "search_type": "text",
+  "top_k": 5
+}</pre>
+
+  <h3 class="section-heading">2) Hybrid (default) — neural + 1-hop relationship expansion</h3>
+  <pre class="devtools">POST /_plugins/_ml/memory_containers/_YWw0J0BFKsTOMMlBkoK/memories/graph/_search
+{
+  "query": "vector databases",
+  "top_k": 10
+}</pre>
+
+  <h3 class="section-heading">3) Traversal — BFS from a known entity</h3>
+  <pre class="devtools">POST /_plugins/_ml/memory_containers/_YWw0J0BFKsTOMMlBkoK/memories/graph/_search
+{
+  "query": "Elena",
+  "search_type": "traversal",
+  "entity_id": "ent:_YWw0J0BFKsTOMMlBkoK:person:elena-torres",
+  "max_depth": 2
+}</pre>
+
+  <h3 class="section-heading">Supporting endpoints</h3>
+  <pre class="devtools">GET /_plugins/_ml/memory_containers/_YWw0J0BFKsTOMMlBkoK/memories/graph/entities?query=*&amp;top_k=50</pre>
+  <pre class="devtools">DELETE /_plugins/_ml/memory_containers/_YWw0J0BFKsTOMMlBkoK/memories/graph</pre>
+
+  <div class="footer-note">
+    Every request above works as-is in OpenSearch Dashboards &rarr; Dev Tools.
+    Paste, hit the green "play" arrow, and the response appears on the right.
+    Replace the container id (<code>_YWw0J0BFKsTOMMlBkoK</code>) with yours if you're running a fresh install.
+  </div>
+</section>
+
+</main>
+</body>
+</html>
