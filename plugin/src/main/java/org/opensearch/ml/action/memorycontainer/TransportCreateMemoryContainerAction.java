@@ -9,6 +9,7 @@ import static org.opensearch.ml.common.CommonValue.ML_MEMORY_CONTAINER_INDEX;
 import static org.opensearch.ml.common.settings.MLCommonsSettings.ML_COMMONS_AGENTIC_MEMORY_DISABLED_MESSAGE;
 
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.Map;
 
 import org.opensearch.OpenSearchStatusException;
@@ -401,33 +402,94 @@ public class TransportCreateMemoryContainerAction extends
         try {
             String graphNodesIndex = config.getGraphNodesIndexName();
             String graphEdgesIndex = config.getGraphEdgesIndexName();
-
-            // Create graph nodes index with KNN vector mapping
-            String nodesMapping = String.format(GRAPH_NODES_INDEX_MAPPING, config.getDimension());
             boolean useSystemIndex = config.isUseSystemIndex();
-            // knn_vector fields require index.knn=true on the index settings.
-            Map<String, Object> nodesSettings = Map.of("index.knn", true);
-            mlIndicesHandler.initIndexIfAbsent(graphNodesIndex, nodesMapping, nodesSettings, 1, ActionListener.wrap(
-                nodesCreated -> {
-                    // Create graph edges index
-                    mlIndicesHandler.initIndexIfAbsent(graphEdgesIndex, GRAPH_EDGES_INDEX_MAPPING, 1, ActionListener.wrap(
-                        edgesCreated -> {
-                            log.info("Successfully created graph indices: {} and {}", graphNodesIndex, graphEdgesIndex);
-                            listener.onResponse(true);
-                        },
-                        error -> {
-                            log.error("Failed to create graph edges index: {}", graphEdgesIndex, error);
-                            listener.onFailure(error);
-                        }
-                    ), useSystemIndex);
-                },
-                error -> {
-                    log.error("Failed to create graph nodes index: {}", graphNodesIndex, error);
-                    listener.onFailure(error);
+
+            // Graph-nodes needs a text_embedding ingest pipeline: entity_name -> entity_embedding.
+            // Create the pipeline first, then the index bound to it as default_pipeline.
+            createGraphNodesIngestPipeline(graphNodesIndex, config, ActionListener.wrap(pipelineName -> {
+                String nodesMapping = String.format(GRAPH_NODES_INDEX_MAPPING, config.getDimension());
+                // knn_vector fields require index.knn=true; default_pipeline wires in the embedding processor.
+                Map<String, Object> nodesSettings = new HashMap<>();
+                nodesSettings.put("index.knn", true);
+                if (pipelineName != null) {
+                    nodesSettings.put("index.default_pipeline", pipelineName);
                 }
-            ), useSystemIndex);
+                mlIndicesHandler.initIndexIfAbsent(graphNodesIndex, nodesMapping, nodesSettings, 1, ActionListener.wrap(
+                    nodesCreated -> {
+                        mlIndicesHandler.initIndexIfAbsent(graphEdgesIndex, GRAPH_EDGES_INDEX_MAPPING, 1, ActionListener.wrap(
+                            edgesCreated -> {
+                                log.info("Successfully created graph indices: {} and {}", graphNodesIndex, graphEdgesIndex);
+                                listener.onResponse(true);
+                            },
+                            error -> {
+                                log.error("Failed to create graph edges index: {}", graphEdgesIndex, error);
+                                listener.onFailure(error);
+                            }
+                        ), useSystemIndex);
+                    },
+                    error -> {
+                        log.error("Failed to create graph nodes index: {}", graphNodesIndex, error);
+                        listener.onFailure(error);
+                    }
+                ), useSystemIndex);
+            }, listener::onFailure));
         } catch (Exception e) {
             log.error("Error creating graph indices", e);
+            listener.onFailure(e);
+        }
+    }
+
+    /**
+     * Create a text-embedding ingest pipeline that maps entity_name → entity_embedding.
+     * The pipeline is only required when an embedding model is configured; otherwise pass
+     * null pipeline name to the listener.
+     */
+    private void createGraphNodesIngestPipeline(String graphNodesIndex, MemoryConfiguration config, ActionListener<String> listener) {
+        if (config.getEmbeddingModelType() == null || config.getEmbeddingModelId() == null) {
+            listener.onResponse(null);
+            return;
+        }
+        String pipelineName = graphNodesIndex + "-embedding";
+        try {
+            String processorName =
+                config.getEmbeddingModelType() == org.opensearch.ml.common.FunctionName.TEXT_EMBEDDING
+                    ? "text_embedding"
+                    : "sparse_encoding";
+            org.opensearch.core.xcontent.XContentBuilder builder = org.opensearch.common.xcontent.XContentFactory.jsonBuilder()
+                .startObject()
+                .field("description", "Agentic Memory graph-nodes text embedding pipeline")
+                .startArray("processors")
+                .startObject()
+                .startObject(processorName)
+                .field("model_id", config.getEmbeddingModelId())
+                .startObject("field_map")
+                .field("entity_name", "entity_embedding")
+                .endObject()
+                .endObject()
+                .endObject()
+                .endArray()
+                .endObject();
+
+            org.opensearch.action.ingest.PutPipelineRequest putRequest = new org.opensearch.action.ingest.PutPipelineRequest(
+                pipelineName,
+                org.opensearch.core.common.bytes.BytesReference.bytes(builder),
+                org.opensearch.common.xcontent.XContentType.JSON
+            );
+
+            client.admin().cluster().putPipeline(putRequest, ActionListener.wrap(response -> {
+                if (response.isAcknowledged()) {
+                    log.info("Successfully created graph-nodes embedding pipeline: {}", pipelineName);
+                    listener.onResponse(pipelineName);
+                } else {
+                    listener.onFailure(new OpenSearchStatusException("Pipeline creation not acknowledged: " + pipelineName,
+                        RestStatus.INTERNAL_SERVER_ERROR));
+                }
+            }, e -> {
+                log.error("Failed to create graph-nodes embedding pipeline '{}'", pipelineName, e);
+                listener.onFailure(e);
+            }));
+        } catch (Exception e) {
+            log.error("Failed to build graph-nodes pipeline config for '{}'", pipelineName, e);
             listener.onFailure(e);
         }
     }
