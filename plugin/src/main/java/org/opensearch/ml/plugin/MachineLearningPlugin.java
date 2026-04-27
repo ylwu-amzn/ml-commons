@@ -110,10 +110,13 @@ import org.opensearch.ml.action.memorycontainer.TransportGetMemoryContainerActio
 import org.opensearch.ml.action.memorycontainer.TransportSearchMemoryContainerAction;
 import org.opensearch.ml.action.memorycontainer.TransportUpdateMemoryContainerAction;
 import org.opensearch.ml.action.memorycontainer.memory.TransportAddMemoriesAction;
+import org.opensearch.ml.action.memorycontainer.memory.TransportDeleteGraphDataAction;
 import org.opensearch.ml.action.memorycontainer.memory.TransportDeleteMemoriesByQueryAction;
 import org.opensearch.ml.action.memorycontainer.memory.TransportDeleteMemoryAction;
 import org.opensearch.ml.action.memorycontainer.memory.TransportGetMemoryAction;
+import org.opensearch.ml.action.memorycontainer.memory.TransportGraphSearchAction;
 import org.opensearch.ml.action.memorycontainer.memory.TransportHybridSearchMemoriesAction;
+import org.opensearch.ml.action.memorycontainer.memory.TransportListGraphEntitiesAction;
 import org.opensearch.ml.action.memorycontainer.memory.TransportSearchMemoriesAction;
 import org.opensearch.ml.action.memorycontainer.memory.TransportSemanticSearchMemoriesAction;
 import org.opensearch.ml.action.memorycontainer.memory.TransportUpdateMemoryAction;
@@ -213,6 +216,9 @@ import org.opensearch.ml.common.transport.mcpserver.action.MLMcpToolsRemoveActio
 import org.opensearch.ml.common.transport.mcpserver.action.MLMcpToolsRemoveOnNodesAction;
 import org.opensearch.ml.common.transport.mcpserver.action.MLMcpToolsUpdateAction;
 import org.opensearch.ml.common.transport.mcpserver.action.MLMcpToolsUpdateOnNodesAction;
+import org.opensearch.ml.common.transport.memory.MLDeleteGraphDataAction;
+import org.opensearch.ml.common.transport.memory.MLGraphSearchAction;
+import org.opensearch.ml.common.transport.memory.MLListGraphEntitiesAction;
 import org.opensearch.ml.common.transport.memorycontainer.MLCreateMemoryContainerAction;
 import org.opensearch.ml.common.transport.memorycontainer.MLMemoryContainerDeleteAction;
 import org.opensearch.ml.common.transport.memorycontainer.MLMemoryContainerGetAction;
@@ -336,6 +342,7 @@ import org.opensearch.ml.rest.RestMLDeleteAgentAction;
 import org.opensearch.ml.rest.RestMLDeleteConnectorAction;
 import org.opensearch.ml.rest.RestMLDeleteContextManagementTemplateAction;
 import org.opensearch.ml.rest.RestMLDeleteControllerAction;
+import org.opensearch.ml.rest.RestMLDeleteGraphDataAction;
 import org.opensearch.ml.rest.RestMLDeleteMemoriesByQueryAction;
 import org.opensearch.ml.rest.RestMLDeleteMemoryAction;
 import org.opensearch.ml.rest.RestMLDeleteMemoryContainerAction;
@@ -358,8 +365,10 @@ import org.opensearch.ml.rest.RestMLGetModelAction;
 import org.opensearch.ml.rest.RestMLGetModelGroupAction;
 import org.opensearch.ml.rest.RestMLGetTaskAction;
 import org.opensearch.ml.rest.RestMLGetToolAction;
+import org.opensearch.ml.rest.RestMLGraphSearchAction;
 import org.opensearch.ml.rest.RestMLHybridSearchMemoriesAction;
 import org.opensearch.ml.rest.RestMLListContextManagementTemplatesAction;
+import org.opensearch.ml.rest.RestMLListGraphEntitiesAction;
 import org.opensearch.ml.rest.RestMLListToolsAction;
 import org.opensearch.ml.rest.RestMLPredictionAction;
 import org.opensearch.ml.rest.RestMLPredictionStreamAction;
@@ -600,6 +609,9 @@ public class MachineLearningPlugin extends Plugin
                 new ActionHandler<>(MLDeleteMemoriesByQueryAction.INSTANCE, TransportDeleteMemoriesByQueryAction.class),
                 new ActionHandler<>(MLUpdateMemoryAction.INSTANCE, TransportUpdateMemoryAction.class),
                 new ActionHandler<>(MLGetMemoryAction.INSTANCE, TransportGetMemoryAction.class),
+                new ActionHandler<>(MLGraphSearchAction.INSTANCE, TransportGraphSearchAction.class),
+                new ActionHandler<>(MLListGraphEntitiesAction.INSTANCE, TransportListGraphEntitiesAction.class),
+                new ActionHandler<>(MLDeleteGraphDataAction.INSTANCE, TransportDeleteGraphDataAction.class),
                 new ActionHandler<>(MLRegisterAgentAction.INSTANCE, TransportRegisterAgentAction.class),
                 new ActionHandler<>(MLSearchAgentAction.INSTANCE, TransportSearchAgentAction.class),
                 new ActionHandler<>(SearchInteractionsAction.INSTANCE, SearchInteractionsTransportAction.class),
@@ -1082,6 +1094,9 @@ public class MachineLearningPlugin extends Plugin
             mlFeatureEnabledSetting
         );
         RestMLUpdateMemoryAction restMLUpdateMemoryAction = new RestMLUpdateMemoryAction(mlFeatureEnabledSetting);
+        RestMLGraphSearchAction restMLGraphSearchAction = new RestMLGraphSearchAction(mlFeatureEnabledSetting);
+        RestMLListGraphEntitiesAction restMLListGraphEntitiesAction = new RestMLListGraphEntitiesAction(mlFeatureEnabledSetting);
+        RestMLDeleteGraphDataAction restMLDeleteGraphDataAction = new RestMLDeleteGraphDataAction(mlFeatureEnabledSetting);
         RestMLDeleteMemoryContainerAction restMLDeleteMemoryContainerAction = new RestMLDeleteMemoryContainerAction(
             mlFeatureEnabledSetting
         );
@@ -1180,6 +1195,9 @@ public class MachineLearningPlugin extends Plugin
                 restMLDeleteMemoriesByQueryAction,
                 restMLUpdateMemoryAction,
                 restMLGetMemoryAction,
+                restMLGraphSearchAction,
+                restMLListGraphEntitiesAction,
+                restMLDeleteGraphDataAction,
                 restSearchConversationsAction,
                 restSearchInteractionsAction,
                 restGetConversationAction,

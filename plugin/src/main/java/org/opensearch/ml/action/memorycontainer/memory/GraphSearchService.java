@@ -32,6 +32,7 @@ import org.opensearch.action.search.SearchAction;
 import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.cluster.service.ClusterService;
+import org.opensearch.common.inject.Inject;
 import org.opensearch.commons.authuser.User;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.common.Strings;
@@ -66,6 +67,7 @@ public class GraphSearchService {
     private static final int DEFAULT_TOP_K = 10;
     private static final int MAX_TRAVERSAL_DEPTH = 5;
 
+    @Inject
     public GraphSearchService(
         Client client,
         ClusterService clusterService,
