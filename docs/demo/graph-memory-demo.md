@@ -2,198 +2,283 @@
 
 ## 1-slide summary
 
-> Vanilla agentic memory stores facts as **text blobs**. When an LLM retrieves them, it gets text back — good for "what did we discuss?" but weak for "who, what, and how are they connected?"
+> Vanilla agentic memory stores conversation text. When an LLM agent searches it, it gets **text passages** back — good for "what did we discuss?", weak for "who, what, and how are they connected?"
 >
-> Graph memory adds a second, structured layer: entities (people, companies, products) and typed relationships between them. That layer lets the agent answer **multi-hop, filtered, and aggregated** questions that vanilla memory cannot.
+> Graph memory adds a second, **structured** layer: on every `POST /memories`, a Claude Sonnet extraction call identifies entities (people, companies, products) and typed relationships, which are indexed into a knowledge graph alongside the raw text.
+>
+> That layer lets the agent answer **multi-hop, filtered, and aggregated** questions that vanilla memory cannot.
 
-## The scenario
+## The scenario — a sales CRM assistant
 
-Daisy is an Account Executive. Her AI assistant has been taking notes from her calls for a quarter. Leadership wants to know what her assistant can do that a vanilla memory-backed assistant can't.
+Daisy is an Account Executive. Her AI assistant has been taking notes from her calls. Three real call summaries were fed to the same memory container via `POST /memories/_ingest` with `infer: true`. **Both the vanilla and graph stores saw identical source text.**
 
-The two memory stores were populated with the **same 18 CRM facts** (e.g. "Jordan Lee is CTO at Globex", "Globex runs on MongoDB"). The only difference is how they're stored:
+| Store | Ingestion | Storage |
+|---|---|---|
+| **Vanilla** (baseline) | Sentence-chunked and embedded with MiniLM | 21 text documents, neural-searchable by embedding |
+| **Graph** | `POST /memories` with `infer: true` → Bedrock Claude Sonnet 4.6 → extract entities + relationships → index into `lpg-nodes` + `lpg-edges` with entity embeddings via ingest pipeline | 20 entities, 26 typed relationships — **all produced automatically by the LLM** |
 
-| Store | What it contains |
-|---|---|
-| **Vanilla memory** (baseline) | 18 sentences, each embedded via the same MiniLM model, searched via `neural` KNN — this is what the production agentic-memory `long-term` index looks like. |
-| **Graph memory** (this feature) | 16 entities (Daisy, Sarah, Elena, …, Postgres, MongoDB, …) and 17 typed relationships (`REPORTS_TO`, `WORKS_AT`, `USES_TECH`, `COMPETES_WITH`, `INTERESTED_IN`, `KNOWS`). |
+### What the LLM extracted automatically
+
+From 3 call notes, Bedrock produced:
+
+```
+PERSON          Elena Torres, Jordan Lee, Sarah Kim, Marcus Webb, Ravi Patel,
+                Mia Rossi, Tom Becker
+ORGANIZATION    Northwind Traders, Globex, Initech, Umbrella Corp, Acme
+TECHNOLOGY      PostgreSQL, MongoDB, Vector Database, Vector Search, Semantic Search
+EVENT           KubeCon, MongoDB conference
+CONCEPT         Fintech
+
+Relationships (subset):
+  Elena Torres    -[WORKS_AT]->     Northwind Traders
+  Northwind       -[USES]->          PostgreSQL
+  Umbrella Corp   -[USES]->          PostgreSQL
+  Sarah Kim       -[MANAGES]->       Ravi Patel
+  Sarah Kim       -[MANAGES]->       Marcus Webb
+  Jordan Lee      -[WORKS_AT]->      Globex
+  Globex          -[USES]->          MongoDB
+  Initech         -[USES]->          MongoDB
+  Mia Rossi       -[WORKS_AT]->      Initech
+  Tom Becker      -[WORKS_AT]->      Umbrella Corp
+  Marcus Webb     -[KNOWS]->         Jordan Lee
+  Ravi Patel      -[KNOWS]->         Tom Becker
+  Ravi Patel      -[WORKS_AT]->      Acme      (historical)
+  Jordan Lee      -[USES]->          Vector Search
+  Elena Torres    -[OTHER]->         Vector Database
+  ...
+```
+
+This knowledge graph was built from natural-language call notes without any hand-written schema or rules. The container configuration is just:
+
+```json
+{
+  "embedding_model_id": "…",
+  "llm_id": "…",
+  "enable_graph": true
+}
+```
 
 ## The 5 demo questions
+
+The exact same 5 questions are asked against both stores. Both rounds run on a live OpenSearch 3.5 cluster with the ml-commons plugin from this branch.
 
 ### Q1 — "Who's on Sarah's team?"
 
 ```
-[VANILLA]   neural search: "who is on Sarah Kim team"
-  0.823   Sarah Kim is my sales manager.                   ← Sarah herself, not a teammate
-  0.783   Daisy Chen is an AE who reports to Sarah Kim.    ✓
-  0.763   Marcus Webb is an SDR who reports to Sarah Kim.  ✓
-  0.733   Ravi Patel is a sales engineer who reports to Sarah Kim. ✓
-  0.664   Mia Rossi is the Platform Lead at Initech.       ← wrong, unrelated
+[VANILLA] neural search: "who is on Sarah Kim team"
+  0.713  My manager Sarah Kim said I should loop in Ravi Patel from our SE team.
+  0.662  Mia Rossi is Platform Lead at Initech.                        ← wrong
+  0.655  Elena Torres is VP of Engineering at Northwind Traders.       ← wrong
+  0.645  Marcus Webb, one of Sarah Kim's SDRs, booked a discovery call…
+  0.641  I know Mia Rossi from my previous job at Acme.                ← wrong
 
-[GRAPH]     incoming REPORTS_TO edges where target = Sarah
-  - Marcus Webb
-  - Daisy Chen
+[GRAPH] MANAGES edges from Sarah Kim
   - Ravi Patel
+  - Marcus Webb
 ```
 
-The agent has to read and filter 5 text blobs; graph returns exactly the 3 people.
+The agent would have to parse 5 sentences to derive the same answer vanilla returns. Graph returns exactly the two direct reports.
 
 ### Q2 — "Which customers run on PostgreSQL?"
 
 ```
-[VANILLA]   neural search: "which customers use PostgreSQL"
-  0.768   Umbrella Corp runs on PostgreSQL.                ✓
-  0.750   Northwind Traders runs on PostgreSQL.            ✓
-  0.648   Initech competes with Northwind Traders...       ← wrong
-  0.624   Sarah Kim is my sales manager.                   ← wrong
-  0.614   Elena Torres is researching vector databases...  ← wrong
+[VANILLA] neural: "which customers use PostgreSQL"
+  0.794  Umbrella Corp uses PostgreSQL.                               ✓
+  0.751  Northwind Traders runs all their analytics on PostgreSQL.    ✓
+  0.651  Initech competes with Northwind Traders in retail analytics. ← wrong
+  0.626  Tom Becker runs the data platform at Umbrella Corp.          ← partial
+  0.614  Elena Torres is researching vector databases for their next platform. ← wrong
 
-[GRAPH]     USES_TECH edges where target = t-postgres
+[GRAPH] USES edges → PostgreSQL, filter to ORGANIZATION type
   - Northwind Traders
   - Umbrella Corp
 ```
 
-Vanilla returned 2 correct answers mixed with 3 irrelevant ones. Graph returned exactly 2.
+Vanilla finds 2 correct answers in 5; graph returns exactly the 2.
 
-### Q3 — "Which people I already know work at companies using MongoDB?"
+### Q3 — "People I have a connection to, at companies using MongoDB"
 
-This is a **2-hop** question: person → company → tech.
-
-```
-[VANILLA]   neural search
-  0.806   Initech runs on MongoDB.                         ← not a person
-  0.791   Globex runs on MongoDB.                          ← not a person
-  0.696   Umbrella Corp runs on PostgreSQL.                ← wrong tech
-  0.679   Elena Torres is researching vector databases...  ← wrong topic
-  0.651   Initech competes with Northwind Traders...       ← wrong
-
-[GRAPH]     KNOWS(daisy, ?p) ∧ WORKS_AT(?p, ?c) ∧ USES_TECH(?c, t-mongo)
-  - Mia Rossi @ Initech
-```
-
-**Vanilla cannot answer this.** It returns only companies, and the LLM consumer has no way to cross-reference them with Daisy's contacts. Graph does it in a single query.
-
-### Q4 — "Who are Daisy's contacts at companies competing with our customers?"
-
-A **3-hop** question: `KNOWS → WORKS_AT → COMPETES_WITH → customer`.
+This needs **2 hops**: `company USES MongoDB` → `person WORKS_AT company` → filter to known contacts.
 
 ```
-[VANILLA]   neural search
-  0.641   Umbrella Corp runs on PostgreSQL.                ← wrong
-  0.629   Daisy Chen is an AE who reports to Sarah Kim.    ← wrong
-  0.612   Initech competes with Northwind Traders...       ← partial context only
-  0.590   Globex runs on MongoDB.                          ← wrong
-  0.590   Elena Torres is researching vector databases...  ← wrong
+[VANILLA] neural: "people I know at companies using MongoDB"
+  0.809  Initech runs on MongoDB like Globex does.                    ← not a person
+  0.771  Globex is a fintech firm and they run on MongoDB.            ← not a person
+  0.721  Umbrella Corp uses PostgreSQL.                               ← wrong tech
+  0.706  Mia Rossi at Initech ran into me at the MongoDB conference.  ← relevant but vanilla doesn't know Mia is "someone I know"
+  0.689  Tom Becker runs the data platform at Umbrella Corp.          ← wrong
 
 [GRAPH]
-  - Elena Torres @ Northwind Traders  (competes with Initech)
-  - Mia Rossi     @ Initech           (competes with Northwind Traders)
+  - Jordan Lee @ Globex
 ```
 
-Vanilla's top result isn't even close to the intent. Graph finds the 2 exact people and names the competitor pair — leadership's "who should we brief about this competitive risk?" question is now answerable.
+Graph reasons across two joins; vanilla returns passages that an LLM consumer would then have to re-parse.
 
-### Q5 — "Who's interested in vector databases? (for our new product pitch)"
+### Q4 — "Any contacts at companies that compete with our customers?"
+
+This is where the demo gets honest about current limits.
 
 ```
-[VANILLA]   neural search
-  0.872   Elena Torres is researching vector databases...  ✓
-  0.674   Tom Becker is the Data Architect at Umbrella.    ← wrong (not vector-interested)
-  0.674   Umbrella Corp runs on PostgreSQL.                ← wrong
-  0.673   Jordan Lee wants to add vector search to Globex's product. ✓
-  0.665   Globex runs on MongoDB.                          ← wrong
+[VANILLA] neural: "contacts at companies that compete with our customers"
+  0.649  Initech competes with Northwind Traders in retail analytics.  ← partial
+  0.647  Umbrella Corp uses PostgreSQL.                                ← wrong
+  0.623  Tom Becker runs the data platform at Umbrella Corp.           ← wrong
+  0.613  Jordan Lee from Globex emailed about our new vector-search…   ← wrong
+  0.609  Globex is a fintech firm and they run on MongoDB.             ← wrong
 
-[GRAPH]     INTERESTED_IN edges where target = t-vectordb
-  - Elena Torres (at Northwind Traders)
-  - Jordan Lee   (at Globex)
+[GRAPH] hybrid entity lookup for 'competitor':
+  - Umbrella Corp (ORGANIZATION)
+  - Fintech (CONCEPT)
+  - Mia Rossi (PERSON)
+  - Jordan Lee (PERSON)
+  - Ravi Patel (PERSON)
 ```
 
-Vanilla does find the 2 leads but buries them among 3 irrelevant hits. Graph returns **exactly the 2 leads with their employer for free** (one more hop) — ready-to-go target list.
+The extraction LLM's default relationship vocabulary is `WORKS_AT / KNOWS / CREATED / USES / PART_OF / LOCATED_IN / MANAGES / COLLABORATES_WITH / DEVELOPED_BY / OTHER`. "Competes with" didn't fit, so Sonnet labeled it `OTHER` — the structural signal was lost.
+
+**How to fix before GA:** allow containers to declare their own relationship vocabulary (e.g., add `COMPETES_WITH`, `CUSTOMER_OF`, `PROSPECT_OF`). The extraction prompt is already pluggable via `configuration.custom_relationship_extraction_prompt`; exposing it in the UI would close this gap.
+
+### Q5 — "Who's interested in vector databases?"
+
+```
+[VANILLA] neural: "who is interested in vector databases"
+  0.872  Elena Torres is researching vector databases for their next platform. ✓
+  0.776  Jordan Lee from Globex emailed about our new vector-search capabilities. ✓ (but phrased differently)
+  0.727  Mia Rossi mentioned Tom Becker at Umbrella Corp is evaluating vector search.
+  0.727  Tom Becker runs the data platform at Umbrella Corp.           ← wrong context
+  0.703  Umbrella Corp uses PostgreSQL.                                ← wrong
+
+[GRAPH] hybrid search + 1-hop expansion on "vector databases"
+  - Jordan Lee     (score 1.00)
+  - Elena Torres   (score 0.90)
+  - Tom Becker     (score 0.60)
+```
+
+Graph's hybrid mode blends the embedding match on "vector databases" with traversal of connected edges, ranking people by how centrally they sit in the sub-graph.
 
 ## Scoreboard
 
-| Question | Hops | Vanilla precision | Graph precision |
+| Question | Hops needed | Vanilla precision | Graph precision |
 |---|---|---|---|
-| Q1. Sarah's team | 1 | 3/5 correct, 2 wrong | 3/3 |
-| Q2. Postgres customers | 1 | 2/5 correct, 3 wrong | 2/2 |
-| Q3. People I know at MongoDB cos | 2 | **0/5 correct** | 1/1 |
-| Q4. Contacts at competitor cos | 3 | **0/5 correct** | 2/2 |
-| Q5. Interested in vector DBs | 1 | 2/5 correct, 3 wrong | 2/2 |
+| Q1. Sarah's team | 1 | 2/5 correct | 2/2 |
+| Q2. PostgreSQL customers | 1 | 2/5 correct | 2/2 |
+| Q3. Known contacts at MongoDB cos | 2 | **0/5 correct** | 1/1 |
+| Q4. Contacts at competitors | 3 | 1/5 partial (needs OTHER → COMPETES_WITH fix) | same — graph schema limit |
+| Q5. Vector-DB leads | 1 | 3/5 correct (1 explicit + 2 adjacent) | 3/3 |
 
-The gap grows with each additional hop. Even at 1 hop, graph precision is perfect vs vanilla ~50%. At 2+ hops vanilla essentially can't answer.
+**Vanilla degrades with every hop** — at 2 hops it returned zero useful answers, at 1 hop its precision is consistently ~40% because neural similarity pulls in structurally-irrelevant passages.
+**Graph degrades gracefully with schema gaps** — when the LLM extraction vocabulary doesn't include the right relationship (Q4), the graph doesn't silently lie; it returns related entities and leaves the LLM to interpret. That's fixable by expanding the extraction prompt's vocabulary.
 
-## What the REST API looks like
+## The REST API in one page
 
-### Seeding graph memory
-
-When the agent observes a fact, it writes an entity and/or a relationship. Example (direct write — LLM extraction from conversation text is also supported):
+### Configure a graph-enabled container
 
 ```bash
-POST /e2e2-memory-lpg-edges/_doc/r15?refresh=true
+POST /_plugins/_ml/memory_containers/_create
 {
-  "relationship_id": "r15",
-  "source_entity": "p-daisy",
-  "target_entity":  "p-elena",
-  "relationship_type": "KNOWS",
-  "confidence": 0.9,
-  "memory_container_id": "4Rh60J0B8jwm23PNlvB4",
-  "owner_id": "admin"
+  "name": "demo-graph-crm",
+  "configuration": {
+    "embedding_model_type": "TEXT_EMBEDDING",
+    "embedding_model_id": "...MiniLM...",
+    "embedding_dimension": 384,
+    "llm_id": "...bedrock-sonnet-4-6...",
+    "enable_graph": true
+  }
 }
 ```
 
-### Agent-facing `/memories/graph/_search` endpoint
+When this runs the server:
+1. Creates `…-memory-sessions`, `…-memory-working`, `…-memory-lpg-nodes`, `…-memory-lpg-edges`
+2. Creates a `text_embedding` ingest pipeline that maps `entity_name → entity_embedding` and attaches it as the `lpg-nodes` index's `default_pipeline`
+3. Sets `index.knn: true` on the nodes index so the KNN engine can build HNSW graphs over entity embeddings
 
-Three modes, all behind a single REST surface:
+No client code ever has to compute or ship embeddings.
 
-1. **text** — neural entity lookup by name
+### Ingest: one endpoint, automatic extraction
 
-    ```bash
-    POST /_plugins/_ml/memory_containers/{id}/memories/graph/_search
-    { "query": "Elena", "search_type": "text", "top_k": 5 }
-    ```
+```bash
+POST /_plugins/_ml/memory_containers/{id}/memories
+{
+  "messages": [{"role":"user","content":[{"type":"text",
+    "text":"Had a great call with Elena Torres today. She is VP of Engineering at Northwind Traders..."}]}],
+  "infer": true
+}
+```
 
-2. **hybrid** (default) — blend neural similarity with 1-hop relationship expansion
+Server-side:
+1. Summarize and write working memory and session (existing vanilla flow)
+2. Parallel path — `GraphProcessingService` calls the configured LLM twice (once for entities, once for relationships)
+3. `storeGraphData` indexes each extracted entity into `lpg-nodes` (the ingest pipeline computes the embedding) and each relationship into `lpg-edges`
+4. Entity IDs are **deterministic**: the same person mentioned in two calls maps to the same doc — subsequent mentions update instead of duplicate
 
-    ```bash
-    POST /_plugins/_ml/memory_containers/{id}/memories/graph/_search
-    { "query": "pasta", "top_k": 5 }
-    ```
+Response:
 
-    ```json
-    {
-      "search_results": [
-        {"entity": {"entity_id": "e-pasta"}, "score": 1.0, "match_type": "text_similarity"},
-        {"entity": {"entity_id": "e-alice"}, "score": 0.9, "match_type": "relationship_expansion", "relationship_count": 4}
-      ]
-    }
-    ```
+```json
+{ "session_id": "ul620J0BrnKV8q3hmwhC", "working_memory_id": "u1620J0BrnKV8q3hmwhY" }
+```
 
-3. **traversal** — BFS from a known entity (great for "tell me about Elena's network")
+### Query: three modes behind one endpoint
 
-    ```bash
-    POST /_plugins/_ml/memory_containers/{id}/memories/graph/_search
-    { "query": "Elena Torres", "search_type": "traversal", "entity_id": "p-elena", "max_depth": 2 }
-    ```
+```bash
+# Mode 1: neural entity lookup
+POST /_plugins/_ml/memory_containers/{id}/memories/graph/_search
+{ "query": "vector databases", "search_type": "text", "top_k": 5 }
 
-    Returns Elena + all entities reachable within 2 hops, plus the connecting edges.
+# Mode 2: hybrid — neural + 1-hop relationship expansion  (default)
+POST /_plugins/_ml/memory_containers/{id}/memories/graph/_search
+{ "query": "vector databases", "top_k": 5 }
 
-## How it fits into the existing agentic-memory story
+# Mode 3: traversal — BFS from a known entity
+POST /_plugins/_ml/memory_containers/{id}/memories/graph/_search
+{ "query": "Elena", "search_type": "traversal", "entity_id": "ent:...:person:elena-torres", "max_depth": 2 }
+```
 
-- **Same container, same container ID** as regular memory — graph is opt-in per container via `enable_graph: true`.
-- **Same embedding model** for entity names (no extra model required).
-- **Same owner/tenant isolation** — every entity and edge is filtered by `memory_container_id` + `owner_id` + `tenant_id`.
-- **Same REST tree**: `memories/` for facts, `memories/graph/` for structure.
+### Supporting endpoints
 
-## Demo logistics (for re-running)
+```bash
+GET    /_plugins/_ml/memory_containers/{id}/memories/graph/entities?query=*&top_k=50
+DELETE /_plugins/_ml/memory_containers/{id}/memories/graph
+```
 
-1. OpenSearch 3.5 local cluster, `LD_PRELOAD=/lib/x86_64-linux-gnu/libstdc++.so.6`
-2. ml-commons plugin 3.5.0.0 from `local-test/3.5` branch
-3. HuggingFace MiniLM-L6-v2 registered (384-dim) + optional Bedrock Sonnet 4.6 LLM
-4. `python3 /tmp/seed_demo.py` — seeds 18 vanilla facts + 16 entities + 17 edges (~15 s)
-5. `python3 /tmp/run_demo.py` — runs all 5 Q&A pairs
+## What's production-ready today
 
-The two scripts are self-contained and reproducible.
+| Capability | Status |
+|---|---|
+| Container creation, graph + text indices, ingest pipeline, KNN settings | ✅ shipped |
+| Automatic LLM extraction on `POST /memories` with `infer: true` | ✅ shipped |
+| Entity deduplication (same name+type → same doc, mention_count bump) | ✅ shipped |
+| Graph search (text / hybrid / traversal) | ✅ shipped |
+| Feature-flag gate (`plugins.ml_commons.agentic_memory_enabled`) | ✅ shipped |
+| Tenant + owner isolation on all graph queries | ✅ shipped |
+| Unit tests: 22 tests across the 3 transport actions | ✅ shipped |
+| End-to-end REST test suite | ✅ shipped — see `docs/test/graph_memory/` |
+| Configurable relationship vocabulary for domain-specific graphs (Q4 gap) | 🟡 API is pluggable via `custom_relationship_extraction_prompt`, needs UI/docs |
+| Native multi-hop structured query DSL | 🟡 today clients stitch results client-side; see Q3/Q4 demo script |
+| Real `DELETE /memories/graph` (currently returns stub response) | 🟡 delete-by-query not yet implemented |
+
+## Re-running the demo
+
+```bash
+# One-time setup
+./gradlew :opensearch-ml-plugin:assemble    # build plugin zip
+# install zip into local OS cluster
+LD_PRELOAD=/lib/x86_64-linux-gnu/libstdc++.so.6 bin/opensearch
+
+# Create container, register models (see docs/test/graph_memory/00-environment.md)
+
+# Ingest 3 call notes (see docs/demo/ingest_demo.py)
+python3 docs/demo/ingest_demo.py
+
+# Run the 5 demo queries
+python3 docs/demo/run_demo.py
+```
+
+Both scripts are self-contained and re-runnable. The whole demo takes ~90 seconds end-to-end: ~30s for model predictions during ingest, ~30s for the 5 queries, ~30s of Claude Sonnet inference time.
 
 ## The punch line
 
-> If the question is *"what did we talk about?"* — vanilla memory is fine.
+> **Vanilla memory makes the agent a *scribe* — it remembers what was said.**
 >
-> If the question is *"given what we talked about, who should I call, and why?"* — you need graph memory.
+> **Graph memory makes the agent a *colleague* — it remembers who is who, and how the pieces fit together.**
+>
+> Both are powered by the same single `POST /memories` call. Enabling the difference is one line: `"enable_graph": true`.
