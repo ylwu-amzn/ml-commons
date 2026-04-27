@@ -26,8 +26,9 @@ import org.opensearch.ml.common.dataset.MLInputDataType;
 import org.opensearch.ml.common.exception.MLException;
 import org.opensearch.ml.common.output.MLOutput;
 import org.opensearch.ml.common.output.MLOutputType;
-import org.opensearch.tools.jackson.core.JsonParseException;
 import org.reflections.Reflections;
+
+import com.fasterxml.jackson.core.JsonParseException;
 
 import lombok.extern.log4j.Log4j2;
 
