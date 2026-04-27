@@ -41,6 +41,10 @@ public class MLGraphSearchRequest extends ActionRequest {
     }
 
     public static MLGraphSearchRequest parse(XContentParser parser, String tenantId) throws IOException {
+        // Advance to the first token if the parser is at its initial (null) position.
+        if (parser.currentToken() == null) {
+            parser.nextToken();
+        }
         ensureExpectedToken(XContentParser.Token.START_OBJECT, parser.currentToken(), parser);
         MLGraphSearchInput input = MLGraphSearchInput.parse(parser);
         return MLGraphSearchRequest.builder()
