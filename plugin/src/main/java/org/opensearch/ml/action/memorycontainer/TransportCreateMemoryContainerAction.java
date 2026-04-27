@@ -9,6 +9,7 @@ import static org.opensearch.ml.common.CommonValue.ML_MEMORY_CONTAINER_INDEX;
 import static org.opensearch.ml.common.settings.MLCommonsSettings.ML_COMMONS_AGENTIC_MEMORY_DISABLED_MESSAGE;
 
 import java.time.Instant;
+import java.util.Map;
 
 import org.opensearch.OpenSearchStatusException;
 import org.opensearch.action.DocWriteResponse;
@@ -404,7 +405,9 @@ public class TransportCreateMemoryContainerAction extends
             // Create graph nodes index with KNN vector mapping
             String nodesMapping = String.format(GRAPH_NODES_INDEX_MAPPING, config.getDimension());
             boolean useSystemIndex = config.isUseSystemIndex();
-            mlIndicesHandler.initIndexIfAbsent(graphNodesIndex, nodesMapping, 1, ActionListener.wrap(
+            // knn_vector fields require index.knn=true on the index settings.
+            Map<String, Object> nodesSettings = Map.of("index.knn", true);
+            mlIndicesHandler.initIndexIfAbsent(graphNodesIndex, nodesMapping, nodesSettings, 1, ActionListener.wrap(
                 nodesCreated -> {
                     // Create graph edges index
                     mlIndicesHandler.initIndexIfAbsent(graphEdgesIndex, GRAPH_EDGES_INDEX_MAPPING, 1, ActionListener.wrap(
