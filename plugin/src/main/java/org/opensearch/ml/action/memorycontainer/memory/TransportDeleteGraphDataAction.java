@@ -14,6 +14,7 @@ import org.opensearch.action.support.HandledTransportAction;
 import org.opensearch.common.inject.Inject;
 import org.opensearch.commons.authuser.User;
 import org.opensearch.core.action.ActionListener;
+import org.opensearch.core.index.shard.ShardId;
 import org.opensearch.core.rest.RestStatus;
 import org.opensearch.ml.common.memorycontainer.MLMemoryContainer;
 import org.opensearch.ml.common.settings.MLFeatureEnabledSetting;
@@ -113,11 +114,12 @@ public class TransportDeleteGraphDataAction extends HandledTransportAction<MLDel
             // For now, we'll return a success response - the actual deletion logic would involve
             // delete-by-query operations filtered by memory_container_id
 
-            log.info("Graph data deletion requested for container: {}", memoryContainerId);
+            log.info("Graph data deletion requested for container: {} (nodes={}, edges={})", memoryContainerId, nodesIndex, edgesIndex);
 
-            // Create a dummy delete response indicating success
+            // ShardId must be non-null; DeleteResponse's constructor chain dereferences it.
+            ShardId shardId = new ShardId(nodesIndex != null ? nodesIndex : "_na_", "_na_", 0);
             DeleteResponse response = new DeleteResponse(
-                null, // ShardId - not applicable for delete-by-query
+                shardId,
                 "graph_data_delete", // id
                 0L, // sequence number
                 0L, // primary term
