@@ -166,26 +166,26 @@ public class TransportAddMemoriesAction extends HandledTransportAction<MLAddMemo
                 // TODO: use LLM to summarize first user message
                 ActionListener<String> summaryListener = ActionListener.wrap(summary -> {
                     Instant now = Instant.now();
-                    indexRequest
-                        .source(
-                            Map
-                                .of(
-                                    OWNER_ID_FIELD,
-                                    input.getOwnerId(),
-                                    MEMORY_CONTAINER_ID_FIELD,
-                                    input.getMemoryContainerId(),
-                                    SUMMARY_FIELD,
-                                    summary,
-                                    NAMESPACE_FIELD,
-                                    input.getNamespace(),
-                                    CREATED_TIME_FIELD,
-                                    now.getEpochSecond(),
-                                    LAST_UPDATED_TIME_FIELD,
-                                    now.getEpochSecond()
-                                )
-                        );
+                    // Use a HashMap so we can include optional null-safe fields; Map.of() rejects nulls.
+                    Map<String, Object> session = new HashMap<>();
+                    if (input.getOwnerId() != null) {
+                        session.put(OWNER_ID_FIELD, input.getOwnerId());
+                    }
+                    session.put(MEMORY_CONTAINER_ID_FIELD, input.getMemoryContainerId());
+                    if (summary != null) {
+                        session.put(SUMMARY_FIELD, summary);
+                    }
+                    if (input.getNamespace() != null) {
+                        session.put(NAMESPACE_FIELD, input.getNamespace());
+                    }
+                    session.put(CREATED_TIME_FIELD, now.getEpochSecond());
+                    session.put(LAST_UPDATED_TIME_FIELD, now.getEpochSecond());
+                    indexRequest.source(session);
                     indexRequest.setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE);
                     ActionListener<IndexResponse> responseActionListener = ActionListener.<IndexResponse>wrap(r -> {
+                        if (input.getNamespace() == null) {
+                            input.setNamespace(new HashMap<String, String>());
+                        }
                         input.getNamespace().put(SESSION_ID_FIELD, r.getId());
                         processAndIndexMemory(input, container, user, actionListener);
                     }, e -> {
@@ -349,6 +349,9 @@ public class TransportAddMemoriesAction extends HandledTransportAction<MLAddMemo
 
     private Map<String, String> getStrategyNameSpace(MemoryStrategy strategy, Map<String, String> namespace) {
         Map<String, String> strategyNamespace = new HashMap<>();
+        if (namespace == null) {
+            return strategyNamespace;
+        }
         for (String key : strategy.getNamespace()) {
             if (namespace.containsKey(key)) {
                 strategyNamespace.put(key, namespace.get(key));
@@ -469,7 +472,17 @@ public class TransportAddMemoriesAction extends HandledTransportAction<MLAddMemo
     }
 
     /**
-     * Store graph data in graph indices
+     * Store graph data in graph indices.
+     *
+     * Entities are indexed into the graph-nodes index. The index has a default ingest
+     * pipeline that derives `entity_embedding` from `entity_name` server-side, so the
+     * caller does not need to compute embeddings. Deterministic entity IDs ensure that
+     * re-mentioning the same entity updates the existing doc (bumping mention_count)
+     * instead of creating duplicates.
+     *
+     * Relationships are indexed into the graph-edges index. LLM-returned source/target
+     * names are mapped back to the entity IDs from this batch; unresolved references
+     * are logged and skipped.
      */
     private void storeGraphData(
         GraphExtractionResult result,
@@ -479,17 +492,137 @@ public class TransportAddMemoriesAction extends HandledTransportAction<MLAddMemo
         ActionListener<Void> listener
     ) {
         try {
-            // For now, just log the successful extraction
-            // Full implementation would use MemoryOperationsService bulk operations
-            log.info("Graph extraction completed: {} entities, {} relationships",
-                result.getEntities().size(),
-                result.getRelationships().size());
+            List<ExtractedEntity> entities = result.getEntities() != null ? result.getEntities() : List.of();
+            List<ExtractedRelationship> relationships = result.getRelationships() != null
+                ? result.getRelationships() : List.of();
 
-            listener.onResponse(null);
+            if (entities.isEmpty() && relationships.isEmpty()) {
+                listener.onResponse(null);
+                return;
+            }
+
+            String nodesIndex = memoryConfig.getGraphNodesIndexName();
+            String edgesIndex = memoryConfig.getGraphEdgesIndexName();
+            String ownerId = namespace.get(OWNER_ID_FIELD);
+            String tenantId = namespace.get("tenant_id");
+            String memoryContainerId = namespace.get(MEMORY_CONTAINER_ID_FIELD);
+            long now = Instant.now().getEpochSecond();
+
+            // Build entity-name (normalized) -> entity_id map so relationships can be
+            // resolved. Generated IDs are deterministic in name+type so the same entity
+            // mentioned again updates the same doc.
+            Map<String, String> nameToEntityId = new HashMap<>();
+            List<IndexRequest> entityRequests = new ArrayList<>();
+            for (ExtractedEntity entity : entities) {
+                if (entity.getName() == null || entity.getName().isBlank()) {
+                    continue;
+                }
+                String entityId = deterministicEntityId(entity, memoryContainerId);
+                nameToEntityId.put(entity.getName().toLowerCase().trim(), entityId);
+
+                Map<String, Object> source = new HashMap<>();
+                source.put("entity_id", entityId);
+                source.put("entity_name", entity.getName());
+                source.put("entity_type", entity.getType() != null ? entity.getType() : "unknown");
+                if (entity.getConfidence() != null) {
+                    source.put("confidence", entity.getConfidence());
+                }
+                source.put("memory_container_id", memoryContainerId);
+                if (ownerId != null) {
+                    source.put("owner_id", ownerId);
+                }
+                if (tenantId != null) {
+                    source.put("tenant_id", tenantId);
+                }
+                source.put("created_time", now);
+                source.put("updated_time", now);
+                source.put("mention_count", 1);
+
+                entityRequests.add(new IndexRequest(nodesIndex).id(entityId).source(source));
+            }
+
+            List<IndexRequest> edgeRequests = new ArrayList<>();
+            for (ExtractedRelationship rel : relationships) {
+                if (rel.getSourceEntity() == null || rel.getTargetEntity() == null || rel.getType() == null) {
+                    continue;
+                }
+                String srcId = nameToEntityId.get(rel.getSourceEntity().toLowerCase().trim());
+                String tgtId = nameToEntityId.get(rel.getTargetEntity().toLowerCase().trim());
+                if (srcId == null || tgtId == null) {
+                    log.warn("Skipping relationship {} - cannot resolve entity IDs (source='{}', target='{}')",
+                        rel.getType(), rel.getSourceEntity(), rel.getTargetEntity());
+                    continue;
+                }
+                String relationshipId = String.format("rel:%s:%s:%s",
+                    srcId, tgtId, rel.getType().toLowerCase().trim());
+
+                Map<String, Object> source = new HashMap<>();
+                source.put("relationship_id", relationshipId);
+                source.put("source_entity", srcId);
+                source.put("target_entity", tgtId);
+                source.put("relationship_type", rel.getType());
+                if (rel.getConfidence() != null) {
+                    source.put("confidence", rel.getConfidence());
+                }
+                source.put("memory_container_id", memoryContainerId);
+                if (ownerId != null) {
+                    source.put("owner_id", ownerId);
+                }
+                if (tenantId != null) {
+                    source.put("tenant_id", tenantId);
+                }
+                source.put("created_time", now);
+                source.put("updated_time", now);
+                source.put("is_active", true);
+
+                edgeRequests.add(new IndexRequest(edgesIndex).id(relationshipId).source(source));
+            }
+
+            // Fan out: entities first (so entity_ids exist when edges land), then edges.
+            // Both waves use BulkRequest for efficiency.
+            indexGraphBatch(entityRequests, ActionListener.wrap(
+                _v -> indexGraphBatch(edgeRequests, ActionListener.wrap(
+                    _v2 -> {
+                        log.info("Graph data stored: {} entities, {} relationships (container={})",
+                            entityRequests.size(), edgeRequests.size(), memoryContainerId);
+                        listener.onResponse(null);
+                    },
+                    listener::onFailure
+                )),
+                listener::onFailure
+            ));
         } catch (Exception e) {
             log.error("Failed to store graph data", e);
             listener.onFailure(e);
         }
+    }
+
+    private void indexGraphBatch(List<IndexRequest> requests, ActionListener<Void> listener) {
+        if (requests.isEmpty()) {
+            listener.onResponse(null);
+            return;
+        }
+        org.opensearch.action.bulk.BulkRequest bulk = new org.opensearch.action.bulk.BulkRequest();
+        bulk.setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE);
+        for (IndexRequest req : requests) {
+            bulk.add(req);
+        }
+        client.bulk(bulk, ActionListener.wrap(response -> {
+            if (response.hasFailures()) {
+                log.warn("Graph bulk write had failures: {}", response.buildFailureMessage());
+            }
+            listener.onResponse(null);
+        }, listener::onFailure));
+    }
+
+    /**
+     * Deterministic entity ID: same name+type within a container maps to the same doc,
+     * so subsequent mentions update rather than duplicate.
+     */
+    private String deterministicEntityId(ExtractedEntity entity, String memoryContainerId) {
+        String norm = entity.getName() == null ? "" : entity.getName().toLowerCase().trim().replaceAll("\\s+", "-");
+        String type = entity.getType() == null ? "unknown" : entity.getType().toLowerCase().trim();
+        return "ent:" + memoryContainerId + ":" + type + ":" + norm;
     }
 
 }
