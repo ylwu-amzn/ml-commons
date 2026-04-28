@@ -1,0 +1,1647 @@
+{
+  "info": {
+    "_postman_id": "3c37c5ad-a289-42dc-8c06-265f409ccc99",
+    "name": "ML Commons Graph Memory \u2014 Demo",
+    "description": "Step-by-step walkthrough of the graph-memory feature on a local OpenSearch 3.5 cluster.\n\n## Setup\n1. In Postman **Settings \u2192 General**, disable 'SSL certificate verification' (self-signed local cert).\n2. In this collection's **Variables** tab, set:\n   - `baseUrl` = `https://localhost:9200`\n   - `awsAccessKey`, `awsSecretKey` = from `~/.aws/credentials` (for step 3)\n3. Run requests top-to-bottom. Where a step produces an ID (task_id, model_id, connector_id, container_id), the test script auto-saves it into a collection variable for downstream steps.\n4. For step 2b (model deployment task), re-run until `state: COMPLETED`.\n5. After each ingest in folder 03, wait ~8 seconds before inspecting \u2014 graph/long-term extraction runs in the background.\n\n## Auth\nCollection-level Basic Auth with `admin` / `RUIwNTVGTDc2MDhDM0JNRC4u`.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "basic",
+    "basic": [
+      {
+        "key": "username",
+        "value": "admin",
+        "type": "string"
+      },
+      {
+        "key": "password",
+        "value": "RUIwNTVGTDc2MDhDM0JNRC4u",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://localhost:9200",
+      "type": "string"
+    },
+    {
+      "key": "awsAccessKey",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "awsSecretKey",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "embeddingTaskId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "embeddingModelId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "connectorId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "llmModelId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "containerId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "01. Setup",
+      "item": [
+        {
+          "name": "1. Enable agentic memory flag",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/_cluster/settings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "_cluster",
+                "settings"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"persistent\": {\n    \"plugins.ml_commons.agentic_memory_enabled\": true,\n    \"plugins.ml_commons.only_run_on_ml_node\": \"false\",\n    \"plugins.ml_commons.model_access_control_enabled\": \"true\",\n    \"plugins.ml_commons.native_memory_threshold\": \"99\",\n    \"plugins.ml_commons.allow_registering_model_via_url\": \"true\",\n    \"plugins.ml_commons.allow_registering_model_via_local_file\": \"true\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Enable agentic memory feature flag and related ML settings."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('acknowledged', () => pm.expect(pm.response.json().acknowledged).to.equal(true));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2a. Register embedding model (MiniLM-L6-v2)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/_plugins/_ml/models/_register?deploy=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "_plugins",
+                "_ml",
+                "models",
+                "_register"
+              ],
+              "query": [
+                {
+                  "key": "deploy",
+                  "value": "true"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"huggingface/sentence-transformers/all-MiniLM-L6-v2\",\n  \"version\": \"1.0.2\",\n  \"model_format\": \"TORCH_SCRIPT\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Register the text embedding model. task_id is stashed into {{embeddingTaskId}} \u2014 poll step 2b until COMPLETED."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "pm.collectionVariables.set('embeddingTaskId', j.task_id);",
+                  "pm.test('got task_id', () => pm.expect(j.task_id).to.be.a('string'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2b. Check embedding model task (poll until COMPLETED)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/_plugins/_ml/tasks/{{embeddingTaskId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "_plugins",
+                "_ml",
+                "tasks",
+                "{{embeddingTaskId}}"
+              ]
+            },
+            "description": "Re-run this until state=COMPLETED. Once complete the model_id is saved to {{embeddingModelId}}."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.state === 'COMPLETED' && j.model_id) {",
+                  "  pm.collectionVariables.set('embeddingModelId', j.model_id);",
+                  "  console.log('embeddingModelId =', j.model_id);",
+                  "} else {",
+                  "  console.log('task state:', j.state, '(re-run this request until COMPLETED)');",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2c. Smoke-test embedding model",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/_plugins/_ml/_predict/text_embedding/{{embeddingModelId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "_plugins",
+                "_ml",
+                "_predict",
+                "text_embedding",
+                "{{embeddingModelId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text_docs\": [\n    \"hello\"\n  ],\n  \"target_response\": [\n    \"sentence_embedding\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Should return a 384-float array."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "const dim = j.inference_results[0].output[0].data.length;",
+                  "pm.test('embedding is 384-dim', () => pm.expect(dim).to.equal(384));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3. Create Bedrock Claude Sonnet connector",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/_plugins/_ml/connectors/_create",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "_plugins",
+                "_ml",
+                "connectors",
+                "_create"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Bedrock Claude Sonnet 4.6 Connector\",\n  \"version\": \"1\",\n  \"protocol\": \"aws_sigv4\",\n  \"parameters\": {\n    \"region\": \"us-west-2\",\n    \"service_name\": \"bedrock\",\n    \"max_tokens\": 4096,\n    \"system_prompt\": \"\",\n    \"user_prompt\": \"\"\n  },\n  \"credential\": {\n    \"access_key\": \"{{awsAccessKey}}\",\n    \"secret_key\": \"{{awsSecretKey}}\"\n  },\n  \"actions\": [\n    {\n      \"action_type\": \"predict\",\n      \"method\": \"POST\",\n      \"url\": \"https://bedrock-runtime.us-west-2.amazonaws.com/model/us.anthropic.claude-sonnet-4-6/converse\",\n      \"headers\": {\n        \"content-type\": \"application/json\"\n      },\n      \"request_body\": \"{\\\"system\\\":[{\\\"text\\\":\\\"${parameters.system_prompt}\\\"}],\\\"inferenceConfig\\\":{\\\"maxTokens\\\":${parameters.max_tokens}},\\\"messages\\\":[{\\\"role\\\":\\\"user\\\",\\\"content\\\":[{\\\"text\\\":\\\"${parameters.user_prompt}\\\"}]}]}\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Set {{awsAccessKey}} and {{awsSecretKey}} in collection variables first. Uses Bedrock Converse API \u2014 response shape matches default llm_result_path."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "pm.collectionVariables.set('connectorId', j.connector_id);",
+                  "pm.test('got connector_id', () => pm.expect(j.connector_id).to.be.a('string'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4a. Register LLM model",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/_plugins/_ml/models/_register?deploy=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "_plugins",
+                "_ml",
+                "models",
+                "_register"
+              ],
+              "query": [
+                {
+                  "key": "deploy",
+                  "value": "true"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"bedrock-claude-sonnet-4-6\",\n  \"function_name\": \"remote\",\n  \"description\": \"Bedrock Claude Sonnet 4.6\",\n  \"connector_id\": \"{{connectorId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Returns model_id synchronously for remote models. Saved to {{llmModelId}}."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.model_id) {",
+                  "  pm.collectionVariables.set('llmModelId', j.model_id);",
+                  "  console.log('llmModelId =', j.model_id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4b. Smoke-test LLM",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/_plugins/_ml/models/{{llmModelId}}/_predict",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "_plugins",
+                "_ml",
+                "models",
+                "{{llmModelId}}",
+                "_predict"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"parameters\": {\n    \"system_prompt\": \"You are a JSON generator.\",\n    \"user_prompt\": \"Return {\\\"ok\\\":true}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Confirms connector + credentials work."
+          }
+        },
+        {
+          "name": "5. Create demo memory container (enable_graph=true)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/_plugins/_ml/memory_containers/_create",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "_plugins",
+                "_ml",
+                "memory_containers",
+                "_create"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"demo-graph-crm\",\n  \"description\": \"Live CRM demo with vanilla + graph memory\",\n  \"configuration\": {\n    \"embedding_model_type\": \"TEXT_EMBEDDING\",\n    \"embedding_model_id\": \"{{embeddingModelId}}\",\n    \"embedding_dimension\": 384,\n    \"llm_id\": \"{{llmModelId}}\",\n    \"index_prefix\": \"demo\",\n    \"enable_graph\": true,\n    \"use_system_index\": false,\n    \"parameters\": {\n      \"llm_result_path\": \"$.output.message.content[0].text\"\n    },\n    \"strategies\": [\n      {\n        \"type\": \"SEMANTIC\",\n        \"enabled\": true,\n        \"namespace\": [\n          \"owner_id\"\n        ]\n      }\n    ],\n    \"custom_relationship_extraction_prompt\": \"<ROLE>You are a relationship extraction agent for a sales CRM.</ROLE>\\n\\n<SCOPE>Extract relationships between entities mentioned in the conversation. Use clear, standardized relationship types.</SCOPE>\\n\\n<OUTPUT>\\nReturn ONLY a single JSON object exactly as {\\\"relationships\\\": [{\\\"source\\\": \\\"entity1\\\", \\\"target\\\": \\\"entity2\\\", \\\"type\\\": \\\"RELATIONSHIP_TYPE\\\", \\\"confidence\\\": 0.8}]}.\\nRelationship types (choose the MOST specific one): WORKS_AT, KNOWS, MANAGES, REPORTS_TO, USES, INTERESTED_IN, EVALUATING, COMPETES_WITH, PART_OF, LOCATED_IN, COLLABORATES_WITH, MET_AT, PREVIOUSLY_WORKED_AT, DEVELOPED_BY, OTHER.\\nUse COMPETES_WITH when one company is described as competing with another.\\nUse INTERESTED_IN when a person is researching or interested in a technology.\\nUse EVALUATING when a person is actively evaluating a technology for adoption.\\nUse PREVIOUSLY_WORKED_AT for past employment.\\nUse MET_AT for events where people met.\\nUse exact entity names as they appear in entity extraction.\\nConfidence: 0.0-1.0.\\nNo code fences, no extra text, one line only.\\nIf no relationships found, return {\\\"relationships\\\": []}.\\n</OUTPUT>\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Core of the demo: enable_graph=true + SEMANTIC strategy + custom prompt with COMPETES_WITH etc."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "pm.collectionVariables.set('containerId', j.memory_container_id);",
+                  "pm.test('container created', () => pm.expect(j.status).to.equal('created'));"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "description": "One-time setup: feature flag, embedding model, Bedrock connector, LLM model, memory container."
+    },
+    {
+      "name": "02. Verify container created correctly",
+      "item": [
+        {
+          "name": "5a. List demo-* indices",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/_cat/indices/demo-*?v&expand_wildcards=all&h=index,docs.count,status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "_cat",
+                "indices",
+                "demo-*"
+              ],
+              "query": [
+                {
+                  "key": "v",
+                  "value": "true"
+                },
+                {
+                  "key": "expand_wildcards",
+                  "value": "all"
+                },
+                {
+                  "key": "h",
+                  "value": "index,docs.count,status"
+                }
+              ]
+            },
+            "description": "Should show sessions / working / long-term / history / lpg-nodes / lpg-edges."
+          }
+        },
+        {
+          "name": "5b. Check graph-nodes ingest pipeline",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/_ingest/pipeline/demo-memory-lpg-nodes-embedding",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "_ingest",
+                "pipeline",
+                "demo-memory-lpg-nodes-embedding"
+              ]
+            },
+            "description": "Should show the text_embedding processor mapping entity_name -> entity_embedding."
+          }
+        },
+        {
+          "name": "5c. Check graph-nodes settings",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/demo-memory-lpg-nodes/_settings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "demo-memory-lpg-nodes",
+                "_settings"
+              ]
+            },
+            "description": "Should show index.knn=true and index.default_pipeline=demo-memory-lpg-nodes-embedding."
+          }
+        }
+      ]
+    },
+    {
+      "name": "03. Ingest 3 call notes",
+      "item": [
+        {
+          "name": "6. Ingest call note \u2014 Elena / Northwind",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/_plugins/_ml/memory_containers/{{containerId}}/memories",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "_plugins",
+                "_ml",
+                "memory_containers",
+                "{{containerId}}",
+                "memories"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": [\n        {\n          \"type\": \"text\",\n          \"text\": \"Daisy Chen had a great call with Elena Torres today. Elena is VP of Engineering at Northwind Traders. Northwind runs all their analytics on PostgreSQL. Elena is researching vector databases for their next platform. Daisy met Elena at KubeCon last quarter. Sarah Kim is the manager of Daisy Chen, and Sarah said Daisy should loop in Ravi Patel from the SE team. Ravi used to work with Tom Becker at Acme five years ago; Tom is now Data Architect at Umbrella Corp.\"\n        }\n      ]\n    }\n  ],\n  \"infer\": true,\n  \"namespace\": {\n    \"owner_id\": \"admin\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Triggers session summary + fact extraction + entity extraction + relationship extraction (4 LLM calls on the server). WAIT ~8s after this before running next request so background work finishes."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('returned session_id', () => pm.expect(pm.response.json().session_id).to.be.a('string'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "7. Ingest call note \u2014 Jordan / Globex",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/_plugins/_ml/memory_containers/{{containerId}}/memories",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "_plugins",
+                "_ml",
+                "memory_containers",
+                "{{containerId}}",
+                "memories"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": [\n        {\n          \"type\": \"text\",\n          \"text\": \"Jordan Lee from Globex emailed Daisy Chen about vector-search capabilities. Globex is a fintech firm that runs on MongoDB. Jordan is their CTO and wants to add semantic search to their trading product. Jordan mentioned Initech is doing something similar; Initech competes with Northwind Traders in retail analytics. Marcus Webb, one of Sarah Kim SDRs, booked a discovery call with Jordan for next Tuesday.\"\n        }\n      ]\n    }\n  ],\n  \"infer\": true,\n  \"namespace\": {\n    \"owner_id\": \"admin\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Triggers session summary + fact extraction + entity extraction + relationship extraction (4 LLM calls on the server). WAIT ~8s after this before running next request so background work finishes."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('returned session_id', () => pm.expect(pm.response.json().session_id).to.be.a('string'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "8. Ingest call note \u2014 Mia / Initech",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/_plugins/_ml/memory_containers/{{containerId}}/memories",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "_plugins",
+                "_ml",
+                "memory_containers",
+                "{{containerId}}",
+                "memories"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": [\n        {\n          \"type\": \"text\",\n          \"text\": \"Mia Rossi at Initech ran into Daisy Chen at the MongoDB conference. Mia is Platform Lead at Initech and Daisy Chen knows her from Daisy Chen previous job at Acme. Initech runs on MongoDB like Globex does. Mia mentioned Tom Becker at Umbrella Corp is evaluating vector search; Tom runs the data platform there and Umbrella uses PostgreSQL.\"\n        }\n      ]\n    }\n  ],\n  \"infer\": true,\n  \"namespace\": {\n    \"owner_id\": \"admin\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Triggers session summary + fact extraction + entity extraction + relationship extraction (4 LLM calls on the server). WAIT ~8s after this before running next request so background work finishes."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('returned session_id', () => pm.expect(pm.response.json().session_id).to.be.a('string'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "9. Count all three memory indices",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/demo-memory-long-term,demo-memory-lpg-nodes,demo-memory-lpg-edges/_count",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "demo-memory-long-term,demo-memory-lpg-nodes,demo-memory-lpg-edges",
+                "_count"
+              ]
+            },
+            "description": "Expect roughly 22 long-term, 18 nodes, 29 edges (Sonnet is non-deterministic)."
+          }
+        }
+      ],
+      "description": "Each call note produces facts + entities + relationships automatically."
+    },
+    {
+      "name": "04. Inspect what Sonnet extracted",
+      "item": [
+        {
+          "name": "6a. Long-term facts (what vanilla memory sees)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/demo-memory-long-term/_search",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "demo-memory-long-term",
+                "_search"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"size\": 30,\n  \"_source\": [\n    \"memory\"\n  ],\n  \"query\": {\n    \"match_all\": {}\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Sentence-level facts Sonnet extracted via the SEMANTIC strategy."
+          }
+        },
+        {
+          "name": "6b. Graph entities",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/demo-memory-lpg-nodes/_search",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "demo-memory-lpg-nodes",
+                "_search"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"size\": 30,\n  \"_source\": {\n    \"excludes\": [\n      \"entity_embedding\"\n    ]\n  },\n  \"query\": {\n    \"match_all\": {}\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Entity docs. Remove the _source.excludes to see the 384-dim entity_embedding."
+          }
+        },
+        {
+          "name": "6c. Graph relationships",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/demo-memory-lpg-edges/_search",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "demo-memory-lpg-edges",
+                "_search"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"size\": 30,\n  \"query\": {\n    \"match_all\": {}\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "All edges with their confidence."
+          }
+        },
+        {
+          "name": "8a. Relationship types histogram",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/demo-memory-lpg-edges/_search",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "demo-memory-lpg-edges",
+                "_search"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"size\": 0,\n  \"aggs\": {\n    \"by_type\": {\n      \"terms\": {\n        \"field\": \"relationship_type\",\n        \"size\": 30\n      }\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Expect WORKS_AT, USES, KNOWS, EVALUATING, PREVIOUSLY_WORKED_AT, INTERESTED_IN, MET_AT, REPORTS_TO, MANAGES, COMPETES_WITH."
+          }
+        },
+        {
+          "name": "8b. COMPETES_WITH edges (proves custom prompt fired)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/demo-memory-lpg-edges/_search",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "demo-memory-lpg-edges",
+                "_search"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"size\": 10,\n  \"query\": {\n    \"term\": {\n      \"relationship_type\": \"COMPETES_WITH\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Should find initech -> northwind-traders."
+          }
+        },
+        {
+          "name": "8c. Entities grouped by type",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/demo-memory-lpg-nodes/_search",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "demo-memory-lpg-nodes",
+                "_search"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"size\": 30,\n  \"_source\": [\n    \"entity_name\",\n    \"entity_type\"\n  ],\n  \"query\": {\n    \"match_all\": {}\n  },\n  \"sort\": [\n    {\n      \"entity_type\": \"asc\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "05. Demo queries Q1\u2013Q5 (vanilla vs graph)",
+      "item": [
+        {
+          "name": "Q1 VANILLA \u2014 Who's on Sarah's team?",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/_plugins/_ml/memory_containers/{{containerId}}/memories/long-term/_semantic_search",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "_plugins",
+                "_ml",
+                "memory_containers",
+                "{{containerId}}",
+                "memories",
+                "long-term",
+                "_semantic_search"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"who is on Sarah Kim team\",\n  \"k\": 5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Returns 5 sentences \u2014 about 1 direct + 2 adjacent."
+          }
+        },
+        {
+          "name": "Q1 GRAPH \u2014 MANAGES-from-Sarah OR REPORTS_TO-Sarah",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/demo-memory-lpg-edges/_search",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "demo-memory-lpg-edges",
+                "_search"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"size\": 10,\n  \"query\": {\n    \"bool\": {\n      \"should\": [\n        {\n          \"bool\": {\n            \"must\": [\n              {\n                \"term\": {\n                  \"source_entity\": \"ent:{{containerId}}:person:sarah-kim\"\n                }\n              },\n              {\n                \"term\": {\n                  \"relationship_type\": \"MANAGES\"\n                }\n              }\n            ]\n          }\n        },\n        {\n          \"bool\": {\n            \"must\": [\n              {\n                \"term\": {\n                  \"target_entity\": \"ent:{{containerId}}:person:sarah-kim\"\n                }\n              },\n              {\n                \"term\": {\n                  \"relationship_type\": \"REPORTS_TO\"\n                }\n              }\n            ]\n          }\n        }\n      ],\n      \"minimum_should_match\": 1\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Expect exactly 2 edges: Marcus Webb + Daisy Chen."
+          }
+        },
+        {
+          "name": "Q2 VANILLA \u2014 Customers on PostgreSQL?",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/_plugins/_ml/memory_containers/{{containerId}}/memories/long-term/_semantic_search",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "_plugins",
+                "_ml",
+                "memory_containers",
+                "{{containerId}}",
+                "memories",
+                "long-term",
+                "_semantic_search"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"which customers use PostgreSQL\",\n  \"k\": 5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Q2 GRAPH \u2014 USES edges to PostgreSQL",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/demo-memory-lpg-edges/_search",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "demo-memory-lpg-edges",
+                "_search"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"size\": 10,\n  \"query\": {\n    \"bool\": {\n      \"must\": [\n        {\n          \"term\": {\n            \"target_entity\": \"ent:{{containerId}}:technology:postgresql\"\n          }\n        },\n        {\n          \"term\": {\n            \"relationship_type\": \"USES\"\n          }\n        }\n      ]\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "source_entity values: Northwind Traders, Umbrella Corp."
+          }
+        },
+        {
+          "name": "Q3 VANILLA \u2014 People Daisy knows at MongoDB cos",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/_plugins/_ml/memory_containers/{{containerId}}/memories/long-term/_semantic_search",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "_plugins",
+                "_ml",
+                "memory_containers",
+                "{{containerId}}",
+                "memories",
+                "long-term",
+                "_semantic_search"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"people Daisy knows at companies using MongoDB\",\n  \"k\": 5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Vanilla returns passages about companies but cannot join \u2014 0/5 direct answers."
+          }
+        },
+        {
+          "name": "Q3 GRAPH step 1 \u2014 Who does Daisy KNOW?",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/demo-memory-lpg-edges/_search",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "demo-memory-lpg-edges",
+                "_search"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"size\": 30,\n  \"query\": {\n    \"bool\": {\n      \"must\": [\n        {\n          \"term\": {\n            \"relationship_type\": \"KNOWS\"\n          }\n        }\n      ],\n      \"should\": [\n        {\n          \"term\": {\n            \"source_entity\": \"ent:{{containerId}}:person:daisy-chen\"\n          }\n        },\n        {\n          \"term\": {\n            \"target_entity\": \"ent:{{containerId}}:person:daisy-chen\"\n          }\n        }\n      ],\n      \"minimum_should_match\": 1\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Collect the 'other' entity of each KNOWS edge involving daisy-chen."
+          }
+        },
+        {
+          "name": "Q3 GRAPH step 2 \u2014 Their employers (WORKS_AT)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/demo-memory-lpg-edges/_search",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "demo-memory-lpg-edges",
+                "_search"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"size\": 30,\n  \"query\": {\n    \"bool\": {\n      \"must\": [\n        {\n          \"terms\": {\n            \"source_entity\": [\n              \"ent:{{containerId}}:person:elena-torres\",\n              \"ent:{{containerId}}:person:jordan-lee\",\n              \"ent:{{containerId}}:person:mia-rossi\"\n            ]\n          }\n        },\n        {\n          \"term\": {\n            \"relationship_type\": \"WORKS_AT\"\n          }\n        }\n      ]\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Adjust the terms list to whatever Daisy actually KNOWS in step 1."
+          }
+        },
+        {
+          "name": "Q3 GRAPH step 3 \u2014 Companies using MongoDB",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/demo-memory-lpg-edges/_search",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "demo-memory-lpg-edges",
+                "_search"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"size\": 10,\n  \"query\": {\n    \"bool\": {\n      \"must\": [\n        {\n          \"term\": {\n            \"target_entity\": \"ent:{{containerId}}:technology:mongodb\"\n          }\n        },\n        {\n          \"term\": {\n            \"relationship_type\": \"USES\"\n          }\n        }\n      ]\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Intersect: Jordan Lee @ Globex and Mia Rossi @ Initech."
+          }
+        },
+        {
+          "name": "Q4 VANILLA \u2014 Contacts at competitor companies",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/_plugins/_ml/memory_containers/{{containerId}}/memories/long-term/_semantic_search",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "_plugins",
+                "_ml",
+                "memory_containers",
+                "{{containerId}}",
+                "memories",
+                "long-term",
+                "_semantic_search"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"Daisy contacts at companies competing with our customers\",\n  \"k\": 5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Vanilla cannot join \u2014 0/5."
+          }
+        },
+        {
+          "name": "Q4 GRAPH \u2014 COMPETES_WITH pairs",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/demo-memory-lpg-edges/_search",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "demo-memory-lpg-edges",
+                "_search"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"size\": 10,\n  \"query\": {\n    \"term\": {\n      \"relationship_type\": \"COMPETES_WITH\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Combine with Q3 step 2 (Daisy's contacts' employers) to get contacts at competitor cos: Elena @ Northwind, Mia @ Initech."
+          }
+        },
+        {
+          "name": "Q5 VANILLA \u2014 Who is interested in vector DBs?",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/_plugins/_ml/memory_containers/{{containerId}}/memories/long-term/_semantic_search",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "_plugins",
+                "_ml",
+                "memory_containers",
+                "{{containerId}}",
+                "memories",
+                "long-term",
+                "_semantic_search"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"who is interested in vector databases\",\n  \"k\": 5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Q5 GRAPH \u2014 hybrid search",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/_plugins/_ml/memory_containers/{{containerId}}/memories/graph/_search",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "_plugins",
+                "_ml",
+                "memory_containers",
+                "{{containerId}}",
+                "memories",
+                "graph",
+                "_search"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"vector databases\",\n  \"top_k\": 10\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Single call, native graph endpoint. Returns search_results[] with match_type=text_similarity | relationship_expansion."
+          }
+        }
+      ]
+    },
+    {
+      "name": "06. Other graph search modes",
+      "item": [
+        {
+          "name": "10. Traversal from Elena (2 hops)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/_plugins/_ml/memory_containers/{{containerId}}/memories/graph/_search",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "_plugins",
+                "_ml",
+                "memory_containers",
+                "{{containerId}}",
+                "memories",
+                "graph",
+                "_search"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"Elena\",\n  \"search_type\": \"traversal\",\n  \"entity_id\": \"ent:{{containerId}}:person:elena-torres\",\n  \"max_depth\": 2\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Returns Elena + all entities within 2 hops + all bridging edges."
+          }
+        },
+        {
+          "name": "11. Text-only entity search",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/_plugins/_ml/memory_containers/{{containerId}}/memories/graph/_search",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "_plugins",
+                "_ml",
+                "memory_containers",
+                "{{containerId}}",
+                "memories",
+                "graph",
+                "_search"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"Elena\",\n  \"search_type\": \"text\",\n  \"top_k\": 5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Pure neural KNN over entity_embedding."
+          }
+        },
+        {
+          "name": "12. List graph entities (GET convenience)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/_plugins/_ml/memory_containers/{{containerId}}/memories/graph/entities?query=*&top_k=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "_plugins",
+                "_ml",
+                "memory_containers",
+                "{{containerId}}",
+                "memories",
+                "graph",
+                "entities"
+              ],
+              "query": [
+                {
+                  "key": "query",
+                  "value": "*"
+                },
+                {
+                  "key": "top_k",
+                  "value": "50"
+                }
+              ]
+            },
+            "description": "Same underlying logic as search_type=text with a match-all fallback."
+          }
+        }
+      ]
+    },
+    {
+      "name": "07. Access control + tenant isolation",
+      "item": [
+        {
+          "name": "13a. Unknown container id (expect 404)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/_plugins/_ml/memory_containers/does-not-exist/memories/graph/_search",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "_plugins",
+                "_ml",
+                "memory_containers",
+                "does-not-exist",
+                "memories",
+                "graph",
+                "_search"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"anything\",\n  \"top_k\": 5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('404 Memory container not found', () => pm.expect(pm.response.code).to.equal(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "13b. Disable agentic memory flag",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/_cluster/settings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "_cluster",
+                "settings"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"persistent\": {\n    \"plugins.ml_commons.agentic_memory_enabled\": false\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "13c. Graph search with flag off (expect 403)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/_plugins/_ml/memory_containers/{{containerId}}/memories/graph/_search",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "_plugins",
+                "_ml",
+                "memory_containers",
+                "{{containerId}}",
+                "memories",
+                "graph",
+                "_search"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"anything\",\n  \"top_k\": 5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('403 forbidden', () => pm.expect(pm.response.code).to.equal(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "13d. Re-enable flag",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/_cluster/settings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "_cluster",
+                "settings"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"persistent\": {\n    \"plugins.ml_commons.agentic_memory_enabled\": true\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "08. Cleanup (optional)",
+      "item": [
+        {
+          "name": "14a. DELETE graph data (stub)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/_plugins/_ml/memory_containers/{{containerId}}/memories/graph",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "_plugins",
+                "_ml",
+                "memory_containers",
+                "{{containerId}}",
+                "memories",
+                "graph"
+              ]
+            },
+            "description": "Currently returns a stub success; real delete-by-query not implemented yet."
+          }
+        },
+        {
+          "name": "14b. Delete memory container (cleans all indices)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/_plugins/_ml/memory_containers/{{containerId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "_plugins",
+                "_ml",
+                "memory_containers",
+                "{{containerId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "14c. Undeploy + delete LLM model",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/_plugins/_ml/models/{{llmModelId}}/_undeploy",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "_plugins",
+                "_ml",
+                "models",
+                "{{llmModelId}}",
+                "_undeploy"
+              ]
+            }
+          }
+        },
+        {
+          "name": "14d. Undeploy + delete embedding model",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/_plugins/_ml/models/{{embeddingModelId}}/_undeploy",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "_plugins",
+                "_ml",
+                "models",
+                "{{embeddingModelId}}",
+                "_undeploy"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
