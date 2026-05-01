@@ -179,12 +179,45 @@
     "custom_relationship_extraction_prompt": "Return {\"relationships\":[{\"source\":…,\"target\":…,\"type\":…,\"confidence\":…}]}. Types: WORKS_AT, KNOWS, MANAGES, REPORTS_TO, USES, INTERESTED_IN, EVALUATING, COMPETES_WITH, PART_OF, MET_AT, PREVIOUSLY_WORKED_AT, OTHER. …"
   }
 }</pre>
+  <h3 class="section-heading">Raw input — the 3 call notes fed to <code>POST /memories</code></h3>
+  <div class="intent">Each block below is the exact JSON body posted to
+    <code>POST /_plugins/_ml/memory_containers/{id}/memories</code> with
+    <code>infer: true</code>. All three use the identical request shape; only the inner
+    <code>text</code> changes.</div>
+
   <pre class="devtools">POST /_plugins/_ml/memory_containers/hV4x0Z0BrnKV8q3htQqt/memories
 {
   "messages": [{
     "role": "user",
-    "content": [{ "type": "text",
-      "text": "Daisy Chen had a great call with Elena Torres today. Elena is VP of Engineering at Northwind Traders. Northwind runs all their analytics on PostgreSQL. Elena is researching vector databases for their next platform. Daisy met Elena at KubeCon last quarter. Sarah Kim is the manager of Daisy Chen… (and 2 more call notes)"
+    "content": [{
+      "type": "text",
+      "text": "Daisy Chen had a great call with Elena Torres today. Elena is VP of Engineering at Northwind Traders. Northwind runs all their analytics on PostgreSQL. Elena is researching vector databases for their next platform. Daisy met Elena at KubeCon last quarter. Sarah Kim is the manager of Daisy Chen, and Sarah said Daisy should loop in Ravi Patel from the SE team. Ravi used to work with Tom Becker at Acme five years ago; Tom is now Data Architect at Umbrella Corp."
+    }]
+  }],
+  "infer": true,
+  "namespace": { "owner_id": "admin" }
+}</pre>
+
+  <pre class="devtools">POST /_plugins/_ml/memory_containers/hV4x0Z0BrnKV8q3htQqt/memories
+{
+  "messages": [{
+    "role": "user",
+    "content": [{
+      "type": "text",
+      "text": "Jordan Lee from Globex emailed Daisy Chen about vector-search capabilities. Globex is a fintech firm that runs on MongoDB. Jordan is their CTO and wants to add semantic search to their trading product. Jordan mentioned Initech is doing something similar; Initech competes with Northwind Traders in retail analytics. Marcus Webb, one of Sarah Kim SDRs, booked a discovery call with Jordan for next Tuesday."
+    }]
+  }],
+  "infer": true,
+  "namespace": { "owner_id": "admin" }
+}</pre>
+
+  <pre class="devtools">POST /_plugins/_ml/memory_containers/hV4x0Z0BrnKV8q3htQqt/memories
+{
+  "messages": [{
+    "role": "user",
+    "content": [{
+      "type": "text",
+      "text": "Mia Rossi at Initech ran into Daisy Chen at the MongoDB conference. Mia is Platform Lead at Initech and Daisy Chen knows her from Daisy Chen previous job at Acme. Initech runs on MongoDB like Globex does. Mia mentioned Tom Becker at Umbrella Corp is evaluating vector search; Tom runs the data platform there and Umbrella uses PostgreSQL."
     }]
   }],
   "infer": true,
