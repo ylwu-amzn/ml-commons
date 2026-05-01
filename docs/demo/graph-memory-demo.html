@@ -88,6 +88,71 @@
   h3.section-heading { margin: 28px 0 12px; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; }
   .footer-note { color: var(--muted); font-size: 12px; padding-top: 18px; border-top: 1px solid var(--border); }
   .callout { border-left: 3px solid var(--good); background: rgba(38, 208, 124, 0.07); padding: 10px 14px; margin: 12px 0; border-radius: 0 6px 6px 0; font-size: 13px; color: #c7d7c9; }
+
+  /* call-note card: shows the prose side-by-side with the JSON request */
+  .note-card {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin: 14px 0;
+    overflow: hidden;
+  }
+  .note-card .note-header {
+    padding: 10px 16px;
+    background: #1a1f2a;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+  .note-card .note-header .tag {
+    font-size: 11px;
+    color: var(--muted);
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+  .note-card .note-body {
+    padding: 14px 18px;
+    font-size: 14px;
+    line-height: 1.7;
+    color: #d7dbe3;
+    background: #111520;
+  }
+  .note-card .note-body em.speaker {
+    color: var(--accent);
+    font-style: normal;
+    font-weight: 600;
+  }
+  .note-card details {
+    background: transparent;
+    border: none;
+    border-top: 1px solid var(--border);
+    border-radius: 0;
+    margin: 0;
+  }
+  .note-card details summary {
+    padding: 8px 16px;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 600;
+  }
+  .note-card details[open] summary {
+    border-bottom: 1px solid var(--border);
+  }
+  .note-card details pre {
+    margin: 0;
+    border: none;
+    border-radius: 0;
+    border-top: none;
+  }
 </style>
 </head>
 <body>
@@ -180,49 +245,113 @@
   }
 }</pre>
   <h3 class="section-heading">Raw input — the 3 call notes fed to <code>POST /memories</code></h3>
-  <div class="intent">Each block below is the exact JSON body posted to
-    <code>POST /_plugins/_ml/memory_containers/{id}/memories</code> with
-    <code>infer: true</code>. All three use the identical request shape; only the inner
-    <code>text</code> changes.</div>
+  <div class="intent">The readable prose is what Daisy's assistant captured from her calls.
+    Each note is sent unchanged as the inner <code>text</code> of a single
+    <code>POST /memories</code> request with <code>infer: true</code>. All three use the
+    identical request shape; only the text changes. Click <em>Show request body</em> to see
+    the JSON that goes over the wire.</div>
 
-  <pre class="devtools">POST /_plugins/_ml/memory_containers/hV4x0Z0BrnKV8q3htQqt/memories
+  <div class="note-card">
+    <div class="note-header">
+      <span>Call note 1 — Elena Torres @ Northwind Traders</span>
+      <span class="tag">~75 words · POST /memories</span>
+    </div>
+    <div class="note-body">
+      <em class="speaker">Daisy Chen</em> had a great call with <em class="speaker">Elena Torres</em> today.
+      Elena is VP of Engineering at Northwind Traders. Northwind runs all their analytics on PostgreSQL.
+      Elena is researching vector databases for their next platform.
+      Daisy met Elena at KubeCon last quarter.
+      Sarah Kim is the manager of Daisy Chen, and Sarah said Daisy should loop in Ravi Patel from
+      the SE team. Ravi used to work with Tom Becker at Acme five years ago; Tom is now Data
+      Architect at Umbrella Corp.
+    </div>
+    <details>
+      <summary>Show request body (Dev Tools)</summary>
+      <pre class="devtools">POST /_plugins/_ml/memory_containers/hV4x0Z0BrnKV8q3htQqt/memories
 {
-  "messages": [{
-    "role": "user",
-    "content": [{
-      "type": "text",
-      "text": "Daisy Chen had a great call with Elena Torres today. Elena is VP of Engineering at Northwind Traders. Northwind runs all their analytics on PostgreSQL. Elena is researching vector databases for their next platform. Daisy met Elena at KubeCon last quarter. Sarah Kim is the manager of Daisy Chen, and Sarah said Daisy should loop in Ravi Patel from the SE team. Ravi used to work with Tom Becker at Acme five years ago; Tom is now Data Architect at Umbrella Corp."
-    }]
-  }],
+  "messages": [
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "text",
+          "text": "Daisy Chen had a great call with Elena Torres today. Elena is VP of Engineering at Northwind Traders. Northwind runs all their analytics on PostgreSQL. Elena is researching vector databases for their next platform. Daisy met Elena at KubeCon last quarter. Sarah Kim is the manager of Daisy Chen, and Sarah said Daisy should loop in Ravi Patel from the SE team. Ravi used to work with Tom Becker at Acme five years ago; Tom is now Data Architect at Umbrella Corp."
+        }
+      ]
+    }
+  ],
   "infer": true,
   "namespace": { "owner_id": "admin" }
 }</pre>
+    </details>
+  </div>
 
-  <pre class="devtools">POST /_plugins/_ml/memory_containers/hV4x0Z0BrnKV8q3htQqt/memories
+  <div class="note-card">
+    <div class="note-header">
+      <span>Call note 2 — Jordan Lee @ Globex</span>
+      <span class="tag">~60 words · POST /memories</span>
+    </div>
+    <div class="note-body">
+      Jordan Lee from Globex emailed <em class="speaker">Daisy Chen</em> about vector-search capabilities.
+      Globex is a fintech firm that runs on MongoDB.
+      Jordan is their CTO and wants to add semantic search to their trading product.
+      Jordan mentioned Initech is doing something similar; Initech competes with Northwind Traders
+      in retail analytics.
+      Marcus Webb, one of Sarah Kim's SDRs, booked a discovery call with Jordan for next Tuesday.
+    </div>
+    <details>
+      <summary>Show request body (Dev Tools)</summary>
+      <pre class="devtools">POST /_plugins/_ml/memory_containers/hV4x0Z0BrnKV8q3htQqt/memories
 {
-  "messages": [{
-    "role": "user",
-    "content": [{
-      "type": "text",
-      "text": "Jordan Lee from Globex emailed Daisy Chen about vector-search capabilities. Globex is a fintech firm that runs on MongoDB. Jordan is their CTO and wants to add semantic search to their trading product. Jordan mentioned Initech is doing something similar; Initech competes with Northwind Traders in retail analytics. Marcus Webb, one of Sarah Kim SDRs, booked a discovery call with Jordan for next Tuesday."
-    }]
-  }],
+  "messages": [
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "text",
+          "text": "Jordan Lee from Globex emailed Daisy Chen about vector-search capabilities. Globex is a fintech firm that runs on MongoDB. Jordan is their CTO and wants to add semantic search to their trading product. Jordan mentioned Initech is doing something similar; Initech competes with Northwind Traders in retail analytics. Marcus Webb, one of Sarah Kim SDRs, booked a discovery call with Jordan for next Tuesday."
+        }
+      ]
+    }
+  ],
   "infer": true,
   "namespace": { "owner_id": "admin" }
 }</pre>
+    </details>
+  </div>
 
-  <pre class="devtools">POST /_plugins/_ml/memory_containers/hV4x0Z0BrnKV8q3htQqt/memories
+  <div class="note-card">
+    <div class="note-header">
+      <span>Call note 3 — Mia Rossi @ Initech</span>
+      <span class="tag">~55 words · POST /memories</span>
+    </div>
+    <div class="note-body">
+      Mia Rossi at Initech ran into <em class="speaker">Daisy Chen</em> at the MongoDB conference.
+      Mia is Platform Lead at Initech and Daisy Chen knows her from Daisy Chen's previous job at Acme.
+      Initech runs on MongoDB like Globex does.
+      Mia mentioned Tom Becker at Umbrella Corp is evaluating vector search; Tom runs the data platform
+      there and Umbrella uses PostgreSQL.
+    </div>
+    <details>
+      <summary>Show request body (Dev Tools)</summary>
+      <pre class="devtools">POST /_plugins/_ml/memory_containers/hV4x0Z0BrnKV8q3htQqt/memories
 {
-  "messages": [{
-    "role": "user",
-    "content": [{
-      "type": "text",
-      "text": "Mia Rossi at Initech ran into Daisy Chen at the MongoDB conference. Mia is Platform Lead at Initech and Daisy Chen knows her from Daisy Chen previous job at Acme. Initech runs on MongoDB like Globex does. Mia mentioned Tom Becker at Umbrella Corp is evaluating vector search; Tom runs the data platform there and Umbrella uses PostgreSQL."
-    }]
-  }],
+  "messages": [
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "text",
+          "text": "Mia Rossi at Initech ran into Daisy Chen at the MongoDB conference. Mia is Platform Lead at Initech and Daisy Chen knows her from Daisy Chen previous job at Acme. Initech runs on MongoDB like Globex does. Mia mentioned Tom Becker at Umbrella Corp is evaluating vector search; Tom runs the data platform there and Umbrella uses PostgreSQL."
+        }
+      ]
+    }
+  ],
   "infer": true,
   "namespace": { "owner_id": "admin" }
 }</pre>
+    </details>
+  </div>
 
   <div class="callout">
     ✓ Both memory layers populated from <em>one</em> REST endpoint. No client-side embedding, no
