@@ -1,0 +1,126 @@
+{
+  "id": "f5b1c800-3a7e-4f0e-a2a1-3d7a8e2a1c01",
+  "name": "ml-commons V2 chat agent",
+  "values": [
+    {
+      "key": "endpoint",
+      "value": "https://localhost:9200",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "username",
+      "value": "admin",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "password",
+      "value": "admin",
+      "type": "secret",
+      "enabled": true
+    },
+    {
+      "key": "aws_region",
+      "value": "us-west-2",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "aws_access_key",
+      "value": "",
+      "type": "secret",
+      "enabled": true
+    },
+    {
+      "key": "aws_secret_key",
+      "value": "",
+      "type": "secret",
+      "enabled": true
+    },
+    {
+      "key": "aws_session_token",
+      "value": "",
+      "type": "secret",
+      "enabled": true
+    },
+    {
+      "key": "bedrock_model_id",
+      "value": "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "embedding_model_id",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "embedding_dimension",
+      "value": "1024",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "fact_extraction_llm_id",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "memory_container_id",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "agent_id",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "agent_id_with_tools",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "memory_id",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "user_id",
+      "value": "alice",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "tiny_png_base64",
+      "value": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+      "type": "default",
+      "enabled": true,
+      "description": "1x1 red pixel PNG, base64 encoded — for image multi-modal tests"
+    },
+    {
+      "key": "sample_s3_image_uri",
+      "value": "s3://my-bucket/cat.png",
+      "type": "default",
+      "enabled": true,
+      "description": "Replace with a real S3 URI of an image bedrock can read for URL-based image tests"
+    },
+    {
+      "key": "sample_pdf_base64",
+      "value": "",
+      "type": "default",
+      "enabled": true,
+      "description": "Set to base64 of a small PDF if you want to test document content blocks"
+    }
+  ],
+  "_postman_variable_scope": "environment",
+  "_postman_exported_at": "2026-05-22T20:00:00.000Z",
+  "_postman_exported_using": "Postman/manual"
+}

@@ -1,0 +1,976 @@
+{
+  "info": {
+    "name": "ml-commons V2 chat agent (CONVERSATIONAL_V2)",
+    "description": "End-to-end manual test cases for the V2 chat agent introduced in PR #4732.\n\n## Setup\n\n1. Import this collection AND the matching `v2_chat_agent.environment.json` environment.\n2. Select the environment in Postman and fill in:\n   - `endpoint`, `username`, `password` for your cluster\n   - `aws_access_key`, `aws_secret_key`, optionally `aws_session_token`, `aws_region`\n3. Run folder **0. Setup** in order. The Tests scripts populate `embedding_model_id`,\n   `fact_extraction_llm_id`, `memory_container_id`, `agent_id`, etc.\n4. Run any of the test folders.\n\n## Notes\n\n- Most requests target the agent registered by `1. Register V2 chat agent`. If you\n  want to use a tools-equipped agent, run `1.b. Register V2 chat agent (with tools)`\n  too — it populates `agent_id_with_tools`.\n- All requests use Basic auth from collection-level auth and the `endpoint` /\n  `username` / `password` environment variables.\n- The cluster needs `plugins.ml_commons.unified_agent_api_enabled=true` and\n  `plugins.ml_commons.agentic_memory_enabled=true`. Folder `0. Setup` enables both.\n- Image content uses `tiny_png_base64` (1x1 red pixel) for portability.\n",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_postman_id": "9b6a0d20-7c6f-4a9e-9f7a-8c2a5f0e1a02"
+  },
+  "auth": {
+    "type": "basic",
+    "basic": [
+      { "key": "username", "value": "{{username}}", "type": "string" },
+      { "key": "password", "value": "{{password}}", "type": "string" }
+    ]
+  },
+  "item": [
+    {
+      "name": "0. Setup",
+      "description": "Run these in order before the test folders. Each request stores its result in an environment variable used by later requests.",
+      "item": [
+        {
+          "name": "0.1 Cluster reachable",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{endpoint}}/", "host": ["{{endpoint}}"], "path": [""] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "console.log('OpenSearch', j.version && j.version.number);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "0.2 Enable unified_agent_api + agentic_memory",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"persistent\": {\n    \"plugins.ml_commons.unified_agent_api_enabled\": true,\n    \"plugins.ml_commons.agentic_memory_enabled\": true\n  }\n}"
+            },
+            "url": {
+              "raw": "{{endpoint}}/_cluster/settings",
+              "host": ["{{endpoint}}"],
+              "path": ["_cluster", "settings"]
+            }
+          }
+        },
+        {
+          "name": "0.3 Register Bedrock Titan Embed v2 connector",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"v2-test Bedrock Titan Embed v2\",\n  \"description\": \"Embedding for V2 agent memory container\",\n  \"version\": 1,\n  \"protocol\": \"aws_sigv4\",\n  \"parameters\": {\n    \"region\": \"{{aws_region}}\",\n    \"service_name\": \"bedrock\",\n    \"model\": \"amazon.titan-embed-text-v2:0\"\n  },\n  \"credential\": {\n    \"access_key\": \"{{aws_access_key}}\",\n    \"secret_key\": \"{{aws_secret_key}}\",\n    \"session_token\": \"{{aws_session_token}}\"\n  },\n  \"actions\": [\n    {\n      \"action_type\": \"predict\",\n      \"method\": \"POST\",\n      \"url\": \"https://bedrock-runtime.${parameters.region}.amazonaws.com/model/${parameters.model}/invoke\",\n      \"headers\": { \"content-type\": \"application/json\" },\n      \"request_body\": \"{ \\\"inputText\\\": \\\"${parameters.inputText}\\\", \\\"normalize\\\": true }\",\n      \"pre_process_function\": \"connector.pre_process.bedrock.embedding\",\n      \"post_process_function\": \"connector.post_process.bedrock.embedding\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{endpoint}}/_plugins/_ml/connectors/_create",
+              "host": ["{{endpoint}}"],
+              "path": ["_plugins", "_ml", "connectors", "_create"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "if (j.connector_id) pm.environment.set('embed_connector_id', j.connector_id);",
+                  "console.log('embed_connector_id =', pm.environment.get('embed_connector_id'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "0.4 Register & deploy embedding model",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"v2-test titan-embed-v2 model\",\n  \"function_name\": \"remote\",\n  \"connector_id\": \"{{embed_connector_id}}\"\n}"
+            },
+            "url": {
+              "raw": "{{endpoint}}/_plugins/_ml/models/_register?deploy=true",
+              "host": ["{{endpoint}}"],
+              "path": ["_plugins", "_ml", "models", "_register"],
+              "query": [{ "key": "deploy", "value": "true" }]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.model_id) pm.environment.set('embedding_model_id', j.model_id);",
+                  "console.log('embedding_model_id =', pm.environment.get('embedding_model_id'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "0.5 Register Bedrock Claude Haiku LLM connector (for memory fact extraction)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"v2-test Bedrock Claude Haiku\",\n  \"description\": \"LLM for memory fact extraction\",\n  \"version\": 1,\n  \"protocol\": \"aws_sigv4\",\n  \"parameters\": {\n    \"region\": \"{{aws_region}}\",\n    \"service_name\": \"bedrock\",\n    \"model\": \"{{bedrock_model_id}}\"\n  },\n  \"credential\": {\n    \"access_key\": \"{{aws_access_key}}\",\n    \"secret_key\": \"{{aws_secret_key}}\",\n    \"session_token\": \"{{aws_session_token}}\"\n  },\n  \"actions\": [\n    {\n      \"action_type\": \"predict\",\n      \"method\": \"POST\",\n      \"url\": \"https://bedrock-runtime.${parameters.region}.amazonaws.com/model/${parameters.model}/converse\",\n      \"headers\": { \"content-type\": \"application/json\" },\n      \"request_body\": \"{ \\\"messages\\\": ${parameters.messages} }\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{endpoint}}/_plugins/_ml/connectors/_create",
+              "host": ["{{endpoint}}"],
+              "path": ["_plugins", "_ml", "connectors", "_create"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.connector_id) pm.environment.set('llm_connector_id', j.connector_id);",
+                  "console.log('llm_connector_id =', pm.environment.get('llm_connector_id'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "0.6 Register & deploy fact-extraction LLM",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"v2-test claude-haiku model\",\n  \"function_name\": \"remote\",\n  \"connector_id\": \"{{llm_connector_id}}\"\n}"
+            },
+            "url": {
+              "raw": "{{endpoint}}/_plugins/_ml/models/_register?deploy=true",
+              "host": ["{{endpoint}}"],
+              "path": ["_plugins", "_ml", "models", "_register"],
+              "query": [{ "key": "deploy", "value": "true" }]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.model_id) pm.environment.set('fact_extraction_llm_id', j.model_id);",
+                  "console.log('fact_extraction_llm_id =', pm.environment.get('fact_extraction_llm_id'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "0.7 Create memory container",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"v2-test mc\",\n  \"description\": \"V2 chat agent test container\",\n  \"configuration\": {\n    \"embedding_model_id\": \"{{embedding_model_id}}\",\n    \"embedding_dimension\": {{embedding_dimension}},\n    \"embedding_model_type\": \"TEXT_EMBEDDING\",\n    \"llm_id\": \"{{fact_extraction_llm_id}}\",\n    \"index_prefix\": \"v2-test\",\n    \"strategies\": [\n      { \"type\": \"SEMANTIC\", \"namespace\": [\"user_id\"], \"enabled\": true }\n    ],\n    \"max_infer_size\": 5\n  }\n}"
+            },
+            "url": {
+              "raw": "{{endpoint}}/_plugins/_ml/memory_containers/_create",
+              "host": ["{{endpoint}}"],
+              "path": ["_plugins", "_ml", "memory_containers", "_create"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.memory_container_id) pm.environment.set('memory_container_id', j.memory_container_id);",
+                  "console.log('memory_container_id =', pm.environment.get('memory_container_id'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "1. Register V2 chat agent",
+      "item": [
+        {
+          "name": "1.a Register V2 chat agent (no tools)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"v2_chat_agent\",\n  \"type\": \"conversational_v2\",\n  \"description\": \"V2 chat agent for testing\",\n  \"model\": {\n    \"model_id\": \"{{bedrock_model_id}}\",\n    \"model_provider\": \"bedrock/converse\",\n    \"credential\": {\n      \"access_key\": \"{{aws_access_key}}\",\n      \"secret_key\": \"{{aws_secret_key}}\",\n      \"session_token\": \"{{aws_session_token}}\",\n      \"region\": \"{{aws_region}}\"\n    },\n    \"model_parameters\": {\n      \"region\": \"{{aws_region}}\",\n      \"max_tokens\": \"1024\",\n      \"temperature\": \"0.0\"\n    }\n  },\n  \"memory\": {\n    \"type\": \"agentic_memory\",\n    \"memory_container_id\": \"{{memory_container_id}}\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{endpoint}}/_plugins/_ml/agents/_register",
+              "host": ["{{endpoint}}"],
+              "path": ["_plugins", "_ml", "agents", "_register"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "if (j.agent_id) pm.environment.set('agent_id', j.agent_id);",
+                  "console.log('agent_id =', pm.environment.get('agent_id'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "1.b Register V2 chat agent (with ListIndexTool)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"v2_chat_agent_with_tools\",\n  \"type\": \"conversational_v2\",\n  \"description\": \"V2 chat agent with ListIndexTool\",\n  \"model\": {\n    \"model_id\": \"{{bedrock_model_id}}\",\n    \"model_provider\": \"bedrock/converse\",\n    \"credential\": {\n      \"access_key\": \"{{aws_access_key}}\",\n      \"secret_key\": \"{{aws_secret_key}}\",\n      \"session_token\": \"{{aws_session_token}}\",\n      \"region\": \"{{aws_region}}\"\n    },\n    \"model_parameters\": {\n      \"region\": \"{{aws_region}}\",\n      \"max_tokens\": \"1024\",\n      \"temperature\": \"0.0\"\n    }\n  },\n  \"tools\": [\n    {\n      \"type\": \"ListIndexTool\",\n      \"name\": \"list_indices\",\n      \"description\": \"Lists OpenSearch indices and their health.\"\n    }\n  ],\n  \"memory\": {\n    \"type\": \"agentic_memory\",\n    \"memory_container_id\": \"{{memory_container_id}}\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{endpoint}}/_plugins/_ml/agents/_register",
+              "host": ["{{endpoint}}"],
+              "path": ["_plugins", "_ml", "agents", "_register"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.agent_id) pm.environment.set('agent_id_with_tools', j.agent_id);",
+                  "console.log('agent_id_with_tools =', pm.environment.get('agent_id_with_tools'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "1.c GET agent (verify registration)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{endpoint}}/_plugins/_ml/agents/{{agent_id}}",
+              "host": ["{{endpoint}}"],
+              "path": ["_plugins", "_ml", "agents", "{{agent_id}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Input shape: TEXT",
+      "description": "Plain string under `input`. The simplest V2 invocation form.",
+      "item": [
+        {
+          "name": "2.1 Single-turn TEXT",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"input\": \"What is 2+2?\",\n  \"parameters\": {\n    \"namespace\": { \"user_id\": \"{{user_id}}\" }\n  }\n}"
+            },
+            "url": {
+              "raw": "{{endpoint}}/_plugins/_ml/agents/{{agent_id}}/_execute",
+              "host": ["{{endpoint}}"],
+              "path": ["_plugins", "_ml", "agents", "{{agent_id}}", "_execute"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "pm.test('stop_reason is end_turn', () => pm.expect(j.stop_reason).to.eql('end_turn'));",
+                  "pm.test('message has assistant role', () => pm.expect(j.message.role).to.eql('assistant'));",
+                  "pm.test('memory_id present', () => pm.expect(j.memory_id).to.be.a('string').and.not.empty);",
+                  "if (j.memory_id) pm.environment.set('memory_id', j.memory_id);",
+                  "console.log('memory_id =', pm.environment.get('memory_id'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. Input shape: CONTENT_BLOCKS",
+      "description": "Array of ContentBlock objects (no `role`). One user turn with one or more content blocks.",
+      "item": [
+        {
+          "name": "3.1 Single text content block",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"input\": [\n    { \"type\": \"text\", \"text\": \"Hello via content blocks!\" }\n  ],\n  \"parameters\": { \"namespace\": { \"user_id\": \"{{user_id}}\" } }\n}"
+            },
+            "url": {
+              "raw": "{{endpoint}}/_plugins/_ml/agents/{{agent_id}}/_execute",
+              "host": ["{{endpoint}}"],
+              "path": ["_plugins", "_ml", "agents", "{{agent_id}}", "_execute"]
+            }
+          }
+        },
+        {
+          "name": "3.2 Multiple text content blocks",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"input\": [\n    { \"type\": \"text\", \"text\": \"Background: I am writing a release test.\" },\n    { \"type\": \"text\", \"text\": \"Question: Reply with exactly one short sentence.\" }\n  ],\n  \"parameters\": { \"namespace\": { \"user_id\": \"{{user_id}}\" } }\n}"
+            },
+            "url": {
+              "raw": "{{endpoint}}/_plugins/_ml/agents/{{agent_id}}/_execute",
+              "host": ["{{endpoint}}"],
+              "path": ["_plugins", "_ml", "agents", "{{agent_id}}", "_execute"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Input shape: MESSAGES",
+      "description": "Array of Message objects with `role` and `content`. Use this when you want to inject conversation history in a single execute call (instead of relying on `memory_id`).",
+      "item": [
+        {
+          "name": "4.1 Single user message",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"input\": [\n    { \"role\": \"user\", \"content\": [{ \"type\": \"text\", \"text\": \"Say hi in 3 words.\" }] }\n  ],\n  \"parameters\": { \"namespace\": { \"user_id\": \"{{user_id}}\" } }\n}"
+            },
+            "url": {
+              "raw": "{{endpoint}}/_plugins/_ml/agents/{{agent_id}}/_execute",
+              "host": ["{{endpoint}}"],
+              "path": ["_plugins", "_ml", "agents", "{{agent_id}}", "_execute"]
+            }
+          }
+        },
+        {
+          "name": "4.2 Multi-turn conversation in a single request (user → assistant → user)",
+          "description": "Inject prior turns explicitly. The agent should answer 'Alice'.",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"input\": [\n    { \"role\": \"user\", \"content\": [{ \"type\": \"text\", \"text\": \"My name is Alice.\" }] },\n    { \"role\": \"assistant\", \"content\": [{ \"type\": \"text\", \"text\": \"Nice to meet you, Alice!\" }] },\n    { \"role\": \"user\", \"content\": [{ \"type\": \"text\", \"text\": \"What is my name?\" }] }\n  ],\n  \"parameters\": { \"namespace\": { \"user_id\": \"{{user_id}}\" } }\n}"
+            },
+            "url": {
+              "raw": "{{endpoint}}/_plugins/_ml/agents/{{agent_id}}/_execute",
+              "host": ["{{endpoint}}"],
+              "path": ["_plugins", "_ml", "agents", "{{agent_id}}", "_execute"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "const text = (j.message && j.message.content && j.message.content[0] && j.message.content[0].text) || '';",
+                  "pm.test(\"answer mentions 'Alice'\", () => pm.expect(text.toLowerCase()).to.include('alice'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4.3 MESSAGES with prior tool round-trip (use agent_id_with_tools)",
+          "description": "Demonstrates feeding back assistant-with-toolCalls + tool-result messages. Requires the with-tools agent registered in 1.b. Note: at least one toolConfig in the conversation requires the agent to have tools registered.",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"input\": [\n    { \"role\": \"user\", \"content\": [{ \"type\": \"text\", \"text\": \"How many indices do I have?\" }] },\n    {\n      \"role\": \"assistant\",\n      \"content\": [{ \"type\": \"text\", \"text\": \"Let me check.\" }],\n      \"toolCalls\": [\n        {\n          \"id\": \"t1\",\n          \"type\": \"function\",\n          \"function\": { \"name\": \"list_indices\", \"arguments\": \"{}\" }\n        }\n      ]\n    },\n    {\n      \"role\": \"tool\",\n      \"toolCallId\": \"t1\",\n      \"content\": [{ \"type\": \"text\", \"text\": \".plugins-ml-model, .plugins-ml-connector, my-data, logs-2026.01\" }]\n    }\n  ],\n  \"parameters\": { \"namespace\": { \"user_id\": \"{{user_id}}\" } }\n}"
+            },
+            "url": {
+              "raw": "{{endpoint}}/_plugins/_ml/agents/{{agent_id_with_tools}}/_execute",
+              "host": ["{{endpoint}}"],
+              "path": ["_plugins", "_ml", "agents", "{{agent_id_with_tools}}", "_execute"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Multi-modal",
+      "description": "Image input via CONTENT_BLOCKS. PNG and JPEG formats supported by Bedrock Converse Claude. URL-based images must be `s3://...` per current ml-commons behavior.",
+      "item": [
+        {
+          "name": "5.1 Image (BASE64) — what color is this image?",
+          "description": "Uses the 1x1 red PNG embedded in `tiny_png_base64`.",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"input\": [\n    { \"type\": \"text\", \"text\": \"What color is this image? Answer in one word.\" },\n    {\n      \"type\": \"image\",\n      \"source\": {\n        \"type\": \"BASE64\",\n        \"format\": \"png\",\n        \"data\": \"{{tiny_png_base64}}\"\n      }\n    }\n  ],\n  \"parameters\": { \"namespace\": { \"user_id\": \"{{user_id}}\" } }\n}"
+            },
+            "url": {
+              "raw": "{{endpoint}}/_plugins/_ml/agents/{{agent_id}}/_execute",
+              "host": ["{{endpoint}}"],
+              "path": ["_plugins", "_ml", "agents", "{{agent_id}}", "_execute"]
+            }
+          }
+        },
+        {
+          "name": "5.2 Image (S3 URL)",
+          "description": "Set environment variable `sample_s3_image_uri` to a real `s3://bucket/key.png` your IAM principal can read. Bedrock Converse only accepts S3 URIs for URL-based image content.",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"input\": [\n    { \"type\": \"text\", \"text\": \"Describe this image briefly.\" },\n    {\n      \"type\": \"image\",\n      \"source\": {\n        \"type\": \"URL\",\n        \"format\": \"png\",\n        \"data\": \"{{sample_s3_image_uri}}\"\n      }\n    }\n  ],\n  \"parameters\": { \"namespace\": { \"user_id\": \"{{user_id}}\" } }\n}"
+            },
+            "url": {
+              "raw": "{{endpoint}}/_plugins/_ml/agents/{{agent_id}}/_execute",
+              "host": ["{{endpoint}}"],
+              "path": ["_plugins", "_ml", "agents", "{{agent_id}}", "_execute"]
+            }
+          }
+        },
+        {
+          "name": "5.3 Document (BASE64 PDF)",
+          "description": "Optional — populate `sample_pdf_base64` first.",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"input\": [\n    { \"type\": \"text\", \"text\": \"Summarize this document in two sentences.\" },\n    {\n      \"type\": \"document\",\n      \"source\": {\n        \"type\": \"BASE64\",\n        \"format\": \"pdf\",\n        \"data\": \"{{sample_pdf_base64}}\"\n      }\n    }\n  ],\n  \"parameters\": { \"namespace\": { \"user_id\": \"{{user_id}}\" } }\n}"
+            },
+            "url": {
+              "raw": "{{endpoint}}/_plugins/_ml/agents/{{agent_id}}/_execute",
+              "host": ["{{endpoint}}"],
+              "path": ["_plugins", "_ml", "agents", "{{agent_id}}", "_execute"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Multi-turn / memory",
+      "description": "Continue a session across multiple `_execute` calls using `memory_id`.",
+      "item": [
+        {
+          "name": "6.1 Turn 1 — establish a fact",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"input\": \"My favorite color is teal. Remember it.\",\n  \"parameters\": { \"namespace\": { \"user_id\": \"{{user_id}}\" } }\n}"
+            },
+            "url": {
+              "raw": "{{endpoint}}/_plugins/_ml/agents/{{agent_id}}/_execute",
+              "host": ["{{endpoint}}"],
+              "path": ["_plugins", "_ml", "agents", "{{agent_id}}", "_execute"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.memory_id) pm.environment.set('memory_id', j.memory_id);",
+                  "console.log('memory_id =', pm.environment.get('memory_id'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "6.2 Turn 2 — recall using memory_id",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"input\": \"What is my favorite color?\",\n  \"parameters\": {\n    \"namespace\": { \"user_id\": \"{{user_id}}\" },\n    \"memory_id\": \"{{memory_id}}\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{endpoint}}/_plugins/_ml/agents/{{agent_id}}/_execute",
+              "host": ["{{endpoint}}"],
+              "path": ["_plugins", "_ml", "agents", "{{agent_id}}", "_execute"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "const text = (j.message && j.message.content && j.message.content[0] && j.message.content[0].text) || '';",
+                  "pm.test(\"answer mentions 'teal'\", () => pm.expect(text.toLowerCase()).to.include('teal'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "6.3 Search long-term memories (semantic)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"namespace\": { \"user_id\": \"{{user_id}}\" },\n  \"query\": \"color preference\",\n  \"k\": 5\n}"
+            },
+            "url": {
+              "raw": "{{endpoint}}/_plugins/_ml/memory_containers/{{memory_container_id}}/memories/long-term/_semantic_search",
+              "host": ["{{endpoint}}"],
+              "path": ["_plugins", "_ml", "memory_containers", "{{memory_container_id}}", "memories", "long-term", "_semantic_search"]
+            }
+          }
+        },
+        {
+          "name": "6.4 Search long-term memories (hybrid, tuned weights)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"namespace\": { \"user_id\": \"{{user_id}}\" },\n  \"query\": \"favorite color teal\",\n  \"k\": 5,\n  \"bm25_weight\": 0.3,\n  \"neural_weight\": 0.7\n}"
+            },
+            "url": {
+              "raw": "{{endpoint}}/_plugins/_ml/memory_containers/{{memory_container_id}}/memories/long-term/_hybrid_search",
+              "host": ["{{endpoint}}"],
+              "path": ["_plugins", "_ml", "memory_containers", "{{memory_container_id}}", "memories", "long-term", "_hybrid_search"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Tools",
+      "description": "Uses `agent_id_with_tools` registered in 1.b.",
+      "item": [
+        {
+          "name": "7.1 Tool execution (ReAct loop, server-side)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"input\": \"List all OpenSearch indices and tell me how many there are.\",\n  \"parameters\": { \"namespace\": { \"user_id\": \"{{user_id}}\" } }\n}"
+            },
+            "url": {
+              "raw": "{{endpoint}}/_plugins/_ml/agents/{{agent_id_with_tools}}/_execute",
+              "host": ["{{endpoint}}"],
+              "path": ["_plugins", "_ml", "agents", "{{agent_id_with_tools}}", "_execute"]
+            }
+          }
+        },
+        {
+          "name": "7.2 Tool agent — bound iterations (max_iteration=1)",
+          "description": "Should hit `stop_reason: max_iterations` when the model wants to call a tool but only one iteration is allowed.",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"input\": \"Use list_indices, then describe each index in detail.\",\n  \"parameters\": {\n    \"namespace\": { \"user_id\": \"{{user_id}}\" },\n    \"max_iteration\": \"1\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{endpoint}}/_plugins/_ml/agents/{{agent_id_with_tools}}/_execute",
+              "host": ["{{endpoint}}"],
+              "path": ["_plugins", "_ml", "agents", "{{agent_id_with_tools}}", "_execute"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. Negative / edge cases",
+      "description": "Each request below is expected to **fail** (or behave surprisingly). Useful for documenting the V2 error surface and confirming validation.",
+      "item": [
+        {
+          "name": "8.1 Missing input field",
+          "description": "Expected: 500 with 'V2 agents require executor-provided memory. Use runV2() instead.' (per [issue #4732 review] this error message is misleading — the user's mistake is the missing `input` field).",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"parameters\": { \"namespace\": { \"user_id\": \"{{user_id}}\" } }\n}"
+            },
+            "url": {
+              "raw": "{{endpoint}}/_plugins/_ml/agents/{{agent_id}}/_execute",
+              "host": ["{{endpoint}}"],
+              "path": ["_plugins", "_ml", "agents", "{{agent_id}}", "_execute"]
+            }
+          }
+        },
+        {
+          "name": "8.2 Empty string input",
+          "description": "Expected: 400 from Bedrock 'The text field in the ContentBlock object at messages.0.content.0 is blank.' (ml-commons does not validate non-empty text in V2 — see V2 review issue P2-3 / P0-3).",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"input\": \"\",\n  \"parameters\": { \"namespace\": { \"user_id\": \"{{user_id}}\" } }\n}"
+            },
+            "url": {
+              "raw": "{{endpoint}}/_plugins/_ml/agents/{{agent_id}}/_execute",
+              "host": ["{{endpoint}}"],
+              "path": ["_plugins", "_ml", "agents", "{{agent_id}}", "_execute"]
+            }
+          }
+        },
+        {
+          "name": "8.3 null input",
+          "description": "Expected: 400 'Invalid input format. Expected string or array.'",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"input\": null,\n  \"parameters\": { \"namespace\": { \"user_id\": \"{{user_id}}\" } }\n}"
+            },
+            "url": {
+              "raw": "{{endpoint}}/_plugins/_ml/agents/{{agent_id}}/_execute",
+              "host": ["{{endpoint}}"],
+              "path": ["_plugins", "_ml", "agents", "{{agent_id}}", "_execute"]
+            }
+          }
+        },
+        {
+          "name": "8.4 Empty array",
+          "description": "Expected: 400 'Input type not supported. Expected String, List<ContentBlock>, or List<Message>'",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"input\": [],\n  \"parameters\": { \"namespace\": { \"user_id\": \"{{user_id}}\" } }\n}"
+            },
+            "url": {
+              "raw": "{{endpoint}}/_plugins/_ml/agents/{{agent_id}}/_execute",
+              "host": ["{{endpoint}}"],
+              "path": ["_plugins", "_ml", "agents", "{{agent_id}}", "_execute"]
+            }
+          }
+        },
+        {
+          "name": "8.5 SourceType: BYTES (misleading error — issue #4829)",
+          "description": "Expected: 400 'Invalid source type. Supported types: BYTES, URL' — but BYTES is NOT a valid value (the enum is BASE64 / URL). Tracked in opensearch-project/ml-commons#4829.",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"input\": [\n    { \"type\": \"text\", \"text\": \"what is this?\" },\n    { \"type\": \"image\", \"source\": { \"type\": \"BYTES\", \"format\": \"png\", \"data\": \"AAAA\" } }\n  ],\n  \"parameters\": { \"namespace\": { \"user_id\": \"{{user_id}}\" } }\n}"
+            },
+            "url": {
+              "raw": "{{endpoint}}/_plugins/_ml/agents/{{agent_id}}/_execute",
+              "host": ["{{endpoint}}"],
+              "path": ["_plugins", "_ml", "agents", "{{agent_id}}", "_execute"]
+            }
+          }
+        },
+        {
+          "name": "8.6 URL image with non-S3 scheme",
+          "description": "Expected: 400 'URL-based content must use S3 URIs (s3://...)'. Bedrock Converse only accepts s3:// for URL-based images.",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"input\": [\n    { \"type\": \"text\", \"text\": \"what is this?\" },\n    { \"type\": \"image\", \"source\": { \"type\": \"URL\", \"format\": \"png\", \"data\": \"https://example.com/cat.png\" } }\n  ],\n  \"parameters\": { \"namespace\": { \"user_id\": \"{{user_id}}\" } }\n}"
+            },
+            "url": {
+              "raw": "{{endpoint}}/_plugins/_ml/agents/{{agent_id}}/_execute",
+              "host": ["{{endpoint}}"],
+              "path": ["_plugins", "_ml", "agents", "{{agent_id}}", "_execute"]
+            }
+          }
+        },
+        {
+          "name": "8.7 Image with missing format",
+          "description": "Expected: 400 'Image format is required'",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"input\": [\n    { \"type\": \"text\", \"text\": \"check\" },\n    { \"type\": \"image\", \"source\": { \"type\": \"BASE64\", \"data\": \"{{tiny_png_base64}}\" } }\n  ],\n  \"parameters\": { \"namespace\": { \"user_id\": \"{{user_id}}\" } }\n}"
+            },
+            "url": {
+              "raw": "{{endpoint}}/_plugins/_ml/agents/{{agent_id}}/_execute",
+              "host": ["{{endpoint}}"],
+              "path": ["_plugins", "_ml", "agents", "{{agent_id}}", "_execute"]
+            }
+          }
+        },
+        {
+          "name": "8.8 Mixed array (Message + ContentBlock)",
+          "description": "Expected: 400 'Mixed array types detected.'",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"input\": [\n    { \"role\": \"user\", \"content\": [{ \"type\": \"text\", \"text\": \"hi\" }] },\n    { \"type\": \"text\", \"text\": \"more\" }\n  ],\n  \"parameters\": { \"namespace\": { \"user_id\": \"{{user_id}}\" } }\n}"
+            },
+            "url": {
+              "raw": "{{endpoint}}/_plugins/_ml/agents/{{agent_id}}/_execute",
+              "host": ["{{endpoint}}"],
+              "path": ["_plugins", "_ml", "agents", "{{agent_id}}", "_execute"]
+            }
+          }
+        },
+        {
+          "name": "8.9 Last message is assistant (should be rejected, currently isn't)",
+          "description": "Expected: 400 per AgentInputProcessor.validateMessages, but currently 200 OK because validation is not wired into V2 (V2 review P0-3). Useful to confirm if/when fixed.",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"input\": [\n    { \"role\": \"user\", \"content\": [{ \"type\": \"text\", \"text\": \"hi\" }] },\n    { \"role\": \"assistant\", \"content\": [{ \"type\": \"text\", \"text\": \"hello\" }] }\n  ],\n  \"parameters\": { \"namespace\": { \"user_id\": \"{{user_id}}\" } }\n}"
+            },
+            "url": {
+              "raw": "{{endpoint}}/_plugins/_ml/agents/{{agent_id}}/_execute",
+              "host": ["{{endpoint}}"],
+              "path": ["_plugins", "_ml", "agents", "{{agent_id}}", "_execute"]
+            }
+          }
+        },
+        {
+          "name": "8.10 role: system (Claude Bedrock rejects)",
+          "description": "Expected: 400 from Bedrock 'This model doesn\\'t support system messages.' — V2 should funnel system text through the agent's `system_prompt` parameter, not the messages array.",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"input\": [\n    { \"role\": \"system\", \"content\": [{ \"type\": \"text\", \"text\": \"You are helpful.\" }] },\n    { \"role\": \"user\", \"content\": [{ \"type\": \"text\", \"text\": \"hi\" }] }\n  ],\n  \"parameters\": { \"namespace\": { \"user_id\": \"{{user_id}}\" } }\n}"
+            },
+            "url": {
+              "raw": "{{endpoint}}/_plugins/_ml/agents/{{agent_id}}/_execute",
+              "host": ["{{endpoint}}"],
+              "path": ["_plugins", "_ml", "agents", "{{agent_id}}", "_execute"]
+            }
+          }
+        },
+        {
+          "name": "8.11 max_tokens is silently ignored (issue #4830)",
+          "description": "Re-register a fresh agent with max_tokens=10, then ask for a long essay. Currently outputTokens >> 10 because the request body template doesn't reference model_parameters. Tracked in opensearch-project/ml-commons#4830.",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"input\": \"Write a 1000-word essay on dragons.\",\n  \"parameters\": { \"namespace\": { \"user_id\": \"{{user_id}}\" } }\n}"
+            },
+            "url": {
+              "raw": "{{endpoint}}/_plugins/_ml/agents/{{agent_id}}/_execute",
+              "host": ["{{endpoint}}"],
+              "path": ["_plugins", "_ml", "agents", "{{agent_id}}", "_execute"]
+            }
+          }
+        },
+        {
+          "name": "8.12 Bad memory_id (silently ignored)",
+          "description": "Expected: 200 OK, new session created, old memory_id discarded. V2 review issue P2-4.",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"input\": \"hi\",\n  \"parameters\": {\n    \"namespace\": { \"user_id\": \"{{user_id}}\" },\n    \"memory_id\": \"nonexistent_mem_id\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{endpoint}}/_plugins/_ml/agents/{{agent_id}}/_execute",
+              "host": ["{{endpoint}}"],
+              "path": ["_plugins", "_ml", "agents", "{{agent_id}}", "_execute"]
+            }
+          }
+        },
+        {
+          "name": "8.13 V2 streaming endpoint (always rejected)",
+          "description": "Expected: 400 'V2 agents (CONVERSATIONAL_V2) do not support streaming. Please use the non-streaming execute endpoint.' This is by design in 3.7.",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "text/event-stream" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"input\": \"Say hi\",\n  \"parameters\": { \"namespace\": { \"user_id\": \"{{user_id}}\" } }\n}"
+            },
+            "url": {
+              "raw": "{{endpoint}}/_plugins/_ml/agents/{{agent_id}}/_execute/stream",
+              "host": ["{{endpoint}}"],
+              "path": ["_plugins", "_ml", "agents", "{{agent_id}}", "_execute", "stream"]
+            }
+          }
+        },
+        {
+          "name": "8.14 Missing memory at register (V2 requires agentic_memory)",
+          "description": "Expected: 400 'V2 agents (CONVERSATIONAL_V2) require memory configuration.'",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"v2_no_memory_repro\",\n  \"type\": \"conversational_v2\",\n  \"model\": {\n    \"model_id\": \"{{bedrock_model_id}}\",\n    \"model_provider\": \"bedrock/converse\",\n    \"credential\": { \"access_key\": \"{{aws_access_key}}\", \"secret_key\": \"{{aws_secret_key}}\", \"session_token\": \"{{aws_session_token}}\", \"region\": \"{{aws_region}}\" }\n  }\n}"
+            },
+            "url": {
+              "raw": "{{endpoint}}/_plugins/_ml/agents/_register",
+              "host": ["{{endpoint}}"],
+              "path": ["_plugins", "_ml", "agents", "_register"]
+            }
+          }
+        },
+        {
+          "name": "8.15 Wrong memory type at register (conversation_index not allowed)",
+          "description": "Expected: 400 'V2 agents (CONVERSATIONAL_V2) are not compatible with conversation_index memory.'",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"v2_wrong_memory_repro\",\n  \"type\": \"conversational_v2\",\n  \"model\": {\n    \"model_id\": \"{{bedrock_model_id}}\",\n    \"model_provider\": \"bedrock/converse\",\n    \"credential\": { \"access_key\": \"{{aws_access_key}}\", \"secret_key\": \"{{aws_secret_key}}\", \"session_token\": \"{{aws_session_token}}\", \"region\": \"{{aws_region}}\" }\n  },\n  \"memory\": { \"type\": \"conversation_index\" }\n}"
+            },
+            "url": {
+              "raw": "{{endpoint}}/_plugins/_ml/agents/_register",
+              "host": ["{{endpoint}}"],
+              "path": ["_plugins", "_ml", "agents", "_register"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "9. Cleanup",
+      "description": "Optional teardown.",
+      "item": [
+        {
+          "name": "9.1 Delete agent",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{endpoint}}/_plugins/_ml/agents/{{agent_id}}",
+              "host": ["{{endpoint}}"],
+              "path": ["_plugins", "_ml", "agents", "{{agent_id}}"]
+            }
+          }
+        },
+        {
+          "name": "9.2 Delete agent_with_tools",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{endpoint}}/_plugins/_ml/agents/{{agent_id_with_tools}}",
+              "host": ["{{endpoint}}"],
+              "path": ["_plugins", "_ml", "agents", "{{agent_id_with_tools}}"]
+            }
+          }
+        },
+        {
+          "name": "9.3 Delete memory container",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{endpoint}}/_plugins/_ml/memory_containers/{{memory_container_id}}",
+              "host": ["{{endpoint}}"],
+              "path": ["_plugins", "_ml", "memory_containers", "{{memory_container_id}}"]
+            }
+          }
+        },
+        {
+          "name": "9.4 Undeploy embedding model",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{endpoint}}/_plugins/_ml/models/{{embedding_model_id}}/_undeploy",
+              "host": ["{{endpoint}}"],
+              "path": ["_plugins", "_ml", "models", "{{embedding_model_id}}", "_undeploy"]
+            }
+          }
+        },
+        {
+          "name": "9.5 Delete embedding model",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{endpoint}}/_plugins/_ml/models/{{embedding_model_id}}",
+              "host": ["{{endpoint}}"],
+              "path": ["_plugins", "_ml", "models", "{{embedding_model_id}}"]
+            }
+          }
+        },
+        {
+          "name": "9.6 Undeploy LLM",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{endpoint}}/_plugins/_ml/models/{{fact_extraction_llm_id}}/_undeploy",
+              "host": ["{{endpoint}}"],
+              "path": ["_plugins", "_ml", "models", "{{fact_extraction_llm_id}}", "_undeploy"]
+            }
+          }
+        },
+        {
+          "name": "9.7 Delete LLM",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{endpoint}}/_plugins/_ml/models/{{fact_extraction_llm_id}}",
+              "host": ["{{endpoint}}"],
+              "path": ["_plugins", "_ml", "models", "{{fact_extraction_llm_id}}"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
