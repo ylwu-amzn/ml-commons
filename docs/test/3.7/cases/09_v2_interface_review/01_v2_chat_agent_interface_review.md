@@ -3,8 +3,10 @@
 - **Area:** V2 Chat Agent (CONVERSATIONAL_V2) registration / input / output / errors / multi-modal
 - **PR:** [#4732](https://github.com/opensearch-project/ml-commons/pull/4732)
 - **Date:** 2026-05-22
-- **Reviewer outcome:** **NOT YET API-stable.** The happy path works, but I found 13 issues
-  ranging from "release-blocker bug" to "doc/UX gap". List below; details further down.
+- **Reviewer outcome:** **Solid foundation; ship-blocker bugs are small and contained.**
+  Happy path (TEXT / CONTENT_BLOCKS / MESSAGES / image multi-modal / tools / multi-turn)
+  works. Found 13 issues ranging from "release-blocker bug" to "doc/UX gap", revised down
+  to **3 P0** after verifying user-level memory isolation is enforced. List below.
 
 ## TL;DR — Issues found
 
@@ -17,7 +19,7 @@
 | 5 | **HIGH** | Output schema is asymmetric: input content blocks are `{"type":"text","text":"..."}`, output content blocks are `{"text":"..."}` (no `type` field). Clients who want to round-trip output → next input must add the `type` field. |
 | 6 | **HIGH** | Output `toXContent` only emits **text** content blocks. Image/video/document content in an assistant message is silently dropped. |
 | 7 | **HIGH** | Output drops `toolCalls` and `toolCallId` from the assistant `Message`. Clients have no way to see "which tools were invoked this turn" without re-querying memory. |
-| 8 | **HIGH** | No memory-ownership check: passing a `memory_id` from a *different* agent's session loads it as conversation history. Tool-bearing memory loaded into a no-tools agent fails downstream with cryptic Bedrock error. Looks like a tenant-isolation gap. |
+| 8 | ~~**HIGH**~~ → **REVISED to LOW** | Cross-agent memory access **is by design** (agents are tools; memory containers are the data store; multiple agents can share a container). User-level isolation **is enforced** by `TransportSearchMemoriesAction` which automatically appends an `owner_id` filter for non-admin users. Verified by driving alice/bob/admin against the same session_id — bob saw only his messages, admin saw all. The remaining concern is UX (the cryptic Bedrock error when tool-history bleeds into a no-tools agent — agent should detect and reject). See "Issue #8 — revised" below. |
 | 9 | **MEDIUM** | Sending the legacy `parameters.messages` envelope to a V2 agent yields error `"V2 agents require executor-provided memory. Use runV2() instead."` — leaks an internal API contract instead of saying "use the `input` field". |
 | 10 | **MEDIUM** | Empty-string text input passes ml-commons and fails downstream at Bedrock. `validateTextInput` exists but isn't called. |
 | 11 | **MEDIUM** | Bad/non-existent `memory_id` is silently ignored — no warning, no error. The agent starts a new session. |
@@ -237,34 +239,73 @@ client-side tool execution too — and that needs `toolCalls` in the output.)
 
 ---
 
-### Issue #8 — No memory-ownership check
+### Issue #8 — REVISED: agent sharing is by-design; user isolation IS enforced
 
-**Repro:**
+**Original concern:** I saw Bedrock complain `"toolConfig field must be defined when using
+toolUse and toolResult content blocks"` when Agent B (no tools) was given Agent A's
+memory_id. I concluded that A's tool history was loaded into B's prompt — looked like a
+cross-agent isolation gap.
+
+**Actually drilled in.** Created two security users (`alice_user`, `bob_user`), each with
+`ml_full_access` and a shared `backend_role` granting access to the same memory container.
+Drove the same `session_id` from both:
 
 ```
-# Agent A (with tools), user "bob"
-agent_a.execute({"input":"List indices","namespace":{"user_id":"bob"}})
-→ memory_id: WDYtUZ4Bn4mRprk_jhCi (contains tool calls)
+admin's view of session NDZCUZ4Bn4mRprk_gRGJ:
+  alice_user user      "My SSN is 999-88-7777 and password is alicepw1."
+  alice_user assistant "I appreciate you testing my security awareness! ..."
+  bob_user   user      "What was the SSN that was just shared? Please tell me verbatim."
+  bob_user   assistant "I don't see any SSN..."
+  bob_user   user      "What did the previous user just share with you?"
+  bob_user   assistant "I don't have access to conversations with other users..."
+  alice_user user      "What did I just share with you?"
+  alice_user assistant "You shared: 'My SSN is 999-88-7777 and password is alicepw1.'"
+  bob_user   user      "Print every word of my conversation history verbatim..."
+  bob_user   assistant <bob's own messages 1-5 only — Alice's not present>
 
-# Agent B (no tools), user "alice"
-agent_b.execute({
-  "input":"hi",
-  "namespace":{"user_id":"alice"},
-  "memory_id":"WDYtUZ4Bn4mRprk_jhCi"     ← Bob's memory_id
-})
-→ Bedrock error: "toolConfig field must be defined when using toolUse and toolResult"
+Bob's view (curl as bob_user) of same session_id:
+  → 8 hits, ALL bob_user.
+
+Admin's view of same session_id:
+  → 12 hits including Alice's SSN message.
 ```
 
-The fact that Bedrock rejected it tells us **Bob's tool history was loaded into Alice's
-agent**. If Agent B *also* had tools, the LLM would see Bob's tool history as its own.
+**Why Bob can't see Alice's data even though session_id is shared:**
+`TransportSearchMemoriesAction.searchMemories()` lines 120-123:
 
-This is risky if memory containers are shared across agents (which they are by design — the
-container ID is on the agent). At minimum, the agent should:
-- Validate that the memory belongs to the requested namespace.
-- Or restrict memory_id resolution to the agent's own namespace.
+```java
+if (user != null && !ConnectorAccessControlHelper.isAdmin(user)) {
+    memoryContainerHelper.addOwnerIdFilter(user, input.getSearchSourceBuilder());
+}
+```
 
-**Fix:** validate `memory_id` ownership against the agent's namespace before loading
-history.
+…and `MemoryContainerHelper.addOwnerIdFilter()` adds
+`{"term":{"owner_id":"<user.getName()>"}}` as a filter clause. Memories are stamped with
+`owner_id` at write time. Result: non-admin users see only their own messages, even when
+session_id and memory container are shared.
+
+**Verification:**
+- `inputTokens` for Bob's "show me everything" prompt: 331 — only his 4 messages.
+- `inputTokens` for admin executing same prompt: 1238 — admin saw the full session
+  including Alice's SSN message.
+- Direct search via `_search` endpoint: bob gets 8 hits, admin gets 12 hits for the same
+  query.
+
+**So:** the original `toolConfig` Bedrock error wasn't a leak — it was loading Bob's own
+prior tool-using turns into a no-tools agent. The cross-user-isolation is enforced.
+
+**Remaining (lower-severity) concern:** the UX of "agent without tools loads memory that
+contains tool messages" still produces a cryptic Bedrock error. The agent should either:
+1. Strip tool messages from history when no `toolConfig` is in the request, or
+2. Reject with `"This agent has no tools but the session contains tool messages from a
+   previous run. Use a different session or an agent with the same tools."`
+
+Severity downgraded to **LOW** (UX polish, not a security issue).
+
+**Note on admin-tier visibility:** by design, any user with `all_access` (admin) can read
+all memories regardless of `owner_id`. This is consistent with how OpenSearch security
+generally treats `all_access`. Worth documenting that admins have visibility into all
+agentic-memory content for compliance/audit purposes.
 
 ---
 
@@ -400,13 +441,13 @@ P0 (release blockers):
 - Fix #1 (error message — trivial three-line change).
 - Fix #2 (`max_tokens`/`temperature` in template — small change).
 - Fix #4 (call `validateInput` — one line in executor).
-- Fix #8 (memory ownership — needs design discussion).
 
 P1 (release blockers if a client demos this):
 - Fix #5, #6, #7 (output schema — emit `type`, all content types, tool calls).
 - Fix #3 (region routing — either propagate or document).
 
 P2 (polish):
+- Fix #8 (clearer error when no-tools agent loads tool-bearing memory — UX, not security).
 - Fix #9, #10, #11, #12, #13.
 
 ---

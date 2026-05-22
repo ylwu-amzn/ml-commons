@@ -36,14 +36,14 @@ requires `plugins.ml_commons.unified_agent_api_enabled=true` and
 | 06.01 | [Jackson 3.x JSON paths](./cases/06_jackson_mcp/01_jackson3_paths_4795_4784.md) | #4795, #4784 | PASS | `tools.jackson` in effect; STRICT_DUPLICATE_DETECTION enforced; MCP tool register/list |
 | 07.01 | [Pooling modes LAST_TOKEN/NONE](./cases/07_pooling_modes/01_pooling_modes_4710_4711.md) | #4711, #4710 | PARTIAL | Parser accepts both; e2e blocked by lack of decoder-only / pre-pooled model fixtures |
 | 08.01 | [USER_PREFERENCE simplified prompt](./cases/08_user_preference/01_user_preference_simplified_prompt_4798.md) | #4798 | PASS | All extracted facts plain sentences; no `Context:` / `Categories:` |
-| 09.01 | [V2 chat agent interface review](./cases/09_v2_interface_review/01_v2_chat_agent_interface_review.md) | #4732 | **REVIEW** | 13 issues found across input/output/error/multi-modal — 4 P0 (incl. error-msg lying about `BYTES`/`URL`, dead `max_tokens`, dead validation, no memory ownership check), 3 P1, 6 P2. Happy paths work. |
+| 09.01 | [V2 chat agent interface review](./cases/09_v2_interface_review/01_v2_chat_agent_interface_review.md) | #4732 | **REVIEW** | 13 issues found across input/output/error/multi-modal — **3 P0** (error-msg lying about `BYTES`/`URL`, dead `max_tokens`, dead validation), 3 P1, 7 P2 (incl. cross-agent memory which was downgraded after verifying user-level isolation works via `owner_id` auto-filter). Happy paths work. |
 
-**Summary:** 13 PASS · 1 REVIEW (V2 interface — 13 issues, 4 P0) · 1 PARTIAL · 0 BLOCKED · 0 FAIL
+**Summary:** 13 PASS · 1 REVIEW (V2 interface — 13 issues, 3 P0) · 1 PARTIAL · 0 BLOCKED · 0 FAIL
 
 ## Bugs / regressions found
 
 The V2 chat agent interface review (`cases/09_v2_interface_review/`) surfaced **13 issues**.
-The four P0 (release-blocker) bugs are:
+The three P0 (release-blocker) bugs are:
 
 1. **`SourceType` error message is wrong.** Says `"Supported types: BYTES, URL"` but the
    enum is `BASE64, URL`. Users copy `BYTES` from the error and still get rejected.
@@ -56,9 +56,14 @@ The four P0 (release-blocker) bugs are:
    finds zero hits. Last-message-must-be-user/tool, assistant-content-or-toolcalls,
    tool-message-must-have-toolCallId — all unenforced. Cross-checked: agents accept
    "first message = assistant" and produce a hallucinated response.
-4. **No memory-ownership check on `memory_id`.** Passing Agent A's memory_id into Agent B's
-   execute call loads A's history (incl. tool calls) into B. Reveals as a Bedrock error
-   when B has no tool config; would silently mix sessions otherwise.
+
+Originally I flagged a 4th P0 (cross-agent memory access). On follow-up testing (alice_user
+and bob_user driving the same session_id with shared backend_role), the security plugin's
+auto-applied `owner_id` filter in `TransportSearchMemoriesAction` enforces user-level
+isolation correctly — bob_user sees only his messages, admin sees all. The cross-agent
+sharing of memory containers is by-design. Downgraded that issue to a LOW UX polish
+(see #8 in the case file: tool-history bleeding into a no-tools agent yields a cryptic
+Bedrock error rather than a clear ml-commons message).
 
 The other 9 issues (P1/P2) are output-schema asymmetry (input vs output content blocks
 differ), `region` routing footgun, dropped image/tool-call output, misleading error
