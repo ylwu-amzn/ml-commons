@@ -36,12 +36,36 @@ requires `plugins.ml_commons.unified_agent_api_enabled=true` and
 | 06.01 | [Jackson 3.x JSON paths](./cases/06_jackson_mcp/01_jackson3_paths_4795_4784.md) | #4795, #4784 | PASS | `tools.jackson` in effect; STRICT_DUPLICATE_DETECTION enforced; MCP tool register/list |
 | 07.01 | [Pooling modes LAST_TOKEN/NONE](./cases/07_pooling_modes/01_pooling_modes_4710_4711.md) | #4711, #4710 | PARTIAL | Parser accepts both; e2e blocked by lack of decoder-only / pre-pooled model fixtures |
 | 08.01 | [USER_PREFERENCE simplified prompt](./cases/08_user_preference/01_user_preference_simplified_prompt_4798.md) | #4798 | PASS | All extracted facts plain sentences; no `Context:` / `Categories:` |
+| 09.01 | [V2 chat agent interface review](./cases/09_v2_interface_review/01_v2_chat_agent_interface_review.md) | #4732 | **REVIEW** | 13 issues found across input/output/error/multi-modal — 4 P0 (incl. error-msg lying about `BYTES`/`URL`, dead `max_tokens`, dead validation, no memory ownership check), 3 P1, 6 P2. Happy paths work. |
 
-**Summary:** 13 PASS · 0 BLOCKED · 1 PARTIAL · 0 FAIL
+**Summary:** 13 PASS · 1 REVIEW (V2 interface — 13 issues, 4 P0) · 1 PARTIAL · 0 BLOCKED · 0 FAIL
 
 ## Bugs / regressions found
 
-None observed in the executed cases. All checked behaviors match the PR descriptions.
+The V2 chat agent interface review (`cases/09_v2_interface_review/`) surfaced **13 issues**.
+The four P0 (release-blocker) bugs are:
+
+1. **`SourceType` error message is wrong.** Says `"Supported types: BYTES, URL"` but the
+   enum is `BASE64, URL`. Users copy `BYTES` from the error and still get rejected.
+   Three-line fix in `AgentInput.java:605, 642, 679`.
+2. **`model_parameters` (max_tokens, temperature) are silently ignored.** They're stored on
+   the auto-generated connector but the `BedrockConverseModelProvider.REQUEST_BODY_TEMPLATE`
+   doesn't reference them. Reproduced: `max_tokens=10` with a "write 1000 words" prompt
+   returns 1316 tokens.
+3. **`AgentInputProcessor.validateInput` is dead code in V2.** `grep -r .validateInput src/main`
+   finds zero hits. Last-message-must-be-user/tool, assistant-content-or-toolcalls,
+   tool-message-must-have-toolCallId — all unenforced. Cross-checked: agents accept
+   "first message = assistant" and produce a hallucinated response.
+4. **No memory-ownership check on `memory_id`.** Passing Agent A's memory_id into Agent B's
+   execute call loads A's history (incl. tool calls) into B. Reveals as a Bedrock error
+   when B has no tool config; would silently mix sessions otherwise.
+
+The other 9 issues (P1/P2) are output-schema asymmetry (input vs output content blocks
+differ), `region` routing footgun, dropped image/tool-call output, misleading error
+messages, etc. See the full case file for details, reproductions, and fixes.
+
+No regressions found in the in-scope PRs from the 3.5 → 3.7 delta. The V2 issues are
+all in the V2 chat agent design (PR #4732 itself), not regressions from earlier versions.
 
 ## Behavior changes worth release-noting
 
